@@ -21,6 +21,7 @@ export async function POST() {
           errors: data.errors ?? [
             { code: "solver_error", message: "Solver returned an error." },
           ],
+          diagnostics: data.diagnostics,
         },
         { status: 422 }
       );

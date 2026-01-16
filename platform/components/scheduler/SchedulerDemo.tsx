@@ -8,7 +8,14 @@ import { mockSchedulingInput } from "@/lib/scheduling/mockData";
 import type { ScheduleSolution, ValidationError } from "@/lib/scheduling/types";
 
 type ApiSuccess = ScheduleSolution & { status: "ok" };
-type ApiError = { status: "error"; errors: ValidationError[] };
+type ApiError = {
+  status: "error";
+  errors: ValidationError[];
+  diagnostics?: {
+    feasible_if_relax?: string[];
+    feasible_if_remove_section?: string[];
+  };
+};
 
 const buildTimeslotLabelMap = () => {
   const map = new Map<string, string>();
@@ -21,6 +28,7 @@ const buildTimeslotLabelMap = () => {
 export const SchedulerDemo = () => {
   const [solution, setSolution] = useState<ScheduleSolution | null>(null);
   const [errors, setErrors] = useState<ValidationError[]>([]);
+  const [diagnostics, setDiagnostics] = useState<ApiError["diagnostics"]>();
   const [status, setStatus] = useState<"idle" | "loading">("idle");
 
   const timeslotLabelMap = useMemo(buildTimeslotLabelMap, []);
@@ -29,6 +37,7 @@ export const SchedulerDemo = () => {
     setStatus("loading");
     setErrors([]);
     setSolution(null);
+    setDiagnostics(undefined);
 
     try {
       const response = await fetch("/api/schedule", { method: "POST" });
@@ -40,6 +49,9 @@ export const SchedulerDemo = () => {
             ? data.errors
             : [{ code: "unknown", message: "Unknown solver error." }]
         );
+        if (data.status === "error") {
+          setDiagnostics(data.diagnostics);
+        }
       } else {
         setSolution(data);
       }
@@ -105,6 +117,17 @@ export const SchedulerDemo = () => {
                 {error.code}: {error.message}
               </div>
             ))}
+            {diagnostics?.feasible_if_relax?.length ? (
+              <div className="pt-2 text-default-600">
+                Try relaxing: {diagnostics.feasible_if_relax.join(", ")}.
+              </div>
+            ) : null}
+            {diagnostics?.feasible_if_remove_section?.length ? (
+              <div className="text-default-600">
+                Feasible if remove section(s):{" "}
+                {diagnostics.feasible_if_remove_section.join(", ")}.
+              </div>
+            ) : null}
           </CardBody>
         </Card>
       )}
