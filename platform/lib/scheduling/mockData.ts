@@ -95,20 +95,20 @@ export const mockSchedulingInput: SchedulingInput = {
     {
       id: "ROOM-A",
       building: "Peters",
-      capacity: 60,
+      capacity: 63,
       features: ["projector", "case_room"],
     },
     {
       id: "ROOM-B",
       building: "Peters",
-      capacity: 40,
-      features: ["projector"],
+      capacity: 63,
+      features: ["projector", "case_room"],
     },
     {
       id: "ROOM-C",
       building: "Smith",
-      capacity: 25,
-      features: [],
+      capacity: 63,
+      features: ["projector", "case_room"],
     },
   ],
   timeslots: [
