@@ -6,10 +6,10 @@ from pydantic import BaseModel
 
 app = FastAPI()
 
-ROOM_WASTE_WEIGHT = 1
-PREF_DAY_WEIGHT = 10
-PREF_PATTERN_WEIGHT = 5
-ADJUNCT_DAY_EXCESS_WEIGHT = 15
+ROOM_WASTE_WEIGHT = 1  # penalty per empty seat in assigned room
+PREF_DAY_WEIGHT = 10  # penalty if assigned days don't match instructor preferences
+PREF_PATTERN_WEIGHT = 5  # penalty if assigned pattern isn't preferred
+ADJUNCT_DAY_EXCESS_WEIGHT = 15  # penalty per day beyond adjunct max
 
 
 class Section(BaseModel):
@@ -119,14 +119,39 @@ class ScheduleRequest(BaseModel):
 
 
 def _timeslot_days(timeslots: List[Timeslot]) -> Dict[str, str]:
+    """Build a lookup from timeslot ID to day.
+
+    Args:
+        timeslots: All timeslot definitions.
+
+    Returns:
+        Mapping of timeslot ID to day string.
+    """
     return {slot.id: slot.day for slot in timeslots}
 
 
 def _has_required_features(room: Room, required: List[str]) -> bool:
+    """Check if a room satisfies all required features.
+
+    Args:
+        room: Room being evaluated.
+        required: Required feature names.
+
+    Returns:
+        True if all required features are present, else False.
+    """
     return all(feature in room.features for feature in required)
 
 
 def _build_crosslist_totals(sections: List[Section]) -> Dict[str, int]:
+    """Compute total expected enrollment per cross-list group.
+
+    Args:
+        sections: All section definitions.
+
+    Returns:
+        Mapping of cross-list group ID to summed expected enrollment.
+    """
     totals: Dict[str, int] = {}
     for section in sections:
         if section.crosslist_group_id:
@@ -140,6 +165,16 @@ def _validate_crosslist_capacity(
     sections: List[Section],
     rooms: List[Room],
 ) -> List[ValidationError]:
+    """Validate that each cross-list group can fit in at least one room.
+
+    Args:
+        crosslists: Cross-list groups.
+        sections: All section definitions.
+        rooms: Available rooms.
+
+    Returns:
+        List of validation errors (empty if all groups fit).
+    """
     errors: List[ValidationError] = []
     max_room_capacity = max((room.capacity for room in rooms), default=0)
     total_by_group = _build_crosslist_totals(sections)
@@ -169,6 +204,21 @@ def _build_options(
     Dict[str, List[Tuple[str, Tuple[str, ...], str, int]]],
     List[ValidationError],
 ]:
+    """Generate feasible assignment options per section.
+
+    Args:
+        input_data: Full scheduling input.
+        ignore_blocked_times: If True, ignore global blocked times.
+        ignore_locks: If True, ignore locked assignments.
+        ignore_room_capacity: If True, ignore capacity checks.
+        ignore_room_features: If True, ignore feature requirements.
+        ignore_crosslist_capacity: If True, ignore cross-list capacity.
+
+    Returns:
+        Tuple of (options_by_section, validation_errors).
+        options_by_section maps section ID to a list of options:
+            (pattern_id, timeslot_set, room_id, room_waste).
+    """
     pattern_by_id = {pattern.id: pattern for pattern in input_data.meeting_patterns}
     locked_by_section = (
         {}
@@ -242,6 +292,15 @@ def _build_options(
 
 
 def _strip_section(input_data: SchedulingInput, section_id: str) -> SchedulingInput:
+    """Return input data with one section removed and groups adjusted.
+
+    Args:
+        input_data: Full scheduling input.
+        section_id: Section ID to remove.
+
+    Returns:
+        A new SchedulingInput with the section removed and any groups updated.
+    """
     remaining_sections = [s for s in input_data.sections if s.id != section_id]
     remaining_crosslists = []
     for group in input_data.crosslist_groups:
@@ -283,6 +342,15 @@ def _check_feasible(
     input_data: SchedulingInput,
     relax: Optional[set] = None,
 ) -> bool:
+    """Check feasibility under optional constraint relaxations.
+
+    Args:
+        input_data: Full scheduling input.
+        relax: Set of constraint keys to relax (ignore).
+
+    Returns:
+        True if a feasible assignment exists, else False.
+    """
     relax = relax or set()
     errors: List[ValidationError] = []
     if "crosslist_capacity" not in relax:
@@ -389,6 +457,16 @@ def _check_feasible(
 
 
 def _diagnose_infeasibility(input_data: SchedulingInput) -> Dict[str, List[str]]:
+    """Suggest single-step relaxations/removals that restore feasibility.
+
+    Args:
+        input_data: Full scheduling input.
+
+    Returns:
+        Diagnostics with two lists:
+            - feasible_if_relax: constraint families to relax.
+            - feasible_if_remove_section: section IDs to remove.
+    """
     relax_candidates = [
         ("blocked_times", "Blocked time constraints"),
         ("locks", "Locked assignments"),
@@ -418,6 +496,14 @@ def _diagnose_infeasibility(input_data: SchedulingInput) -> Dict[str, List[str]]
 
 
 def _solve_schedule(input_data: SchedulingInput):
+    """Solve the schedule using CP-SAT.
+
+    Args:
+        input_data: Full scheduling input.
+
+    Returns:
+        Dict payload with status, solution or errors/diagnostics.
+    """
     errors: List[ValidationError] = []
     errors.extend(
         _validate_crosslist_capacity(
@@ -429,6 +515,7 @@ def _solve_schedule(input_data: SchedulingInput):
     if errors:
         return {"status": "error", "errors": [err.model_dump() for err in errors]}
 
+    # Build optimization model
     model = cp_model.CpModel()
     timeslot_day = _timeslot_days(input_data.timeslots)
     instructors_by_id = {inst.id: inst for inst in input_data.instructors}
@@ -448,6 +535,7 @@ def _solve_schedule(input_data: SchedulingInput):
     option_vars: Dict[Tuple[str, int], cp_model.IntVar] = {}
     option_data: Dict[Tuple[str, int], Tuple[str, Tuple[str, ...], str, int]] = {}
 
+    # One option must be selected per section.
     for section_id, options in options_by_section.items():
         section_vars = []
         for idx, option in enumerate(options):
@@ -457,6 +545,7 @@ def _solve_schedule(input_data: SchedulingInput):
             section_vars.append(var)
         model.Add(sum(section_vars) == 1)
 
+    # Room usage: prevent overlaps across different roomshare groups.
     for room in input_data.rooms:
         for timeslot in input_data.timeslots:
             vars_by_group: Dict[str, List[cp_model.IntVar]] = {}
@@ -474,6 +563,7 @@ def _solve_schedule(input_data: SchedulingInput):
                     group_used_vars.append(group_used)
                 model.Add(sum(group_used_vars) <= 1)
 
+    # Instructor cannot teach overlapping times.
     for instructor in input_data.instructors:
         for timeslot in input_data.timeslots:
             vars_for_slot = []
@@ -487,6 +577,7 @@ def _solve_schedule(input_data: SchedulingInput):
             if vars_for_slot:
                 model.Add(sum(vars_for_slot) <= 1)
 
+    # No-overlap groups cannot overlap in time.
     for group in input_data.no_overlap_groups:
         for timeslot in input_data.timeslots:
             vars_for_slot = []
@@ -499,6 +590,7 @@ def _solve_schedule(input_data: SchedulingInput):
             if vars_for_slot:
                 model.Add(sum(vars_for_slot) <= 1)
 
+    # Cross-listed sections share times and (optionally) room.
     for group in input_data.crosslist_groups:
         members = group.member_section_ids
         for i, section_a in enumerate(members):
@@ -522,11 +614,13 @@ def _solve_schedule(input_data: SchedulingInput):
                                 <= 1
                             )
 
+    # Soft constraint terms for the objective.
     penalty_terms = []
     unique_days = sorted({slot.day for slot in input_data.timeslots})
 
     instructor_day_vars: Dict[Tuple[str, str], cp_model.IntVar] = {}
     adjunct_day_excess_vars: Dict[str, cp_model.IntVar] = {}
+    # Track adjunct teaching days for max-teaching-days penalty.
     for instructor in input_data.instructors:
         if instructor.rank_type != "Adjunct" or not instructor.preferences.max_teaching_days:
             continue
@@ -542,6 +636,7 @@ def _solve_schedule(input_data: SchedulingInput):
         adjunct_day_excess_vars[instructor.id] = excess
         penalty_terms.append(excess * ADJUNCT_DAY_EXCESS_WEIGHT)
 
+    # Penalties per assignment: room waste, day preference, pattern preference.
     for (section_id, idx), var in option_vars.items():
         pattern_id, timeslot_set, room_id, room_waste = option_data[
             (section_id, idx)
@@ -562,14 +657,17 @@ def _solve_schedule(input_data: SchedulingInput):
         )
         penalty_terms.append(var * total_penalty)
 
+        # Link chosen option to adjunct day usage.
         if instructor and instructor.rank_type == "Adjunct":
             for day in days:
                 day_var = instructor_day_vars.get((instructor.id, day))
                 if day_var is not None:
                     model.Add(day_var >= var)
 
+    # Minimize total penalty.
     model.Minimize(sum(penalty_terms))
 
+    # Solve model.
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = 5.0
     status = solver.Solve(model)
