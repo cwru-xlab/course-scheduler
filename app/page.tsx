@@ -1,55 +1,17 @@
-import { Link } from "@heroui/link";
-import { Snippet } from "@heroui/snippet";
-import { Code } from "@heroui/code";
-import { button as buttonStyles } from "@heroui/theme";
-
-import { siteConfig } from "@/config/site";
 import { title, subtitle } from "@/components/primitives";
-import { GithubIcon } from "@/components/icons";
+import { SchedulerDemo } from "@/components/scheduler/SchedulerDemo";
 
 export default function Home() {
   return (
-    <section className="flex flex-col items-center justify-center gap-4 py-8 md:py-10">
-      <div className="inline-block max-w-xl text-center justify-center">
-        <span className={title()}>Jupyter Notebook&nbsp;</span>
-        <span className={title({ color: "violet" })}>Viewer&nbsp;</span>
-        <br />
-        <span className={title()}>
-          with AI Assistant
-        </span>
+    <section className="flex flex-col gap-10 py-8 md:py-10">
+      <div className="inline-block max-w-3xl">
+        <span className={title()}>Weatherhead Course Scheduling</span>
         <div className={subtitle({ class: "mt-4" })}>
-          View and interact with Jupyter notebooks in your browser.
+          Prototype decision-support UI backed by a server-side mock solver API.
         </div>
       </div>
 
-      <div className="flex gap-3">
-        <Link
-          className={buttonStyles({
-            color: "primary",
-            radius: "full",
-            variant: "shadow",
-          })}
-          href="/ipynb"
-        >
-          Open Notebook Viewer
-        </Link>
-        <Link
-          isExternal
-          className={buttonStyles({ variant: "bordered", radius: "full" })}
-          href={siteConfig.links.github}
-        >
-          <GithubIcon size={20} />
-          GitHub
-        </Link>
-      </div>
-
-      <div className="mt-8">
-        <Snippet hideCopyButton hideSymbol variant="bordered">
-          <span>
-            Try the sample notebook at <Code color="primary">/ipynb</Code>
-          </span>
-        </Snippet>
-      </div>
+      <SchedulerDemo />
     </section>
   );
 }

@@ -1,29 +1,21 @@
 export type SiteConfig = typeof siteConfig;
 
 export const siteConfig = {
-  name: "BTEC420 Code Helper",
-  description: "Make beautiful websites regardless of your design experience.",
+  name: "Weatherhead Course Scheduling",
+  description: "Decision-support scheduler prototype with mock solver output.",
   navItems: [
     {
-      label: "Home",
+      label: "Scheduler",
       href: "/",
-    },
-    {
-      label: "Notebook Viewer",
-      href: "/ipynb",
     },
   ],
   navMenuItems: [
     {
-      label: "Home",
+      label: "Scheduler",
       href: "/",
-    },
-    {
-      label: "Notebook Viewer",
-      href: "/ipynb",
     },
   ],
   links: {
-    github: "https://github.com/JerryYang666/btec420-code-helper",
+    github: "https://github.com/",
   },
 };

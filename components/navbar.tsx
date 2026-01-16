@@ -23,7 +23,7 @@ export const Navbar = () => {
         <NavbarBrand as="li" className="gap-3 max-w-fit">
           <NextLink className="flex justify-start items-center gap-1" href="/">
             <CodeXml />
-            <p className="font-bold text-inherit">BTEC420 Code Helper</p>
+            <p className="font-bold text-inherit">Weatherhead Scheduler</p>
           </NextLink>
         </NavbarBrand>
         <ul className="hidden lg:flex gap-4 justify-start ml-2">
