@@ -12,7 +12,7 @@ export async function POST() {
         status: "error",
         errors: result.errors,
       },
-      { status: 422 },
+      { status: 422 }
     );
   }
 

@@ -13,10 +13,7 @@ type ApiError = { status: "error"; errors: ValidationError[] };
 const buildTimeslotLabelMap = () => {
   const map = new Map<string, string>();
   mockSchedulingInput.timeslots.forEach((slot) => {
-    map.set(
-      slot.id,
-      `${slot.day} ${slot.start_time}-${slot.end_time}`,
-    );
+    map.set(slot.id, `${slot.day} ${slot.start_time}-${slot.end_time}`);
   });
   return map;
 };
@@ -41,7 +38,7 @@ export const SchedulerDemo = () => {
         setErrors(
           data.status === "error"
             ? data.errors
-            : [{ code: "unknown", message: "Unknown solver error." }],
+            : [{ code: "unknown", message: "Unknown solver error." }]
         );
       } else {
         setSolution(data);
@@ -69,24 +66,38 @@ export const SchedulerDemo = () => {
           <div>Rooms: {mockSchedulingInput.rooms.length}</div>
           <div>Instructors: {mockSchedulingInput.instructors.length}</div>
           <div>Timeslots: {mockSchedulingInput.timeslots.length}</div>
-          <div>Meeting Patterns: {mockSchedulingInput.meeting_patterns.length}</div>
-          <div>Constraints: {mockSchedulingInput.crosslist_groups.length + mockSchedulingInput.no_overlap_groups.length}</div>
+          <div>
+            Meeting Patterns: {mockSchedulingInput.meeting_patterns.length}
+          </div>
+          <div>
+            Constraints:{" "}
+            {mockSchedulingInput.crosslist_groups.length +
+              mockSchedulingInput.no_overlap_groups.length}
+          </div>
         </CardBody>
       </Card>
 
       <div className="flex items-center gap-3">
-        <Button color="primary" radius="full" onPress={runSolver} isLoading={status === "loading"}>
+        <Button
+          color="primary"
+          radius="full"
+          onPress={runSolver}
+          isLoading={status === "loading"}
+        >
           Run Solver
         </Button>
         <span className="text-sm text-default-500">
-          Server-side API call: <code className="text-default-700">POST /api/schedule</code>
+          Server-side API call:{" "}
+          <code className="text-default-700">POST /api/schedule</code>
         </span>
       </div>
 
       {errors.length > 0 && (
         <Card className="border border-danger-200">
           <CardHeader>
-            <h3 className="text-lg font-semibold text-danger">Validation Errors</h3>
+            <h3 className="text-lg font-semibold text-danger">
+              Validation Errors
+            </h3>
           </CardHeader>
           <CardBody className="space-y-2 text-sm text-danger-600">
             {errors.map((error) => (
@@ -116,9 +127,16 @@ export const SchedulerDemo = () => {
                 </thead>
                 <tbody>
                   {solution.assignments.map((assignment) => (
-                    <tr key={assignment.section_id} className="border-t border-default-200">
-                      <td className="py-2 pr-4 font-medium">{assignment.section_id}</td>
-                      <td className="py-2 pr-4">{assignment.meeting_pattern_id}</td>
+                    <tr
+                      key={assignment.section_id}
+                      className="border-t border-default-200"
+                    >
+                      <td className="py-2 pr-4 font-medium">
+                        {assignment.section_id}
+                      </td>
+                      <td className="py-2 pr-4">
+                        {assignment.meeting_pattern_id}
+                      </td>
                       <td className="py-2 pr-4">
                         {assignment.timeslot_ids
                           .map((id) => timeslotLabelMap.get(id) ?? id)
@@ -138,11 +156,13 @@ export const SchedulerDemo = () => {
             </CardHeader>
             <CardBody className="text-sm space-y-1">
               <div>Total Score: {solution.total_score.toFixed(2)}</div>
-              {Object.entries(solution.penalty_breakdown).map(([key, value]) => (
-                <div key={key}>
-                  {key.replace(/_/g, " ")}: {value.toFixed(2)}
-                </div>
-              ))}
+              {Object.entries(solution.penalty_breakdown).map(
+                ([key, value]) => (
+                  <div key={key}>
+                    {key.replace(/_/g, " ")}: {value.toFixed(2)}
+                  </div>
+                )
+              )}
             </CardBody>
           </Card>
 
