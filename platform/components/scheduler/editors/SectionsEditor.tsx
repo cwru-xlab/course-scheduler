@@ -6,14 +6,15 @@ import { Card, CardBody, CardHeader } from "@heroui/card";
 import { EditableCell } from "../EditableCell";
 import { EditableArrayCell } from "../EditableArrayCell";
 import { EditableSelectCell } from "../EditableSelectCell";
+import { MultiSelect } from "../MultiSelect";
 
 import type { Section } from "@/lib/scheduling/types";
 
 type SectionsEditorProps = {
   sections: Section[];
-  instructorIds: string[];
-  meetingPatternIds: string[];
-  crosslistGroupIds: string[];
+  instructorOptions: { key: string; label: string }[];
+  meetingPatternOptions: { key: string; label: string }[];
+  crosslistGroupOptions: { key: string; label: string }[];
   onUpdate: (sections: Section[]) => void;
 };
 
@@ -32,9 +33,9 @@ const createEmptySection = (): Section => ({
 
 export const SectionsEditor = ({
   sections,
-  instructorIds,
-  meetingPatternIds,
-  crosslistGroupIds,
+  instructorOptions,
+  meetingPatternOptions,
+  crosslistGroupOptions,
   onUpdate,
 }: SectionsEditorProps) => {
   const updateSection = (index: number, field: keyof Section, value: unknown) => {
@@ -51,10 +52,9 @@ export const SectionsEditor = ({
     onUpdate(sections.filter((_, i) => i !== index));
   };
 
-  const instructorOptions = instructorIds.map((id) => ({ key: id, label: id }));
-  const crosslistOptions = [
-    { key: "__none__", label: "None" },
-    ...crosslistGroupIds.map((id) => ({ key: id, label: id })),
+  const crosslistOptionsWithNone = [
+    { key: "__none__", label: "(None)" },
+    ...crosslistGroupOptions,
   ];
 
   return (
@@ -75,9 +75,9 @@ export const SectionsEditor = ({
               <th className="pb-2 pr-3">Instructor</th>
               <th className="pb-2 pr-3">Enroll</th>
               <th className="pb-2 pr-3">Cap</th>
-              <th className="pb-2 pr-3">Patterns</th>
+              <th className="pb-2 pr-3">Meeting Patterns</th>
               <th className="pb-2 pr-3">Room Req</th>
-              <th className="pb-2 pr-3">Crosslist</th>
+              <th className="pb-2 pr-3">Crosslist Group</th>
               <th className="pb-2 pr-3">Tags</th>
               <th className="pb-2 pr-3"></th>
             </tr>
@@ -95,16 +95,12 @@ export const SectionsEditor = ({
                   <EditableCell value={section.section_code} onChange={(v) => updateSection(idx, "section_code", v)} />
                 </td>
                 <td className="py-2 pr-3">
-                  {instructorOptions.length > 0 ? (
-                    <EditableSelectCell
-                      value={section.instructor_id}
-                      options={instructorOptions}
-                      onChange={(v) => updateSection(idx, "instructor_id", v)}
-                      placeholder="Select..."
-                    />
-                  ) : (
-                    <EditableCell value={section.instructor_id} onChange={(v) => updateSection(idx, "instructor_id", v)} />
-                  )}
+                  <EditableSelectCell
+                    value={section.instructor_id}
+                    options={instructorOptions}
+                    onChange={(v) => updateSection(idx, "instructor_id", v)}
+                    placeholder="Select instructor"
+                  />
                 </td>
                 <td className="py-2 pr-3">
                   <EditableCell type="number" value={section.expected_enrollment} onChange={(v) => updateSection(idx, "expected_enrollment", v)} />
@@ -113,7 +109,12 @@ export const SectionsEditor = ({
                   <EditableCell type="number" value={section.enrollment_cap} onChange={(v) => updateSection(idx, "enrollment_cap", v)} />
                 </td>
                 <td className="py-2 pr-3">
-                  <EditableArrayCell value={section.allowed_meeting_patterns} onChange={(v) => updateSection(idx, "allowed_meeting_patterns", v)} placeholder="patterns" />
+                  <MultiSelect
+                    value={section.allowed_meeting_patterns}
+                    options={meetingPatternOptions}
+                    onChange={(v) => updateSection(idx, "allowed_meeting_patterns", v)}
+                    placeholder="Select patterns"
+                  />
                 </td>
                 <td className="py-2 pr-3">
                   <EditableArrayCell value={section.room_requirements} onChange={(v) => updateSection(idx, "room_requirements", v)} placeholder="features" />
@@ -121,7 +122,7 @@ export const SectionsEditor = ({
                 <td className="py-2 pr-3">
                   <EditableSelectCell
                     value={section.crosslist_group_id ?? "__none__"}
-                    options={crosslistOptions}
+                    options={crosslistOptionsWithNone}
                     onChange={(v) => updateSection(idx, "crosslist_group_id", v === "__none__" ? null : v)}
                     placeholder="None"
                   />

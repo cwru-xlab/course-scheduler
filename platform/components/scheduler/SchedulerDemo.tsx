@@ -56,10 +56,36 @@ export const SchedulerDemo = () => {
     return map;
   }, [data]);
 
-  // Derived IDs for dropdowns
-  const instructorIds = useMemo(() => data?.instructors.map((i) => i.id) ?? [], [data]);
-  const meetingPatternIds = useMemo(() => data?.meeting_patterns.map((p) => p.id) ?? [], [data]);
-  const crosslistGroupIds = useMemo(() => data?.crosslist_groups.map((g) => g.id) ?? [], [data]);
+  // Derived options for dropdowns (with labels)
+  const sectionOptions = useMemo(
+    () => data?.sections.map((s) => ({ key: s.id, label: `${s.id} (${s.course_id})` })) ?? [],
+    [data]
+  );
+
+  const instructorOptions = useMemo(
+    () => data?.instructors.map((i) => ({ key: i.id, label: `${i.id} (${i.rank_type})` })) ?? [],
+    [data]
+  );
+
+  const roomOptions = useMemo(
+    () => data?.rooms.map((r) => ({ key: r.id, label: `${r.id} (${r.building}, cap: ${r.capacity})` })) ?? [],
+    [data]
+  );
+
+  const timeslotOptions = useMemo(
+    () => data?.timeslots.map((t) => ({ key: t.id, label: `${t.day} ${t.start_time}-${t.end_time}` })) ?? [],
+    [data]
+  );
+
+  const meetingPatternOptions = useMemo(
+    () => data?.meeting_patterns.map((p) => ({ key: p.id, label: `${p.id} (${p.allowed_days.join("/")})` })) ?? [],
+    [data]
+  );
+
+  const crosslistGroupOptions = useMemo(
+    () => data?.crosslist_groups.map((g) => ({ key: g.id, label: g.id })) ?? [],
+    [data]
+  );
 
   const runSolver = async () => {
     if (!data) return;
@@ -172,16 +198,17 @@ export const SchedulerDemo = () => {
         <Tab key="sections" title="Sections">
           <SectionsEditor
             sections={data.sections}
-            instructorIds={instructorIds}
-            meetingPatternIds={meetingPatternIds}
-            crosslistGroupIds={crosslistGroupIds}
+            instructorOptions={instructorOptions}
+            meetingPatternOptions={meetingPatternOptions}
+            crosslistGroupOptions={crosslistGroupOptions}
             onUpdate={(sections) => updateField("sections", sections)}
           />
         </Tab>
         <Tab key="instructors" title="Instructors">
           <InstructorsEditor
             instructors={data.instructors}
-            meetingPatternIds={meetingPatternIds}
+            meetingPatternOptions={meetingPatternOptions}
+            timeslotOptions={timeslotOptions}
             onUpdate={(instructors) => updateField("instructors", instructors)}
           />
         </Tab>
@@ -200,6 +227,7 @@ export const SchedulerDemo = () => {
         <Tab key="patterns" title="Meeting Patterns">
           <MeetingPatternsEditor
             meetingPatterns={data.meeting_patterns}
+            timeslotOptions={timeslotOptions}
             onUpdate={(patterns) => updateField("meeting_patterns", patterns)}
           />
         </Tab>
@@ -207,22 +235,31 @@ export const SchedulerDemo = () => {
           <div className="flex flex-col gap-4">
             <CrossListGroupsEditor
               groups={data.crosslist_groups}
+              sectionOptions={sectionOptions}
               onUpdate={(groups) => updateField("crosslist_groups", groups)}
             />
             <NoOverlapGroupsEditor
               groups={data.no_overlap_groups}
+              sectionOptions={sectionOptions}
               onUpdate={(groups) => updateField("no_overlap_groups", groups)}
             />
             <BlockedTimesEditor
               blockedTimes={data.blocked_times}
+              timeslotOptions={timeslotOptions}
               onUpdate={(blockedTimes) => updateField("blocked_times", blockedTimes)}
             />
             <LockedAssignmentsEditor
               lockedAssignments={data.locked_assignments}
+              sectionOptions={sectionOptions}
+              timeslotOptions={timeslotOptions}
+              roomOptions={roomOptions}
               onUpdate={(locks) => updateField("locked_assignments", locks)}
             />
             <SoftLocksEditor
               softLocks={data.soft_locks}
+              sectionOptions={sectionOptions}
+              timeslotOptions={timeslotOptions}
+              roomOptions={roomOptions}
               onUpdate={(locks) => updateField("soft_locks", locks)}
             />
           </div>

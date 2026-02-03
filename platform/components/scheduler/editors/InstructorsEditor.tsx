@@ -4,14 +4,15 @@ import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 
 import { EditableCell } from "../EditableCell";
-import { EditableArrayCell } from "../EditableArrayCell";
 import { EditableSelectCell } from "../EditableSelectCell";
+import { MultiSelect } from "../MultiSelect";
 
 import type { Instructor } from "@/lib/scheduling/types";
 
 type InstructorsEditorProps = {
   instructors: Instructor[];
-  meetingPatternIds: string[];
+  meetingPatternOptions: { key: string; label: string }[];
+  timeslotOptions: { key: string; label: string }[];
   onUpdate: (instructors: Instructor[]) => void;
 };
 
@@ -20,6 +21,14 @@ const RANK_OPTIONS = [
   { key: "Tenured", label: "Tenured" },
   { key: "NTT", label: "NTT" },
   { key: "Adjunct", label: "Adjunct" },
+];
+
+const DAY_OPTIONS = [
+  { key: "Mon", label: "Mon" },
+  { key: "Tue", label: "Tue" },
+  { key: "Wed", label: "Wed" },
+  { key: "Thu", label: "Thu" },
+  { key: "Fri", label: "Fri" },
 ];
 
 const createEmptyInstructor = (): Instructor => ({
@@ -34,6 +43,8 @@ const createEmptyInstructor = (): Instructor => ({
 
 export const InstructorsEditor = ({
   instructors,
+  meetingPatternOptions,
+  timeslotOptions,
   onUpdate,
 }: InstructorsEditorProps) => {
   const updateInstructor = (index: number, field: string, value: unknown) => {
@@ -93,24 +104,27 @@ export const InstructorsEditor = ({
                   />
                 </td>
                 <td className="py-2 pr-3">
-                  <EditableArrayCell
+                  <MultiSelect
                     value={inst.unavailable_times}
+                    options={timeslotOptions}
                     onChange={(v) => updateInstructor(idx, "unavailable_times", v)}
-                    placeholder="timeslot IDs"
+                    placeholder="Select timeslots"
                   />
                 </td>
                 <td className="py-2 pr-3">
-                  <EditableArrayCell
+                  <MultiSelect
                     value={inst.preferences.preferred_days}
+                    options={DAY_OPTIONS}
                     onChange={(v) => updateInstructor(idx, "preferences.preferred_days", v)}
-                    placeholder="Mon, Tue..."
+                    placeholder="Select days"
                   />
                 </td>
                 <td className="py-2 pr-3">
-                  <EditableArrayCell
+                  <MultiSelect
                     value={inst.preferences.preferred_patterns}
+                    options={meetingPatternOptions}
                     onChange={(v) => updateInstructor(idx, "preferences.preferred_patterns", v)}
-                    placeholder="pattern IDs"
+                    placeholder="Select patterns"
                   />
                 </td>
                 <td className="py-2 pr-3">

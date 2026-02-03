@@ -4,14 +4,25 @@ import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 
 import { EditableCell } from "../EditableCell";
-import { EditableArrayCell } from "../EditableArrayCell";
+import { MultiSelect } from "../MultiSelect";
 
 import type { MeetingPattern } from "@/lib/scheduling/types";
 
 type MeetingPatternsEditorProps = {
   meetingPatterns: MeetingPattern[];
+  timeslotOptions: { key: string; label: string }[];
   onUpdate: (patterns: MeetingPattern[]) => void;
 };
+
+const DAY_OPTIONS = [
+  { key: "Mon", label: "Mon" },
+  { key: "Tue", label: "Tue" },
+  { key: "Wed", label: "Wed" },
+  { key: "Thu", label: "Thu" },
+  { key: "Fri", label: "Fri" },
+  { key: "Sat", label: "Sat" },
+  { key: "Sun", label: "Sun" },
+];
 
 const createEmptyMeetingPattern = (): MeetingPattern => ({
   id: `MP-NEW-${Date.now()}`,
@@ -22,6 +33,7 @@ const createEmptyMeetingPattern = (): MeetingPattern => ({
 
 export const MeetingPatternsEditor = ({
   meetingPatterns,
+  timeslotOptions,
   onUpdate,
 }: MeetingPatternsEditorProps) => {
   const updatePattern = (index: number, field: keyof MeetingPattern, value: unknown) => {
@@ -76,7 +88,7 @@ export const MeetingPatternsEditor = ({
         {meetingPatterns.map((pattern, idx) => (
           <div key={`${pattern.id}-${idx}`} className="border border-default-200 rounded-lg p-3">
             <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 flex-wrap">
                 <div className="flex items-center gap-2">
                   <span className="text-default-500">ID:</span>
                   <EditableCell value={pattern.id} onChange={(v) => updatePattern(idx, "id", v)} />
@@ -87,7 +99,12 @@ export const MeetingPatternsEditor = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-default-500">Days:</span>
-                  <EditableArrayCell value={pattern.allowed_days} onChange={(v) => updatePattern(idx, "allowed_days", v)} placeholder="Mon, Wed..." />
+                  <MultiSelect
+                    value={pattern.allowed_days}
+                    options={DAY_OPTIONS}
+                    onChange={(v) => updatePattern(idx, "allowed_days", v)}
+                    placeholder="Select days"
+                  />
                 </div>
               </div>
               <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deletePattern(idx)}>
@@ -107,11 +124,12 @@ export const MeetingPatternsEditor = ({
                 <div className="space-y-1">
                   {pattern.compatible_timeslot_sets.map((set, setIdx) => (
                     <div key={setIdx} className="flex items-center gap-2 bg-default-50 rounded px-2 py-1">
-                      <span className="text-default-400 text-xs">Set {setIdx + 1}:</span>
-                      <EditableArrayCell
+                      <span className="text-default-400 text-xs whitespace-nowrap">Set {setIdx + 1}:</span>
+                      <MultiSelect
                         value={set}
+                        options={timeslotOptions}
                         onChange={(v) => updateTimeslotSet(idx, setIdx, v)}
-                        placeholder="TS-M-0900, TS-W-0900"
+                        placeholder="Select timeslots"
                       />
                       <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteTimeslotSet(idx, setIdx)}>
                         ✕
