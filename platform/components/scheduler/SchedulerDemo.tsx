@@ -369,13 +369,53 @@ export const SchedulerDemo = () => {
                 )}
               </div>
               <div>
-                <div className="font-medium">Locked Assignments</div>
+                <div className="font-medium">Locked Assignments (Hard)</div>
                 {mockData.locked_assignments.length ? (
                   mockData.locked_assignments.map((lock) => (
-                    <div key={lock.section_id}>
-                      {lock.section_id}: times=
-                      {lock.fixed_timeslot_set?.join(", ") ?? "—"}, room=
-                      {lock.fixed_room ?? "—"}
+                    <div
+                      key={lock.section_id}
+                      className="flex items-center gap-2"
+                    >
+                      <span className="inline-flex items-center rounded bg-danger-100 px-1.5 py-0.5 text-xs font-medium text-danger-700">
+                        HARD
+                      </span>
+                      <span>
+                        {lock.section_id}: times=
+                        {lock.fixed_timeslot_set?.join(", ") ?? "—"}, room=
+                        {lock.fixed_room ?? "—"}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div>None</div>
+                )}
+              </div>
+              <div>
+                <div className="font-medium">Soft Locks (Preferences)</div>
+                {mockData.soft_locks.length ? (
+                  mockData.soft_locks.map((lock) => (
+                    <div
+                      key={lock.section_id}
+                      className="flex items-center gap-2"
+                    >
+                      <span
+                        className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium"
+                        style={{
+                          backgroundColor: `rgba(59, 130, 246, ${lock.weight / 100})`,
+                          color: lock.weight > 50 ? "white" : "rgb(30, 64, 175)",
+                        }}
+                      >
+                        {lock.weight}
+                      </span>
+                      <span>
+                        {lock.section_id}:
+                        {lock.preferred_timeslot_set
+                          ? ` times=${lock.preferred_timeslot_set.join(", ")}`
+                          : ""}
+                        {lock.preferred_room
+                          ? ` room=${lock.preferred_room}`
+                          : ""}
+                      </span>
                     </div>
                   ))
                 ) : (

@@ -10,6 +10,7 @@ ROOM_WASTE_WEIGHT = 1  # penalty per empty seat in assigned room
 PREF_DAY_WEIGHT = 10  # penalty if assigned days don't match instructor preferences
 PREF_PATTERN_WEIGHT = 5  # penalty if assigned pattern isn't preferred
 ADJUNCT_DAY_EXCESS_WEIGHT = 15  # penalty per day beyond adjunct max
+SOFT_LOCK_BASE_WEIGHT = 1  # base multiplier for soft lock penalties
 
 
 class Section(BaseModel):
@@ -83,6 +84,13 @@ class LockedAssignment(BaseModel):
     fixed_room: Optional[str] = None
 
 
+class SoftLock(BaseModel):
+    section_id: str
+    preferred_timeslot_set: Optional[List[str]] = None
+    preferred_room: Optional[str] = None
+    weight: float  # Higher = stronger preference (e.g., 1-100)
+
+
 class SchedulingInput(BaseModel):
     sections: List[Section]
     instructors: List[Instructor]
@@ -93,6 +101,7 @@ class SchedulingInput(BaseModel):
     no_overlap_groups: List[NoOverlapGroup]
     blocked_times: List[BlockedTime]
     locked_assignments: List[LockedAssignment]
+    soft_locks: List[SoftLock] = []
 
 
 class ValidationError(BaseModel):
@@ -325,6 +334,9 @@ def _strip_section(input_data: SchedulingInput, section_id: str) -> SchedulingIn
     remaining_locks = [
         lock for lock in input_data.locked_assignments if lock.section_id != section_id
     ]
+    remaining_soft_locks = [
+        lock for lock in input_data.soft_locks if lock.section_id != section_id
+    ]
     return SchedulingInput(
         sections=remaining_sections,
         instructors=input_data.instructors,
@@ -335,6 +347,7 @@ def _strip_section(input_data: SchedulingInput, section_id: str) -> SchedulingIn
         no_overlap_groups=remaining_no_overlap,
         blocked_times=input_data.blocked_times,
         locked_assignments=remaining_locks,
+        soft_locks=remaining_soft_locks,
     )
 
 
@@ -664,6 +677,25 @@ def _solve_schedule(input_data: SchedulingInput):
                 if day_var is not None:
                     model.Add(day_var >= var)
 
+    # Soft lock penalties: penalize options that don't match preferred time/room.
+    soft_lock_by_section = {lock.section_id: lock for lock in input_data.soft_locks}
+    for (section_id, idx), var in option_vars.items():
+        soft_lock = soft_lock_by_section.get(section_id)
+        if not soft_lock:
+            continue
+        pattern_id, timeslot_set, room_id, _ = option_data[(section_id, idx)]
+        soft_penalty = 0
+        # Penalize if timeslot doesn't match preference
+        if soft_lock.preferred_timeslot_set:
+            if set(timeslot_set) != set(soft_lock.preferred_timeslot_set):
+                soft_penalty += soft_lock.weight * SOFT_LOCK_BASE_WEIGHT
+        # Penalize if room doesn't match preference
+        if soft_lock.preferred_room:
+            if room_id != soft_lock.preferred_room:
+                soft_penalty += soft_lock.weight * SOFT_LOCK_BASE_WEIGHT
+        if soft_penalty > 0:
+            penalty_terms.append(var * int(soft_penalty))
+
     # Minimize total penalty.
     model.Minimize(sum(penalty_terms))
 
@@ -691,6 +723,8 @@ def _solve_schedule(input_data: SchedulingInput):
         "instructor_day_preference": 0.0,
         "instructor_pattern_preference": 0.0,
         "adjunct_day_excess": 0.0,
+        "soft_lock_time": 0.0,
+        "soft_lock_room": 0.0,
     }
 
     for section_id, options in options_by_section.items():
@@ -720,6 +754,20 @@ def _solve_schedule(input_data: SchedulingInput):
         penalty_breakdown["instructor_pattern_preference"] += float(
             pref_pattern_penalty
         )
+
+        # Calculate soft lock penalties for this assignment
+        soft_lock = soft_lock_by_section.get(section_id)
+        if soft_lock:
+            if soft_lock.preferred_timeslot_set:
+                if set(timeslot_set) != set(soft_lock.preferred_timeslot_set):
+                    penalty_breakdown["soft_lock_time"] += float(
+                        soft_lock.weight * SOFT_LOCK_BASE_WEIGHT
+                    )
+            if soft_lock.preferred_room:
+                if room_id != soft_lock.preferred_room:
+                    penalty_breakdown["soft_lock_room"] += float(
+                        soft_lock.weight * SOFT_LOCK_BASE_WEIGHT
+                    )
 
         assignments.append(
             ScheduleAssignment(

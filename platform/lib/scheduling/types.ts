@@ -69,6 +69,13 @@ export type LockedAssignment = {
   fixed_room?: Id;
 };
 
+export type SoftLock = {
+  section_id: Id;
+  preferred_timeslot_set?: Id[];
+  preferred_room?: Id;
+  weight: number; // Higher = stronger preference (e.g., 1-100)
+};
+
 export type ScheduleAssignment = {
   section_id: Id;
   meeting_pattern_id: Id;
@@ -100,6 +107,7 @@ export type SchedulingInput = {
   no_overlap_groups: NoOverlapGroup[];
   blocked_times: BlockedTime[];
   locked_assignments: LockedAssignment[];
+  soft_locks: SoftLock[];
 };
 
 export type SolverResult =

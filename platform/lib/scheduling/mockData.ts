@@ -181,5 +181,23 @@ export const mockSchedulingInput: SchedulingInput = {
       reason: "university_event",
     },
   ],
-  locked_assignments: [],
+  locked_assignments: [
+    {
+      section_id: "SEC-330-A",
+      fixed_timeslot_set: ["TS-M-0900", "TS-W-0900"],
+      fixed_room: "ROOM-B",
+    },
+  ],
+  soft_locks: [
+    {
+      section_id: "SEC-101-A",
+      preferred_timeslot_set: ["TS-T-1030", "TS-TH-1030"],
+      weight: 80,
+    },
+    {
+      section_id: "SEC-220-A",
+      preferred_room: "ROOM-A",
+      weight: 50,
+    },
+  ],
 };
