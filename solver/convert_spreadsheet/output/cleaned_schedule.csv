@@ -1,0 +1,566 @@
+Subject,Description,Section,Days,Start_Time,End_Time,Room (Capacity),Enrollment_Cap,Instructor,Session,Units
+ACCT,ACCT 100 - Foundations of Accounting I,*100-LEC(1461),"Tue,Thu",1:00PM,2:15PM,PBL 202,62,"Skomra,Piotr Antoni",Regular,3
+ACCT,ACCT 100 - Foundations of Accounting I,*100-LEC(1461),"Mon,Wed",12:45PM,2:00PM,PBL 202,62,"Skomra,Piotr Antoni",Regular,3
+ACCT,ACCT 100 - Foundations of Accounting I,*101-LEC(1462),"Mon,Wed",9:00AM,10:15AM,PBL 202,62,"Sasmaz, Mary
+Carlisle,Melissa R",Regular,3
+ACCT,ACCT 100 - Foundations of Accounting I,*101-LEC(1462),"Tue,Thu",8:30AM,9:45AM,PBL 202,62,"Sasmaz, Mary
+Carlisle,Melissa R",Regular,3
+ACCT,ACCT 100 - Foundations of Accounting I,*102-LEC(1463),"Mon,Wed",10:30AM,11:45AM,PBL 202,62,"Sasmaz, Mary
+Carlisle,Melissa R",Regular,3
+ACCT,ACCT 100 - Foundations of Accounting I,*102-LEC(1463),"Tue,Thu",10:00AM,11:15AM,PBL 202,62,"Sasmaz, Mary
+Carlisle,Melissa R",Regular,3
+ACCT,ACCT 106 - Spreadsheet Basics for Business and Non-Business Majors,*100-LEC(1423),Tue,8:30AM,9:20AM,PBL 501,50.0,"Szabo, Bruce
+Olavarria Baeza,Jose Valentin",Regular,1
+ACCT,ACCT 106 - Spreadsheet Basics for Business and Non-Business Majors,*100-LEC(1423),Wed,9:00AM,9:50AM,PBL 501,50.0,"Szabo, Bruce
+Olavarria Baeza,Jose Valentin",Regular,1
+ACCT,ACCT 106 - Spreadsheet Basics for Business and Non-Business Majors,*101-LEC(1404),Thu,1:00PM,1:50PM,PBL 106,50,"Olavarria, Jose
+Szabo,Bruce MIchael",Regular,1
+ACCT,ACCT 106 - Spreadsheet Basics for Business and Non-Business Majors,*101-LEC(1404),Wed,1:00PM,1:50PM,PBL 106,50,"Olavarria, Jose
+Szabo,Bruce MIchael",Regular,1
+ACCT,ACCT 106 - Spreadsheet Basics for Business and Non-Business Majors,*101-LEC(1404),Tue,10:00AM,10:50AM,PBL 106,50,"Olavarria, Jose
+Szabo,Bruce MIchael",Regular,1
+ACCT,ACCT 200 - Foundations of Accounting II,*100-LEC(1400),"Mon,Wed",6:00PM,7:15PM,PBL 02,60   59,"Blakeway-Phillips,Heidi Christine",Regular,3
+ACCT,ACCT 200 - Foundations of Accounting II,*100-LEC(1400),"Mon,Wed",9:00AM,10:15AM,PBL 02,60   59,"Blakeway-Phillips,Heidi Christine",Regular,3
+ACCT,ACCT 200 - Foundations of Accounting II,*101-LEC(1402),"Mon,Wed",12:45PM,2:00PM,PBL 401,60   59,"Blakeway-Phillips,Heidi Christine",Regular,3
+ACCT,ACCT 200 - Foundations of Accounting II,*102-LEC(1403),"Mon,Wed",3:20PM,4:35PM,PBL 02,60   59,"Blakeway-Phillips,Heidi Christine",Regular,3
+ACCT,ACCT 300 - Corporate Reporting I,*100-LEC(1321),"Mon,Wed",12:45PM,2:00PM,"PBL 03
+PBL 04",40   50,"Sasmaz,Mary B",Regular,3
+ACCT,ACCT 300 - Corporate Reporting I,*100-LEC(1321),"Tue,Thu",1:00PM,2:15PM,"PBL 03
+PBL 04",40   50,"Sasmaz,Mary B",Regular,3
+,ACCT400 - Corporate Reporting I,100-LEC(10258),"Mon,Wed",12:45PM,2:00PM,"PBL 03
+PBL 04",10.0,"Sasmaz,Mary B",Regular,3.0
+,ACCT400 - Corporate Reporting I,100-LEC(10258),"Tue,Thu",1:00PM,2:15PM,"PBL 03
+PBL 04",10.0,"Sasmaz,Mary B",Regular,3.0
+ACCT,ACCT 301 - Corporate Reporting II,*100-LEC(1322),"Mon,Wed",9:00AM,10:15AM,PBL 106,40   58,"Dong,Yufan",Regular,3
+ACCT,ACCT 401 - Corporate Reporting II,100-LEC(10259),"Mon,Wed",9:00AM,10:15AM,PBL 106,10.0,"Dong,Yufan",Regular,3
+ACCT,"ACCT 305 - Income Tax: Concepts, Skills, Planning",*100-LEC(1323),"Mon,Wed",10:35AM,11:50AM,To Be Announced,50,"Fogarty,Timothy J",Regular,3
+ACCT,"ACCT 305 - Income Tax: Concepts, Skills, Planning",100-LEC(1323),"Mon,Wed",3:20PM,4:35PM,PBL 118,40  35,"Fogarty,Timothy J",Regular,3
+ACCT,ACCT 306 - Systems & Controls (STEM),*100-LEC(10062),"Tue,Thu",10:00AM,11:15AM,PBL 401,35   60,"Bucaro, Anthony   Staff",Regular,3
+,ACCT 406 - Systems & Controls (STEM),100-LEC(10508),"Tue,Thu",10:00AM,11:15AM,PBL 401,15.0,"Bucaro, Anthony   Staff",Regular,3
+ACCT,ACCT 307 - Applied Management Accounting,*100-LEC(1324),"Tue,Thu",11:30AM,12:45PM,PBL 401,45,"Jarvis,Mark",Regular,3
+,ACCT 407 - Applied Management Accounting,100-LEC(10509),"Tue,Thu",11:30AM,12:45PM,PBL 401,10.0,"Jarvis,Mark",Regular,3.0
+ACCT,ACCT 307L - Technology Lab for Management Accounting,*100-LAB(1401),"Thu,Tue",2:30PM,3:30PM,PBL 106,45,"Jarvis,Mark",Regular,1
+,ACCT 316 - Technology for Financial Management,100-LEC(10210),Thu,1:00PM,2:15PM,PBL 05,35.0,"Bucaro, Anthony   ",,1.0
+ACCT,ACCT 404 - Advanced Financial Reporting,*400-LEC(1391),"Mon,Wed",4:00PM,5:15PM,PBL 258,50   55,"Martin,Sharon Lee",Regular,3
+ACCT,ACCT 404 - Advanced Financial Reporting,*400-LEC(1391),"Mon,Wed",12:45PM,2:00PM,PBL 258,50   55,"Martin,Sharon Lee",Regular,3
+ACCT,ACCT 405 - Advanced Federal Taxes,100-LEC(1484),Wed,6:00PM,8:30PM,PBL 118,50   51,"Barrus,Mark Elliott",Regular,3
+ACCT,ACCT 414 - Corporate Reporting and Analysis,*100-LEC(1369),Thu,6:00PM,8:30PM,PBL 202,50   62,"Olavarria Baeza,Jose Valentin",Regular,3
+ACCT,"ACCT 431 - Client Communication, Ethics, and Professionalism",*100-LEC(1249),Mon,6:00PM,8:30PM,PBL 501,50   55,"Johnson,David G",Regular,3
+ACCT,"ACCT 431 - Client Communication, Ethics, and Professionalism",*100-LEC(1249),Mon,3:00PM,5:45PM,PBL 501,50   55,"Johnson,David G",Regular,3
+ACCT,ACCT 444 - Advanced Auditing Theory and Practice,*100-LEC(1258),Thu,2:30PM,5:15PM,PBL 106,50   55,"Carlisle, Melissa
+Staff",Regular,3
+ACCT,ACCT 444 - Advanced Auditing Theory and Practice,*100-LEC(1258),Wed,3:00PM,5:45PM,PBL 106,50   55,"Carlisle, Melissa
+Staff",Regular,3
+ACCT,ACCT 501 - Special Problems and Topics: Accounting Information Systems,*102-IND(1487),"Tue,Thu",1:00PM,2:15PM,To Be Announced,58,"Bucaro,Anthony Carl",Regular,0-18
+ACCT,ACCT 520 - Advanced Accounting Theory,*100-LEC(1460),Tue,6:00PM,8:30PM,PBL 118,50   51,"Jonas, Gregory 
+Blackburn,Christopher",Regular,3
+ACCT,ACCT 601 - Special Problems and Topics: Experimental Rsch & Auditing,*100-RSC(1447),Wed,9:00AM,12:00PM,To Be Announced,999,"Bucaro,Anthony Carl; Carlisle,Melissa R",Regular,1-18
+BAFI,BAFI 210 - Seminar: Financial Services Industry,*400-SEM(1319),Mon,6:30PM,8:00PM,PBL 03,40,"Fine,Scott",Dyn Dt,0-1.5
+BAFI,BAFI 341 - Money and Banking,*100-LEC(1238),"Tue,Thu",11:30AM,12:45PM,PBL 202,33 (50),"Harmon,Gregory William",Regular,3
+ECON,ECON 341 - Money and Banking,*100-LEC(1357),"Tue,Thu",11:30AM,12:45PM,PBL 202,14 (50),"Harmon,Gregory William",Regular,3
+BAFI,BAFI 341 - Money and Banking,*101-LEC(1450),"Tue,Thu",2:30PM,3:45PM,PBL 07,33 (50),"Harmon,Gregory William",Regular,3
+ECON,ECON 341 - Money and Banking,*101-LEC(1451),"Tue,Thu",2:30PM,3:45PM,PBL 07,14 (50),"Harmon,Gregory William",Regular,3
+BAFI,BAFI 351 - Financial Data Science: Data Analytics & Machine Learning Fundamentals,*100-LEC(1464),"Tue,Thu",11:30AM,12:45PM,PBL 05,33,"Vaidya,Jay Dee",Regular,3
+BAFI,BAFI 351 - Financial Data Science: Data Analytics & Machine Learning Fundamentals,*100-LEC(1464),"Mon,Wed",10:35AM,11:50AM,PBL 05,33,"Vaidya,Jay Dee",Regular,3
+BAFI,BAFI 355 - Corporate Finance,*100-LEC(1465),"Mon,Wed",9:00AM,10:15AM,PBL 401,55   50,"Gupta, Anurag
+Olavarria Baeza,Jose Valentin",Regular,3
+BAFI,BAFI 355 - Corporate Finance,*101-LEC(1466),"Mon,Wed",10:35AM,11:50AM,PBL 401,55   40,"Gupta, Anurag
+Olavarria Baeza,Jose Valentin",Regular,3
+BAFI,BAFI 355 - Corporate Finance,*101-LEC(1466),"Tue,Thu",10:00AM,11:15AM,PBL 401,55   40,"Gupta, Anurag
+Olavarria Baeza,Jose Valentin",Regular,3
+BAFI,BAFI 355 - Corporate Finance,*102-LEC(1508),"Tue,Thu",11:30AM,12:45PM,PBL 201   106,55   57,"Bae,Joonwoo",Regular,3
+BAFI,BAFI 356 - Investments,*100-LEC(1239),"Mon,Wed",12:45PM,2:00PM,PBL 201,50   57,"Noh,Joonki",Regular,3
+BAFI,BAFI 357 - ValuAtion : Financial Modeling Using A.I.,*100-LEC(1325),"Mon,Wed",10:35AM,11:50AM,PBL 07,50   60,"Balasubramanyan,Lakshmi",Regular,3
+BAFI,BAFI 358 - Intermediate Corporate Finance,*100-LEC(1406),"Mon,Wed",3:20PM,4:35PM,PBL 501,50   48,"Krishnan,C N V",Regular,3
+BAFI,BAFI 362 - Advanced Analytics in Credit Risk Management,*100-LEC(1326),"Tue,Thu",1:00PM,2:15PM,PBL 501,50   45,"Balasubramanyan,Lakshmi",Regular,3
+BAFI,BAFI 365 - Options and Other Derivatives,*100-LEC(1509),Tue,6:00PM,8:30PM,PBL 501,50   49,"Martinez,Edwin Cornelius Amorsolo",Regular,3
+BAFI,BAFI 428 - Financial Strategy and Value Creation,*100-LEC(1320),Tue,6:00PM,8:45PM,PBL 401,22 (57),"Fine,Scott",Regular,3
+FNCE,FNCE 428 - Financial Strategy and Value Creation,*100-LEC(1379),Tue,6:00PM,8:45PM,PBL 401,35 (57),"Fine,Scott",Regular,3
+BAFI,BAFI 429 - Investment Management,*101-LEC(1276),Mon,9:00AM,11:30AM,"PBL 118
+PBL 202",10 (62),"Noh,Joonki",Regular,3
+BAFI,BAFI 429 - Investment Management,*101-LEC(1276),Mon,3:00PM,5:45PM,"PBL 118
+PBL 202",10 (62),"Noh,Joonki",Regular,3
+FNCE,FNCE 429 - Investment Management,*101-LEC(1395),Mon,9:00AM,11:30AM,"PBL 118
+PBL 202",52 (62),"Noh,Joonki",Regular,3
+FNCE,FNCE 429 - Investment Management,*101-LEC(1395),Mon,3:00PM,5:45PM,"PBL 118
+PBL 202",52 (62),"Noh,Joonki",Regular,3
+BAFI,BAFI 431 - Fixed Income Markets and Their Derivatives,*101-LEC(1496),Tue,3:00PM,5:45PM,PBL 501,10 (62),"Bae,Joonwoo",Regular,3
+FNCE,FNCE 431 - Fixed Income Markets and Their Derivatives,*101-LEC(1495),Tue,3:00PM,5:45PM,PBL 501,"42
+52 (62)","Bae,Joonwoo",Regular,3
+,BAFI 432 - Corporate Risk Management,100-LEC(10557),Tue,11:30AM,2:15PM,PBL 201,,"Gupta, Anurag",Regular,3.0
+,FNCE 432 - Corporate Risk Management,100-LEC(10558),Tue,11:30AM,2:15PM,PBL 201,,"Gupta, Anurag",Regular,3.0
+BAFI,BAFI 440 - Financial Decisions Modeling and Analytics,*100-LEC(1530),Wed,12:00PM,2:45PM,PBL 501,5 (49),"Krishnan,C N V",Regular,3
+BAFI,BAFI 440 - Financial Decisions Modeling and Analytics,*100-LEC(1530),"Mon,Wed",1:30PM,2:45PM,PBL 501,5 (49),"Krishnan,C N V",Regular,3
+FNCE,FNCE 440 - Financial Decisions Modeling and Analytics,*100-LEC(1477),Wed,12:00PM,2:45PM,PBL 501,44 (49),"Krishnan,C N V",Regular,3
+FNCE,FNCE 440 - Financial Decisions Modeling and Analytics,*100-LEC(1477),"Mon,Wed",1:30PM,2:45PM,PBL 501,44 (49),"Krishnan,C N V",Regular,3
+BAFI,BAFI 480 - Global Banking & Capital Markets,*100-LEC(1275),Wed,3:00PM,5:45PM,PBL 202,12 (62),"Balasubramanyan,Lakshmi",Regular,3
+FNCE,FNCE 480 - Global Banking & Capital Markets,*100-LEC(1397),Wed,3:00PM,5:45PM,PBL 202,50 (62),"Balasubramanyan,Lakshmi",Regular,3
+BLAW,BLAW 331 - Legal Environment of Management,100-LEC(10218),"Mon,Wed",12:45PM,2:00PM,PBL 258,35.0,"Fogarty,Timothy J",,3.0
+BLAW,BLAW 417 - Legal Environment of Management,*100-LEC(1405),"Mon,Wed",12:45PM,2:00PM,PBL 258,15   49,"Fogarty,Timothy J",Regular,3
+BTEC,BTEC 420 - Introduction to Programming for Business Applications,*101-LEC(1493),Mon,6:00PM,8:30PM,PBL 106 per Laura W. 12/3/25; PBL 401,25 (50),"Stanek,David A",Regular,3
+DESN,DESN 210 - Introduction to Programming for Business Applications,*101-LEC(1364),Mon,6:00PM,8:30PM,PBL 106 per Laura W. 12/3/25; PBL 401,25 (50),"Stanek,David A",Regular,3
+BTEC,BTEC 420 - Introduction to Programming for Business Applications,*102-LEC(1522),"Mon,Wed",3:20PM,4:35PM,PBL 106,"7 (50)
+10 (50)","Jung,Miyeon",Regular,3
+DESN,DESN 210 - Introduction to Programming for Business Applications,*102-LEC(1511),"Mon,Wed",3:20PM,4:35PM,PBL 106,"43 (50)  
+40 (50)","Jung,Miyeon",Regular,3
+BUAI,BUAI 407A - Managerial Marketing I,*100-LEC(1419),Mon,9:00AM,11:45AM,PBL 501,49,"Binkowski, Kris
+Brock,Juergen",Dyn Dt,1.5
+BUAI,BUAI 407B - Managerial Marketing II,*100-LEC(1420),Mon,9:00AM,11:45AM,PBL 501,49,"Binkowski, Kris
+Brock,Juergen",Dyn Dt,1.5
+,BUAI 410 - Accounting and Financial Management,,Wed,6:00PM,8:30PM,PBL 106,,"Rausche, Amra",,3.0
+BUAI,BUAI 432 - Operations Analytics: Stochastic,*100-LEC(1392),Tue,8:30AM,11:15AM,To Be Announced,51,"Alireza Fallahtafti
+Staff",Regular,3
+OPRE,OPRE 332A - Spreadsheet and Business Process Simulation - I,*100-LEC(1409),Tue,3:00PM,5:45PM,PBL 401,5 (54),"Alireza Fallahtafti
+Mathur,Kamlesh",Dyn Dt,1.5
+OPRE,OPRE 432A - Spreadsheet and Business Process Simulation - I,*100-LEC(1382),Tue,3:00PM,5:45PM,PBL 401,"5 per Kamlesh 
+11 (54)","Alireza Fallahtafti
+Mathur,Kamlesh",Dyn Dt,1.5
+SCMG,SCMG 432A - Spreadsheet and Business Process Simulation - I,*100-LEC(1380),Tue,3:00PM,5:45PM,PBL 401,"22 per Kamlesh
+38 (54)","Alireza Fallahtafti
+Mathur,Kamlesh",Dyn Dt,1.5
+OPRE,OPRE 332B - Spreadsheet and Business Process Simulation - II,*100-LEC(1410),Tue,3:00PM,5:45PM,PBL 401,5 (54),"Fallahtafti,Alireza",Dyn Dt,1.5
+OPRE,OPRE 432B - Spreadsheet and Business Process Simulation - II,*100-LEC(1383),Tue,3:00PM,5:45PM,PBL 401,"5 per Kamlesh 
+11 (54)","Fallahtafti,Alireza",Dyn Dt,1.5
+SCMG,SCMG 432B - Spreadsheet and Business Process Simulation - II,*100-LEC(1381),Tue,3:00PM,5:45PM,PBL 401,"22 per Kamlesh
+38 (54)","Fallahtafti,Alireza",Dyn Dt,1.5
+BUAI,BUAI 445 - Advanced Marketing Analytics,*100-LEC(1393),Wed,2:15PM,5:00PM,PBL 03,48  57,"Niraj,Rakesh Kumar",Regular,3
+BUAI,BUAI 445 - Advanced Marketing Analytics,*100-LEC(1393),Wed,3:00PM,5:45PM,PBL 03,48  57,"Niraj,Rakesh Kumar",Regular,3
+BUAI,BUAI 485B - Team Development,*100-SEM(1394),Thu,3:00PM,5:45PM,PBL 501,50   49,"Messer,Tracey Eira",Dyn Dt,1.5
+DESN,"DESN 302 - Creativity in Design & Business: Sources of Perception, Imagination, & Creative Thinking",*100-LEC(1510),"Tue,Thu",2:30PM,3:45PM,PBL 03,45,"Gilmore,James Haydn",Regular,3
+DESN,DESN 318 - Entrepreneurship Through Acquisition II,*100-LEC(1537),Tue,6:00PM,8:30PM,PBL 106,"20 (40)
+20 (58)","King,GJ",Dyn Dt,1.5
+DESN,DESN 420 - Entrepreneurship Through Acquisition II,*100-LEC(1478),Tue,6:00PM,8:30PM,PBL 106,"20 (40)
+38 (58)","King,GJ",Dyn Dt,1.5
+DESN,DESN 319 - Entrepreneurship Through Acquisition III,*100-LEC(1543),Tue,6:00PM,8:30PM,PBL 106,"20 (40)
+20 (58)","Lowry,Scot",Dyn Dt,1.5
+DESN,DESN 419 - Entrepreneurship Through Acquisition III,*100-LEC(1523),Tue,6:00PM,8:30PM,PBL 106,"20 (40)
+38 (58)","Lowry,Scot",Dyn Dt,1.5
+DESN,DESN 320 - Database Management,*100-LEC(1490),Tue,4:00PM,6:30PM,PBL 04,45   49,"Dangelo,Mark",Regular,3
+,DESN 322 - Designing the User Experience,100-LEC(10219),"Tue,Thu",11:30AM,12:45PM,PBL 04,49.0,"Misconish Edwards, Sara",,3.0
+,DESN 494 - Managerial Consultancy,,Mon,7:45PM,9:00PM,,,,,3.0
+ECON,ECON 102 - Principles of Microeconomics,*100-LEC(1345),"Mon,Wed",10:35AM,11:50AM,PBL 201,60,"Ernest PhD,Jonathan Orry",Regular,3
+ECON,ECON 102 - Principles of Microeconomics,*100-LEC(1345),"Mon,Wed,Fri",10:35AM,11:25AM,PBL 201,60,"Ernest PhD,Jonathan Orry",Regular,3
+ECON,ECON 102 - Principles of Microeconomics,*101-LEC(1346),"Mon,Wed,Fri",2:15PM,3:05PM,PBL 201,60   65,"Ernest PhD,Jonathan Orry",Regular,3
+ECON,ECON 102 - Principles of Microeconomics,"
+*103-LEC(1429)","Tue,Thu",2:30PM,3:45PM,PBL 202,60   62,"Wolcowitz, Jeffrey
+Hawkins,Jenny Rae",Regular,3
+ECON,ECON 103 - Principles of Macroeconomics,*100-LEC(1348),"Mon,Wed",3:20PM,4:35PM,PBL 201,60   68,"Lussier,Martine",Regular,3
+ECON,ECON 103 - Principles of Macroeconomics,*101-LEC(1349),"Tue,Thu",8:30AM,9:45AM,PBL 202,60   50,"Wang,Sining",Regular,3
+ECON,ECON 103 - Principles of Macroeconomics,*103-LEC(1467),"Tue,Thu",2:30PM,3:45PM,PBL 201,60   68,"Hammack,Peter",Regular,3
+ECON,ECON 103 - Principles of Macroeconomics,*104-LEC(1491),"Mon,Wed",12:45PM,2:00PM,PBL 203,60   62,"Wang, Sining
+Lussier,Martine",Regular,3
+ECON,ECON 216 - Data Visualization in R,*100-LEC(1333),"Tue,Thu",10:00AM,11:15AM,PBL 106,50,"Clingingsmith,David L",Regular,3
+ECON,ECON 216 - Data Visualization in R,*100-LEC(1333),"Tue,Thu",8:30AM,9:45AM,PBL 106,50,"Clingingsmith,David L",Regular,3
+ECON,ECON 307 - Intermediate Macro Theory,*100-LEC(1350),"Mon,Wed,Fri",10:35AM,11:25AM,PBL 106,50   51,"Lussier,Martine",Regular,3
+ECON,ECON 307 - Intermediate Macro Theory,*101-LEC(1351),"Mon,Wed,Fri",11:40AM,12:30PM,"PBL 106
+No Room at this time",51,"Lussier, Martine
+Smith,Dominic",Regular,3
+ECON,ECON 307 - Intermediate Macro Theory,*101-LEC(1351),"Mon,Wed",3:20PM,4:35PM,"PBL 106
+No Room at this time",51,"Lussier, Martine
+Smith,Dominic",Regular,3
+ECON,ECON 309 - Intermediate Micro Theory: Calculus-Based,*100-LEC(1352),"Tue,Thu",11:30AM,12:45PM,PBL 258,40,"Xiong,Heyu",Regular,3
+ECON,ECON 326 - Econometrics,*100-LEC(1353),"Mon,Wed",3:20PM,4:35PM,PBL 07,56,"Votruba,Mark",Regular,4
+ECON,ECON 326 - Econometrics,*110-LAB(1354),Mon,2:15PM,3:05PM,PBL 07,28,"Votruba,Mark",Regular,4
+ECON,ECON 326 - Econometrics,*111-LAB(1355),Mon,4:50PM,5:40PM,PBL 07,28,"Votruba,Mark",Regular,4
+ECON,ECON 327 - Advanced Econometrics,*100-LEC(1356),"Tue,Thu",11:30AM,12:45PM,PBL 07,"45 (50)
+45 (49)","Shoag,Daniel Warren",Regular,3
+ECON,ECON 427 - Advanced Econometrics,*100-LEC(1428),"Tue,Thu",11:30AM,12:45PM,PBL 07,"5 (50)
+4 (49)","Shoag,Daniel Warren",Regular,3
+ECON,ECON 329 - Game Theory: The Economics of Thinking Strategically,*100-LEC(1468),"Tue,Thu",8:30AM,9:45AM,PBL 106,"55 (60)
+54 (58)","Sheremeta,Roman M",Regular,3
+ECON,ECON 429 - Game Theory: The Economics of Thinking Strategically,*100-LEC(1469),"Tue,Thu",8:30AM,9:45AM,PBL 106,"5 (60) 
+4 (58)","Sheremeta,Roman M",Regular,3
+ECON,"ECON 332 - Labor Economics: Theory, Data, and Policy",*100-LEC(1512),"Tue,Thu",10:00AM,11:15AM,"PBL 04   
+PBL 05","50
+18   40","Schweitzer,Mark Edward",Regular,3
+ECON,ECON 342 - Public Finance,*100-LEC(1471),"Tue,Thu",2:30PM,3:45PM,PBL 258,55,"Shoag,Daniel Warren",Regular,3
+ECON,ECON 364 - Economic Analysis of Business Strategies,*100-LEC(1430),"Mon,Wed",9:00AM,10:15AM,PBL 201,50   68,"Ernest PhD,Jonathan Orry",Regular,3
+,ECON 367 - Industrial Strategy: Government Action to Transform the Economy,100-SEM(10221),"Mon,Wed",12:45PM,2:00PM,PBL 05,18.0,"Helper,Susan",,3.0
+ECON,ECON 391 - Advanced Topics and Writing in Economics,*100-SEM(1358),"Tue,Thu",10:00AM,11:15AM,PBL 220,18,"Hawkins,Jenny Rae",Regular,3
+ECON,ECON 395 - Capstone Research in Economics,*100-SEM(1359),Fri,9:00AM,11:00AM,To Be Announced,26,"Clingingsmith, David
+Hawkins,Jenny Rae",Dyn Dt,3
+ECON,ECON 395 - Capstone Research in Economics,*100-SEM(1359),Tue,5:30PM,7:30PM,To Be Announced,26,"Clingingsmith, David
+Hawkins,Jenny Rae",Dyn Dt,3
+ECON,ECON 395 - Capstone Research in Economics,*100-SEM(1359),"Tue,Thu",1:00PM,2:15PM,PBL 258,26,"Clingingsmith, David
+Hawkins,Jenny Rae",Dyn Dt,3
+ECON,ECON 395 - Capstone Research in Economics,*101-SEM(1553),Fri,9:00AM,11:00AM,To Be Announced,27,"Schweitzer,Mark Edward",Dyn Dt,3
+ECON,ECON 395 - Capstone Research in Economics,*101-SEM(1553),Tue,5:30PM,7:30PM,To Be Announced,27,"Schweitzer,Mark Edward",Dyn Dt,3
+ECON,ECON 395 - Capstone Research in Economics,*101-SEM(1553),"Tue,Thu",1:00PM,2:15PM,PBL 220,27,"Schweitzer,Mark Edward",Dyn Dt,3
+ECON,ECON 431 - Economics of Negotiation and Conflict Resolution,*100-LEC(1470),Wed,6:00PM,8:30PM,PBL 401,37 (57),"Sheremeta,Roman M",Regular,3
+ORBH,ORBH 413 - Economics of Negotiation and Conflict Resolution,*100-LEC(1485),Wed,6:00PM,8:30PM,PBL 401,20 (57),"Sheremeta,Roman M",Regular,3
+,ECON 3XX - Allocating Scarce Resources: Are Free Markets Always the Best Way?,,"Tue,Thu",11:30AM,12:45PM,PBL 220,,"Wolcowitz, Jeffrey",,
+BAFI,ENTP 444 - Entrepreneurial Finance,*100-LEC(1304),Thu,6:00PM,8:45PM,PBL 02,50   59,"Goldberg,Michael; Schwarzinger,Todd  ; Todia,Liz",Regular,3
+EMBA,EMBA 437 - Economic Analysis for Managers,*100-SEM(1265),Fri,10:15AM,12:15PM,To Be Announced,50,"Votruba,Mark",Dyn Dt,2.5
+EMBA,EMBA 437 - Economic Analysis for Managers,*100-SEM(1265),Fri,1:15PM,3:15PM,To Be Announced,50,"Votruba,Mark",Dyn Dt,2.5
+EMBA,EMBA 437 - Economic Analysis for Managers,*100-SEM(1265),Fri,8:00AM,10:00AM,To Be Announced,50,"Votruba,Mark",Dyn Dt,2.5
+EMBA,EMBA 437 - Economic Analysis for Managers,*100-SEM(1265),Sat,10:15AM,12:15PM,To Be Announced,50,"Votruba,Mark",Dyn Dt,2.5
+EMBA,EMBA 437 - Economic Analysis for Managers,*100-SEM(1265),Sat,1:15PM,5:30PM,To Be Announced,50,"Votruba,Mark",Dyn Dt,2.5
+EMBA,EMBA 437 - Economic Analysis for Managers,*100-SEM(1265),Sat,8:00AM,10:00AM,To Be Announced,50,"Votruba,Mark",Dyn Dt,2.5
+EMBA,EMBA 437 - Economic Analysis for Managers,*100-SEM(1265),Thu,10:15AM,12:15PM,To Be Announced,50,"Votruba,Mark",Dyn Dt,2.5
+EMBA,EMBA 437 - Economic Analysis for Managers,*100-SEM(1265),Thu,1:15PM,3:15PM,To Be Announced,50,"Votruba,Mark",Dyn Dt,2.5
+EMBA,EMBA 439 - Corporate Finance,*100-SEM(1266),Fri,10:15AM,12:15PM,To Be Announced,50,"Gupta,Anurag",Dyn Dt,2.5
+EMBA,EMBA 439 - Corporate Finance,*100-SEM(1266),Fri,1:15PM,3:15PM,To Be Announced,50,"Gupta,Anurag",Dyn Dt,2.5
+EMBA,EMBA 439 - Corporate Finance,*100-SEM(1266),Fri,8:00AM,12:15PM,To Be Announced,50,"Gupta,Anurag",Dyn Dt,2.5
+EMBA,EMBA 439 - Corporate Finance,*100-SEM(1266),Sat,10:15AM,12:15PM,To Be Announced,50,"Gupta,Anurag",Dyn Dt,2.5
+EMBA,EMBA 439 - Corporate Finance,*100-SEM(1266),Sat,8:00AM,12:15PM,To Be Announced,50,"Gupta,Anurag",Dyn Dt,2.5
+EMBA,EMBA 439 - Corporate Finance,*100-SEM(1266),Thu,10:15AM,12:15PM,To Be Announced,50,"Gupta,Anurag",Dyn Dt,2.5
+EMBA,EMBA 439 - Corporate Finance,*100-SEM(1266),Thu,3:30PM,5:30PM,To Be Announced,50,"Gupta,Anurag",Dyn Dt,2.5
+EMBA,EMBA 442 - Innovation,*100-LEC(1255),Fri,8:00AM,10:00AM,To Be Announced,50,"Agamanolis,Stefan",Dyn Dt,2.5
+EMBA,EMBA 442 - Innovation,*100-LEC(1255),Sat,8:00AM,12:15PM,To Be Announced,50,"Agamanolis,Stefan",Dyn Dt,2.5
+EMBA,EMBA 442 - Innovation,*100-LEC(1255),Thu,8:00AM,12:15PM,To Be Announced,50,"Agamanolis,Stefan",Dyn Dt,2.5
+EMBA,EMBA 449 - Contemporary Issues in Management,*100-LEC(1272),Fri,10:15AM,12:15PM,To Be Announced,50,"Bailey,Bernard Craig",Dyn Dt,2.5
+EMBA,EMBA 449 - Contemporary Issues in Management,*100-LEC(1272),Fri,1:15PM,3:15PM,To Be Announced,50,"Bailey,Bernard Craig",Dyn Dt,2.5
+EMBA,EMBA 449 - Contemporary Issues in Management,*100-LEC(1272),Fri,8:00AM,10:00AM,To Be Announced,50,"Bailey,Bernard Craig",Dyn Dt,2.5
+EMBA,EMBA 449 - Contemporary Issues in Management,*100-LEC(1272),Sat,1:15PM,3:15PM,To Be Announced,50,"Bailey,Bernard Craig",Dyn Dt,2.5
+EMBA,EMBA 449 - Contemporary Issues in Management,*100-LEC(1272),Thu,10:15AM,12:15PM,To Be Announced,50,"Bailey,Bernard Craig",Dyn Dt,2.5
+EMBA,EMBA 449 - Contemporary Issues in Management,*100-LEC(1272),Thu,1:15PM,3:15PM,To Be Announced,50,"Bailey,Bernard Craig",Dyn Dt,2.5
+EMBA,EMBA 449 - Contemporary Issues in Management,*100-LEC(1272),Thu,1:15PM,5:30PM,To Be Announced,50,"Bailey,Bernard Craig",Dyn Dt,2.5
+EMBA,EMBA 451 - Strategy,*100-SEM(1541),Fri,8:00AM,10:00AM,To Be Announced,50,"Chatterjee,Sayan",Dyn Dt,2.5
+EMBA,EMBA 451 - Strategy,*100-SEM(1541),Fri,8:00AM,12:15PM,To Be Announced,50,"Chatterjee,Sayan",Dyn Dt,2.5
+EMBA,EMBA 451 - Strategy,*100-SEM(1541),Sat,10:15AM,12:15PM,To Be Announced,50,"Chatterjee,Sayan",Dyn Dt,2.5
+EMBA,EMBA 451 - Strategy,*100-SEM(1541),Sat,8:00AM,10:00AM,To Be Announced,50,"Chatterjee,Sayan",Dyn Dt,2.5
+EMBA,EMBA 451 - Strategy,*100-SEM(1541),Thu,8:00AM,10:00AM,To Be Announced,50,"Chatterjee,Sayan",Dyn Dt,2.5
+EMBA,EMBA 451 - Strategy,*100-SEM(1541),Thu,8:00AM,12:15PM,To Be Announced,50,"Chatterjee,Sayan",Dyn Dt,2.5
+EMBA,EMBA 471 - Strategic Negotiations,*100-LEC(1542),Fri,3:30PM,5:30PM,To Be Announced,50,"Sheremeta,Roman M",Dyn Dt,1.25
+EMBA,EMBA 471 - Strategic Negotiations,*100-LEC(1542),Thu,10:15AM,12:15PM,To Be Announced,50,"Sheremeta,Roman M",Dyn Dt,1.25
+EMBA,EMBA 471 - Strategic Negotiations,*100-LEC(1542),Thu,3:30PM,5:30PM,To Be Announced,50,"Sheremeta,Roman M",Dyn Dt,1.25
+EMBA,EMBA 473 - Leading Change: Teams,*100-LEC(1259),Fri,1:15PM,5:30PM,To Be Announced,50,"Van Oosten,Ellen Brooks",Dyn Dt,2.5
+EMBA,EMBA 473 - Leading Change: Teams,*100-LEC(1259),Sat,1:15PM,5:30PM,To Be Announced,50,"Van Oosten,Ellen Brooks",Dyn Dt,2.5
+EMBA,EMBA 473 - Leading Change: Teams,*100-LEC(1259),Thu,1:15PM,5:30PM,To Be Announced,50,"Van Oosten,Ellen Brooks",Dyn Dt,2.5
+EMBA,EMBA 476 - Corporate Governance and Dialogues in Healthcare,*100-SEM(1262),Fri,10:15AM,12:15PM,To Be Announced,50,"Peck,Simon Ian",Dyn Dt,1.25
+EMBA,EMBA 476 - Corporate Governance and Dialogues in Healthcare,*100-SEM(1262),Fri,3:30PM,5:30PM,To Be Announced,50,"Peck,Simon Ian",Dyn Dt,1.25
+EMBA,EMBA 476 - Corporate Governance and Dialogues in Healthcare,*100-SEM(1262),Sat,10:15AM,12:15PM,To Be Announced,50,"Peck,Simon Ian",Dyn Dt,1.25
+EMBA,EMBA 476 - Corporate Governance and Dialogues in Healthcare,*100-SEM(1262),Sat,1:15PM,3:15PM,To Be Announced,50,"Peck,Simon Ian",Dyn Dt,1.25
+EMBA,EMBA 476 - Corporate Governance and Dialogues in Healthcare,*100-SEM(1262),Sat,1:15PM,5:30PM,To Be Announced,50,"Peck,Simon Ian",Dyn Dt,1.25
+EMBA,EMBA 476 - Corporate Governance and Dialogues in Healthcare,*100-SEM(1262),Sat,8:00AM,12:15PM,To Be Announced,50,"Peck,Simon Ian",Dyn Dt,1.25
+EMBA,EMBA 476 - Corporate Governance and Dialogues in Healthcare,*100-SEM(1262),Thu,8:00AM,10:00AM,To Be Announced,50,"Peck,Simon Ian",Dyn Dt,1.25
+EMBA,EMBA 478B - Leading Design in Organizations,*100-SEM(1263),Fri,3:30PM,5:30PM,To Be Announced,50,"Yoo,Youngjin",Dyn Dt,1.25
+EMBA,EMBA 478B - Leading Design in Organizations,*100-SEM(1263),Fri,8:00AM,12:15PM,To Be Announced,50,"Yoo,Youngjin",Dyn Dt,1.25
+EMBA,EMBA 478B - Leading Design in Organizations,*100-SEM(1263),Sat,1:15PM,5:30PM,To Be Announced,50,"Yoo,Youngjin",Dyn Dt,1.25
+EMBA,EMBA 478B - Leading Design in Organizations,*100-SEM(1263),Sat,3:30PM,5:30PM,To Be Announced,50,"Yoo,Youngjin",Dyn Dt,1.25
+EMBA,EMBA 478B - Leading Design in Organizations,*100-SEM(1263),Thu,3:30PM,5:30PM,To Be Announced,50,"Yoo,Youngjin",Dyn Dt,1.25
+EMBA,EMBA 479 - Leading Change: Society,*100-SEM(1264),Fri,10:15AM,12:15PM,To Be Announced,50,"Cooperrider,David L",Dyn Dt,2.5
+EMBA,EMBA 479 - Leading Change: Society,*100-SEM(1264),Fri,1:15PM,3:15PM,To Be Announced,50,"Cooperrider,David L",Dyn Dt,2.5
+EMBA,EMBA 479 - Leading Change: Society,*100-SEM(1264),Fri,1:15PM,5:30PM,To Be Announced,50,"Cooperrider,David L",Dyn Dt,2.5
+EMBA,EMBA 479 - Leading Change: Society,*100-SEM(1264),Sat,8:00AM,10:00AM,To Be Announced,50,"Cooperrider,David L",Dyn Dt,2.5
+EMBA,EMBA 479 - Leading Change: Society,*100-SEM(1264),Sat,8:00AM,12:15PM,To Be Announced,50,"Cooperrider,David L",Dyn Dt,2.5
+EMBA,EMBA 479 - Leading Change: Society,*100-SEM(1264),Thu,1:15PM,5:30PM,To Be Announced,50,"Cooperrider,David L",Dyn Dt,2.5
+ENTP,ENTP 301 - Entrepreneurial Strategy,*100-LEC(1371),"Tue,Thu",2:30PM,3:45PM,PBL 02,58,"Buchter,Megan Elizabeth",Regular,3
+ENTP,ENTP 322 - Social Entrepreneurship: Igniting Social Change,*100-SEM(1476),"Tue,Thu",1:00PM,2:15PM,PBL 03,36,"Cashon, Tiffany  BOTH??
+Baierl,Mindy M; Cashon,Tiffany E",Regular,3
+,ENTP 323 - Silicon Valley,*100-LEC(10229),"Tue,Thu",11:30AM,12:45PM,PBL 121,,need instructor,,
+FNCE,FNCE 412 - Algorithmic Trading,*100-LEC(1446),Mon,3:00PM,5:45PM,"PBL 202
+PBL 118","38
+40 (58)","Noh,Joonki",Regular,3
+FNCE,FNCE 412 - Algorithmic Trading,*100-LEC(1446),Mon,9:00AM,11:45AM,"PBL 202
+PBL 118","38
+40 (58)","Noh,Joonki",Regular,3
+FTEC,FTEC 412 - Algorithmic Trading,*100-LEC(1445),Mon,3:00PM,5:45PM,"PBL 202
+PBL 118","16
+18 (58)","Noh,Joonki",Regular,3
+FTEC,FTEC 412 - Algorithmic Trading,*100-LEC(1445),Mon,9:00AM,11:45AM,"PBL 202
+PBL 118","16
+18 (58)","Noh,Joonki",Regular,3
+FNCE,FNCE 470 - Financial Models Using Big Data,*100-LEC(1494),Thu,3:00PM,5:45PM,PBL 401,55   57,"Bae,Joonwoo",Regular,3
+FNCE,"FNCE 436B - Individual, Team and Career Development",*100-SEM(1417),Fri,9:00AM,1:00PM,"PBL 203
+To Be Announced",54,"Fine,Scott",Regular,1.75
+FNCE,"FNCE 436B - Individual, Team and Career Development",*100-SEM(1417),Fri,9:30AM,11:45AM,To Be Announced,54,"Fine,Scott",Regular,1.75
+HSMC,HSMC 420 - Health Finance,*100-LEC(1274),Mon,6:00PM,8:00PM,PBL 118 per Laura 1/12/26; To Be Announced,30,"Herschman,Ray Samuel",Regular,3
+LEOC,LEOC 435 - Practicum in Appreciative Inquiry and Positive OD,*100-PRA(1480),"Wed,Thu,Fri",8:30AM,5:00PM,To Be Announced,35,"Fry,Ronald E",Dyn Dt,3
+LEOC,LEOC 480 - Dynamics of Creativity and Innovation in Organizations,*400-SEM(1441),Sat,8:30AM,5:00PM,Online - Synchronous (999),35,"Barrett,Frank",Dyn Dt,3
+LEOC,LEOC 480 - Dynamics of Creativity and Innovation in Organizations,*400-SEM(1441),Sat,8:30AM,5:00PM,To Be Announced,35,"Barrett,Frank",Dyn Dt,3
+LEOC,LEOC 480 - Dynamics of Creativity and Innovation in Organizations,*400-SEM(1441),Sun,8:30AM,5:00PM,Online - Synchronous (999),35,"Barrett,Frank",Dyn Dt,3
+MBAC,MBAC 501D - Professional Development and Career Strategy,*100-LEC(1548),Fri,11:00AM,12:30PM,To Be Announced,20,"Tischler,Nicole Therese",Regular,.5
+MBAC,MBAC 503 - Managerial Accounting,*100-LEC(1376),"Tue,Thu",10:00AM,11:15AM,PBL 118,55   57,"Jarvis,Mark",Dyn Dt,1.5
+MBAC,MBAC 505 - Corporate Finance II,*100-LEC(1305),Wed,2:15PM,5:00PM,PBL 203,55   57,"Fine, Scott
+Olavarria Baeza,Jose Valentin",Dyn Dt,1.5
+MBAC,MBAC 505 - Corporate Finance II,*100-LEC(1305),Wed,3:00PM,5:45PM,PBL 203,55   57,"Fine, Scott
+Olavarria Baeza,Jose Valentin",Dyn Dt,1.5
+MBAC,MBAC 507 - Operations and Supply Chain Management,*100-LEC(1248),Tue,1:00PM,3:45PM,PBL 118,55   57,"Ning, Jie
+Goulder,Michael Lee",Regular,3
+MBAC,MBAC 512 - Economics,*100-LEC(1291),Mon,12:00PM,2:45PM,PBL 106,55   57,"Sheremeta, Roman
+Shoag,Daniel Warren",Regular,3
+MBAC,MBAC 515B - Leadership Assessment and Development,*100-LEC(1532),Thu,11:30AM,2:15PM,PBL 02,55   57,"Van Oosten,Ellen Brooks",Dyn Dt,1.5
+MBAC,MBAC 518 - Business Analytics & AI for Business,*100-LEC(1533),"Mon,Wed",10:30AM,11:45AM,PBL 02,55   57,"Niraj,Rakesh Kumar",Regular,3
+MBAP,MBAP 402 - Financial and Managerial Accountancy,*400-LEC(1475),Mon,7:45PM,9:15PM,To Be Announced,58,"Bucaro,Anthony Carl",Regular,3
+MBAP,MBAP 402 - Financial and Managerial Accountancy,*800-LEC(1504),Wed,7:00PM,8:00PM,Online - Synchronous (999),45,Staff,Virt Reg,3
+MBAP,MBAP 403 - Statistics and Decision Modeling,*400-LEC(1534),Mon,6:00PM,7:30PM,To Be Announced,58,"Fallahtafti,Alireza",Regular,3
+MBAP,MBAP 403 - Statistics and Decision Modeling,*800-LEC(1505),Thu,7:00PM,8:30PM,Online - Synchronous (999),45,"Wu,Qi",Virt Reg,3
+MBAP,MBAP 404 - Managing People and Organizations,*400-LEC(10152),Mon,6:00PM,7:30PM,Peter B Lewis Building (999),50,"Laszlo,Christopher Peter; Ramamurthi,Radhika",Regular,3
+MBAP,MBAP 406 - Economics for Managers,*400-LEC(1535),Mon,6:00PM,7:30PM,To Be Announced,57,"Shoag,Daniel Warren",Regular,3
+MBAP,MBAP 408 - Operations Management,*800-LEC(1507),Thu,7:00PM,8:30PM,Online - Synchronous (999),45,"Goulder,Michael Lee",Virt Reg,3
+MBAP,MBAP 410 - Strategic Issues and Applications,*800-LEC(1506),Tue,7:00PM,8:30PM,Online - Synchronous (999),45,"Peck,Simon Ian",Virt Reg,3
+MBAP,MBAP 427H - Introduction to Population Health,*800-LEC(1457),Thu,7:00PM,8:30PM,Online - Synchronous (999),45,"Nevel,Alan",Virt Sess1,1.5
+MBAP,MBAP 428H - Healthcare Decision Making and Analytics,*800-LEC(1459),Wed,7:00PM,8:30PM,Online - Synchronous (999),45,Staff,Virt Reg,3
+MBAP,MBAP 429H - Artificial Intelligence Applications in Healthcare Management,*800-LEC(1458),Thu,7:00PM,8:30PM,Online - Synchronous (999),45,Staff,Virt Sess2,1.5
+MBAP,MBAP 474 - Leading Others,*400-LEC(10150),Mon,7:45PM,9:15PM,Peter B Lewis Building (999),50,"Messer,Tracey Eira; Ramamurthi,Radhika",Virt Sess1,1.5
+MBAP,MBAP 474 - Leading Others,*800-LEC(10151),Thu,7:00PM,8:30PM,Online - Synchronous (999),50,"Messer,Tracey Eira; Ramamurthi,Radhika",Virt Sess1,1.5
+MBAP,MBAP 475 - Using Financial Statements to Evaluate Performance,*400-LEC(10144),Mon,6:00PM,7:30PM,Peter B Lewis Building (999),50,"Jonas,Gregory Alan; Ramamurthi,Radhika",Virt Sess1,1.5
+MBAP,MBAP 475 - Using Financial Statements to Evaluate Performance,*800-LEC(10145),Tue,7:00PM,8:30PM,Online - Synchronous (999),50,"Jonas,Gregory Alan; Ramamurthi,Radhika",Virt Sess1,1.5
+MBAP,MBAP 476 - Cost-Based Decision Making,*400-LEC(10146),Mon,6:00PM,7:30PM,Peter B Lewis Building (999),50,"Jonas,Gregory Alan; Ramamurthi,Radhika",Virt Sess2,1.5
+MBAP,MBAP 476 - Cost-Based Decision Making,*800-LEC(10147),Tue,7:00PM,8:30PM,Online - Synchronous (999),50,"Jonas,Gregory Alan; Ramamurthi,Radhika",Virt Sess2,1.5
+MBAP,MBAP 477 - Corporate Finance,*400-LEC(10148),Mon,6:00PM,7:30PM,Peter B Lewis Building (999),50,"Olavarria Baeza,Jose Valentin; Ramamurthi,Radhika",Virt Sess2,1.5
+MBAP,MBAP 477 - Corporate Finance,*800-LEC(10149),Thu,7:45PM,9:15PM,Online - Synchronous (999),50,"Olavarria Baeza,Jose Valentin; Ramamurthi,Radhika",Virt Sess2,1.5
+MBAP,MBAP 482 - Introduction to Supply Chain Management,*400-LEC(10119),Mon,6:00PM,7:30PM,To Be Announced,50,"Ramamurthi,Radhika",Virt Sess2,1.5
+MBAP,MBAP 482 - Introduction to Supply Chain Management,*800-LEC(10120),Thu,7:00PM,8:30PM,Online - Synchronous (999),50,"Ramamurthi,Radhika; Vairaktarakis,George",Virt Sess2,1.5
+MBAP,MBAP 483 - The Strategic Edge - Economics for Leaders,*400-LEC(10142),Mon,7:45PM,9:15PM,Peter B Lewis Building (999),50,"Ramamurthi,Radhika; Sheremeta,Roman M",Virt Sess2,1.5
+MBAP,MBAP 483 - The Strategic Edge - Economics for Leaders,*800-LEC(10143),Tue,7:00PM,8:30PM,Online - Synchronous (999),50,"Ramamurthi,Radhika; Sheremeta,Roman M",Virt Sess2,1.5
+MBAP,MBAP 484 - Introduction to Operations Management,400-LEC(10118),Mon,6:00PM,7:30PM,Peter B Lewis Building (999),50,"Ramamurthi,Radhika",Virt Sess1,1.5
+MBAP,MBAP 484 - Introduction to Operations Management,800-LEC(10117),Thu,7:00PM,8:30PM,Online - Synchronous (999),50,"Ramamurthi,Radhika; Vairaktarakis,George",Virt Sess1,1.5
+MBAP,MBAP 499 - Introduction to Learning Skills,*800-SEM(1377),Mon,7:00PM,9:00PM,Online - Synchronous (999),45,"Healy,Suzanne Lee",Virt Reg,0
+MGMT,MGMT 198 - Experience in Business Problem Solving: Organizations,*100-LEC(1516),Tue,6:00PM,8:00PM,PBL 03,40,"Hazard, Brett C.
+Hazard,Brett C; Taylor,John D",Dyn Dt,1
+MGMT,MGMT 198 - Experience in Business Problem Solving: Organizations,*100-LEC(1516),Tue,4:00PM,6:00PM,PBL 03,40,"Hazard, Brett C.
+Hazard,Brett C; Taylor,John D",Dyn Dt,1
+MGMT,MGMT 198 - Experience in Business Problem Solving: Organizations,*100-LEC(1516),Tue,6:00PM,8:00PM,PBL 03,40,"Hazard, Brett C.
+Hazard,Brett C; Taylor,John D",Dyn Dt,1
+,MGMT 198 - Experience in Business Problem Solving: Organizations,*100-LEC(1516),Tue,6:00PM,8:00PM,PBL 03,40.0,"Hazard, Brett C.
+Hazard,Brett C; Taylor,John D",Dyn Dt,1
+,MGMT 198 - Experience in Business Problem Solving: Organizations,*100-LEC(1516),Tue,6:00PM,8:00PM,PBL 03,40.0,"Hazard, Brett C.
+Hazard,Brett C; Taylor,John D",Dyn Dt,1
+,MGMT 198 - Experience in Business Problem Solving: Organizations,*100-LEC(1516),Tue,6:00PM,8:00PM,PBL 03,40.0,"Hazard, Brett C.
+Hazard,Brett C; Taylor,John D",Dyn Dt,1
+,MGMT 198 - Experience in Business Problem Solving: Organizations,*100-LEC(1516),Tue,6:00PM,8:00PM,PBL 03,40.0,"Hazard, Brett C.
+Hazard,Brett C; Taylor,John D",Dyn Dt,1
+MGMT,MGMT 198 - Experience in Business Problem Solving: Organizations,*100-LEC(1516),Tue,6:00PM,9:00PM,PBL 03,40,"Hazard, Brett C.
+Hazard,Brett C; Taylor,John D",Dyn Dt,1
+MGMT,MGMT 198 - Experience in Business Problem Solving: Sustainability,*101-LEC(1517),Tue,10:00AM,11:15AM,"PBL 202
+PBL 02",40,"Buchter,Megan Elizabeth, Agamanolis, Stefan",Regular,1
+MGMT,MGMT 198 - Experience in Business Problem Solving: Sustainability,*101-LEC(1517),Tue,4:00PM,5:00PM,"PBL 202
+PBL 02",40,"Buchter,Megan Elizabeth, Agamanolis, Stefan",Regular,1
+MGMT,MGMT 198 - Experience in Business Problem Solving: Sustainability,102.0,Wed,2:15PM,3:30PM,PBL 258,40,"Buchter,Megan Elizabeth, Agamanolis, Stefan",Regular,1
+MGMT,MGMT 201 - Contemporary Business and Communication,*101-LEC(1330),"Tue,Thu",10:00AM,11:15AM,PBL 03,45,"Gilmore,James Haydn",Regular,3
+MGMT,MGMT 201 - Contemporary Business and Communication,*102-LEC(1331),"Tue,Thu",11:30AM,12:45PM,PBL 03,45,"Gilmore,James Haydn",Regular,3
+MGMT,MGMT 205 - Essentials of Personal Finance,*100-LEC(1473),Tue,2:30PM,3:45PM,PBL 04,40,"Sasmaz,Mary B",Regular,1.5
+MGMT,MGMT 205 - Essentials of Personal Finance,*101-LEC(1515),Mon,3:20PM,4:35PM,"PBL 05
+PBL 04",40,"Sasmaz,Mary B",Regular,1.5
+MGMT,MGMT 205 - Essentials of Personal Finance,*101-LEC(1515),Thu,2:30PM,3:45PM,"PBL 05
+PBL 04",40,"Sasmaz,Mary B",Regular,1.5
+,MGMT 221 - Doing Good: How Nonprofits Change Lives,,"Tue,Thu",10:00AM,11:15AM,PBL 120,18.0,,,
+MGMT,"MGMT 224 - What is Making and Manufacturing Today, and Why is Innovation Part of the Story?",*100-SEM(1549),"Mon,Wed",12:45PM,2:00PM,PBL 220,18,"Camp,Lisa Ann",Regular,3
+,MGMT 298 - Experience in Business Problem Solving: Applied Methods,,Tue,6:00PM,8:00PM,PBL 07,40.0,"Taylor, John D",,
+,MGMT 298 - Experience in Business Problem Solving: Applied Methods,,Tue,6:00PM,8:00PM,PBL 07,40.0,"Taylor, John D",,
+,MGMT 298 - Experience in Business Problem Solving: Applied Methods,,Tue,6:00PM,8:00PM,PBL 07,40.0,"Taylor, John D",,
+,MGMT 298 - Experience in Business Problem Solving: Applied Methods,,Tue,6:00PM,8:00PM,PBL07,40.0,"Taylor, John D",,
+,MGMT 298 - Experience in Business Problem Solving: Applied Methods,,Tue,6:00PM,8:00PM,PBL 07,40.0,"Taylor, John D",,
+,MGMT 298 - Experience in Business Problem Solving: Applied Methods,,Tue,6:00PM,8:00PM,PBL 07,40.0,"Taylor, John D",,
+,MGMT 298 - Experience in Business Problem Solving: Applied Methods,,Tue,6:00PM,9:00PM,PBL 07,40.0,"Taylor, John D",,
+MGMT,MGMT 315 - International Management Institute: Iceland,*100-LEC(1488),Thu,4:00PM,5:00PM,PBL 03,30,"Buchter,Megan Elizabeth",Regular,3
+,MGMT 320 - Introduction to Family Business,,Mon,6:00PM,8:30PM,PBL 05,15.0,"Steeb, Cindy",,1.5
+,MGMT 420 - Introduction to Family Business,,Mon,6:00PM,8:30PM,PBL 05,15.0,"Steeb, Cindy",,1.5
+,MGMT 321 - Complexities of Family Business,,Mon,6:00PM,8:30PM,PBL 05,15.0,"Steeb, Cindy",,1.5
+,MGMT 421 - Complexities of Family Business,,Mon,6:00PM,8:30PM,PBL 05,15.0,"Steeb, Cindy",,1.5
+MGMT,MGMT 395 - Advanced Seminar: Booms and Busts - Lessons,*106-SEM(1431),Wed,12:45PM,1:45PM,Peter B Lewis 121 (25),18,"Levine,Kenneth L",Regular,1
+MGMT,MGMT 395 - Advanced Seminar: Booms and Busts - Lessons,*107-SEM(1432),Wed,2:15PM,3:15PM,Peter B Lewis 121 (25),18,"Levine,Kenneth L",Regular,1
+MGMT,MGMT 395 - Advanced Seminar: Booms and Busts - Lessons,*107-SEM(1432),Thu,10:00AM,11:00AM,Peter B Lewis 121 (25),18,"Levine,Kenneth L",Regular,1
+MGMT,MGMT 395 - Advanced Seminar: Commercial Credit Risk,*108-SEM(1520),Wed,4:30PM,5:30PM,Peter B Lewis 121 (25),18,"Rausche,Amra",Regular,1
+MGMT,MGMT 395 - Advanced Seminar: Commercial Credit Risk,*108-SEM(1520),Wed,5:30PM,6:30PM,Peter B Lewis 121 (25),18,"Rausche,Amra",Regular,1
+MGMT,MGMT 395 - Advanced Seminar: Private Credit: New Corp Debt,*105-SEM(1538),Tue,6:00PM,8:00PM,Peter B Lewis 121 (25),18,"Thompson,John",Reg 1 Half,1
+MGMT,MGMT 395 - Advanced Seminar: Private Credit: New Corp Debt,*105-SEM(1538),Mon,6:00PM,8:00PM,Peter B Lewis 121 (25),18,"Thompson,John",Reg 1 Half,1
+MGMT,MGMT 395 - Advanced Seminar: Social Justice Leadership,*102-SEM(1413),Tue,1:00PM,2:00PM,Peter B Lewis 121 (25),18,"Howard,Anita R",Regular,1
+MGMT,MGMT 395 - Advanced Seminar: Social Justice Leadership,*103-SEM(1414),Tue,2:30PM,3:30PM,Peter B Lewis 121 (25),18,"Howard,Anita R",Regular,1
+MGMT,MGMT 395 - Advanced Seminar: Social Justice Leadership,*104-SEM(1415),Tue,4:00PM,5:00PM,Peter B Lewis 121 (25),18,"Howard,Anita R",Regular,1
+MGMT,MGMT 395 - Advanced Seminar: Sports Management  Sports & Entertainment Sponsorships & Management,*100-SEM(1411),Thu,1:00PM,3:00PM,Peter B Lewis 121 (25),18,"Linton,Michael",Regular,1
+MGMT,MGMT 395 - Advanced Seminar: Sports Management  Sports & Entertainment Sponsorships & Management,*100-SEM(1411),Wed,9:00AM,10:00AM,Peter B Lewis 121 (25),18,"Linton,Michael",Regular,1
+MGMT,MGMT 395 - Advanced Seminar: Sports Management Spotlight Feedback: Evaluating Ideas in Real Time ,*101-SEM(1412),Fri,12:00PM,2:00PM,Peter B Lewis 121 (25),18,"Linton,Michael",Regular,1
+MGMT,MGMT 395 - Advanced Seminar: Sports Management Spotlight Feedback: Evaluating Ideas in Real Time ,*101-SEM(1412),Wed,10:45AM,11:45AM,Peter B Lewis 121 (25),18,"Linton,Michael",Regular,1
+,MGMT 395 - Advanced Seminar: Lead with Purpose: Strategies for Intentional Impact,400.0,Thu,1:00PM,3:00PM,Peter B Lewis 121 (25),,"Simpson, Yvette",,
+,MGMT 395 - Advanced Seminar: Lead with Purpose: Strategies for Intentional Impact,,Fri,10:00AM,12:00PM,"Peter B Lewis 121 (25)
+Peter B Lewis 220 (36)",,Yvette Simpson,,
+,MGMT 395 - Advanced Seminar: Lead with Purpose: Strategies for Intentional Impact,,Fri,12:00PM,2:00PM,"Peter B Lewis 121 (25)
+Peter B Lewis 220 (36)",,Yvette Simpson,,
+,MGMT 395 - Advanced Seminar: Lead with Purpose: Strategies for Intentional Impact,,Thu,9:00AM,11:00AM,Online - Synchronous (999),,Yvette Simpson,,
+,MGMT 395 - Advanced Seminar: Lead with Purpose: Strategies for Intentional Impact,,Thu,1:00PM,3:00PM,Online - Synchronous (999),,Yvette Simpson,,
+,MGMT 395 - Advanced Seminar - Becoming conversant in Artificial Intelligence,,Tue,1:00PM,2:00PM,Peter B Lewis 05 (43),,"Vaidya, Jay",,
+,MGMT 395 - Advanced Seminar - Effective Communication as an Analyst - Real Estate Investment Application,,Mon,2:15PM,3:15PM,Peter B Lewis 121 (25),,"Schwartz, Edward; Stone, Kevin",,
+,MGMT 395 - Advanced Seminar - Art and Science of Decision Making,,Mon,1:00PM,2:00PM,Peter B Lewis 121 (25),,"Arbesman, Samuel",,
+,MGMT 395 - Advanced Seminar - What Your CFO Isn't Telling You,,Thu,4:00PM,5:00PM,Peter B Lewis 121 (25),,"Steinberg, Gregory",,
+,MGMT 396 - Experience in Business Consulting for Sustainable Impact,,Thu,6:00PM,8:00PM,PBL 401,50.0,"Buchter, Megan",,3.0
+MGMT,MGMT 398 - Action Learning,*100-LEC(1366),Fri,9:00AM,11:00AM,PBL 202,45   42,"Hazard,Brett C; Taylor,John D",Regular,6
+,MGMT 398 - Action Learning,*100-LEC(1366),Fri,9:00AM,11:00AM,PBL 202,45   42,"Hazard,Brett C; Taylor,John D",Regular,6
+,MGMT 398 - Action Learning,*100-LEC(1366),Fri,9:00AM,11:00AM,PBL 202,45   42,"Hazard,Brett C; Taylor,John D",Regular,6
+,MGMT 398 - Action Learning,*100-LEC(1366),Fri,9:00AM,11:00AM,PBL 202,45   42,"Hazard,Brett C; Taylor,John D",Regular,6
+,MGMT 398 - Action Learning,*100-LEC(1366),Fri,9:00AM,11:00AM,PBL 202,45   42,"Hazard,Brett C; Taylor,John D",Regular,6
+,MGMT 398 - Action Learning,*100-LEC(1366),Fri,9:00AM,11:00AM,PBL 202,45   42,"Hazard,Brett C; Taylor,John D",Regular,6
+MGMT,MGMT 398 - Action Learning,*100-LEC(1366),Mon,6:00PM,8:00PM,PBL 07,42,"Hazard,Brett C; Taylor,John D",Regular,6
+MGMT,MGMT 398 - Action Learning,*100-LEC(1366),Thu,6:00PM,9:00PM,PBL 201,42,"Hazard,Brett C; Taylor,John D",Regular,6
+MGMT,MGMT 398 - Action Learning,*100-LEC(1366),Wed,6:00PM,9:00PM,PBL 201,42,"Hazard,Brett C; Taylor,John D",Regular,6
+MGMT,MGMT 458 - International Institute: Brno and Prague  Estonia & Finland,*100-LEC(1434),"Mon,Tue,Wed,Thu,Fri,Sat,Sun",7:00AM,8:00AM,To Be Announced,30,"Goldberg,Michael",Regular,3
+MGMT,MGMT 571 - Measurement Theory and Method,*100-LEC(1497),Fri,9:00AM,3:00PM,To Be Announced,10,"Singh,Jagdip",Dyn Dt,3
+MGMT,MGMT 571 - Measurement Theory and Method,*100-LEC(1497),Mon,9:00AM,3:00PM,To Be Announced,10,"Singh,Jagdip",Dyn Dt,3
+MGMT,MGMT 571 - Measurement Theory and Method,*100-LEC(1497),Tue,9:00AM,3:00PM,To Be Announced,10,"Singh,Jagdip",Dyn Dt,3
+MIDS,MIDS 301 - Introduction to Information: A Systems and Design Approach,*100-SEM(1334),"Tue,Thu",10:00AM,11:15AM,PBL 07,55  57,"Kim, Dongyeob
+Sarangadharan Geetha Kumari,Akhil",Regular,3
+MKMR,MKMR 201 - Marketing Management,*100-LEC(1335),"Mon,Wed",10:35AM,11:50AM,PBL 05,40.0,"Hughes,Christian",Regular,3
+MKMR,MKMR 201 - Marketing Management,*101-LEC(1336),"Tue,Thu",10:00AM,11:15AM,PBL 501,50  33,"Ghosh,Somali",Regular,3
+MKMR,MKMR 201 - Marketing Management,*102-LEC(1337),"Tue,Thu",11:30AM,12:45PM,PBL 501,50  48,"Ghosh,Somali",Regular,3
+MKMR,MKMR 310 - Marketing Analytics,*100-LEC(1332),"Tue,Thu",11:30AM,12:45PM,PBL 118,50  51,"Wang, Nengbo
+Azar,Pablo",Regular,3
+MKMR,MKMR 311 - Customer Relationship Management,*100-LEC(1407),"Tue,Thu",1:00PM,2:15PM,PBL 07,43 (50)  43 (51),"Bodapati, Narsi
+Azar,Pablo",Regular,3
+MKMR,MKMR 411 - Customer Relationship Management,*100-SEM(1449),"Tue,Thu",1:00PM,2:15PM,PBL 07,"7 (50) 
+8 (51)","Bodapati, Narsi
+Azar,Pablo",Regular,3
+MKMR,MKMR 348 - Strategic Internet Marketing,*100-LEC(1338),"Mon,Wed",10:35AM,11:50AM,PBL 03,45,"Ghosh,Somali",Regular,3
+,MKMR 350 - Social Media Strategy,need class number,"Mon,Wed",12:45PM,2:00PM,PBL 04,50  45,"Hughes,Christian",,
+MKMR,MKMR 412 - E-Marketing,*100-LEC(1525),Thu,6:00PM,8:30PM,PBL 118,45,"Hughes,Christian",Regular,3
+MPOD,MPOD 416B - Leadership and Executive Assessment and Development,*100-LEC(1479),Tue,8:30AM,5:00PM,To Be Announced,35,"Van Oosten,Ellen Brooks",Dyn Dt,1
+MPOD,MPOD 439 - Individual Mastery Projects,*400-LEC(1481),Sun,8:30AM,5:00PM,Online - Synchronous (999),35,"Barrett,Frank",Dyn Dt,3
+MPOD,MPOD 439 - Individual Mastery Projects,*400-LEC(1481),"Thu,Fri",8:30AM,5:00PM,To Be Announced,35,"Barrett,Frank",Dyn Dt,3
+OPMT,OPMT 377A - Business Forecasting,*100-LEC(1339),Wed,6:00PM,8:30PM,"PBL 501
+PBL 106",10 (50),"Mathur, Kamlesh
+Zokaeinikoo,Maryam",Dyn Dt,1.5
+OPMT,OPMT 377A - Business Forecasting,*100-LEC(1339),Thu,6:00PM,8:30PM,"PBL 501
+PBL 106",10 (50),"Mathur, Kamlesh
+Zokaeinikoo,Maryam",Dyn Dt,1.5
+OPMT,OPMT 477A - Business Forecasting,*100-LEC(1241),Wed,6:00PM,8:30PM,"PBL 501
+PBL 106","10 (50)
+5 (50)","Mathur, Kamlesh
+Zokaeinikoo,Maryam",Dyn Dt,1.5
+OPMT,OPMT 477A - Business Forecasting,*100-LEC(1241),Thu,6:00PM,8:30PM,"PBL 501
+PBL 106","10 (50)
+5 (50)","Mathur, Kamlesh
+Zokaeinikoo,Maryam",Dyn Dt,1.5
+SCMG,SCMG 477A - Business Forecasting,*100-LEC(1384),Wed,6:00PM,8:30PM,"PBL 501
+PBL 106","30 (50)
+35 (50)","Mathur, Kamlesh
+Zokaeinikoo,Maryam",Dyn Dt,1.5
+SCMG,SCMG 477A - Business Forecasting,*100-LEC(1384),Thu,6:00PM,8:30PM,"PBL 501
+PBL 106","30 (50)
+35 (50)","Mathur, Kamlesh
+Zokaeinikoo,Maryam",Dyn Dt,1.5
+OPMT,OPMT 377B - Enterprise Resource Planning in the Supply Chain,*100-LEC(1408),Wed,6:00PM,8:30PM,"PBL 501
+PBL 106",10 (50),"DiFilippo, Daniel
+Zokaeinikoo,Maryam",Dyn Dt,1.5
+OPMT,OPMT 377B - Enterprise Resource Planning in the Supply Chain,*100-LEC(1408),Thu,6:00PM,8:30PM,"PBL 501
+PBL 106",10 (50),"DiFilippo, Daniel
+Zokaeinikoo,Maryam",Dyn Dt,1.5
+OPMT,OPMT 477B - Enterprise Resource Planning in the Supply Chain,*100-LEC(1386),Wed,6:00PM,8:30PM,"PBL 501
+PBL 106","10 (50)
+5 (50)","DiFilippo, Daniel
+Zokaeinikoo,Maryam",Dyn Dt,1.5
+OPMT,OPMT 477B - Enterprise Resource Planning in the Supply Chain,*100-LEC(1386),Thu,6:00PM,8:30PM,"PBL 501
+PBL 106","10 (50)
+5 (50)","DiFilippo, Daniel
+Zokaeinikoo,Maryam",Dyn Dt,1.5
+SCMG,SCMG 477B - Enterprise Resource Planning in the Supply Chain,*100-LEC(1385),Wed,6:00PM,8:30PM,"PBL 501
+PBL 106","30 (50)
+35 (50)","DiFilippo, Daniel
+Zokaeinikoo,Maryam",Dyn Dt,1.5
+SCMG,SCMG 477B - Enterprise Resource Planning in the Supply Chain,*100-LEC(1385),Thu,6:00PM,8:30PM,"PBL 501
+PBL 106","30 (50)
+35 (50)","DiFilippo, Daniel
+Zokaeinikoo,Maryam",Dyn Dt,1.5
+OPMT,OPMT 420 - Experiential Learning with Six Sigma Green Belt,"100
+*101-LEC(1433)",TBA,2:30PM,5:15PM,"PBL 05
+PBL 202","4 per Kamlesh & Mike
+30 (60)
+5 (27)","Goulder,Michael Lee",Regular,3
+OPMT,OPMT 420 - Experiential Learning with Six Sigma Green Belt,"100
+*101-LEC(1433)",Wed,6:00PM,8:30PM,"PBL 05
+PBL 202","4 per Kamlesh & Mike
+30 (60)
+5 (27)","Goulder,Michael Lee",Regular,3
+SCMG,SCMG 420 - Experiential Learning with Six Sigma Green Belt,"100
+*101-LEC(1422)",TBA,2:30PM,5:15PM,"PBL 05
+PBL 202","20 per Kamlesh & Mike
+30 (60) 
+20 (27)","Goulder,Michael Lee",Regular,3
+SCMG,SCMG 420 - Experiential Learning with Six Sigma Green Belt,"100
+*101-LEC(1422)",Wed,6:00PM,8:30PM,"PBL 05
+PBL 202","20 per Kamlesh & Mike
+30 (60) 
+20 (27)","Goulder,Michael Lee",Regular,3
+OPMT,OPMT 475 - Global Supply Chain Logistics,*100-LEC(1388),"Tue,Thu",10:00AM,11:15AM,"PBL 401
+PBL 118",7 (51),"Mathur,Kamlesh",Regular,3
+OPMT,OPMT 475 - Global Supply Chain Logistics,*100-LEC(1388),"Mon,Wed",12:45PM,2:00PM,"PBL 401
+PBL 118",7 (51),"Mathur,Kamlesh",Regular,3
+SCMG,SCMG 475 - Global Supply Chain Logistics,*100-LEC(1387),"Tue,Thu",10:00AM,11:15AM,"PBL 401
+PBL 118",44 (51),"Mathur,Kamlesh",Regular,3
+SCMG,SCMG 475 - Global Supply Chain Logistics,*100-LEC(1387),"Mon,Wed",12:45PM,2:00PM,"PBL 401
+PBL 118",44 (51),"Mathur,Kamlesh",Regular,3
+OPRE,OPRE 207 - Statistics for Business and Management Science I,*100-LEC(1340),"Mon,Wed",9:00AM,10:15AM,"PBL 258
+PBL 07",55  57,"Zokaeinikoo,Maryam",Regular,3
+OPRE,OPRE 207 - Statistics for Business and Management Science I,*101-LEC(1341),"Mon,Wed",10:35AM,11:50AM,"PBL 258
+PBL 07",55  57,"Zokaeinikoo,Maryam",Regular,3
+OPRE,OPRE 207 - Statistics for Business and Management Science I,*101-LEC(1341),"Mon,Wed",12:45PM,2:00PM,"PBL 258
+PBL 07",55  57,"Zokaeinikoo,Maryam",Regular,3
+OPRE,OPRE 301 - Operations Research and Supply Chain Management,*100-LEC(1370),"Mon,Wed",12:45PM,2:00PM,"PBL 07
+PBL 258",55,"Fallahtafti,Alireza",Regular,3
+OPRE,OPRE 301 - Operations Research and Supply Chain Management,*100-LEC(1370),"Mon,Wed",10:35AM,11:50AM,"PBL 07
+PBL 258",55,"Fallahtafti,Alireza",Regular,3
+OPRE,OPRE 301 - Operations Research and Supply Chain Management,*101-LEC(1425),"Mon,Wed",3:20PM,4:35PM,PBL 401,55  57,"Fallahtafti,Alireza",Regular,3
+,"ORBH 222 - The Confidence Blueprint: Skills for College, Career and Life",,Thu,5:30PM,8:00PM,PBL 03,18.0,"Smith, Dalithia",,
+ORBH,"ORBH 250 - Leading People: The Practice, Theory, and Reality of Leadership (LEAD I)",*100-LEC(1342),"Tue,Thu",10:00AM,11:15AM,PBL 02,60,"Volkova Feddeck, Maria
+Van Oosten, Ellen
+Liu,Han",Regular,3
+ORBH,"ORBH 250 - Leading People: The Practice, Theory, and Reality of Leadership (LEAD I)",*100-LEC(1342),"Tue,Thu",11:30AM,12:45PM,PBL 02,60,"Volkova Feddeck, Maria
+Van Oosten, Ellen
+Liu,Han",Regular,3
+ORBH,ORBH 251 - Leading Organizations (LEAD II),*100-LEC(1343),"Tue,Thu",11:30AM,12:45PM,PBL 203,60  58,"Laszlo, Christopher 
+Volkova-Feddeck, Maria 
+Ehasz,Sharon Fitzgerald",Regular,3
+ORBH,ORBH 251 - Leading Organizations (LEAD II),*100-LEC(1343),"Tue,Thu",10:00AM,11:15AM,PBL 203,60  58,"Laszlo, Christopher 
+Volkova-Feddeck, Maria 
+Ehasz,Sharon Fitzgerald",Regular,3
+ORBH,ORBH 303 - Developing Interpersonal Skills for Leading,*400-SEM(1482),"Mon,Tue,Thu,Fri,Sat",10:00AM,2:30PM,Online - Synchronous (999),50,"Messer,Tracey Eira",Dyn Dt,3
+ORBH,ORBH 303 - Developing Interpersonal Skills for Leading,*400-SEM(1482),Sat,10:00AM,1:30PM,To Be Announced,50,"Messer,Tracey Eira",Dyn Dt,3
+ORBH,ORBH 303 - Developing Interpersonal Skills for Leading,*400-SEM(1482),"Thu,Fri",10:00AM,2:30PM,To Be Announced,50,"Messer,Tracey Eira",Dyn Dt,3
+ORBH,ORBH 310 - The Art and Science of High-Functioning Teams,*100-SEM(1474),"Mon,Wed",3:20PM,4:35PM,PBL 04,50  49,"Stephens,John P",Regular,3
+ORBH,"ORBH 330 - Quantum Leadership: Creating Value for You, Business, and the World",*100-SEM(1365),Tue,6:00PM,8:00PM,PBL 02,"40 (50)
+44 (58)","Laszlo,Christopher Peter",Regular,3
+ORBH,"ORBH 430 - Quantum Leadership: Creating Value for You, Business, and the World",*100-SEM(1302),Tue,6:00PM,8:00PM,PBL 02,"10 (50) 
+15 (58)","Laszlo,Christopher Peter",Regular,3
+ORBH,ORBH 375 - Building Leadership Character: Ethics in Action,*100-LEC(1486),"Tue,Thu",10:00AM,11:15AM,PBL 120,18,"Case PhD,Susan S",Regular,3
+ORBH,ORBH 375 - Building Leadership Character: Ethics in Action,*100-LEC(1486),"Tue,Thu",11:30AM,12:45PM,PBL 120,18,"Case PhD,Susan S",Regular,3
+ORBH,ORBH 403 - Developing Interpersonal Skills for Managers,*100-LEC(1399),"Mon,Tue,Wed,Thu,Fri",6:00PM,9:30PM,PBL 02,40,"Fry,Ronald E",Dyn Dt,3
+ORBH,ORBH 403 - Developing Interpersonal Skills for Managers,*100-LEC(1399),"Mon,Tue,Wed,Thu,Fri",6:00PM,10:00PM,PBL 02,40,"Fry,Ronald E",Dyn Dt,3
+ORBH,ORBH 403 - Developing Interpersonal Skills for Managers,*100-LEC(1399),Sat,9:00AM,5:00PM,PBL 02,40,"Fry,Ronald E",Dyn Dt,3
+ORBH,ORBH 451 - Alternative Dispute Resolution,*100-LEC(1256),Wed,3:25PM,5:25PM,Gund Hall (999),10 (32),"Mercer,Kathryn L",Regular,3
+ORBH,ORBH 460 - Women in Organizations,*800-LEC(1398),"Mon,Tue,Wed,Thu",5:00PM,9:00PM,Online - Synchronous (999),56,"Bilimoria,Diana",Dyn Dt,3
+ORBH,ORBH 460 - Women in Organizations,*800-LEC(1398),"Mon,Tue,Wed,Thu",7:00AM,8:00AM,Online - Synchronous (999),56,"Bilimoria,Diana",Dyn Dt,3
+ORBH,ORBH 460 - Women in Organizations,*800-LEC(1398),Sat,9:00AM,5:00PM,Online - Synchronous (999),56,"Bilimoria,Diana",Dyn Dt,3
+ORBH,ORBH 510 - Organizational Behavior Department Seminar,*100-LEC(1260),Wed,9:00AM,12:00PM,To Be Announced,6,"Case PhD,Susan S",Regular,1.5
+PLCY,PLCY 399 - Business Policy,*100-LEC(1344),"Mon,Wed",12:45PM,2:00PM,PBL 202,55  58,"Peck, Simon, Mainardi, Cesare
+Chatterjee,Sayan",Regular,3
+,SCMG 462 - Artificial Intelligence Fundamentals for Supply Chain Managementy ,,Wed,9:00AM,11:45AM,PBL 118,,"Vaida, Jay",,1.5
+,SCMG 463 - Case Studies in Artificial Intelligence - Supply Chain Application,,Wed,9:00AM,11:45AM,PBL 118,,"Goulder, Michael",,1.5
+VEAL,VEAL 334 - Innovation & Entrepreneurship: Concepts and Practice,*100-SEM(1456),"Mon,Tue,Wed,Thu,Fri,Sat,Sun",7:00AM,8:00AM,Abroad (999),12,"Baierl,Mindy M; Hill,Michael",Dyn Dt,3
+BAFI,BAFI 403 - Corporate Financial Technology,*100-LEC(1316),Thu,6:00PM,8:45PM,To Be Announced,20 (65),"Harmon,Gregory William",Regular,3
+FNCE,FNCE 403 - Corporate Financial Technology,*100-LEC(1378),Thu,6:00PM,8:45PM,To Be Announced,45 (65),"Harmon,Gregory William",Regular,3
+BAFI,BAFI 433 - Quantitative Risk Modeling,*100-LEC(1440),Mon,6:00PM,8:30PM,To Be Announced,12 (62),"Martinez,Edwin Cornelius Amorsolo",Regular,3
+FNCE,FNCE 433 - Quantitative Risk Modeling,*100-LEC(1396),Mon,6:00PM,8:30PM,To Be Announced,50 (62),"Martinez,Edwin Cornelius Amorsolo",Regular,3
+BTEC,BTEC 420 - Introduction to Programming for Business Applications,*100-LEC(1492),"Tue,Thu",8:30AM,9:45AM,To Be Announced,7 (50),"Azar,Pablo",Regular,3
+DESN,DESN 210 - Introduction to Programming for Business Applications,*100-LEC(1363),"Tue,Thu",8:30AM,9:45AM,To Be Announced,43 (50),"Azar,Pablo",Regular,3
+BTEC,BTEC 494 - Artificial Intelligence for Financial Modeling,*100-LEC(1327),Wed,9:00AM,11:45AM,To Be Announced,22 (58),"Vaidya,Jay Dee",Regular,3
+FNCE,FNCE 494 - Artificial Intelligence for Financial Modeling,*100-LEC(1416),Wed,9:00AM,11:45AM,To Be Announced,36 (58),"Vaidya,Jay Dee",Regular,3
+DESN,DESN 494 - Managerial Consultancy,*100-LEC(1539),Mon,7:45PM,9:00PM,To Be Announced,35,"Khayat,Clark Harold Ibrahim",Regular,3
+DESN,DESN 494 - Managerial Consultancy,*100-LEC(1539),Sat,9:00AM,5:00PM,To Be Announced,35,"Khayat,Clark Harold Ibrahim",Regular,3
+BUAI,BUAI 460 - Experiential Learning in Business Analytics,*100-LEC(1544),Mon,3:00PM,5:45PM,PBL 03,35   34,"Niraj,Rakesh Kumar",Regular,3
+ECON,ECON 102 - Principles of Microeconomics,*102-LEC(1347),"Tue,Thu",10:00AM,11:15AM,To Be Announced,23,"Wolcowitz,Jeffrey",Regular,3
+ECON,ECON 103 - Principles of Macroeconomics,*102-LEC(1424),"Tue,Thu",11:30AM,12:45PM,To Be Announced,65,"Wang,Sining",Regular,3
+ECON,ECON 355 - The Origins of the Modern Economy,*100-LEC(1513),"Tue,Thu",1:00PM,2:15PM,To Be Announced,57,"Clingingsmith,David L",Regular,3
+ECON,ECON 368 - Environmental Economics,*100-LEC(1472),"Mon,Wed",9:00AM,10:15AM,To Be Announced,40,"Helper,Susan",Regular,3
+ECON,ECON 380 - Computational Economics,*800-LEC(1519),"Tue,Thu",4:00PM,5:15PM,Online - Synchronous (999),45,"Wang,Sining",Regular,3
+,ENTP 222 - Social Entrepreneurship: Igniting Social Change,,"Tue,Thu",1:00PM,2:15PM,PBL 03,,"Cashon, Tiffany",,3.0
+,ENTP 324 - Financing Change: Impact Investing in Action,,"Tue,Thu",4:00PM,5:15PM,PBL 120,18.0,"Falco, Elizabeth",,3.0
+MGMT,MGMT 201 - Contemporary Business and Communication,*103-LEC(1426),"Mon,Wed",10:30AM,11:45AM,To Be Announced,43,"Chatterjee,Sayan",Regular,3
+MGMT,MGMT 315 - International Management Institute: England,*101-LEC(1489),"Mon,Tue,Wed,Thu,Fri,Sat,Sun",9:00AM,5:00PM,Abroad (999),30,"Blakeway-Phillips,Heidi Christine",Dyn Dt,3
+MGMT,MGMT 315 - International Management Institute: England,*101-LEC(1489),Sat,10:00AM,11:30AM,Online - Synchronous (999),30,"Blakeway-Phillips,Heidi Christine",Dyn Dt,3
+MGTE,MGTE 440 - Six Sigma and Quality Management,*101-LEC(1524),Wed,6:00PM,8:30PM,To Be Announced,2 (27),"Goulder,Michael Lee",Regular,3
+OPMT,OPMT 480 - Blockchain Technology in Supply Chain Management,*100-LEC(1390),Thu,11:30AM,2:15PM,To Be Announced,10 (57),Staff,Dyn Dt,1.5
+SCMG,SCMG 480 - Blockchain Technology in Supply Chain Management,*100-LEC(1389),Thu,11:30AM,2:15PM,To Be Announced,47 (57),Staff,Dyn Dt,1.5
+OPMT,OPMT 481 - Artificial Intelligence for Business Management,*100-LEC(1527),Thu,11:30AM,2:15PM,To Be Announced,10 (57),Staff,Dyn Dt,1.5
+SCMG,SCMG 481 - Artificial Intelligence for Business Management,*100-LEC(1526),Thu,11:30AM,2:15PM,To Be Announced,47 (57),Staff,Dyn Dt,1.5
+ORBH,ORBH 240 - Ethics for the Real World: Developing a Code of Ethics to Guide Decisions in Work and Life,*100-SEM(1518),"Tue,Thu",10:00AM,11:15AM,To Be Announced,18,"Case PhD,Susan S",Regular,3
+ORBH,ORBH 511 - Micro Organizational Behavior,*100-SEM(1528),Tue,12:00PM,3:00PM,To Be Announced,10,"Cola,Philip A.",Dyn Dt,1.5
+ORBH,ORBH 541 - Organizational Systems,*100-LEC(1529),Tue,1:00PM,5:00PM,To Be Announced,14,"Bilimoria,Diana",Dyn Dt,1.5
+ORBH,ORBH 541 - Organizational Systems,*100-LEC(1529),Wed,1:00PM,5:00PM,To Be Announced,14,"Bilimoria,Diana",Dyn Dt,1.5
+ORBH,ORBH 570 - Learning and Development,*100-SEM(1448),Tue,1:00PM,5:00PM,To Be Announced,6,"Messer,Tracey Eira",Regular,1.5
+MGMT,MGMT 395 - Advanced Seminar: Entrepreneurship in Energy,*109-SEM(1521),Mon,4:00PM,5:00PM,To Be Announced,18,"Goodrich,Grant George; Lyon,Jean  ; Steirer,Jonathan Wiley",Regular,1
+MGMT,MGMT 395 - Advanced Seminar: Sustainable Impact Entp,*400-SEM(1536),Fri,10:00AM,2:30PM,To Be Announced,15,Staff,Reg 2 Half,1
+MGMT,MGMT 395 - Advanced Seminar: Sustainable Impact Entp,*400-SEM(1536),Thu,4:00PM,6:00PM,To Be Announced,15,"Butler DeLong,Tramayne",Reg 2 Half,1
+MGMT,MGMT 395 - Advanced Seminar: Sustainable Impact Entp,*400-SEM(1536),"Tue,Thu",11:30AM,12:30PM,Online - Synchronous (999),15,Staff,Reg 2 Half,1
+MGTE,"MGTE 430 - Product and Process Design, Development, and Delivery",*100-LEC(1501),Tue,1:00PM,3:30PM,To Be Scheduled (In-Person),15,"Drummond,Colin K",Regular,3
+MGTE,MGTE 450 - Engineering Entrepreneurship,*100-LEC(1502),Tue,3:00PM,5:45PM,To Be Scheduled (In-Person),15,"Marder,James Marc",Regular,3
+MBAC,MBAC 508B - Strategic Issues and its Applications II,*100-LEC(1531),Thu,11:30AM,2:15PM,PBL 02,58,"Peck,Simon Ian",Dyn Dt,1.5

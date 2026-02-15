@@ -1,0 +1,8459 @@
+[
+  {
+    "subject": "ACCT",
+    "description": "ACCT 100 - Foundations of Accounting I",
+    "section": "*100-LEC(1461)",
+    "instructor": [
+      "Skomra,Piotr Antoni"
+    ],
+    "room": "PBL 202",
+    "enrollmentCap": "62",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "2:15PM",
+        "rawString": "TuTh 1:00PM-2:15PM"
+      },
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "12:45PM",
+        "endTime": "2:00PM",
+        "rawString": "MW 12:45PM - 2:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "ACCT",
+    "description": "ACCT 100 - Foundations of Accounting I",
+    "section": "*101-LEC(1462)",
+    "instructor": [
+      "Sasmaz, Mary",
+      "Carlisle,Melissa R"
+    ],
+    "room": "PBL 202",
+    "enrollmentCap": "62",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "10:15AM",
+        "rawString": "MW 9:00AM-10:15AM"
+      },
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "8:30AM",
+        "endTime": "9:45AM",
+        "rawString": "TuTh 8:30AM - 9:45AM"
+      }
+    ]
+  },
+  {
+    "subject": "ACCT",
+    "description": "ACCT 100 - Foundations of Accounting I",
+    "section": "*102-LEC(1463)",
+    "instructor": [
+      "Sasmaz, Mary",
+      "Carlisle,Melissa R"
+    ],
+    "room": "PBL 202",
+    "enrollmentCap": "62",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "10:30AM",
+        "endTime": "11:45AM",
+        "rawString": "MW 10:30AM-11:45AM"
+      },
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "11:15AM",
+        "rawString": "TuTh 10:00AM - 11:15AM"
+      }
+    ]
+  },
+  {
+    "subject": "ACCT",
+    "description": "ACCT 106 - Spreadsheet Basics for Business and Non-Business Majors",
+    "section": "*100-LEC(1423)",
+    "instructor": [
+      "Szabo, Bruce",
+      "Olavarria Baeza,Jose Valentin"
+    ],
+    "room": "PBL 501",
+    "enrollmentCap": 50.0,
+    "units": "1",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "8:30AM",
+        "endTime": "9:20AM",
+        "rawString": "Tu 8:30AM-9:20AM"
+      },
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "9:50AM",
+        "rawString": "W 9:00AM - 9:50AM"
+      }
+    ]
+  },
+  {
+    "subject": "ACCT",
+    "description": "ACCT 106 - Spreadsheet Basics for Business and Non-Business Majors",
+    "section": "*101-LEC(1404)",
+    "instructor": [
+      "Olavarria, Jose",
+      "Szabo,Bruce MIchael"
+    ],
+    "room": "PBL 106",
+    "enrollmentCap": "50",
+    "units": "1",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "1:50PM",
+        "rawString": "Th 1:00PM-1:50PM"
+      },
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "1:50PM",
+        "rawString": "W 1:00PM-1:50PM"
+      },
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "10:50AM",
+        "rawString": "Tu 10:00AM - 10:50AM"
+      }
+    ]
+  },
+  {
+    "subject": "ACCT",
+    "description": "ACCT 200 - Foundations of Accounting II",
+    "section": "*100-LEC(1400)",
+    "instructor": [
+      "Blakeway-Phillips,Heidi Christine"
+    ],
+    "room": "PBL 02",
+    "enrollmentCap": "60   59",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "7:15PM",
+        "rawString": "MW 6:00PM - 7:15PM"
+      },
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "10:15AM",
+        "rawString": "MW 9:00AM - 10:15AM"
+      }
+    ]
+  },
+  {
+    "subject": "ACCT",
+    "description": "ACCT 200 - Foundations of Accounting II",
+    "section": "*101-LEC(1402)",
+    "instructor": [
+      "Blakeway-Phillips,Heidi Christine"
+    ],
+    "room": "PBL 401",
+    "enrollmentCap": "60   59",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "12:45PM",
+        "endTime": "2:00PM",
+        "rawString": "MW 12:45PM - 2:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "ACCT",
+    "description": "ACCT 200 - Foundations of Accounting II",
+    "section": "*102-LEC(1403)",
+    "instructor": [
+      "Blakeway-Phillips,Heidi Christine"
+    ],
+    "room": "PBL 02",
+    "enrollmentCap": "60   59",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "3:20PM",
+        "endTime": "4:35PM",
+        "rawString": "MW 3:20PM - 4:35PM"
+      }
+    ]
+  },
+  {
+    "subject": "ACCT",
+    "description": "ACCT 300 - Corporate Reporting I",
+    "section": "*100-LEC(1321)",
+    "instructor": [
+      "Sasmaz,Mary B"
+    ],
+    "room": "PBL 03\nPBL 04",
+    "enrollmentCap": "40   50",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "12:45PM",
+        "endTime": "2:00PM",
+        "rawString": "MW 12:45PM - 2:00PM"
+      },
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "2:15PM",
+        "rawString": "TuTh 1:00PM - 2:15PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "ACCT400 - Corporate Reporting I",
+    "section": "100-LEC(10258)",
+    "instructor": [
+      "Sasmaz,Mary B"
+    ],
+    "room": "PBL 03\nPBL 04",
+    "enrollmentCap": 10.0,
+    "units": 3.0,
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "12:45PM",
+        "endTime": "2:00PM",
+        "rawString": "MW 12:45PM - 2:00PM"
+      },
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "2:15PM",
+        "rawString": "TuTh 1:00PM - 2:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "ACCT",
+    "description": "ACCT 301 - Corporate Reporting II",
+    "section": "*100-LEC(1322)",
+    "instructor": [
+      "Dong,Yufan"
+    ],
+    "room": "PBL 106",
+    "enrollmentCap": "40   58",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "10:15AM",
+        "rawString": "MW 9:00AM - 10:15AM"
+      }
+    ]
+  },
+  {
+    "subject": "ACCT",
+    "description": "ACCT 401 - Corporate Reporting II",
+    "section": "100-LEC(10259)",
+    "instructor": [
+      "Dong,Yufan"
+    ],
+    "room": "PBL 106",
+    "enrollmentCap": 10.0,
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "10:15AM",
+        "rawString": "MW 9:00AM - 10:15AM"
+      }
+    ]
+  },
+  {
+    "subject": "ACCT",
+    "description": "ACCT 305 - Income Tax: Concepts, Skills, Planning",
+    "section": "*100-LEC(1323)",
+    "instructor": [
+      "Fogarty,Timothy J"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "10:35AM",
+        "endTime": "11:50AM",
+        "rawString": "MW 10:35AM - 11:50AM"
+      }
+    ]
+  },
+  {
+    "subject": "ACCT",
+    "description": "ACCT 305 - Income Tax: Concepts, Skills, Planning",
+    "section": "100-LEC(1323)",
+    "instructor": [
+      "Fogarty,Timothy J"
+    ],
+    "room": "PBL 118",
+    "enrollmentCap": "40  35",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "3:20PM",
+        "endTime": "4:35PM",
+        "rawString": "MW 3:20PM - 4:35PM"
+      }
+    ]
+  },
+  {
+    "subject": "ACCT",
+    "description": "ACCT 306 - Systems & Controls (STEM)",
+    "section": "*100-LEC(10062)",
+    "instructor": [
+      "Bucaro, Anthony   Staff"
+    ],
+    "room": "PBL 401",
+    "enrollmentCap": "35   60",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "11:15AM",
+        "rawString": "TuTh 10:00AM-11:15AM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "ACCT 406 - Systems & Controls (STEM)",
+    "section": "100-LEC(10508)",
+    "instructor": [
+      "Bucaro, Anthony   Staff"
+    ],
+    "room": "PBL 401",
+    "enrollmentCap": 15.0,
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "11:15AM",
+        "rawString": "TuTh 10:00AM-11:15AM"
+      }
+    ]
+  },
+  {
+    "subject": "ACCT",
+    "description": "ACCT 307 - Applied Management Accounting",
+    "section": "*100-LEC(1324)",
+    "instructor": [
+      "Jarvis,Mark"
+    ],
+    "room": "PBL 401",
+    "enrollmentCap": "45",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "12:45PM",
+        "rawString": "TuTh 11:30AM - 12:45PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "ACCT 407 - Applied Management Accounting",
+    "section": "100-LEC(10509)",
+    "instructor": [
+      "Jarvis,Mark"
+    ],
+    "room": "PBL 401",
+    "enrollmentCap": 10.0,
+    "units": 3.0,
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "12:45PM",
+        "rawString": "TuTh 11:30AM - 12:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "ACCT",
+    "description": "ACCT 307L - Technology Lab for Management Accounting",
+    "section": "*100-LAB(1401)",
+    "instructor": [
+      "Jarvis,Mark"
+    ],
+    "room": "PBL 106",
+    "enrollmentCap": "45",
+    "units": "1",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Thu",
+          "Tue"
+        ],
+        "startTime": "2:30PM",
+        "endTime": "3:30PM",
+        "rawString": "Th  Tu 2:30PM - 3:30PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "ACCT 316 - Technology for Financial Management",
+    "section": "100-LEC(10210)",
+    "instructor": [
+      "Bucaro, Anthony"
+    ],
+    "room": "PBL 05",
+    "enrollmentCap": 35.0,
+    "units": 1.0,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "2:15PM",
+        "rawString": "Th 1:00PM - 2:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "ACCT",
+    "description": "ACCT 404 - Advanced Financial Reporting",
+    "section": "*400-LEC(1391)",
+    "instructor": [
+      "Martin,Sharon Lee"
+    ],
+    "room": "PBL 258",
+    "enrollmentCap": "50   55",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "4:00PM",
+        "endTime": "5:15PM",
+        "rawString": "MW  4:00PM-5:15PM"
+      },
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "12:45PM",
+        "endTime": "2:00PM",
+        "rawString": "MW 12:45PM - 2:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "ACCT",
+    "description": "ACCT 405 - Advanced Federal Taxes",
+    "section": "100-LEC(1484)",
+    "instructor": [
+      "Barrus,Mark Elliott"
+    ],
+    "room": "PBL 118",
+    "enrollmentCap": "50   51",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "W 6:00PM - 8:30PM   8:45pm"
+      }
+    ]
+  },
+  {
+    "subject": "ACCT",
+    "description": "ACCT 414 - Corporate Reporting and Analysis",
+    "section": "*100-LEC(1369)",
+    "instructor": [
+      "Olavarria Baeza,Jose Valentin"
+    ],
+    "room": "PBL 202",
+    "enrollmentCap": "50   62",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Th 6:00PM - 8:30PM  8:45pm"
+      }
+    ]
+  },
+  {
+    "subject": "ACCT",
+    "description": "ACCT 431 - Client Communication, Ethics, and Professionalism",
+    "section": "*100-LEC(1249)",
+    "instructor": [
+      "Johnson,David G"
+    ],
+    "room": "PBL 501",
+    "enrollmentCap": "50   55",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "M 6:00PM - 8:30PM   8:45pm"
+      },
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "3:00PM",
+        "endTime": "5:45PM",
+        "rawString": "M 3:00PM - 5:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "ACCT",
+    "description": "ACCT 444 - Advanced Auditing Theory and Practice",
+    "section": "*100-LEC(1258)",
+    "instructor": [
+      "Carlisle, Melissa",
+      "Staff"
+    ],
+    "room": "PBL 106",
+    "enrollmentCap": "50   55",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "2:30PM",
+        "endTime": "5:15PM",
+        "rawString": "Th 2:30PM - 5:15PM"
+      },
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "3:00PM",
+        "endTime": "5:45PM",
+        "rawString": "W 3:00PM - 5:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "ACCT",
+    "description": "ACCT 501 - Special Problems and Topics: Accounting Information Systems",
+    "section": "*102-IND(1487)",
+    "instructor": [
+      "Bucaro,Anthony Carl"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "58",
+    "units": "0-18",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "2:15PM",
+        "rawString": "TuTh 1:00PM - 2:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "ACCT",
+    "description": "ACCT 520 - Advanced Accounting Theory",
+    "section": "*100-LEC(1460)",
+    "instructor": [
+      "Jonas, Gregory",
+      "Blackburn,Christopher"
+    ],
+    "room": "PBL 118",
+    "enrollmentCap": "50   51",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Tu 6:00PM - 8:30PM   8:45pm"
+      }
+    ]
+  },
+  {
+    "subject": "ACCT",
+    "description": "ACCT 601 - Special Problems and Topics: Experimental Rsch & Auditing",
+    "section": "*100-RSC(1447)",
+    "instructor": [
+      "Bucaro,Anthony Carl; Carlisle,Melissa R"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "999",
+    "units": "1-18",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "12:00PM",
+        "rawString": "W 9:00AM - 12:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "BAFI",
+    "description": "BAFI 210 - Seminar: Financial Services Industry",
+    "section": "*400-SEM(1319)",
+    "instructor": [
+      "Fine,Scott"
+    ],
+    "room": "PBL 03",
+    "enrollmentCap": "40",
+    "units": "0-1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "6:30PM",
+        "endTime": "8:00PM",
+        "rawString": "M 6:30PM - 8:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "BAFI",
+    "description": "BAFI 341 - Money and Banking",
+    "section": "*100-LEC(1238)",
+    "instructor": [
+      "Harmon,Gregory William"
+    ],
+    "room": "PBL 202",
+    "enrollmentCap": "33 (50)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "12:45PM",
+        "rawString": "TuTh 11:30AM - 12:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 341 - Money and Banking",
+    "section": "*100-LEC(1357)",
+    "instructor": [
+      "Harmon,Gregory William"
+    ],
+    "room": "PBL 202",
+    "enrollmentCap": "14 (50)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "12:45PM",
+        "rawString": "TuTh 11:30AM - 12:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "BAFI",
+    "description": "BAFI 341 - Money and Banking",
+    "section": "*101-LEC(1450)",
+    "instructor": [
+      "Harmon,Gregory William"
+    ],
+    "room": "PBL 07",
+    "enrollmentCap": "33 (50)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "2:30PM",
+        "endTime": "3:45PM",
+        "rawString": "TuTh 2:30PM - 3:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 341 - Money and Banking",
+    "section": "*101-LEC(1451)",
+    "instructor": [
+      "Harmon,Gregory William"
+    ],
+    "room": "PBL 07",
+    "enrollmentCap": "14 (50)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "2:30PM",
+        "endTime": "3:45PM",
+        "rawString": "TuTh 2:30PM - 3:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "BAFI",
+    "description": "BAFI 351 - Financial Data Science: Data Analytics & Machine Learning Fundamentals",
+    "section": "*100-LEC(1464)",
+    "instructor": [
+      "Vaidya,Jay Dee"
+    ],
+    "room": "PBL 05",
+    "enrollmentCap": "33",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "12:45PM",
+        "rawString": "TuTh  11:30AM - 12:45PM"
+      },
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "10:35AM",
+        "endTime": "11:50AM",
+        "rawString": "MW 10:35AM - 11:50AM"
+      }
+    ]
+  },
+  {
+    "subject": "BAFI",
+    "description": "BAFI 355 - Corporate Finance",
+    "section": "*100-LEC(1465)",
+    "instructor": [
+      "Gupta, Anurag",
+      "Olavarria Baeza,Jose Valentin"
+    ],
+    "room": "PBL 401",
+    "enrollmentCap": "55   50",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "10:15AM",
+        "rawString": "MW 9:00AM - 10:15AM"
+      }
+    ]
+  },
+  {
+    "subject": "BAFI",
+    "description": "BAFI 355 - Corporate Finance",
+    "section": "*101-LEC(1466)",
+    "instructor": [
+      "Gupta, Anurag",
+      "Olavarria Baeza,Jose Valentin"
+    ],
+    "room": "PBL 401",
+    "enrollmentCap": "55   40",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "10:35AM",
+        "endTime": "11:50AM",
+        "rawString": "MW  10:35AM - 11:50AM"
+      },
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "11:15AM",
+        "rawString": "TuTh 10:00AM - 11:15AM"
+      }
+    ]
+  },
+  {
+    "subject": "BAFI",
+    "description": "BAFI 355 - Corporate Finance",
+    "section": "*102-LEC(1508)",
+    "instructor": [
+      "Bae,Joonwoo"
+    ],
+    "room": "PBL 201   106",
+    "enrollmentCap": "55   57",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "12:45PM",
+        "rawString": "TuTh 11:30AM - 12:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "BAFI",
+    "description": "BAFI 356 - Investments",
+    "section": "*100-LEC(1239)",
+    "instructor": [
+      "Noh,Joonki"
+    ],
+    "room": "PBL 201",
+    "enrollmentCap": "50   57",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "12:45PM",
+        "endTime": "2:00PM",
+        "rawString": "MW 12:45PM - 2:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "BAFI",
+    "description": "BAFI 357 - ValuAtion : Financial Modeling Using A.I.",
+    "section": "*100-LEC(1325)",
+    "instructor": [
+      "Balasubramanyan,Lakshmi"
+    ],
+    "room": "PBL 07",
+    "enrollmentCap": "50   60",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "10:35AM",
+        "endTime": "11:50AM",
+        "rawString": "MW 10:35AM - 11:50AM"
+      }
+    ]
+  },
+  {
+    "subject": "BAFI",
+    "description": "BAFI 358 - Intermediate Corporate Finance",
+    "section": "*100-LEC(1406)",
+    "instructor": [
+      "Krishnan,C N V"
+    ],
+    "room": "PBL 501",
+    "enrollmentCap": "50   48",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "3:20PM",
+        "endTime": "4:35PM",
+        "rawString": "MW 3:20PM - 4:35PM"
+      }
+    ]
+  },
+  {
+    "subject": "BAFI",
+    "description": "BAFI 362 - Advanced Analytics in Credit Risk Management",
+    "section": "*100-LEC(1326)",
+    "instructor": [
+      "Balasubramanyan,Lakshmi"
+    ],
+    "room": "PBL 501",
+    "enrollmentCap": "50   45",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "2:15PM",
+        "rawString": "TuTh 1:00PM - 2:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "BAFI",
+    "description": "BAFI 365 - Options and Other Derivatives",
+    "section": "*100-LEC(1509)",
+    "instructor": [
+      "Martinez,Edwin Cornelius Amorsolo"
+    ],
+    "room": "PBL 501",
+    "enrollmentCap": "50   49",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Tu 6:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "BAFI",
+    "description": "BAFI 428 - Financial Strategy and Value Creation",
+    "section": "*100-LEC(1320)",
+    "instructor": [
+      "Fine,Scott"
+    ],
+    "room": "PBL 401",
+    "enrollmentCap": "22 (57)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:45PM",
+        "rawString": "Tu 6:00PM - 8:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "FNCE",
+    "description": "FNCE 428 - Financial Strategy and Value Creation",
+    "section": "*100-LEC(1379)",
+    "instructor": [
+      "Fine,Scott"
+    ],
+    "room": "PBL 401",
+    "enrollmentCap": "35 (57)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:45PM",
+        "rawString": "Tu 6:00PM - 8:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "BAFI",
+    "description": "BAFI 429 - Investment Management",
+    "section": "*101-LEC(1276)",
+    "instructor": [
+      "Noh,Joonki"
+    ],
+    "room": "PBL 118\nPBL 202",
+    "enrollmentCap": "10 (62)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "11:30AM",
+        "rawString": "M 9:00AM - 11:30AM"
+      },
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "3:00PM",
+        "endTime": "5:45PM",
+        "rawString": "M 3:00PM - 5:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "FNCE",
+    "description": "FNCE 429 - Investment Management",
+    "section": "*101-LEC(1395)",
+    "instructor": [
+      "Noh,Joonki"
+    ],
+    "room": "PBL 118\nPBL 202",
+    "enrollmentCap": "52 (62)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "11:30AM",
+        "rawString": "M 9:00AM - 11:30AM"
+      },
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "3:00PM",
+        "endTime": "5:45PM",
+        "rawString": "M 3:00PM - 5:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "BAFI",
+    "description": "BAFI 431 - Fixed Income Markets and Their Derivatives",
+    "section": "*101-LEC(1496)",
+    "instructor": [
+      "Bae,Joonwoo"
+    ],
+    "room": "PBL 501",
+    "enrollmentCap": "10 (62)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "3:00PM",
+        "endTime": "5:45PM",
+        "rawString": "Tu 3:00PM - 5:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "FNCE",
+    "description": "FNCE 431 - Fixed Income Markets and Their Derivatives",
+    "section": "*101-LEC(1495)",
+    "instructor": [
+      "Bae,Joonwoo"
+    ],
+    "room": "PBL 501",
+    "enrollmentCap": "42\n52 (62)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "3:00PM",
+        "endTime": "5:45PM",
+        "rawString": "Tu 3:00PM - 5:45PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "BAFI 432 - Corporate Risk Management",
+    "section": "100-LEC(10557)",
+    "instructor": [
+      "Gupta, Anurag"
+    ],
+    "room": "PBL 201",
+    "enrollmentCap": null,
+    "units": 3.0,
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "2:15PM",
+        "rawString": "Tu 11:30AM - 2:15PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "FNCE 432 - Corporate Risk Management",
+    "section": "100-LEC(10558)",
+    "instructor": [
+      "Gupta, Anurag"
+    ],
+    "room": "PBL 201",
+    "enrollmentCap": null,
+    "units": 3.0,
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "2:15PM",
+        "rawString": "Tu 11:30AM - 2:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "BAFI",
+    "description": "BAFI 440 - Financial Decisions Modeling and Analytics",
+    "section": "*100-LEC(1530)",
+    "instructor": [
+      "Krishnan,C N V"
+    ],
+    "room": "PBL 501",
+    "enrollmentCap": "5 (49)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "12:00PM",
+        "endTime": "2:45PM",
+        "rawString": "W 12:00PM - 2:45PM"
+      },
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "1:30PM",
+        "endTime": "2:45PM",
+        "rawString": "MW 1:30PM - 2:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "FNCE",
+    "description": "FNCE 440 - Financial Decisions Modeling and Analytics",
+    "section": "*100-LEC(1477)",
+    "instructor": [
+      "Krishnan,C N V"
+    ],
+    "room": "PBL 501",
+    "enrollmentCap": "44 (49)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "12:00PM",
+        "endTime": "2:45PM",
+        "rawString": "W 12:00PM - 2:45PM"
+      },
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "1:30PM",
+        "endTime": "2:45PM",
+        "rawString": "MW 1:30PM - 2:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "BAFI",
+    "description": "BAFI 480 - Global Banking & Capital Markets",
+    "section": "*100-LEC(1275)",
+    "instructor": [
+      "Balasubramanyan,Lakshmi"
+    ],
+    "room": "PBL 202",
+    "enrollmentCap": "12 (62)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "3:00PM",
+        "endTime": "5:45PM",
+        "rawString": "W 3:00PM - 5:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "FNCE",
+    "description": "FNCE 480 - Global Banking & Capital Markets",
+    "section": "*100-LEC(1397)",
+    "instructor": [
+      "Balasubramanyan,Lakshmi"
+    ],
+    "room": "PBL 202",
+    "enrollmentCap": "50 (62)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "3:00PM",
+        "endTime": "5:45PM",
+        "rawString": "W 3:00PM - 5:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "BLAW",
+    "description": "BLAW 331 - Legal Environment of Management",
+    "section": "100-LEC(10218)",
+    "instructor": [
+      "Fogarty,Timothy J"
+    ],
+    "room": "PBL 258",
+    "enrollmentCap": 35.0,
+    "units": 3.0,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "12:45PM",
+        "endTime": "2:00PM",
+        "rawString": "MW 12:45PM - 2:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "BLAW",
+    "description": "BLAW 417 - Legal Environment of Management",
+    "section": "*100-LEC(1405)",
+    "instructor": [
+      "Fogarty,Timothy J"
+    ],
+    "room": "PBL 258",
+    "enrollmentCap": "15   49",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "12:45PM",
+        "endTime": "2:00PM",
+        "rawString": "MW 12:45PM - 2:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "BTEC",
+    "description": "BTEC 420 - Introduction to Programming for Business Applications",
+    "section": "*101-LEC(1493)",
+    "instructor": [
+      "Stanek,David A"
+    ],
+    "room": "PBL 106 per Laura W. 12/3/25; PBL 401",
+    "enrollmentCap": "25 (50)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "M 6:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "DESN",
+    "description": "DESN 210 - Introduction to Programming for Business Applications",
+    "section": "*101-LEC(1364)",
+    "instructor": [
+      "Stanek,David A"
+    ],
+    "room": "PBL 106 per Laura W. 12/3/25; PBL 401",
+    "enrollmentCap": "25 (50)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "M 6:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "BTEC",
+    "description": "BTEC 420 - Introduction to Programming for Business Applications",
+    "section": "*102-LEC(1522)",
+    "instructor": [
+      "Jung,Miyeon"
+    ],
+    "room": "PBL 106",
+    "enrollmentCap": "7 (50)\n10 (50)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "3:20PM",
+        "endTime": "4:35PM",
+        "rawString": "MW 3:20PM - 4:35PM"
+      }
+    ]
+  },
+  {
+    "subject": "DESN",
+    "description": "DESN 210 - Introduction to Programming for Business Applications",
+    "section": "*102-LEC(1511)",
+    "instructor": [
+      "Jung,Miyeon"
+    ],
+    "room": "PBL 106",
+    "enrollmentCap": "43 (50)  \n40 (50)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "3:20PM",
+        "endTime": "4:35PM",
+        "rawString": "MW 3:20PM - 4:35PM"
+      }
+    ]
+  },
+  {
+    "subject": "BUAI",
+    "description": "BUAI 407A - Managerial Marketing I",
+    "section": "*100-LEC(1419)",
+    "instructor": [
+      "Binkowski, Kris",
+      "Brock,Juergen"
+    ],
+    "room": "PBL 501",
+    "enrollmentCap": "49",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "11:45AM",
+        "rawString": "M 9:00AM - 11:45AM"
+      }
+    ]
+  },
+  {
+    "subject": "BUAI",
+    "description": "BUAI 407B - Managerial Marketing II",
+    "section": "*100-LEC(1420)",
+    "instructor": [
+      "Binkowski, Kris",
+      "Brock,Juergen"
+    ],
+    "room": "PBL 501",
+    "enrollmentCap": "49",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "11:45AM",
+        "rawString": "M 9:00AM - 11:45AM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "BUAI 410 - Accounting and Financial Management",
+    "section": null,
+    "instructor": [
+      "Rausche, Amra"
+    ],
+    "room": "PBL 106",
+    "enrollmentCap": null,
+    "units": 3.0,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "W 6:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "BUAI",
+    "description": "BUAI 432 - Operations Analytics: Stochastic",
+    "section": "*100-LEC(1392)",
+    "instructor": [
+      "Alireza Fallahtafti",
+      "Staff"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "51",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "8:30AM",
+        "endTime": "11:15AM",
+        "rawString": "Tu 8:30AM - 11:15AM"
+      }
+    ]
+  },
+  {
+    "subject": "OPRE",
+    "description": "OPRE 332A - Spreadsheet and Business Process Simulation - I",
+    "section": "*100-LEC(1409)",
+    "instructor": [
+      "Alireza Fallahtafti",
+      "Mathur,Kamlesh"
+    ],
+    "room": "PBL 401",
+    "enrollmentCap": "5 (54)",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "3:00PM",
+        "endTime": "5:45PM",
+        "rawString": "Tu 3:00PM - 5:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "OPRE",
+    "description": "OPRE 432A - Spreadsheet and Business Process Simulation - I",
+    "section": "*100-LEC(1382)",
+    "instructor": [
+      "Alireza Fallahtafti",
+      "Mathur,Kamlesh"
+    ],
+    "room": "PBL 401",
+    "enrollmentCap": "5 per Kamlesh \n11 (54)",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "3:00PM",
+        "endTime": "5:45PM",
+        "rawString": "Tu 3:00PM - 5:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "SCMG",
+    "description": "SCMG 432A - Spreadsheet and Business Process Simulation - I",
+    "section": "*100-LEC(1380)",
+    "instructor": [
+      "Alireza Fallahtafti",
+      "Mathur,Kamlesh"
+    ],
+    "room": "PBL 401",
+    "enrollmentCap": "22 per Kamlesh\n38 (54)",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "3:00PM",
+        "endTime": "5:45PM",
+        "rawString": "Tu 3:00PM - 5:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "OPRE",
+    "description": "OPRE 332B - Spreadsheet and Business Process Simulation - II",
+    "section": "*100-LEC(1410)",
+    "instructor": [
+      "Fallahtafti,Alireza"
+    ],
+    "room": "PBL 401",
+    "enrollmentCap": "5 (54)",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "3:00PM",
+        "endTime": "5:45PM",
+        "rawString": "Tu 3:00PM - 5:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "OPRE",
+    "description": "OPRE 432B - Spreadsheet and Business Process Simulation - II",
+    "section": "*100-LEC(1383)",
+    "instructor": [
+      "Fallahtafti,Alireza"
+    ],
+    "room": "PBL 401",
+    "enrollmentCap": "5 per Kamlesh \n11 (54)",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "3:00PM",
+        "endTime": "5:45PM",
+        "rawString": "Tu 3:00PM - 5:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "SCMG",
+    "description": "SCMG 432B - Spreadsheet and Business Process Simulation - II",
+    "section": "*100-LEC(1381)",
+    "instructor": [
+      "Fallahtafti,Alireza"
+    ],
+    "room": "PBL 401",
+    "enrollmentCap": "22 per Kamlesh\n38 (54)",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "3:00PM",
+        "endTime": "5:45PM",
+        "rawString": "Tu 3:00PM - 5:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "BUAI",
+    "description": "BUAI 445 - Advanced Marketing Analytics",
+    "section": "*100-LEC(1393)",
+    "instructor": [
+      "Niraj,Rakesh Kumar"
+    ],
+    "room": "PBL 03",
+    "enrollmentCap": "48  57",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "2:15PM",
+        "endTime": "5:00PM",
+        "rawString": "W 2:15PM - 5:00PM"
+      },
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "3:00PM",
+        "endTime": "5:45PM",
+        "rawString": "W 3:00PM - 5:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "BUAI",
+    "description": "BUAI 485B - Team Development",
+    "section": "*100-SEM(1394)",
+    "instructor": [
+      "Messer,Tracey Eira"
+    ],
+    "room": "PBL 501",
+    "enrollmentCap": "50   49",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "3:00PM",
+        "endTime": "5:45PM",
+        "rawString": "Th 3:00PM - 5:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "DESN",
+    "description": "DESN 302 - Creativity in Design & Business: Sources of Perception, Imagination, & Creative Thinking",
+    "section": "*100-LEC(1510)",
+    "instructor": [
+      "Gilmore,James Haydn"
+    ],
+    "room": "PBL 03",
+    "enrollmentCap": "45",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "2:30PM",
+        "endTime": "3:45PM",
+        "rawString": "TuTh 2:30PM - 3:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "DESN",
+    "description": "DESN 318 - Entrepreneurship Through Acquisition II",
+    "section": "*100-LEC(1537)",
+    "instructor": [
+      "King,GJ"
+    ],
+    "room": "PBL 106",
+    "enrollmentCap": "20 (40)\n20 (58)",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Tu 6:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "DESN",
+    "description": "DESN 420 - Entrepreneurship Through Acquisition II",
+    "section": "*100-LEC(1478)",
+    "instructor": [
+      "King,GJ"
+    ],
+    "room": "PBL 106",
+    "enrollmentCap": "20 (40)\n38 (58)",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Tu 6:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "DESN",
+    "description": "DESN 319 - Entrepreneurship Through Acquisition III",
+    "section": "*100-LEC(1543)",
+    "instructor": [
+      "Lowry,Scot"
+    ],
+    "room": "PBL 106",
+    "enrollmentCap": "20 (40)\n20 (58)",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Tu 6:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "DESN",
+    "description": "DESN 419 - Entrepreneurship Through Acquisition III",
+    "section": "*100-LEC(1523)",
+    "instructor": [
+      "Lowry,Scot"
+    ],
+    "room": "PBL 106",
+    "enrollmentCap": "20 (40)\n38 (58)",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Tu 6:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "DESN",
+    "description": "DESN 320 - Database Management",
+    "section": "*100-LEC(1490)",
+    "instructor": [
+      "Dangelo,Mark"
+    ],
+    "room": "PBL 04",
+    "enrollmentCap": "45   49",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "4:00PM",
+        "endTime": "6:30PM",
+        "rawString": "Tu 4:00PM - 6:30PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "DESN 322 - Designing the User Experience",
+    "section": "100-LEC(10219)",
+    "instructor": [
+      "Misconish Edwards, Sara"
+    ],
+    "room": "PBL 04",
+    "enrollmentCap": 49.0,
+    "units": 3.0,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "12:45PM",
+        "rawString": "TuTh 11:30AM - 12:45PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "DESN 494 - Managerial Consultancy",
+    "section": null,
+    "instructor": [],
+    "room": null,
+    "enrollmentCap": null,
+    "units": 3.0,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "7:45PM",
+        "endTime": "9:00PM",
+        "rawString": "M 7:45PM - 9:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 102 - Principles of Microeconomics",
+    "section": "*100-LEC(1345)",
+    "instructor": [
+      "Ernest PhD,Jonathan Orry"
+    ],
+    "room": "PBL 201",
+    "enrollmentCap": "60",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "10:35AM",
+        "endTime": "11:50AM",
+        "rawString": "MW 10:35AM - 11:50AM"
+      },
+      {
+        "days": [
+          "Mon",
+          "Wed",
+          "Fri"
+        ],
+        "startTime": "10:35AM",
+        "endTime": "11:25AM",
+        "rawString": "MWF 10:35AM - 11:25AM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 102 - Principles of Microeconomics",
+    "section": "*101-LEC(1346)",
+    "instructor": [
+      "Ernest PhD,Jonathan Orry"
+    ],
+    "room": "PBL 201",
+    "enrollmentCap": "60   65",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed",
+          "Fri"
+        ],
+        "startTime": "2:15PM",
+        "endTime": "3:05PM",
+        "rawString": "MWF 2:15PM - 3:05PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 102 - Principles of Microeconomics",
+    "section": "\n*103-LEC(1429)",
+    "instructor": [
+      "Wolcowitz, Jeffrey",
+      "Hawkins,Jenny Rae"
+    ],
+    "room": "PBL 202",
+    "enrollmentCap": "60   62",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "2:30PM",
+        "endTime": "3:45PM",
+        "rawString": "TuTh 2:30PM - 3:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 103 - Principles of Macroeconomics",
+    "section": "*100-LEC(1348)",
+    "instructor": [
+      "Lussier,Martine"
+    ],
+    "room": "PBL 201",
+    "enrollmentCap": "60   68",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "3:20PM",
+        "endTime": "4:35PM",
+        "rawString": "MW 3:20PM - 4:35PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 103 - Principles of Macroeconomics",
+    "section": "*101-LEC(1349)",
+    "instructor": [
+      "Wang,Sining"
+    ],
+    "room": "PBL 202",
+    "enrollmentCap": "60   50",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "8:30AM",
+        "endTime": "9:45AM",
+        "rawString": "TuTh 8:30AM - 9:45AM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 103 - Principles of Macroeconomics",
+    "section": "*103-LEC(1467)",
+    "instructor": [
+      "Hammack,Peter"
+    ],
+    "room": "PBL 201",
+    "enrollmentCap": "60   68",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "2:30PM",
+        "endTime": "3:45PM",
+        "rawString": "TuTh 2:30PM - 3:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 103 - Principles of Macroeconomics",
+    "section": "*104-LEC(1491)",
+    "instructor": [
+      "Wang, Sining",
+      "Lussier,Martine"
+    ],
+    "room": "PBL 203",
+    "enrollmentCap": "60   62",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "12:45PM",
+        "endTime": "2:00PM",
+        "rawString": "MW 12:45PM - 2:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 216 - Data Visualization in R",
+    "section": "*100-LEC(1333)",
+    "instructor": [
+      "Clingingsmith,David L"
+    ],
+    "room": "PBL 106",
+    "enrollmentCap": "50",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "11:15AM",
+        "rawString": "TuTh 10:00AM - 11:15AM"
+      },
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "8:30AM",
+        "endTime": "9:45AM",
+        "rawString": "TuTh 8:30AM - 9:45AM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 307 - Intermediate Macro Theory",
+    "section": "*100-LEC(1350)",
+    "instructor": [
+      "Lussier,Martine"
+    ],
+    "room": "PBL 106",
+    "enrollmentCap": "50   51",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed",
+          "Fri"
+        ],
+        "startTime": "10:35AM",
+        "endTime": "11:25AM",
+        "rawString": "MWF 10:35AM - 11:25AM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 307 - Intermediate Macro Theory",
+    "section": "*101-LEC(1351)",
+    "instructor": [
+      "Lussier, Martine",
+      "Smith,Dominic"
+    ],
+    "room": "PBL 106\nNo Room at this time",
+    "enrollmentCap": "51",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed",
+          "Fri"
+        ],
+        "startTime": "11:40AM",
+        "endTime": "12:30PM",
+        "rawString": "MWF 11:40AM - 12:30PM"
+      },
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "3:20PM",
+        "endTime": "4:35PM",
+        "rawString": "MW 3:20PM - 4:35PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 309 - Intermediate Micro Theory: Calculus-Based",
+    "section": "*100-LEC(1352)",
+    "instructor": [
+      "Xiong,Heyu"
+    ],
+    "room": "PBL 258",
+    "enrollmentCap": "40",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "12:45PM",
+        "rawString": "TuTh 11:30AM - 12:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 326 - Econometrics",
+    "section": "*100-LEC(1353)",
+    "instructor": [
+      "Votruba,Mark"
+    ],
+    "room": "PBL 07",
+    "enrollmentCap": "56",
+    "units": "4",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "3:20PM",
+        "endTime": "4:35PM",
+        "rawString": "MW 3:20PM - 4:35PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 326 - Econometrics",
+    "section": "*110-LAB(1354)",
+    "instructor": [
+      "Votruba,Mark"
+    ],
+    "room": "PBL 07",
+    "enrollmentCap": "28",
+    "units": "4",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "2:15PM",
+        "endTime": "3:05PM",
+        "rawString": "M 2:15PM - 3:05PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 326 - Econometrics",
+    "section": "*111-LAB(1355)",
+    "instructor": [
+      "Votruba,Mark"
+    ],
+    "room": "PBL 07",
+    "enrollmentCap": "28",
+    "units": "4",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "4:50PM",
+        "endTime": "5:40PM",
+        "rawString": "M 4:50PM - 5:40PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 327 - Advanced Econometrics",
+    "section": "*100-LEC(1356)",
+    "instructor": [
+      "Shoag,Daniel Warren"
+    ],
+    "room": "PBL 07",
+    "enrollmentCap": "45 (50)\n45 (49)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "12:45PM",
+        "rawString": "TuTh 11:30AM - 12:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 427 - Advanced Econometrics",
+    "section": "*100-LEC(1428)",
+    "instructor": [
+      "Shoag,Daniel Warren"
+    ],
+    "room": "PBL 07",
+    "enrollmentCap": "5 (50)\n4 (49)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "12:45PM",
+        "rawString": "TuTh 11:30AM - 12:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 329 - Game Theory: The Economics of Thinking Strategically",
+    "section": "*100-LEC(1468)",
+    "instructor": [
+      "Sheremeta,Roman M"
+    ],
+    "room": "PBL 106",
+    "enrollmentCap": "55 (60)\n54 (58)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "8:30AM",
+        "endTime": "9:45AM",
+        "rawString": "TuTh 8:30AM - 9:45AM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 429 - Game Theory: The Economics of Thinking Strategically",
+    "section": "*100-LEC(1469)",
+    "instructor": [
+      "Sheremeta,Roman M"
+    ],
+    "room": "PBL 106",
+    "enrollmentCap": "5 (60) \n4 (58)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "8:30AM",
+        "endTime": "9:45AM",
+        "rawString": "TuTh 8:30AM - 9:45AM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 332 - Labor Economics: Theory, Data, and Policy",
+    "section": "*100-LEC(1512)",
+    "instructor": [
+      "Schweitzer,Mark Edward"
+    ],
+    "room": "PBL 04   \nPBL 05",
+    "enrollmentCap": "50\n18   40",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "11:15AM",
+        "rawString": "TuTh 10:00AM - 11:15AM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 342 - Public Finance",
+    "section": "*100-LEC(1471)",
+    "instructor": [
+      "Shoag,Daniel Warren"
+    ],
+    "room": "PBL 258",
+    "enrollmentCap": "55",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "2:30PM",
+        "endTime": "3:45PM",
+        "rawString": "TuTh 2:30PM - 3:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 364 - Economic Analysis of Business Strategies",
+    "section": "*100-LEC(1430)",
+    "instructor": [
+      "Ernest PhD,Jonathan Orry"
+    ],
+    "room": "PBL 201",
+    "enrollmentCap": "50   68",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "10:15AM",
+        "rawString": "MW 9:00AM - 10:15AM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "ECON 367 - Industrial Strategy: Government Action to Transform the Economy",
+    "section": "100-SEM(10221)",
+    "instructor": [
+      "Helper,Susan"
+    ],
+    "room": "PBL 05",
+    "enrollmentCap": 18.0,
+    "units": 3.0,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "12:45PM",
+        "endTime": "2:00PM",
+        "rawString": "MW 12:45PM - 2:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 391 - Advanced Topics and Writing in Economics",
+    "section": "*100-SEM(1358)",
+    "instructor": [
+      "Hawkins,Jenny Rae"
+    ],
+    "room": "PBL 220",
+    "enrollmentCap": "18",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "11:15AM",
+        "rawString": "TuTh 10:00AM - 11:15AM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 395 - Capstone Research in Economics",
+    "section": "*100-SEM(1359)",
+    "instructor": [
+      "Clingingsmith, David",
+      "Hawkins,Jenny Rae"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "26",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "11:00AM",
+        "rawString": "F 9:00AM - 11:00AM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 395 - Capstone Research in Economics",
+    "section": "*100-SEM(1359)",
+    "instructor": [
+      "Clingingsmith, David",
+      "Hawkins,Jenny Rae"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "26",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "5:30PM",
+        "endTime": "7:30PM",
+        "rawString": "Tu 5:30PM - 7:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 395 - Capstone Research in Economics",
+    "section": "*100-SEM(1359)",
+    "instructor": [
+      "Clingingsmith, David",
+      "Hawkins,Jenny Rae"
+    ],
+    "room": "PBL 258",
+    "enrollmentCap": "26",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "2:15PM",
+        "rawString": "TuTh 1:00PM - 2:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 395 - Capstone Research in Economics",
+    "section": "*101-SEM(1553)",
+    "instructor": [
+      "Schweitzer,Mark Edward"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "27",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "11:00AM",
+        "rawString": "F 9:00AM - 11:00AM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 395 - Capstone Research in Economics",
+    "section": "*101-SEM(1553)",
+    "instructor": [
+      "Schweitzer,Mark Edward"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "27",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "5:30PM",
+        "endTime": "7:30PM",
+        "rawString": "Tu 5:30PM - 7:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 395 - Capstone Research in Economics",
+    "section": "*101-SEM(1553)",
+    "instructor": [
+      "Schweitzer,Mark Edward"
+    ],
+    "room": "PBL 220",
+    "enrollmentCap": "27",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "2:15PM",
+        "rawString": "TuTh 1:00PM - 2:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 431 - Economics of Negotiation and Conflict Resolution",
+    "section": "*100-LEC(1470)",
+    "instructor": [
+      "Sheremeta,Roman M"
+    ],
+    "room": "PBL 401",
+    "enrollmentCap": "37 (57)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "W 6:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "ORBH",
+    "description": "ORBH 413 - Economics of Negotiation and Conflict Resolution",
+    "section": "*100-LEC(1485)",
+    "instructor": [
+      "Sheremeta,Roman M"
+    ],
+    "room": "PBL 401",
+    "enrollmentCap": "20 (57)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "W 6:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "ECON 3XX - Allocating Scarce Resources: Are Free Markets Always the Best Way?",
+    "section": null,
+    "instructor": [
+      "Wolcowitz, Jeffrey"
+    ],
+    "room": "PBL 220",
+    "enrollmentCap": null,
+    "units": null,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "12:45PM",
+        "rawString": "TuTh 11:30AM - 12:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "BAFI",
+    "description": "ENTP 444 - Entrepreneurial Finance",
+    "section": "*100-LEC(1304)",
+    "instructor": [
+      "Goldberg,Michael; Schwarzinger,Todd  ; Todia,Liz"
+    ],
+    "room": "PBL 02",
+    "enrollmentCap": "50   59",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:45PM",
+        "rawString": "Th 6:00PM - 8:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 437 - Economic Analysis for Managers",
+    "section": "*100-SEM(1265)",
+    "instructor": [
+      "Votruba,Mark"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "10:15AM",
+        "endTime": "12:15PM",
+        "rawString": "F 10:15AM - 12:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 437 - Economic Analysis for Managers",
+    "section": "*100-SEM(1265)",
+    "instructor": [
+      "Votruba,Mark"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "1:15PM",
+        "endTime": "3:15PM",
+        "rawString": "F 1:15PM - 3:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 437 - Economic Analysis for Managers",
+    "section": "*100-SEM(1265)",
+    "instructor": [
+      "Votruba,Mark"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "8:00AM",
+        "endTime": "10:00AM",
+        "rawString": "F 8:00AM - 10:00AM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 437 - Economic Analysis for Managers",
+    "section": "*100-SEM(1265)",
+    "instructor": [
+      "Votruba,Mark"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "10:15AM",
+        "endTime": "12:15PM",
+        "rawString": "Sa 10:15AM - 12:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 437 - Economic Analysis for Managers",
+    "section": "*100-SEM(1265)",
+    "instructor": [
+      "Votruba,Mark"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "1:15PM",
+        "endTime": "5:30PM",
+        "rawString": "Sa 1:15PM - 5:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 437 - Economic Analysis for Managers",
+    "section": "*100-SEM(1265)",
+    "instructor": [
+      "Votruba,Mark"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "8:00AM",
+        "endTime": "10:00AM",
+        "rawString": "Sa 8:00AM - 10:00AM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 437 - Economic Analysis for Managers",
+    "section": "*100-SEM(1265)",
+    "instructor": [
+      "Votruba,Mark"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "10:15AM",
+        "endTime": "12:15PM",
+        "rawString": "Th 10:15AM - 12:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 437 - Economic Analysis for Managers",
+    "section": "*100-SEM(1265)",
+    "instructor": [
+      "Votruba,Mark"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "1:15PM",
+        "endTime": "3:15PM",
+        "rawString": "Th 1:15PM - 3:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 439 - Corporate Finance",
+    "section": "*100-SEM(1266)",
+    "instructor": [
+      "Gupta,Anurag"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "10:15AM",
+        "endTime": "12:15PM",
+        "rawString": "F 10:15AM - 12:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 439 - Corporate Finance",
+    "section": "*100-SEM(1266)",
+    "instructor": [
+      "Gupta,Anurag"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "1:15PM",
+        "endTime": "3:15PM",
+        "rawString": "F 1:15PM - 3:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 439 - Corporate Finance",
+    "section": "*100-SEM(1266)",
+    "instructor": [
+      "Gupta,Anurag"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "8:00AM",
+        "endTime": "12:15PM",
+        "rawString": "F 8:00AM - 12:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 439 - Corporate Finance",
+    "section": "*100-SEM(1266)",
+    "instructor": [
+      "Gupta,Anurag"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "10:15AM",
+        "endTime": "12:15PM",
+        "rawString": "Sa 10:15AM - 12:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 439 - Corporate Finance",
+    "section": "*100-SEM(1266)",
+    "instructor": [
+      "Gupta,Anurag"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "8:00AM",
+        "endTime": "12:15PM",
+        "rawString": "Sa 8:00AM - 12:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 439 - Corporate Finance",
+    "section": "*100-SEM(1266)",
+    "instructor": [
+      "Gupta,Anurag"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "10:15AM",
+        "endTime": "12:15PM",
+        "rawString": "Th 10:15AM - 12:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 439 - Corporate Finance",
+    "section": "*100-SEM(1266)",
+    "instructor": [
+      "Gupta,Anurag"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "3:30PM",
+        "endTime": "5:30PM",
+        "rawString": "Th 3:30PM - 5:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 442 - Innovation",
+    "section": "*100-LEC(1255)",
+    "instructor": [
+      "Agamanolis,Stefan"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "8:00AM",
+        "endTime": "10:00AM",
+        "rawString": "F 8:00AM - 10:00AM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 442 - Innovation",
+    "section": "*100-LEC(1255)",
+    "instructor": [
+      "Agamanolis,Stefan"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "8:00AM",
+        "endTime": "12:15PM",
+        "rawString": "Sa 8:00AM - 12:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 442 - Innovation",
+    "section": "*100-LEC(1255)",
+    "instructor": [
+      "Agamanolis,Stefan"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "8:00AM",
+        "endTime": "12:15PM",
+        "rawString": "Th 8:00AM - 12:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 449 - Contemporary Issues in Management",
+    "section": "*100-LEC(1272)",
+    "instructor": [
+      "Bailey,Bernard Craig"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "10:15AM",
+        "endTime": "12:15PM",
+        "rawString": "F 10:15AM - 12:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 449 - Contemporary Issues in Management",
+    "section": "*100-LEC(1272)",
+    "instructor": [
+      "Bailey,Bernard Craig"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "1:15PM",
+        "endTime": "3:15PM",
+        "rawString": "F 1:15PM - 3:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 449 - Contemporary Issues in Management",
+    "section": "*100-LEC(1272)",
+    "instructor": [
+      "Bailey,Bernard Craig"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "8:00AM",
+        "endTime": "10:00AM",
+        "rawString": "F 8:00AM - 10:00AM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 449 - Contemporary Issues in Management",
+    "section": "*100-LEC(1272)",
+    "instructor": [
+      "Bailey,Bernard Craig"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "1:15PM",
+        "endTime": "3:15PM",
+        "rawString": "Sa 1:15PM - 3:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 449 - Contemporary Issues in Management",
+    "section": "*100-LEC(1272)",
+    "instructor": [
+      "Bailey,Bernard Craig"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "10:15AM",
+        "endTime": "12:15PM",
+        "rawString": "Th 10:15AM - 12:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 449 - Contemporary Issues in Management",
+    "section": "*100-LEC(1272)",
+    "instructor": [
+      "Bailey,Bernard Craig"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "1:15PM",
+        "endTime": "3:15PM",
+        "rawString": "Th 1:15PM - 3:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 449 - Contemporary Issues in Management",
+    "section": "*100-LEC(1272)",
+    "instructor": [
+      "Bailey,Bernard Craig"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "1:15PM",
+        "endTime": "5:30PM",
+        "rawString": "Th 1:15PM - 5:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 451 - Strategy",
+    "section": "*100-SEM(1541)",
+    "instructor": [
+      "Chatterjee,Sayan"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "8:00AM",
+        "endTime": "10:00AM",
+        "rawString": "F 8:00AM - 10:00AM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 451 - Strategy",
+    "section": "*100-SEM(1541)",
+    "instructor": [
+      "Chatterjee,Sayan"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "8:00AM",
+        "endTime": "12:15PM",
+        "rawString": "F 8:00AM - 12:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 451 - Strategy",
+    "section": "*100-SEM(1541)",
+    "instructor": [
+      "Chatterjee,Sayan"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "10:15AM",
+        "endTime": "12:15PM",
+        "rawString": "Sa 10:15AM - 12:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 451 - Strategy",
+    "section": "*100-SEM(1541)",
+    "instructor": [
+      "Chatterjee,Sayan"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "8:00AM",
+        "endTime": "10:00AM",
+        "rawString": "Sa 8:00AM - 10:00AM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 451 - Strategy",
+    "section": "*100-SEM(1541)",
+    "instructor": [
+      "Chatterjee,Sayan"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "8:00AM",
+        "endTime": "10:00AM",
+        "rawString": "Th 8:00AM - 10:00AM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 451 - Strategy",
+    "section": "*100-SEM(1541)",
+    "instructor": [
+      "Chatterjee,Sayan"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "8:00AM",
+        "endTime": "12:15PM",
+        "rawString": "Th 8:00AM - 12:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 471 - Strategic Negotiations",
+    "section": "*100-LEC(1542)",
+    "instructor": [
+      "Sheremeta,Roman M"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "1.25",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "3:30PM",
+        "endTime": "5:30PM",
+        "rawString": "F 3:30PM - 5:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 471 - Strategic Negotiations",
+    "section": "*100-LEC(1542)",
+    "instructor": [
+      "Sheremeta,Roman M"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "1.25",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "10:15AM",
+        "endTime": "12:15PM",
+        "rawString": "Th 10:15AM - 12:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 471 - Strategic Negotiations",
+    "section": "*100-LEC(1542)",
+    "instructor": [
+      "Sheremeta,Roman M"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "1.25",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "3:30PM",
+        "endTime": "5:30PM",
+        "rawString": "Th 3:30PM - 5:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 473 - Leading Change: Teams",
+    "section": "*100-LEC(1259)",
+    "instructor": [
+      "Van Oosten,Ellen Brooks"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "1:15PM",
+        "endTime": "5:30PM",
+        "rawString": "F 1:15PM - 5:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 473 - Leading Change: Teams",
+    "section": "*100-LEC(1259)",
+    "instructor": [
+      "Van Oosten,Ellen Brooks"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "1:15PM",
+        "endTime": "5:30PM",
+        "rawString": "Sa 1:15PM - 5:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 473 - Leading Change: Teams",
+    "section": "*100-LEC(1259)",
+    "instructor": [
+      "Van Oosten,Ellen Brooks"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "1:15PM",
+        "endTime": "5:30PM",
+        "rawString": "Th 1:15PM - 5:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 476 - Corporate Governance and Dialogues in Healthcare",
+    "section": "*100-SEM(1262)",
+    "instructor": [
+      "Peck,Simon Ian"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "1.25",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "10:15AM",
+        "endTime": "12:15PM",
+        "rawString": "F 10:15AM - 12:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 476 - Corporate Governance and Dialogues in Healthcare",
+    "section": "*100-SEM(1262)",
+    "instructor": [
+      "Peck,Simon Ian"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "1.25",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "3:30PM",
+        "endTime": "5:30PM",
+        "rawString": "F 3:30PM - 5:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 476 - Corporate Governance and Dialogues in Healthcare",
+    "section": "*100-SEM(1262)",
+    "instructor": [
+      "Peck,Simon Ian"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "1.25",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "10:15AM",
+        "endTime": "12:15PM",
+        "rawString": "Sa 10:15AM - 12:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 476 - Corporate Governance and Dialogues in Healthcare",
+    "section": "*100-SEM(1262)",
+    "instructor": [
+      "Peck,Simon Ian"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "1.25",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "1:15PM",
+        "endTime": "3:15PM",
+        "rawString": "Sa 1:15PM - 3:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 476 - Corporate Governance and Dialogues in Healthcare",
+    "section": "*100-SEM(1262)",
+    "instructor": [
+      "Peck,Simon Ian"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "1.25",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "1:15PM",
+        "endTime": "5:30PM",
+        "rawString": "Sa 1:15PM - 5:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 476 - Corporate Governance and Dialogues in Healthcare",
+    "section": "*100-SEM(1262)",
+    "instructor": [
+      "Peck,Simon Ian"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "1.25",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "8:00AM",
+        "endTime": "12:15PM",
+        "rawString": "Sa 8:00AM - 12:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 476 - Corporate Governance and Dialogues in Healthcare",
+    "section": "*100-SEM(1262)",
+    "instructor": [
+      "Peck,Simon Ian"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "1.25",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "8:00AM",
+        "endTime": "10:00AM",
+        "rawString": "Th 8:00AM - 10:00AM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 478B - Leading Design in Organizations",
+    "section": "*100-SEM(1263)",
+    "instructor": [
+      "Yoo,Youngjin"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "1.25",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "3:30PM",
+        "endTime": "5:30PM",
+        "rawString": "F 3:30PM - 5:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 478B - Leading Design in Organizations",
+    "section": "*100-SEM(1263)",
+    "instructor": [
+      "Yoo,Youngjin"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "1.25",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "8:00AM",
+        "endTime": "12:15PM",
+        "rawString": "F 8:00AM - 12:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 478B - Leading Design in Organizations",
+    "section": "*100-SEM(1263)",
+    "instructor": [
+      "Yoo,Youngjin"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "1.25",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "1:15PM",
+        "endTime": "5:30PM",
+        "rawString": "Sa 1:15PM - 5:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 478B - Leading Design in Organizations",
+    "section": "*100-SEM(1263)",
+    "instructor": [
+      "Yoo,Youngjin"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "1.25",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "3:30PM",
+        "endTime": "5:30PM",
+        "rawString": "Sa 3:30PM - 5:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 478B - Leading Design in Organizations",
+    "section": "*100-SEM(1263)",
+    "instructor": [
+      "Yoo,Youngjin"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "1.25",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "3:30PM",
+        "endTime": "5:30PM",
+        "rawString": "Th 3:30PM - 5:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 479 - Leading Change: Society",
+    "section": "*100-SEM(1264)",
+    "instructor": [
+      "Cooperrider,David L"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "10:15AM",
+        "endTime": "12:15PM",
+        "rawString": "F 10:15AM - 12:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 479 - Leading Change: Society",
+    "section": "*100-SEM(1264)",
+    "instructor": [
+      "Cooperrider,David L"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "1:15PM",
+        "endTime": "3:15PM",
+        "rawString": "F 1:15PM - 3:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 479 - Leading Change: Society",
+    "section": "*100-SEM(1264)",
+    "instructor": [
+      "Cooperrider,David L"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "1:15PM",
+        "endTime": "5:30PM",
+        "rawString": "F 1:15PM - 5:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 479 - Leading Change: Society",
+    "section": "*100-SEM(1264)",
+    "instructor": [
+      "Cooperrider,David L"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "8:00AM",
+        "endTime": "10:00AM",
+        "rawString": "Sa 8:00AM - 10:00AM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 479 - Leading Change: Society",
+    "section": "*100-SEM(1264)",
+    "instructor": [
+      "Cooperrider,David L"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "8:00AM",
+        "endTime": "12:15PM",
+        "rawString": "Sa 8:00AM - 12:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "EMBA",
+    "description": "EMBA 479 - Leading Change: Society",
+    "section": "*100-SEM(1264)",
+    "instructor": [
+      "Cooperrider,David L"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "2.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "1:15PM",
+        "endTime": "5:30PM",
+        "rawString": "Th 1:15PM - 5:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "ENTP",
+    "description": "ENTP 301 - Entrepreneurial Strategy",
+    "section": "*100-LEC(1371)",
+    "instructor": [
+      "Buchter,Megan Elizabeth"
+    ],
+    "room": "PBL 02",
+    "enrollmentCap": "58",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "2:30PM",
+        "endTime": "3:45PM",
+        "rawString": "TuTh 2:30PM - 3:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "ENTP",
+    "description": "ENTP 322 - Social Entrepreneurship: Igniting Social Change",
+    "section": "*100-SEM(1476)",
+    "instructor": [
+      "Cashon, Tiffany  BOTH??",
+      "Baierl,Mindy M; Cashon,Tiffany E"
+    ],
+    "room": "PBL 03",
+    "enrollmentCap": "36",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "2:15PM",
+        "rawString": "TuTh 1:00PM - 2:15PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "ENTP 323 - Silicon Valley",
+    "section": "*100-LEC(10229)",
+    "instructor": [
+      "need instructor"
+    ],
+    "room": "PBL 121",
+    "enrollmentCap": null,
+    "units": null,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "12:45PM",
+        "rawString": "TuTh 11:30AM - 12:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "FNCE",
+    "description": "FNCE 412 - Algorithmic Trading",
+    "section": "*100-LEC(1446)",
+    "instructor": [
+      "Noh,Joonki"
+    ],
+    "room": "PBL 202\nPBL 118",
+    "enrollmentCap": "38\n40 (58)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "3:00PM",
+        "endTime": "5:45PM",
+        "rawString": "M 3:00PM - 5:45PM"
+      },
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "11:45AM",
+        "rawString": "M 9:00AM - 11:45AM"
+      }
+    ]
+  },
+  {
+    "subject": "FTEC",
+    "description": "FTEC 412 - Algorithmic Trading",
+    "section": "*100-LEC(1445)",
+    "instructor": [
+      "Noh,Joonki"
+    ],
+    "room": "PBL 202\nPBL 118",
+    "enrollmentCap": "16\n18 (58)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "3:00PM",
+        "endTime": "5:45PM",
+        "rawString": "M 3:00PM - 5:45PM"
+      },
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "11:45AM",
+        "rawString": "M 9:00AM - 11:45AM"
+      }
+    ]
+  },
+  {
+    "subject": "FNCE",
+    "description": "FNCE 470 - Financial Models Using Big Data",
+    "section": "*100-LEC(1494)",
+    "instructor": [
+      "Bae,Joonwoo"
+    ],
+    "room": "PBL 401",
+    "enrollmentCap": "55   57",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "3:00PM",
+        "endTime": "5:45PM",
+        "rawString": "Th 3:00PM - 5:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "FNCE",
+    "description": "FNCE 436B - Individual, Team and Career Development",
+    "section": "*100-SEM(1417)",
+    "instructor": [
+      "Fine,Scott"
+    ],
+    "room": "PBL 203\nTo Be Announced",
+    "enrollmentCap": "54",
+    "units": "1.75",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "1:00PM",
+        "rawString": "F 9:00AM - 1:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "FNCE",
+    "description": "FNCE 436B - Individual, Team and Career Development",
+    "section": "*100-SEM(1417)",
+    "instructor": [
+      "Fine,Scott"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "54",
+    "units": "1.75",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "9:30AM",
+        "endTime": "11:45AM",
+        "rawString": "F 9:30AM - 11:45AM"
+      }
+    ]
+  },
+  {
+    "subject": "HSMC",
+    "description": "HSMC 420 - Health Finance",
+    "section": "*100-LEC(1274)",
+    "instructor": [
+      "Herschman,Ray Samuel"
+    ],
+    "room": "PBL 118 per Laura 1/12/26; To Be Announced",
+    "enrollmentCap": "30",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:00PM",
+        "rawString": "M 6:00PM - 8:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "LEOC",
+    "description": "LEOC 435 - Practicum in Appreciative Inquiry and Positive OD",
+    "section": "*100-PRA(1480)",
+    "instructor": [
+      "Fry,Ronald E"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "35",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Wed",
+          "Thu",
+          "Fri"
+        ],
+        "startTime": "8:30AM",
+        "endTime": "5:00PM",
+        "rawString": "WThF 8:30AM - 5:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "LEOC",
+    "description": "LEOC 480 - Dynamics of Creativity and Innovation in Organizations",
+    "section": "*400-SEM(1441)",
+    "instructor": [
+      "Barrett,Frank"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "35",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "8:30AM",
+        "endTime": "5:00PM",
+        "rawString": "Sa 8:30AM - 5:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "LEOC",
+    "description": "LEOC 480 - Dynamics of Creativity and Innovation in Organizations",
+    "section": "*400-SEM(1441)",
+    "instructor": [
+      "Barrett,Frank"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "35",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "8:30AM",
+        "endTime": "5:00PM",
+        "rawString": "Sa 8:30AM - 5:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "LEOC",
+    "description": "LEOC 480 - Dynamics of Creativity and Innovation in Organizations",
+    "section": "*400-SEM(1441)",
+    "instructor": [
+      "Barrett,Frank"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "35",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sun"
+        ],
+        "startTime": "8:30AM",
+        "endTime": "5:00PM",
+        "rawString": "Su 8:30AM - 5:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAC",
+    "description": "MBAC 501D - Professional Development and Career Strategy",
+    "section": "*100-LEC(1548)",
+    "instructor": [
+      "Tischler,Nicole Therese"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "20",
+    "units": ".5",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "11:00AM",
+        "endTime": "12:30PM",
+        "rawString": "F 11:00AM - 12:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAC",
+    "description": "MBAC 503 - Managerial Accounting",
+    "section": "*100-LEC(1376)",
+    "instructor": [
+      "Jarvis,Mark"
+    ],
+    "room": "PBL 118",
+    "enrollmentCap": "55   57",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "11:15AM",
+        "rawString": "TuTh 10:00AM - 11:15AM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAC",
+    "description": "MBAC 505 - Corporate Finance II",
+    "section": "*100-LEC(1305)",
+    "instructor": [
+      "Fine, Scott",
+      "Olavarria Baeza,Jose Valentin"
+    ],
+    "room": "PBL 203",
+    "enrollmentCap": "55   57",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "2:15PM",
+        "endTime": "5:00PM",
+        "rawString": "W 2:15PM - 5:00PM"
+      },
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "3:00PM",
+        "endTime": "5:45PM",
+        "rawString": "W 3:00PM - 5:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAC",
+    "description": "MBAC 507 - Operations and Supply Chain Management",
+    "section": "*100-LEC(1248)",
+    "instructor": [
+      "Ning, Jie",
+      "Goulder,Michael Lee"
+    ],
+    "room": "PBL 118",
+    "enrollmentCap": "55   57",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "3:45PM",
+        "rawString": "Tu 1:00PM - 3:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAC",
+    "description": "MBAC 512 - Economics",
+    "section": "*100-LEC(1291)",
+    "instructor": [
+      "Sheremeta, Roman",
+      "Shoag,Daniel Warren"
+    ],
+    "room": "PBL 106",
+    "enrollmentCap": "55   57",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "12:00PM",
+        "endTime": "2:45PM",
+        "rawString": "M 12:00PM - 2:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAC",
+    "description": "MBAC 515B - Leadership Assessment and Development",
+    "section": "*100-LEC(1532)",
+    "instructor": [
+      "Van Oosten,Ellen Brooks"
+    ],
+    "room": "PBL 02",
+    "enrollmentCap": "55   57",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "2:15PM",
+        "rawString": "Th 11:30AM - 2:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAC",
+    "description": "MBAC 518 - Business Analytics & AI for Business",
+    "section": "*100-LEC(1533)",
+    "instructor": [
+      "Niraj,Rakesh Kumar"
+    ],
+    "room": "PBL 02",
+    "enrollmentCap": "55   57",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "10:30AM",
+        "endTime": "11:45AM",
+        "rawString": "MW 10:30AM - 11:45AM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 402 - Financial and Managerial Accountancy",
+    "section": "*400-LEC(1475)",
+    "instructor": [
+      "Bucaro,Anthony Carl"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "58",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "7:45PM",
+        "endTime": "9:15PM",
+        "rawString": "M 7:45PM - 9:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 402 - Financial and Managerial Accountancy",
+    "section": "*800-LEC(1504)",
+    "instructor": [
+      "Staff"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "45",
+    "units": "3",
+    "session": "Virt Reg",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "7:00PM",
+        "endTime": "8:00PM",
+        "rawString": "W 7:00PM - 8:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 403 - Statistics and Decision Modeling",
+    "section": "*400-LEC(1534)",
+    "instructor": [
+      "Fallahtafti,Alireza"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "58",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "7:30PM",
+        "rawString": "M 6:00PM - 7:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 403 - Statistics and Decision Modeling",
+    "section": "*800-LEC(1505)",
+    "instructor": [
+      "Wu,Qi"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "45",
+    "units": "3",
+    "session": "Virt Reg",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "7:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Th 7:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 404 - Managing People and Organizations",
+    "section": "*400-LEC(10152)",
+    "instructor": [
+      "Laszlo,Christopher Peter; Ramamurthi,Radhika"
+    ],
+    "room": "Peter B Lewis Building (999)",
+    "enrollmentCap": "50",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "7:30PM",
+        "rawString": "M 6:00PM - 7:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 406 - Economics for Managers",
+    "section": "*400-LEC(1535)",
+    "instructor": [
+      "Shoag,Daniel Warren"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "57",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "7:30PM",
+        "rawString": "M 6:00PM - 7:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 408 - Operations Management",
+    "section": "*800-LEC(1507)",
+    "instructor": [
+      "Goulder,Michael Lee"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "45",
+    "units": "3",
+    "session": "Virt Reg",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "7:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Th 7:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 410 - Strategic Issues and Applications",
+    "section": "*800-LEC(1506)",
+    "instructor": [
+      "Peck,Simon Ian"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "45",
+    "units": "3",
+    "session": "Virt Reg",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "7:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Tu 7:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 427H - Introduction to Population Health",
+    "section": "*800-LEC(1457)",
+    "instructor": [
+      "Nevel,Alan"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "45",
+    "units": "1.5",
+    "session": "Virt Sess1",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "7:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Th 7:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 428H - Healthcare Decision Making and Analytics",
+    "section": "*800-LEC(1459)",
+    "instructor": [
+      "Staff"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "45",
+    "units": "3",
+    "session": "Virt Reg",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "7:00PM",
+        "endTime": "8:30PM",
+        "rawString": "W 7:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 429H - Artificial Intelligence Applications in Healthcare Management",
+    "section": "*800-LEC(1458)",
+    "instructor": [
+      "Staff"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "45",
+    "units": "1.5",
+    "session": "Virt Sess2",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "7:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Th 7:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 474 - Leading Others",
+    "section": "*400-LEC(10150)",
+    "instructor": [
+      "Messer,Tracey Eira; Ramamurthi,Radhika"
+    ],
+    "room": "Peter B Lewis Building (999)",
+    "enrollmentCap": "50",
+    "units": "1.5",
+    "session": "Virt Sess1",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "7:45PM",
+        "endTime": "9:15PM",
+        "rawString": "M 7:45PM - 9:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 474 - Leading Others",
+    "section": "*800-LEC(10151)",
+    "instructor": [
+      "Messer,Tracey Eira; Ramamurthi,Radhika"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "50",
+    "units": "1.5",
+    "session": "Virt Sess1",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "7:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Th 7:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 475 - Using Financial Statements to Evaluate Performance",
+    "section": "*400-LEC(10144)",
+    "instructor": [
+      "Jonas,Gregory Alan; Ramamurthi,Radhika"
+    ],
+    "room": "Peter B Lewis Building (999)",
+    "enrollmentCap": "50",
+    "units": "1.5",
+    "session": "Virt Sess1",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "7:30PM",
+        "rawString": "M 6:00PM - 7:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 475 - Using Financial Statements to Evaluate Performance",
+    "section": "*800-LEC(10145)",
+    "instructor": [
+      "Jonas,Gregory Alan; Ramamurthi,Radhika"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "50",
+    "units": "1.5",
+    "session": "Virt Sess1",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "7:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Tu 7:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 476 - Cost-Based Decision Making",
+    "section": "*400-LEC(10146)",
+    "instructor": [
+      "Jonas,Gregory Alan; Ramamurthi,Radhika"
+    ],
+    "room": "Peter B Lewis Building (999)",
+    "enrollmentCap": "50",
+    "units": "1.5",
+    "session": "Virt Sess2",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "7:30PM",
+        "rawString": "M 6:00PM - 7:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 476 - Cost-Based Decision Making",
+    "section": "*800-LEC(10147)",
+    "instructor": [
+      "Jonas,Gregory Alan; Ramamurthi,Radhika"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "50",
+    "units": "1.5",
+    "session": "Virt Sess2",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "7:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Tu 7:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 477 - Corporate Finance",
+    "section": "*400-LEC(10148)",
+    "instructor": [
+      "Olavarria Baeza,Jose Valentin; Ramamurthi,Radhika"
+    ],
+    "room": "Peter B Lewis Building (999)",
+    "enrollmentCap": "50",
+    "units": "1.5",
+    "session": "Virt Sess2",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "7:30PM",
+        "rawString": "M 6:00PM - 7:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 477 - Corporate Finance",
+    "section": "*800-LEC(10149)",
+    "instructor": [
+      "Olavarria Baeza,Jose Valentin; Ramamurthi,Radhika"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "50",
+    "units": "1.5",
+    "session": "Virt Sess2",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "7:45PM",
+        "endTime": "9:15PM",
+        "rawString": "Th 7:45PM - 9:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 482 - Introduction to Supply Chain Management",
+    "section": "*400-LEC(10119)",
+    "instructor": [
+      "Ramamurthi,Radhika"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "1.5",
+    "session": "Virt Sess2",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "7:30PM",
+        "rawString": "M 6:00PM - 7:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 482 - Introduction to Supply Chain Management",
+    "section": "*800-LEC(10120)",
+    "instructor": [
+      "Ramamurthi,Radhika; Vairaktarakis,George"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "50",
+    "units": "1.5",
+    "session": "Virt Sess2",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "7:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Th 7:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 483 - The Strategic Edge - Economics for Leaders",
+    "section": "*400-LEC(10142)",
+    "instructor": [
+      "Ramamurthi,Radhika; Sheremeta,Roman M"
+    ],
+    "room": "Peter B Lewis Building (999)",
+    "enrollmentCap": "50",
+    "units": "1.5",
+    "session": "Virt Sess2",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "7:45PM",
+        "endTime": "9:15PM",
+        "rawString": "M 7:45PM - 9:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 483 - The Strategic Edge - Economics for Leaders",
+    "section": "*800-LEC(10143)",
+    "instructor": [
+      "Ramamurthi,Radhika; Sheremeta,Roman M"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "50",
+    "units": "1.5",
+    "session": "Virt Sess2",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "7:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Tu 7:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 484 - Introduction to Operations Management",
+    "section": "400-LEC(10118)",
+    "instructor": [
+      "Ramamurthi,Radhika"
+    ],
+    "room": "Peter B Lewis Building (999)",
+    "enrollmentCap": "50",
+    "units": "1.5",
+    "session": "Virt Sess1",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "7:30PM",
+        "rawString": "M 6:00PM - 7:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 484 - Introduction to Operations Management",
+    "section": "800-LEC(10117)",
+    "instructor": [
+      "Ramamurthi,Radhika; Vairaktarakis,George"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "50",
+    "units": "1.5",
+    "session": "Virt Sess1",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "7:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Th 7:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAP",
+    "description": "MBAP 499 - Introduction to Learning Skills",
+    "section": "*800-SEM(1377)",
+    "instructor": [
+      "Healy,Suzanne Lee"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "45",
+    "units": "0",
+    "session": "Virt Reg",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "7:00PM",
+        "endTime": "9:00PM",
+        "rawString": "M 7:00PM - 9:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 198 - Experience in Business Problem Solving: Organizations",
+    "section": "*100-LEC(1516)",
+    "instructor": [
+      "Hazard, Brett C.",
+      "Hazard,Brett C; Taylor,John D"
+    ],
+    "room": "PBL 03",
+    "enrollmentCap": "40",
+    "units": "1",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:00PM",
+        "rawString": "Tu 6:00PM - 8:00PM"
+      },
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "4:00PM",
+        "endTime": "6:00PM",
+        "rawString": "Tu 4:00PM - 6:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 198 - Experience in Business Problem Solving: Organizations",
+    "section": "*100-LEC(1516)",
+    "instructor": [
+      "Hazard, Brett C.",
+      "Hazard,Brett C; Taylor,John D"
+    ],
+    "room": "PBL 03",
+    "enrollmentCap": "40",
+    "units": "1",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:00PM",
+        "rawString": "Tu 6:00PM - 8:00PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 198 - Experience in Business Problem Solving: Organizations",
+    "section": "*100-LEC(1516)",
+    "instructor": [
+      "Hazard, Brett C.",
+      "Hazard,Brett C; Taylor,John D"
+    ],
+    "room": "PBL 03",
+    "enrollmentCap": 40.0,
+    "units": "1",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:00PM",
+        "rawString": "Tu 6:00PM - 8:00PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 198 - Experience in Business Problem Solving: Organizations",
+    "section": "*100-LEC(1516)",
+    "instructor": [
+      "Hazard, Brett C.",
+      "Hazard,Brett C; Taylor,John D"
+    ],
+    "room": "PBL 03",
+    "enrollmentCap": 40.0,
+    "units": "1",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:00PM",
+        "rawString": "Tu 6:00PM - 8:00PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 198 - Experience in Business Problem Solving: Organizations",
+    "section": "*100-LEC(1516)",
+    "instructor": [
+      "Hazard, Brett C.",
+      "Hazard,Brett C; Taylor,John D"
+    ],
+    "room": "PBL 03",
+    "enrollmentCap": 40.0,
+    "units": "1",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:00PM",
+        "rawString": "Tu 6:00PM - 8:00PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 198 - Experience in Business Problem Solving: Organizations",
+    "section": "*100-LEC(1516)",
+    "instructor": [
+      "Hazard, Brett C.",
+      "Hazard,Brett C; Taylor,John D"
+    ],
+    "room": "PBL 03",
+    "enrollmentCap": 40.0,
+    "units": "1",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:00PM",
+        "rawString": "Tu 6:00PM - 8:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 198 - Experience in Business Problem Solving: Organizations",
+    "section": "*100-LEC(1516)",
+    "instructor": [
+      "Hazard, Brett C.",
+      "Hazard,Brett C; Taylor,John D"
+    ],
+    "room": "PBL 03",
+    "enrollmentCap": "40",
+    "units": "1",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "9:00PM",
+        "rawString": "Tu 6:00PM - 9:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 198 - Experience in Business Problem Solving: Sustainability",
+    "section": "*101-LEC(1517)",
+    "instructor": [
+      "Buchter,Megan Elizabeth, Agamanolis, Stefan"
+    ],
+    "room": "PBL 202\nPBL 02",
+    "enrollmentCap": "40",
+    "units": "1",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "11:15AM",
+        "rawString": "Tu 10:00AM - 11:15AM"
+      },
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "4:00PM",
+        "endTime": "5:00PM",
+        "rawString": "Tu 4:00PM - 5:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 198 - Experience in Business Problem Solving: Sustainability",
+    "section": 102.0,
+    "instructor": [
+      "Buchter,Megan Elizabeth, Agamanolis, Stefan"
+    ],
+    "room": "PBL 258",
+    "enrollmentCap": "40",
+    "units": "1",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "2:15PM",
+        "endTime": "3:30PM",
+        "rawString": "W 2:15PM - 3:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 201 - Contemporary Business and Communication",
+    "section": "*101-LEC(1330)",
+    "instructor": [
+      "Gilmore,James Haydn"
+    ],
+    "room": "PBL 03",
+    "enrollmentCap": "45",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "11:15AM",
+        "rawString": "TuTh 10:00AM - 11:15AM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 201 - Contemporary Business and Communication",
+    "section": "*102-LEC(1331)",
+    "instructor": [
+      "Gilmore,James Haydn"
+    ],
+    "room": "PBL 03",
+    "enrollmentCap": "45",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "12:45PM",
+        "rawString": "TuTh 11:30AM - 12:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 205 - Essentials of Personal Finance",
+    "section": "*100-LEC(1473)",
+    "instructor": [
+      "Sasmaz,Mary B"
+    ],
+    "room": "PBL 04",
+    "enrollmentCap": "40",
+    "units": "1.5",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "2:30PM",
+        "endTime": "3:45PM",
+        "rawString": "Tu 2:30PM - 3:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 205 - Essentials of Personal Finance",
+    "section": "*101-LEC(1515)",
+    "instructor": [
+      "Sasmaz,Mary B"
+    ],
+    "room": "PBL 05\nPBL 04",
+    "enrollmentCap": "40",
+    "units": "1.5",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "3:20PM",
+        "endTime": "4:35PM",
+        "rawString": "M 3:20PM - 4:35PM"
+      },
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "2:30PM",
+        "endTime": "3:45PM",
+        "rawString": "Th 2:30PM - 3:45PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 221 - Doing Good: How Nonprofits Change Lives",
+    "section": null,
+    "instructor": [],
+    "room": "PBL 120",
+    "enrollmentCap": 18.0,
+    "units": null,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "11:15AM",
+        "rawString": "TuTh 10:00AM - 11:15AM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 224 - What is Making and Manufacturing Today, and Why is Innovation Part of the Story?",
+    "section": "*100-SEM(1549)",
+    "instructor": [
+      "Camp,Lisa Ann"
+    ],
+    "room": "PBL 220",
+    "enrollmentCap": "18",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "12:45PM",
+        "endTime": "2:00PM",
+        "rawString": "MW 12:45PM - 2:00PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 298 - Experience in Business Problem Solving: Applied Methods",
+    "section": null,
+    "instructor": [
+      "Taylor, John D"
+    ],
+    "room": "PBL 07",
+    "enrollmentCap": 40.0,
+    "units": null,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:00PM",
+        "rawString": "Tu 6:00PM - 8:00PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 298 - Experience in Business Problem Solving: Applied Methods",
+    "section": null,
+    "instructor": [
+      "Taylor, John D"
+    ],
+    "room": "PBL 07",
+    "enrollmentCap": 40.0,
+    "units": null,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:00PM",
+        "rawString": "Tu 6:00PM - 8:00PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 298 - Experience in Business Problem Solving: Applied Methods",
+    "section": null,
+    "instructor": [
+      "Taylor, John D"
+    ],
+    "room": "PBL 07",
+    "enrollmentCap": 40.0,
+    "units": null,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:00PM",
+        "rawString": "Tu 6:00PM - 8:00PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 298 - Experience in Business Problem Solving: Applied Methods",
+    "section": null,
+    "instructor": [
+      "Taylor, John D"
+    ],
+    "room": "PBL07",
+    "enrollmentCap": 40.0,
+    "units": null,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:00PM",
+        "rawString": "Tu 6:00PM - 8:00PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 298 - Experience in Business Problem Solving: Applied Methods",
+    "section": null,
+    "instructor": [
+      "Taylor, John D"
+    ],
+    "room": "PBL 07",
+    "enrollmentCap": 40.0,
+    "units": null,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:00PM",
+        "rawString": "Tu 6:00PM - 8:00PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 298 - Experience in Business Problem Solving: Applied Methods",
+    "section": null,
+    "instructor": [
+      "Taylor, John D"
+    ],
+    "room": "PBL 07",
+    "enrollmentCap": 40.0,
+    "units": null,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:00PM",
+        "rawString": "Tu 6:00PM - 8:00PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 298 - Experience in Business Problem Solving: Applied Methods",
+    "section": null,
+    "instructor": [
+      "Taylor, John D"
+    ],
+    "room": "PBL 07",
+    "enrollmentCap": 40.0,
+    "units": null,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "9:00PM",
+        "rawString": "Tu 6:00PM - 9:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 315 - International Management Institute: Iceland",
+    "section": "*100-LEC(1488)",
+    "instructor": [
+      "Buchter,Megan Elizabeth"
+    ],
+    "room": "PBL 03",
+    "enrollmentCap": "30",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "4:00PM",
+        "endTime": "5:00PM",
+        "rawString": "Th 4:00PM - 5:00PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 320 - Introduction to Family Business",
+    "section": null,
+    "instructor": [
+      "Steeb, Cindy"
+    ],
+    "room": "PBL 05",
+    "enrollmentCap": 15.0,
+    "units": 1.5,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "M 6:00PM-8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 420 - Introduction to Family Business",
+    "section": null,
+    "instructor": [
+      "Steeb, Cindy"
+    ],
+    "room": "PBL 05",
+    "enrollmentCap": 15.0,
+    "units": 1.5,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "M 6:00PM-8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 321 - Complexities of Family Business",
+    "section": null,
+    "instructor": [
+      "Steeb, Cindy"
+    ],
+    "room": "PBL 05",
+    "enrollmentCap": 15.0,
+    "units": 1.5,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "M 6:00PM-8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 421 - Complexities of Family Business",
+    "section": null,
+    "instructor": [
+      "Steeb, Cindy"
+    ],
+    "room": "PBL 05",
+    "enrollmentCap": 15.0,
+    "units": 1.5,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "M 6:00PM-8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 395 - Advanced Seminar: Booms and Busts - Lessons",
+    "section": "*106-SEM(1431)",
+    "instructor": [
+      "Levine,Kenneth L"
+    ],
+    "room": "Peter B Lewis 121 (25)",
+    "enrollmentCap": "18",
+    "units": "1",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "12:45PM",
+        "endTime": "1:45PM",
+        "rawString": "W 12:45PM - 1:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 395 - Advanced Seminar: Booms and Busts - Lessons",
+    "section": "*107-SEM(1432)",
+    "instructor": [
+      "Levine,Kenneth L"
+    ],
+    "room": "Peter B Lewis 121 (25)",
+    "enrollmentCap": "18",
+    "units": "1",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "2:15PM",
+        "endTime": "3:15PM",
+        "rawString": "W 2:15PM - 3:15PM"
+      },
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "11:00AM",
+        "rawString": "Th 10:00AM - 11:00AM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 395 - Advanced Seminar: Commercial Credit Risk",
+    "section": "*108-SEM(1520)",
+    "instructor": [
+      "Rausche,Amra"
+    ],
+    "room": "Peter B Lewis 121 (25)",
+    "enrollmentCap": "18",
+    "units": "1",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "4:30PM",
+        "endTime": "5:30PM",
+        "rawString": "W 4:30PM - 5:30PM"
+      },
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "5:30PM",
+        "endTime": "6:30PM",
+        "rawString": "W 5:30PM - 6:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 395 - Advanced Seminar: Private Credit: New Corp Debt",
+    "section": "*105-SEM(1538)",
+    "instructor": [
+      "Thompson,John"
+    ],
+    "room": "Peter B Lewis 121 (25)",
+    "enrollmentCap": "18",
+    "units": "1",
+    "session": "Reg 1 Half",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:00PM",
+        "rawString": "Tu 6:00PM - 8:00PM"
+      },
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:00PM",
+        "rawString": "M 6:00PM - 8:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 395 - Advanced Seminar: Social Justice Leadership",
+    "section": "*102-SEM(1413)",
+    "instructor": [
+      "Howard,Anita R"
+    ],
+    "room": "Peter B Lewis 121 (25)",
+    "enrollmentCap": "18",
+    "units": "1",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "2:00PM",
+        "rawString": "Tu 1:00PM - 2:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 395 - Advanced Seminar: Social Justice Leadership",
+    "section": "*103-SEM(1414)",
+    "instructor": [
+      "Howard,Anita R"
+    ],
+    "room": "Peter B Lewis 121 (25)",
+    "enrollmentCap": "18",
+    "units": "1",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "2:30PM",
+        "endTime": "3:30PM",
+        "rawString": "Tu 2:30PM - 3:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 395 - Advanced Seminar: Social Justice Leadership",
+    "section": "*104-SEM(1415)",
+    "instructor": [
+      "Howard,Anita R"
+    ],
+    "room": "Peter B Lewis 121 (25)",
+    "enrollmentCap": "18",
+    "units": "1",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "4:00PM",
+        "endTime": "5:00PM",
+        "rawString": "Tu 4:00PM - 5:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 395 - Advanced Seminar: Sports Management  Sports & Entertainment Sponsorships & Management",
+    "section": "*100-SEM(1411)",
+    "instructor": [
+      "Linton,Michael"
+    ],
+    "room": "Peter B Lewis 121 (25)",
+    "enrollmentCap": "18",
+    "units": "1",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "3:00PM",
+        "rawString": "Th 1:00PM - 3:00PM"
+      },
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "10:00AM",
+        "rawString": "W 9:00AM - 10:00AM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 395 - Advanced Seminar: Sports Management Spotlight Feedback: Evaluating Ideas in Real Time ",
+    "section": "*101-SEM(1412)",
+    "instructor": [
+      "Linton,Michael"
+    ],
+    "room": "Peter B Lewis 121 (25)",
+    "enrollmentCap": "18",
+    "units": "1",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "12:00PM",
+        "endTime": "2:00PM",
+        "rawString": "F 12:00PM - 2:00PM"
+      },
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "10:45AM",
+        "endTime": "11:45AM",
+        "rawString": "W 10:45AM - 11:45AM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 395 - Advanced Seminar: Lead with Purpose: Strategies for Intentional Impact",
+    "section": 400.0,
+    "instructor": [
+      "Simpson, Yvette"
+    ],
+    "room": "Peter B Lewis 121 (25)",
+    "enrollmentCap": null,
+    "units": null,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "3:00PM",
+        "rawString": "Th 1:00PM - 3:00PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 395 - Advanced Seminar: Lead with Purpose: Strategies for Intentional Impact",
+    "section": null,
+    "instructor": [
+      "Yvette Simpson"
+    ],
+    "room": "Peter B Lewis 121 (25)\nPeter B Lewis 220 (36)",
+    "enrollmentCap": null,
+    "units": null,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "12:00PM",
+        "rawString": "F 10:00AM - 12:00PM"
+      },
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "12:00PM",
+        "endTime": "2:00PM",
+        "rawString": "F 12:00PM  - 2:00PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 395 - Advanced Seminar: Lead with Purpose: Strategies for Intentional Impact",
+    "section": null,
+    "instructor": [
+      "Yvette Simpson"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": null,
+    "units": null,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "11:00AM",
+        "rawString": "Th 9:00AM - 11:00AM"
+      },
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "3:00PM",
+        "rawString": "Th 1:00PM - 3:00PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 395 - Advanced Seminar - Becoming conversant in Artificial Intelligence",
+    "section": null,
+    "instructor": [
+      "Vaidya, Jay"
+    ],
+    "room": "Peter B Lewis 05 (43)",
+    "enrollmentCap": null,
+    "units": null,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "2:00PM",
+        "rawString": "Tu 1:00PM - 2:00PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 395 - Advanced Seminar - Effective Communication as an Analyst - Real Estate Investment Application",
+    "section": null,
+    "instructor": [
+      "Schwartz, Edward; Stone, Kevin"
+    ],
+    "room": "Peter B Lewis 121 (25)",
+    "enrollmentCap": null,
+    "units": null,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "2:15PM",
+        "endTime": "3:15PM",
+        "rawString": "M 2:15PM - 3:15PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 395 - Advanced Seminar - Art and Science of Decision Making",
+    "section": null,
+    "instructor": [
+      "Arbesman, Samuel"
+    ],
+    "room": "Peter B Lewis 121 (25)",
+    "enrollmentCap": null,
+    "units": null,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "2:00PM",
+        "rawString": "M 1:00PM - 2:00PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 395 - Advanced Seminar - What Your CFO Isn't Telling You",
+    "section": null,
+    "instructor": [
+      "Steinberg, Gregory"
+    ],
+    "room": "Peter B Lewis 121 (25)",
+    "enrollmentCap": null,
+    "units": null,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "4:00PM",
+        "endTime": "5:00PM",
+        "rawString": "Th 4:00PM - 5:00PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 396 - Experience in Business Consulting for Sustainable Impact",
+    "section": null,
+    "instructor": [
+      "Buchter, Megan"
+    ],
+    "room": "PBL 401",
+    "enrollmentCap": 50.0,
+    "units": 3.0,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:00PM",
+        "rawString": "Th 6:00PM - 8:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 398 - Action Learning",
+    "section": "*100-LEC(1366)",
+    "instructor": [
+      "Hazard,Brett C; Taylor,John D"
+    ],
+    "room": "PBL 202",
+    "enrollmentCap": "45   42",
+    "units": "6",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "11:00AM",
+        "rawString": "F 9:00AM - 11:00AM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 398 - Action Learning",
+    "section": "*100-LEC(1366)",
+    "instructor": [
+      "Hazard,Brett C; Taylor,John D"
+    ],
+    "room": "PBL 202",
+    "enrollmentCap": "45   42",
+    "units": "6",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "11:00AM",
+        "rawString": "F 9:00AM - 11:00AM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 398 - Action Learning",
+    "section": "*100-LEC(1366)",
+    "instructor": [
+      "Hazard,Brett C; Taylor,John D"
+    ],
+    "room": "PBL 202",
+    "enrollmentCap": "45   42",
+    "units": "6",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "11:00AM",
+        "rawString": "F 9:00AM - 11:00AM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 398 - Action Learning",
+    "section": "*100-LEC(1366)",
+    "instructor": [
+      "Hazard,Brett C; Taylor,John D"
+    ],
+    "room": "PBL 202",
+    "enrollmentCap": "45   42",
+    "units": "6",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "11:00AM",
+        "rawString": "F 9:00AM - 11:00AM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 398 - Action Learning",
+    "section": "*100-LEC(1366)",
+    "instructor": [
+      "Hazard,Brett C; Taylor,John D"
+    ],
+    "room": "PBL 202",
+    "enrollmentCap": "45   42",
+    "units": "6",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "11:00AM",
+        "rawString": "F 9:00AM - 11:00AM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MGMT 398 - Action Learning",
+    "section": "*100-LEC(1366)",
+    "instructor": [
+      "Hazard,Brett C; Taylor,John D"
+    ],
+    "room": "PBL 202",
+    "enrollmentCap": "45   42",
+    "units": "6",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "11:00AM",
+        "rawString": "F 9:00AM - 11:00AM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 398 - Action Learning",
+    "section": "*100-LEC(1366)",
+    "instructor": [
+      "Hazard,Brett C; Taylor,John D"
+    ],
+    "room": "PBL 07",
+    "enrollmentCap": "42",
+    "units": "6",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:00PM",
+        "rawString": "M 6:00PM - 8:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 398 - Action Learning",
+    "section": "*100-LEC(1366)",
+    "instructor": [
+      "Hazard,Brett C; Taylor,John D"
+    ],
+    "room": "PBL 201",
+    "enrollmentCap": "42",
+    "units": "6",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "9:00PM",
+        "rawString": "Th 6:00PM - 9:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 398 - Action Learning",
+    "section": "*100-LEC(1366)",
+    "instructor": [
+      "Hazard,Brett C; Taylor,John D"
+    ],
+    "room": "PBL 201",
+    "enrollmentCap": "42",
+    "units": "6",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "9:00PM",
+        "rawString": "W 6:00PM - 9:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 458 - International Institute: Brno and Prague  Estonia & Finland",
+    "section": "*100-LEC(1434)",
+    "instructor": [
+      "Goldberg,Michael"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "30",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Tue",
+          "Wed",
+          "Thu",
+          "Fri",
+          "Sat",
+          "Sun"
+        ],
+        "startTime": "7:00AM",
+        "endTime": "8:00AM",
+        "rawString": "MTuWThFSaSu 7:00AM - 8:00AM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 571 - Measurement Theory and Method",
+    "section": "*100-LEC(1497)",
+    "instructor": [
+      "Singh,Jagdip"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "10",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "3:00PM",
+        "rawString": "F 9:00AM - 3:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 571 - Measurement Theory and Method",
+    "section": "*100-LEC(1497)",
+    "instructor": [
+      "Singh,Jagdip"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "10",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "3:00PM",
+        "rawString": "M 9:00AM - 3:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 571 - Measurement Theory and Method",
+    "section": "*100-LEC(1497)",
+    "instructor": [
+      "Singh,Jagdip"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "10",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "3:00PM",
+        "rawString": "Tu 9:00AM - 3:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MIDS",
+    "description": "MIDS 301 - Introduction to Information: A Systems and Design Approach",
+    "section": "*100-SEM(1334)",
+    "instructor": [
+      "Kim, Dongyeob",
+      "Sarangadharan Geetha Kumari,Akhil"
+    ],
+    "room": "PBL 07",
+    "enrollmentCap": "55  57",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "11:15AM",
+        "rawString": "TuTh 10:00AM - 11:15AM"
+      }
+    ]
+  },
+  {
+    "subject": "MKMR",
+    "description": "MKMR 201 - Marketing Management",
+    "section": "*100-LEC(1335)",
+    "instructor": [
+      "Hughes,Christian"
+    ],
+    "room": "PBL 05",
+    "enrollmentCap": 40.0,
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "10:35AM",
+        "endTime": "11:50AM",
+        "rawString": "MW 10:35AM - 11:50AM"
+      }
+    ]
+  },
+  {
+    "subject": "MKMR",
+    "description": "MKMR 201 - Marketing Management",
+    "section": "*101-LEC(1336)",
+    "instructor": [
+      "Ghosh,Somali"
+    ],
+    "room": "PBL 501",
+    "enrollmentCap": "50  33",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "11:15AM",
+        "rawString": "TuTh 10:00AM - 11:15AM"
+      }
+    ]
+  },
+  {
+    "subject": "MKMR",
+    "description": "MKMR 201 - Marketing Management",
+    "section": "*102-LEC(1337)",
+    "instructor": [
+      "Ghosh,Somali"
+    ],
+    "room": "PBL 501",
+    "enrollmentCap": "50  48",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "12:45PM",
+        "rawString": "TuTh 11:30AM - 12:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "MKMR",
+    "description": "MKMR 310 - Marketing Analytics",
+    "section": "*100-LEC(1332)",
+    "instructor": [
+      "Wang, Nengbo",
+      "Azar,Pablo"
+    ],
+    "room": "PBL 118",
+    "enrollmentCap": "50  51",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "12:45PM",
+        "rawString": "TuTh 11:30AM - 12:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "MKMR",
+    "description": "MKMR 311 - Customer Relationship Management",
+    "section": "*100-LEC(1407)",
+    "instructor": [
+      "Bodapati, Narsi",
+      "Azar,Pablo"
+    ],
+    "room": "PBL 07",
+    "enrollmentCap": "43 (50)  43 (51)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "2:15PM",
+        "rawString": "TuTh 1:00PM - 2:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "MKMR",
+    "description": "MKMR 411 - Customer Relationship Management",
+    "section": "*100-SEM(1449)",
+    "instructor": [
+      "Bodapati, Narsi",
+      "Azar,Pablo"
+    ],
+    "room": "PBL 07",
+    "enrollmentCap": "7 (50) \n8 (51)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "2:15PM",
+        "rawString": "TuTh 1:00PM - 2:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "MKMR",
+    "description": "MKMR 348 - Strategic Internet Marketing",
+    "section": "*100-LEC(1338)",
+    "instructor": [
+      "Ghosh,Somali"
+    ],
+    "room": "PBL 03",
+    "enrollmentCap": "45",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "10:35AM",
+        "endTime": "11:50AM",
+        "rawString": "MW 10:35AM - 11:50AM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "MKMR 350 - Social Media Strategy",
+    "section": "need class number",
+    "instructor": [
+      "Hughes,Christian"
+    ],
+    "room": "PBL 04",
+    "enrollmentCap": "50  45",
+    "units": null,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "12:45PM",
+        "endTime": "2:00PM",
+        "rawString": "MW 12:45PM - 2:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MKMR",
+    "description": "MKMR 412 - E-Marketing",
+    "section": "*100-LEC(1525)",
+    "instructor": [
+      "Hughes,Christian"
+    ],
+    "room": "PBL 118",
+    "enrollmentCap": "45",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Th 6:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MPOD",
+    "description": "MPOD 416B - Leadership and Executive Assessment and Development",
+    "section": "*100-LEC(1479)",
+    "instructor": [
+      "Van Oosten,Ellen Brooks"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "35",
+    "units": "1",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "8:30AM",
+        "endTime": "5:00PM",
+        "rawString": "Tu 8:30AM - 5:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MPOD",
+    "description": "MPOD 439 - Individual Mastery Projects",
+    "section": "*400-LEC(1481)",
+    "instructor": [
+      "Barrett,Frank"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "35",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sun"
+        ],
+        "startTime": "8:30AM",
+        "endTime": "5:00PM",
+        "rawString": "Su 8:30AM - 5:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MPOD",
+    "description": "MPOD 439 - Individual Mastery Projects",
+    "section": "*400-LEC(1481)",
+    "instructor": [
+      "Barrett,Frank"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "35",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu",
+          "Fri"
+        ],
+        "startTime": "8:30AM",
+        "endTime": "5:00PM",
+        "rawString": "ThF 8:30AM - 5:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "OPMT",
+    "description": "OPMT 377A - Business Forecasting",
+    "section": "*100-LEC(1339)",
+    "instructor": [
+      "Mathur, Kamlesh",
+      "Zokaeinikoo,Maryam"
+    ],
+    "room": "PBL 501\nPBL 106",
+    "enrollmentCap": "10 (50)",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "W 6:00PM - 8:30PM"
+      },
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Th 6:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "OPMT",
+    "description": "OPMT 477A - Business Forecasting",
+    "section": "*100-LEC(1241)",
+    "instructor": [
+      "Mathur, Kamlesh",
+      "Zokaeinikoo,Maryam"
+    ],
+    "room": "PBL 501\nPBL 106",
+    "enrollmentCap": "10 (50)\n5 (50)",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "W 6:00PM - 8:30PM"
+      },
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Th 6:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "SCMG",
+    "description": "SCMG 477A - Business Forecasting",
+    "section": "*100-LEC(1384)",
+    "instructor": [
+      "Mathur, Kamlesh",
+      "Zokaeinikoo,Maryam"
+    ],
+    "room": "PBL 501\nPBL 106",
+    "enrollmentCap": "30 (50)\n35 (50)",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "W 6:00PM - 8:30PM"
+      },
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Th 6:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "OPMT",
+    "description": "OPMT 377B - Enterprise Resource Planning in the Supply Chain",
+    "section": "*100-LEC(1408)",
+    "instructor": [
+      "DiFilippo, Daniel",
+      "Zokaeinikoo,Maryam"
+    ],
+    "room": "PBL 501\nPBL 106",
+    "enrollmentCap": "10 (50)",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "W 6:00PM - 8:30PM"
+      },
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Th 6:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "OPMT",
+    "description": "OPMT 477B - Enterprise Resource Planning in the Supply Chain",
+    "section": "*100-LEC(1386)",
+    "instructor": [
+      "DiFilippo, Daniel",
+      "Zokaeinikoo,Maryam"
+    ],
+    "room": "PBL 501\nPBL 106",
+    "enrollmentCap": "10 (50)\n5 (50)",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "W 6:00PM - 8:30PM"
+      },
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Th 6:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "SCMG",
+    "description": "SCMG 477B - Enterprise Resource Planning in the Supply Chain",
+    "section": "*100-LEC(1385)",
+    "instructor": [
+      "DiFilippo, Daniel",
+      "Zokaeinikoo,Maryam"
+    ],
+    "room": "PBL 501\nPBL 106",
+    "enrollmentCap": "30 (50)\n35 (50)",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "W 6:00PM - 8:30PM"
+      },
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "Th 6:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "OPMT",
+    "description": "OPMT 420 - Experiential Learning with Six Sigma Green Belt",
+    "section": "100\n*101-LEC(1433)",
+    "instructor": [
+      "Goulder,Michael Lee"
+    ],
+    "room": "PBL 05\nPBL 202",
+    "enrollmentCap": "4 per Kamlesh & Mike\n30 (60)\n5 (27)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "TBA"
+        ],
+        "startTime": "2:30PM",
+        "endTime": "5:15PM",
+        "rawString": "TH 2:30PM - 5:15PM"
+      },
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "W 6:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "SCMG",
+    "description": "SCMG 420 - Experiential Learning with Six Sigma Green Belt",
+    "section": "100\n*101-LEC(1422)",
+    "instructor": [
+      "Goulder,Michael Lee"
+    ],
+    "room": "PBL 05\nPBL 202",
+    "enrollmentCap": "20 per Kamlesh & Mike\n30 (60) \n20 (27)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "TBA"
+        ],
+        "startTime": "2:30PM",
+        "endTime": "5:15PM",
+        "rawString": "TH 2:30PM - 5:15PM"
+      },
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "W 6:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "OPMT",
+    "description": "OPMT 475 - Global Supply Chain Logistics",
+    "section": "*100-LEC(1388)",
+    "instructor": [
+      "Mathur,Kamlesh"
+    ],
+    "room": "PBL 401\nPBL 118",
+    "enrollmentCap": "7 (51)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "11:15AM",
+        "rawString": "TuTh 10:00AM - 11:15AM"
+      },
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "12:45PM",
+        "endTime": "2:00PM",
+        "rawString": "MW 12:45PM - 2:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "SCMG",
+    "description": "SCMG 475 - Global Supply Chain Logistics",
+    "section": "*100-LEC(1387)",
+    "instructor": [
+      "Mathur,Kamlesh"
+    ],
+    "room": "PBL 401\nPBL 118",
+    "enrollmentCap": "44 (51)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "11:15AM",
+        "rawString": "TuTh 10:00AM - 11:15AM"
+      },
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "12:45PM",
+        "endTime": "2:00PM",
+        "rawString": "MW 12:45PM - 2:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "OPRE",
+    "description": "OPRE 207 - Statistics for Business and Management Science I",
+    "section": "*100-LEC(1340)",
+    "instructor": [
+      "Zokaeinikoo,Maryam"
+    ],
+    "room": "PBL 258\nPBL 07",
+    "enrollmentCap": "55  57",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "10:15AM",
+        "rawString": "MW 9:00AM - 10:15AM"
+      }
+    ]
+  },
+  {
+    "subject": "OPRE",
+    "description": "OPRE 207 - Statistics for Business and Management Science I",
+    "section": "*101-LEC(1341)",
+    "instructor": [
+      "Zokaeinikoo,Maryam"
+    ],
+    "room": "PBL 258\nPBL 07",
+    "enrollmentCap": "55  57",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "10:35AM",
+        "endTime": "11:50AM",
+        "rawString": "MW 10:35AM - 11:50AM"
+      },
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "12:45PM",
+        "endTime": "2:00PM",
+        "rawString": "MW 12:45PM - 2:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "OPRE",
+    "description": "OPRE 301 - Operations Research and Supply Chain Management",
+    "section": "*100-LEC(1370)",
+    "instructor": [
+      "Fallahtafti,Alireza"
+    ],
+    "room": "PBL 07\nPBL 258",
+    "enrollmentCap": "55",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "12:45PM",
+        "endTime": "2:00PM",
+        "rawString": "MW 12:45PM - 2:00PM"
+      },
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "10:35AM",
+        "endTime": "11:50AM",
+        "rawString": "MW 10:35AM - 11:50AM"
+      }
+    ]
+  },
+  {
+    "subject": "OPRE",
+    "description": "OPRE 301 - Operations Research and Supply Chain Management",
+    "section": "*101-LEC(1425)",
+    "instructor": [
+      "Fallahtafti,Alireza"
+    ],
+    "room": "PBL 401",
+    "enrollmentCap": "55  57",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "3:20PM",
+        "endTime": "4:35PM",
+        "rawString": "MW 3:20PM - 4:35PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "ORBH 222 - The Confidence Blueprint: Skills for College, Career and Life",
+    "section": null,
+    "instructor": [
+      "Smith, Dalithia"
+    ],
+    "room": "PBL 03",
+    "enrollmentCap": 18.0,
+    "units": null,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "5:30PM",
+        "endTime": "8:00PM",
+        "rawString": "Th 5:30PM - 8:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "ORBH",
+    "description": "ORBH 250 - Leading People: The Practice, Theory, and Reality of Leadership (LEAD I)",
+    "section": "*100-LEC(1342)",
+    "instructor": [
+      "Volkova Feddeck, Maria",
+      "Van Oosten, Ellen",
+      "Liu,Han"
+    ],
+    "room": "PBL 02",
+    "enrollmentCap": "60",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "11:15AM",
+        "rawString": "TuTh 10:00AM - 11:15AM"
+      },
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "12:45PM",
+        "rawString": "TuTh 11:30AM - 12:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "ORBH",
+    "description": "ORBH 251 - Leading Organizations (LEAD II)",
+    "section": "*100-LEC(1343)",
+    "instructor": [
+      "Laszlo, Christopher",
+      "Volkova-Feddeck, Maria",
+      "Ehasz,Sharon Fitzgerald"
+    ],
+    "room": "PBL 203",
+    "enrollmentCap": "60  58",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "12:45PM",
+        "rawString": "TuTh 11:30AM - 12:45PM"
+      },
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "11:15AM",
+        "rawString": "TuTh 10:00AM - 11:15AM"
+      }
+    ]
+  },
+  {
+    "subject": "ORBH",
+    "description": "ORBH 303 - Developing Interpersonal Skills for Leading",
+    "section": "*400-SEM(1482)",
+    "instructor": [
+      "Messer,Tracey Eira"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "50",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Tue",
+          "Thu",
+          "Fri",
+          "Sat"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "2:30PM",
+        "rawString": "MTuThFSa 10:00AM - 2:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "ORBH",
+    "description": "ORBH 303 - Developing Interpersonal Skills for Leading",
+    "section": "*400-SEM(1482)",
+    "instructor": [
+      "Messer,Tracey Eira"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "1:30PM",
+        "rawString": "Sa 10:00AM - 1:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "ORBH",
+    "description": "ORBH 303 - Developing Interpersonal Skills for Leading",
+    "section": "*400-SEM(1482)",
+    "instructor": [
+      "Messer,Tracey Eira"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu",
+          "Fri"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "2:30PM",
+        "rawString": "ThF 10:00AM - 2:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "ORBH",
+    "description": "ORBH 310 - The Art and Science of High-Functioning Teams",
+    "section": "*100-SEM(1474)",
+    "instructor": [
+      "Stephens,John P"
+    ],
+    "room": "PBL 04",
+    "enrollmentCap": "50  49",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "3:20PM",
+        "endTime": "4:35PM",
+        "rawString": "MW 3:20PM - 4:35PM"
+      }
+    ]
+  },
+  {
+    "subject": "ORBH",
+    "description": "ORBH 330 - Quantum Leadership: Creating Value for You, Business, and the World",
+    "section": "*100-SEM(1365)",
+    "instructor": [
+      "Laszlo,Christopher Peter"
+    ],
+    "room": "PBL 02",
+    "enrollmentCap": "40 (50)\n44 (58)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:00PM",
+        "rawString": "Tu 6:00PM - 8:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "ORBH",
+    "description": "ORBH 430 - Quantum Leadership: Creating Value for You, Business, and the World",
+    "section": "*100-SEM(1302)",
+    "instructor": [
+      "Laszlo,Christopher Peter"
+    ],
+    "room": "PBL 02",
+    "enrollmentCap": "10 (50) \n15 (58)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:00PM",
+        "rawString": "Tu 6:00PM - 8:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "ORBH",
+    "description": "ORBH 375 - Building Leadership Character: Ethics in Action",
+    "section": "*100-LEC(1486)",
+    "instructor": [
+      "Case PhD,Susan S"
+    ],
+    "room": "PBL 120",
+    "enrollmentCap": "18",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "11:15AM",
+        "rawString": "TuTh 10:00AM - 11:15AM"
+      },
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "12:45PM",
+        "rawString": "TuTh 11:30AM - 12:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "ORBH",
+    "description": "ORBH 403 - Developing Interpersonal Skills for Managers",
+    "section": "*100-LEC(1399)",
+    "instructor": [
+      "Fry,Ronald E"
+    ],
+    "room": "PBL 02",
+    "enrollmentCap": "40",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Tue",
+          "Wed",
+          "Thu",
+          "Fri"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "9:30PM",
+        "rawString": "MTuWThF 6:00PM - 9:30PM"
+      },
+      {
+        "days": [
+          "Mon",
+          "Tue",
+          "Wed",
+          "Thu",
+          "Fri"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "10:00PM",
+        "rawString": "MTuWThF 6:00PM - 10:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "ORBH",
+    "description": "ORBH 403 - Developing Interpersonal Skills for Managers",
+    "section": "*100-LEC(1399)",
+    "instructor": [
+      "Fry,Ronald E"
+    ],
+    "room": "PBL 02",
+    "enrollmentCap": "40",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "5:00PM",
+        "rawString": "Sa 9:00AM - 5:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "ORBH",
+    "description": "ORBH 451 - Alternative Dispute Resolution",
+    "section": "*100-LEC(1256)",
+    "instructor": [
+      "Mercer,Kathryn L"
+    ],
+    "room": "Gund Hall (999)",
+    "enrollmentCap": "10 (32)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "3:25PM",
+        "endTime": "5:25PM",
+        "rawString": "W 3:25PM - 5:25PM"
+      }
+    ]
+  },
+  {
+    "subject": "ORBH",
+    "description": "ORBH 460 - Women in Organizations",
+    "section": "*800-LEC(1398)",
+    "instructor": [
+      "Bilimoria,Diana"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "56",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Tue",
+          "Wed",
+          "Thu"
+        ],
+        "startTime": "5:00PM",
+        "endTime": "9:00PM",
+        "rawString": "MTuWTh 5:00PM - 9:00PM"
+      },
+      {
+        "days": [
+          "Mon",
+          "Tue",
+          "Wed",
+          "Thu"
+        ],
+        "startTime": "7:00AM",
+        "endTime": "8:00AM",
+        "rawString": "MTuWTh 7:00AM - 8:00AM"
+      }
+    ]
+  },
+  {
+    "subject": "ORBH",
+    "description": "ORBH 460 - Women in Organizations",
+    "section": "*800-LEC(1398)",
+    "instructor": [
+      "Bilimoria,Diana"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "56",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "5:00PM",
+        "rawString": "Sa 9:00AM - 5:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "ORBH",
+    "description": "ORBH 510 - Organizational Behavior Department Seminar",
+    "section": "*100-LEC(1260)",
+    "instructor": [
+      "Case PhD,Susan S"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "6",
+    "units": "1.5",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "12:00PM",
+        "rawString": "W 9:00AM - 12:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "PLCY",
+    "description": "PLCY 399 - Business Policy",
+    "section": "*100-LEC(1344)",
+    "instructor": [
+      "Peck, Simon, Mainardi, Cesare",
+      "Chatterjee,Sayan"
+    ],
+    "room": "PBL 202",
+    "enrollmentCap": "55  58",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "12:45PM",
+        "endTime": "2:00PM",
+        "rawString": "MW 12:45PM - 2:00PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "SCMG 462 - Artificial Intelligence Fundamentals for Supply Chain Managementy ",
+    "section": null,
+    "instructor": [
+      "Vaida, Jay"
+    ],
+    "room": "PBL 118",
+    "enrollmentCap": null,
+    "units": 1.5,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "11:45AM",
+        "rawString": "W 9:00AM - 11:45AM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "SCMG 463 - Case Studies in Artificial Intelligence - Supply Chain Application",
+    "section": null,
+    "instructor": [
+      "Goulder, Michael"
+    ],
+    "room": "PBL 118",
+    "enrollmentCap": null,
+    "units": 1.5,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "11:45AM",
+        "rawString": "W 9:00AM - 11:45AM"
+      }
+    ]
+  },
+  {
+    "subject": "VEAL",
+    "description": "VEAL 334 - Innovation & Entrepreneurship: Concepts and Practice",
+    "section": "*100-SEM(1456)",
+    "instructor": [
+      "Baierl,Mindy M; Hill,Michael"
+    ],
+    "room": "Abroad (999)",
+    "enrollmentCap": "12",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Tue",
+          "Wed",
+          "Thu",
+          "Fri",
+          "Sat",
+          "Sun"
+        ],
+        "startTime": "7:00AM",
+        "endTime": "8:00AM",
+        "rawString": "MTuWThFSaSu 7:00AM - 8:00AM"
+      }
+    ]
+  },
+  {
+    "subject": "BAFI",
+    "description": "BAFI 403 - Corporate Financial Technology",
+    "section": "*100-LEC(1316)",
+    "instructor": [
+      "Harmon,Gregory William"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "20 (65)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:45PM",
+        "rawString": "Th 6:00PM - 8:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "FNCE",
+    "description": "FNCE 403 - Corporate Financial Technology",
+    "section": "*100-LEC(1378)",
+    "instructor": [
+      "Harmon,Gregory William"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "45 (65)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:45PM",
+        "rawString": "Th 6:00PM - 8:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "BAFI",
+    "description": "BAFI 433 - Quantitative Risk Modeling",
+    "section": "*100-LEC(1440)",
+    "instructor": [
+      "Martinez,Edwin Cornelius Amorsolo"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "12 (62)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "M 6:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "FNCE",
+    "description": "FNCE 433 - Quantitative Risk Modeling",
+    "section": "*100-LEC(1396)",
+    "instructor": [
+      "Martinez,Edwin Cornelius Amorsolo"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "50 (62)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "M 6:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "BTEC",
+    "description": "BTEC 420 - Introduction to Programming for Business Applications",
+    "section": "*100-LEC(1492)",
+    "instructor": [
+      "Azar,Pablo"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "7 (50)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "8:30AM",
+        "endTime": "9:45AM",
+        "rawString": "TuTh 8:30AM - 9:45AM"
+      }
+    ]
+  },
+  {
+    "subject": "DESN",
+    "description": "DESN 210 - Introduction to Programming for Business Applications",
+    "section": "*100-LEC(1363)",
+    "instructor": [
+      "Azar,Pablo"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "43 (50)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "8:30AM",
+        "endTime": "9:45AM",
+        "rawString": "TuTh 8:30AM - 9:45AM"
+      }
+    ]
+  },
+  {
+    "subject": "BTEC",
+    "description": "BTEC 494 - Artificial Intelligence for Financial Modeling",
+    "section": "*100-LEC(1327)",
+    "instructor": [
+      "Vaidya,Jay Dee"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "22 (58)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "11:45AM",
+        "rawString": "W 9:00AM - 11:45AM"
+      }
+    ]
+  },
+  {
+    "subject": "FNCE",
+    "description": "FNCE 494 - Artificial Intelligence for Financial Modeling",
+    "section": "*100-LEC(1416)",
+    "instructor": [
+      "Vaidya,Jay Dee"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "36 (58)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "11:45AM",
+        "rawString": "W 9:00AM - 11:45AM"
+      }
+    ]
+  },
+  {
+    "subject": "DESN",
+    "description": "DESN 494 - Managerial Consultancy",
+    "section": "*100-LEC(1539)",
+    "instructor": [
+      "Khayat,Clark Harold Ibrahim"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "35",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "7:45PM",
+        "endTime": "9:00PM",
+        "rawString": "M 7:45PM - 9:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "DESN",
+    "description": "DESN 494 - Managerial Consultancy",
+    "section": "*100-LEC(1539)",
+    "instructor": [
+      "Khayat,Clark Harold Ibrahim"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "35",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "5:00PM",
+        "rawString": "Sa 9:00AM - 5:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "BUAI",
+    "description": "BUAI 460 - Experiential Learning in Business Analytics",
+    "section": "*100-LEC(1544)",
+    "instructor": [
+      "Niraj,Rakesh Kumar"
+    ],
+    "room": "PBL 03",
+    "enrollmentCap": "35   34",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "3:00PM",
+        "endTime": "5:45PM",
+        "rawString": "M 3:00PM - 5:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 102 - Principles of Microeconomics",
+    "section": "*102-LEC(1347)",
+    "instructor": [
+      "Wolcowitz,Jeffrey"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "23",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "11:15AM",
+        "rawString": "TuTh 10:00AM - 11:15AM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 103 - Principles of Macroeconomics",
+    "section": "*102-LEC(1424)",
+    "instructor": [
+      "Wang,Sining"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "65",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "12:45PM",
+        "rawString": "TuTh 11:30AM - 12:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 355 - The Origins of the Modern Economy",
+    "section": "*100-LEC(1513)",
+    "instructor": [
+      "Clingingsmith,David L"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "57",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "2:15PM",
+        "rawString": "TuTh 1:00PM - 2:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 368 - Environmental Economics",
+    "section": "*100-LEC(1472)",
+    "instructor": [
+      "Helper,Susan"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "40",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "10:15AM",
+        "rawString": "MW 9:00AM - 10:15AM"
+      }
+    ]
+  },
+  {
+    "subject": "ECON",
+    "description": "ECON 380 - Computational Economics",
+    "section": "*800-LEC(1519)",
+    "instructor": [
+      "Wang,Sining"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "45",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "4:00PM",
+        "endTime": "5:15PM",
+        "rawString": "TuTh 4:00PM - 5:15PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "ENTP 222 - Social Entrepreneurship: Igniting Social Change",
+    "section": null,
+    "instructor": [
+      "Cashon, Tiffany"
+    ],
+    "room": "PBL 03",
+    "enrollmentCap": null,
+    "units": 3.0,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "2:15PM",
+        "rawString": "TuTh 1:00PM - 2:15PM"
+      }
+    ]
+  },
+  {
+    "subject": null,
+    "description": "ENTP 324 - Financing Change: Impact Investing in Action",
+    "section": null,
+    "instructor": [
+      "Falco, Elizabeth"
+    ],
+    "room": "PBL 120",
+    "enrollmentCap": 18.0,
+    "units": 3.0,
+    "session": null,
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "4:00PM",
+        "endTime": "5:15PM",
+        "rawString": "TuTh 4:00PM - 5:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 201 - Contemporary Business and Communication",
+    "section": "*103-LEC(1426)",
+    "instructor": [
+      "Chatterjee,Sayan"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "43",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Wed"
+        ],
+        "startTime": "10:30AM",
+        "endTime": "11:45AM",
+        "rawString": "MW 10:30AM - 11:45AM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 315 - International Management Institute: England",
+    "section": "*101-LEC(1489)",
+    "instructor": [
+      "Blakeway-Phillips,Heidi Christine"
+    ],
+    "room": "Abroad (999)",
+    "enrollmentCap": "30",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Mon",
+          "Tue",
+          "Wed",
+          "Thu",
+          "Fri",
+          "Sat",
+          "Sun"
+        ],
+        "startTime": "9:00AM",
+        "endTime": "5:00PM",
+        "rawString": "MTuWThFSaSu 9:00AM - 5:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 315 - International Management Institute: England",
+    "section": "*101-LEC(1489)",
+    "instructor": [
+      "Blakeway-Phillips,Heidi Christine"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "30",
+    "units": "3",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Sat"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "11:30AM",
+        "rawString": "Sa 10:00AM - 11:30AM"
+      }
+    ]
+  },
+  {
+    "subject": "MGTE",
+    "description": "MGTE 440 - Six Sigma and Quality Management",
+    "section": "*101-LEC(1524)",
+    "instructor": [
+      "Goulder,Michael Lee"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "2 (27)",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "6:00PM",
+        "endTime": "8:30PM",
+        "rawString": "W 6:00PM - 8:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "OPMT",
+    "description": "OPMT 480 - Blockchain Technology in Supply Chain Management",
+    "section": "*100-LEC(1390)",
+    "instructor": [
+      "Staff"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "10 (57)",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "2:15PM",
+        "rawString": "Th 11:30AM - 2:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "SCMG",
+    "description": "SCMG 480 - Blockchain Technology in Supply Chain Management",
+    "section": "*100-LEC(1389)",
+    "instructor": [
+      "Staff"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "47 (57)",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "2:15PM",
+        "rawString": "Th 11:30AM - 2:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "OPMT",
+    "description": "OPMT 481 - Artificial Intelligence for Business Management",
+    "section": "*100-LEC(1527)",
+    "instructor": [
+      "Staff"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "10 (57)",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "2:15PM",
+        "rawString": "Th 11:30AM - 2:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "SCMG",
+    "description": "SCMG 481 - Artificial Intelligence for Business Management",
+    "section": "*100-LEC(1526)",
+    "instructor": [
+      "Staff"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "47 (57)",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "2:15PM",
+        "rawString": "Th 11:30AM - 2:15PM"
+      }
+    ]
+  },
+  {
+    "subject": "ORBH",
+    "description": "ORBH 240 - Ethics for the Real World: Developing a Code of Ethics to Guide Decisions in Work and Life",
+    "section": "*100-SEM(1518)",
+    "instructor": [
+      "Case PhD,Susan S"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "18",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "11:15AM",
+        "rawString": "TuTh 10:00AM - 11:15AM"
+      }
+    ]
+  },
+  {
+    "subject": "ORBH",
+    "description": "ORBH 511 - Micro Organizational Behavior",
+    "section": "*100-SEM(1528)",
+    "instructor": [
+      "Cola,Philip A."
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "10",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "12:00PM",
+        "endTime": "3:00PM",
+        "rawString": "Tu 12:00PM - 3:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "ORBH",
+    "description": "ORBH 541 - Organizational Systems",
+    "section": "*100-LEC(1529)",
+    "instructor": [
+      "Bilimoria,Diana"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "14",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "5:00PM",
+        "rawString": "Tu 1:00PM - 5:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "ORBH",
+    "description": "ORBH 541 - Organizational Systems",
+    "section": "*100-LEC(1529)",
+    "instructor": [
+      "Bilimoria,Diana"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "14",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Wed"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "5:00PM",
+        "rawString": "W 1:00PM - 5:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "ORBH",
+    "description": "ORBH 570 - Learning and Development",
+    "section": "*100-SEM(1448)",
+    "instructor": [
+      "Messer,Tracey Eira"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "6",
+    "units": "1.5",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "5:00PM",
+        "rawString": "Tu 1:00PM - 5:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 395 - Advanced Seminar: Entrepreneurship in Energy",
+    "section": "*109-SEM(1521)",
+    "instructor": [
+      "Goodrich,Grant George; Lyon,Jean  ; Steirer,Jonathan Wiley"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "18",
+    "units": "1",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Mon"
+        ],
+        "startTime": "4:00PM",
+        "endTime": "5:00PM",
+        "rawString": "M 4:00PM - 5:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 395 - Advanced Seminar: Sustainable Impact Entp",
+    "section": "*400-SEM(1536)",
+    "instructor": [
+      "Staff"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "15",
+    "units": "1",
+    "session": "Reg 2 Half",
+    "schedule": [
+      {
+        "days": [
+          "Fri"
+        ],
+        "startTime": "10:00AM",
+        "endTime": "2:30PM",
+        "rawString": "F 10:00AM - 2:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 395 - Advanced Seminar: Sustainable Impact Entp",
+    "section": "*400-SEM(1536)",
+    "instructor": [
+      "Butler DeLong,Tramayne"
+    ],
+    "room": "To Be Announced",
+    "enrollmentCap": "15",
+    "units": "1",
+    "session": "Reg 2 Half",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "4:00PM",
+        "endTime": "6:00PM",
+        "rawString": "Th 4:00PM - 6:00PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGMT",
+    "description": "MGMT 395 - Advanced Seminar: Sustainable Impact Entp",
+    "section": "*400-SEM(1536)",
+    "instructor": [
+      "Staff"
+    ],
+    "room": "Online - Synchronous (999)",
+    "enrollmentCap": "15",
+    "units": "1",
+    "session": "Reg 2 Half",
+    "schedule": [
+      {
+        "days": [
+          "Tue",
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "12:30PM",
+        "rawString": "TuTh 11:30AM - 12:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGTE",
+    "description": "MGTE 430 - Product and Process Design, Development, and Delivery",
+    "section": "*100-LEC(1501)",
+    "instructor": [
+      "Drummond,Colin K"
+    ],
+    "room": "To Be Scheduled (In-Person)",
+    "enrollmentCap": "15",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "1:00PM",
+        "endTime": "3:30PM",
+        "rawString": "Tu 1:00PM - 3:30PM"
+      }
+    ]
+  },
+  {
+    "subject": "MGTE",
+    "description": "MGTE 450 - Engineering Entrepreneurship",
+    "section": "*100-LEC(1502)",
+    "instructor": [
+      "Marder,James Marc"
+    ],
+    "room": "To Be Scheduled (In-Person)",
+    "enrollmentCap": "15",
+    "units": "3",
+    "session": "Regular",
+    "schedule": [
+      {
+        "days": [
+          "Tue"
+        ],
+        "startTime": "3:00PM",
+        "endTime": "5:45PM",
+        "rawString": "Tu 3:00PM - 5:45PM"
+      }
+    ]
+  },
+  {
+    "subject": "MBAC",
+    "description": "MBAC 508B - Strategic Issues and its Applications II",
+    "section": "*100-LEC(1531)",
+    "instructor": [
+      "Peck,Simon Ian"
+    ],
+    "room": "PBL 02",
+    "enrollmentCap": "58",
+    "units": "1.5",
+    "session": "Dyn Dt",
+    "schedule": [
+      {
+        "days": [
+          "Thu"
+        ],
+        "startTime": "11:30AM",
+        "endTime": "2:15PM",
+        "rawString": "Th 11:30AM - 2:15PM"
+      }
+    ]
+  }
+]
