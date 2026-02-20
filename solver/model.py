@@ -201,6 +201,28 @@ class InstructorPreferences(db.Model):
         }
 
 
+class MajorPreferences(db.Model):
+    """
+    Non-course-specific preferences at the major/program level.
+    """
+    __tablename__ = "major_preferences"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    major_id = Column(String, ForeignKey("majors.id"), nullable=False, unique=True)
+    
+    # Placeholder for program-specific logic (e.g., 'no core conflicts allowed')
+    # This can be expanded as your program-level requirements grow.
+    strict_core_scheduling = Column(Boolean, default=True)
+    
+    # Relationship back to the Major model
+    major = relationship("Major", backref=db.backref("preferences", uselist=False))
+
+    def to_dict(self):
+        return {
+            "major_id": self.major_id,
+            "strict_core_scheduling": self.strict_core_scheduling
+        }
+
+
 class Room(db.Model):
     """
     Room model representing physical classrooms.
