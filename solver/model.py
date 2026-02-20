@@ -209,8 +209,8 @@ class MajorPreferences(db.Model):
     id = Column(Integer, primary_key=True, autoincrement=True)
     major_id = Column(String, ForeignKey("majors.id"), nullable=False, unique=True)
     
-    # Placeholder for program-specific logic (e.g., 'no core conflicts allowed')
-    # This can be expanded as your program-level requirements grow.
+    # no core conflicts: If true, core courses for this major cannot be scheduled at the same time
+    no_core_conflicts = Column(Boolean, default=False)
     strict_core_scheduling = Column(Boolean, default=True)
     
     # Relationship back to the Major model
@@ -466,11 +466,10 @@ class SectionPreferences(db.Model):
     section_id = Column(String, ForeignKey("sections.id"), nullable=False, unique=True)
     
     # JSON columns can store complex data structures
-    cannot_collide_with = Column(JSON, nullable=False)  # List[str] - section IDs that cannot conflict
+    cannot_collide_with = Column(JSON, nullable=False)  #Dict[str, str] - section_id: collision type
     preferred_time = Column(String, nullable=True)  # Preferred timeslot ID (optional)
     allowed_times = Column(JSON, nullable=True)  # Dict[str, float] - timeslot_id: weight mapping
     allowed_rooms = Column(JSON, nullable=True)  # List[str] - allowed room IDs (or "virtual")
-    
     # Text type: For longer text fields (no length limit like String)
     general_info = Column(Text, nullable=True)  # Additional notes/info (optional)
 
@@ -479,7 +478,8 @@ class SectionPreferences(db.Model):
 
     def to_dict(self):
         return {
-            "cannot_collide_with": self.cannot_collide_with or [],
+            "section_id": self.section_id,
+            "cannot_collide_with": self.cannot_collide_with or {}, #a dict
             "preferred_time": self.preferred_time,
             "allowed_times": self.allowed_times or {},
             "allowed_rooms": self.allowed_rooms or [],
@@ -489,18 +489,19 @@ class SectionPreferences(db.Model):
 
 class CrossListGroup(db.Model):
     """
-    Cross-list group for sections that must be scheduled together.
-    
-    Groups multiple sections that share the same meeting time/room.
-    One-to-many with Section (one group has many sections).
+    Updated Cross-list group to include both Room and Time.
+    This allows us to enforce that cross-listed sections share the same time and/or room.
     """
     __tablename__ = "crosslist_groups"
 
     id = Column(String, primary_key=True)
-    member_section_ids = Column(JSON, nullable=False)  # List[str] - section IDs in this group
-    require_same_room = Column(Boolean, nullable=False, default=False)  # Must share same room?
+    member_section_ids = Column(JSON, nullable=False)  # List of section IDs
+    
+    # set to true as crosslist usually requires same room and time.
+    require_same_room = Column(Boolean, nullable=False, default=True)
+    require_same_time = Column(Boolean, nullable=False, default=True) 
 
-    # One-to-many: One group contains many sections
+    # One-to-many relationship with Section
     sections = relationship("Section", back_populates="crosslist_group")
 
     def to_dict(self):
@@ -508,6 +509,7 @@ class CrossListGroup(db.Model):
             "id": self.id,
             "member_section_ids": self.member_section_ids or [],
             "require_same_room": self.require_same_room,
+            "require_same_time": self.require_same_time,
         }
 
 
