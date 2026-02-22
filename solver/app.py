@@ -24,6 +24,7 @@ class Section(BaseModel):
     room_requirements: List[str]
     crosslist_group_id: Optional[str] = None
     tags: List[str]
+    previous_meeting_pattern: Optional[str] = None
 
 
 class InstructorPreferences(BaseModel):

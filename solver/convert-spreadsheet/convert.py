@@ -211,10 +211,24 @@ def load_sections_from_sis() -> tuple[list[dict], list[dict], list[dict], list[d
             "expected_enrollment": enrl_tot,
             "enrollment_cap": enrl_cap,
             "allowed_meeting_patterns": [pattern_id],
+            "previous_meeting_pattern": pattern_id,
             "room_requirements": DEFAULT_ROOM_REQUIREMENTS.copy(),
             "crosslist_group_id": None,
             "tags": DEFAULT_TAGS.copy(),
         })
+
+    pattern_id_to_slots = {p["id"]: p["slots_required"] for p in pattern_key_to_pattern.values()}
+    all_pattern_ids = list(pattern_id_to_slots.keys())
+    for s in sections:
+        prev_id = s.get("previous_meeting_pattern")
+        if prev_id is not None and prev_id in pattern_id_to_slots:
+            n_slots = pattern_id_to_slots[prev_id]
+            s["allowed_meeting_patterns"] = [
+                pid for pid in all_pattern_ids
+                if pattern_id_to_slots[pid] == n_slots
+            ]
+        else:
+            s["allowed_meeting_patterns"] = all_pattern_ids
 
     timeslots = list(timeslot_id_to_timeslot.values())
     meeting_patterns = list(pattern_key_to_pattern.values())

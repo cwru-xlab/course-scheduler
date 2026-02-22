@@ -11,6 +11,7 @@ export type Section = {
   room_requirements: string[];
   crosslist_group_id?: Id | null;
   tags: string[];
+  previous_meeting_pattern?: Id;
 };
 
 export type Instructor = {
