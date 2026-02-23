@@ -1,7 +1,7 @@
 import { title, subtitle } from "@/components/primitives";
 import { SchedulerDemo } from "@/components/scheduler/SchedulerDemo";
 
-export default function Home() {
+export default function Page() {
   return (
     <section className="flex flex-col gap-10 py-8 md:py-10">
       <div className="inline-block max-w-3xl">
