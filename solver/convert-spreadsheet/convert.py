@@ -121,34 +121,36 @@ def load_sections_from_sis() -> tuple[list[dict], list[dict], list[dict], list[d
     sections: list[dict] = []
 
     for row in rows:
+        # Parse meeting pattern info (days/times). If missing, we still keep the
+        # section but with no previous meeting pattern so the solver can place it.
         days_str = row.get("CLASS_MTG_DAYS") or row.get("days") or ""
         times_str = row.get("CW_CLASS_MTG_TIMES") or row.get("times") or ""
         days = _parse_days(days_str)
         time_range = _parse_time_range(times_str)
 
-        if not days or not time_range:
-            continue
-
-        start_time, end_time = time_range
-        pattern_slot_ids: list[str] = []
-        for day in days:
-            slot_id = _build_timeslot_id(day, start_time, end_time)
-            pattern_slot_ids.append(slot_id)
-            if slot_id not in timeslot_id_to_timeslot:
-                timeslot_id_to_timeslot[slot_id] = {
-                    "id": slot_id,
-                    "day": day,
-                    "start_time": start_time,
-                    "end_time": end_time,
+        pattern_id: str | None = None
+        if days and time_range:
+            start_time, end_time = time_range
+            pattern_slot_ids: list[str] = []
+            for day in days:
+                slot_id = _build_timeslot_id(day, start_time, end_time)
+                pattern_slot_ids.append(slot_id)
+                if slot_id not in timeslot_id_to_timeslot:
+                    timeslot_id_to_timeslot[slot_id] = {
+                        "id": slot_id,
+                        "day": day,
+                        "start_time": start_time,
+                        "end_time": end_time,
+                    }
+            pattern_key = "|".join(sorted(pattern_slot_ids))
+            if pattern_key not in pattern_key_to_pattern:
+                pattern_key_to_pattern[pattern_key] = {
+                    "id": _normalize_id(pattern_key) or "default",
+                    "slots_required": len(pattern_slot_ids),
+                    "allowed_days": list(days),
+                    "compatible_timeslot_sets": [pattern_slot_ids],
                 }
-        pattern_key = "|".join(sorted(pattern_slot_ids))
-        if pattern_key not in pattern_key_to_pattern:
-            pattern_key_to_pattern[pattern_key] = {
-                "id": _normalize_id(pattern_key) or "default",
-                "slots_required": len(pattern_slot_ids),
-                "allowed_days": list(days),
-                "compatible_timeslot_sets": [pattern_slot_ids],
-            }
+            pattern_id = pattern_key_to_pattern[pattern_key]["id"]
 
         room_str = (row.get("CW_MEETING_ROOM") or row.get("room") or "TBA").strip()
         if not room_str or room_str.upper() == "TO BE ANNOUNCED":
@@ -199,7 +201,6 @@ def load_sections_from_sis() -> tuple[list[dict], list[dict], list[dict], list[d
         except (TypeError, ValueError):
             enrl_tot = 0
 
-        pattern_id = pattern_key_to_pattern[pattern_key]["id"]
         instr_id = _normalize_id(instr_name) if instr_name else "unknown"
         room_id = room_name_to_room[room_str]["id"]
 
@@ -210,7 +211,9 @@ def load_sections_from_sis() -> tuple[list[dict], list[dict], list[dict], list[d
             "instructor_id": instr_id,
             "expected_enrollment": enrl_tot,
             "enrollment_cap": enrl_cap,
-            "allowed_meeting_patterns": [pattern_id],
+            # If we know the previous pattern, seed from that; otherwise let the
+            # post-processing step below give access to all patterns.
+            "allowed_meeting_patterns": [pattern_id] if pattern_id is not None else [],
             "previous_meeting_pattern": pattern_id,
             "room_requirements": DEFAULT_ROOM_REQUIREMENTS.copy(),
             "crosslist_group_id": None,
