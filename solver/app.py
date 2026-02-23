@@ -1,23 +1,25 @@
 from typing import Dict, List, Optional, Tuple
 
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify, request
 from ortools.sat.python import cp_model
+from werkzeug.utils import secure_filename
 
+from excel_importer import ParsedData, parse_excel_to_dicts, persist_parsed_data
 from model import (
-    db,
-    Section,
-    Instructor,
-    Room,
-    Timeslot,
-    MeetingPattern,
-    CrossListGroup,
-    NoOverlapGroup,
     BlockedTime,
+    CrossListGroup,
+    Instructor,
     LockedAssignment,
-    SoftLock,
-    ValidationError,
+    MeetingPattern,
+    NoOverlapGroup,
+    Room,
     ScheduleAssignment,
     ScheduleSolution,
+    Section,
+    SoftLock,
+    Timeslot,
+    ValidationError,
+    db,
 )
 
 app = Flask(__name__)
@@ -850,6 +852,104 @@ def _solve_schedule(input_data: SchedulingInput):
 @app.route("/", methods=["GET"])
 def read_root():
     return jsonify({"service": "weatherhead-solver", "status": "ok"})
+
+
+@app.route("/import-excel", methods=["POST"])
+def import_excel():
+    """
+    Accept an Excel file and convert it into data-model-shaped JSON.
+
+    - Multipart/form-data with field name 'file'
+    - Optional query param ?persist=true to upsert into the database
+    - Response contains both raw records and a 'scheduling_input' payload
+      ready to pass to /solve.
+    """
+    if "file" not in request.files:
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "missing_file",
+                            "message": "Upload an Excel file in form field 'file'.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    file = request.files["file"]
+    filename = secure_filename(file.filename or "")
+    if not filename.lower().endswith((".xlsx", ".xlsm", ".xls")):
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "invalid_file_type",
+                            "message": "Only Excel files (.xlsx, .xlsm, .xls) are supported.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    try:
+        file_bytes = file.read()
+        parsed: ParsedData = parse_excel_to_dicts(file_bytes)
+    except Exception as exc:  # pylint: disable=broad-except
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "parse_failed",
+                            "message": f"Failed to parse Excel file: {exc}",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    persist_flag = str(request.args.get("persist", "false")).lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if persist_flag:
+        persist_parsed_data(parsed)
+
+    scheduling_input = parsed.to_scheduling_input()
+    return jsonify(
+        {
+            "status": "ok",
+            "persisted": persist_flag,
+            "records": {
+                "courses": parsed.courses,
+                "instructors": parsed.instructors,
+                "rooms": parsed.rooms,
+                "timeslots": [
+                    {
+                        "id": t["id"],
+                        "days": t["days"],
+                        "start_time": t["start_time"].strftime("%H:%M"),
+                        "end_time": t["end_time"].strftime("%H:%M"),
+                        "slot_type": t["slot_type"],
+                    }
+                    for t in parsed.timeslots
+                ],
+                "meeting_patterns": parsed.meeting_patterns,
+                "sections": parsed.sections,
+            },
+            "scheduling_input": scheduling_input,
+        }
+    )
 
 
 @app.route("/solve", methods=["POST"])
