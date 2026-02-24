@@ -4,7 +4,8 @@ from flask import Flask, jsonify, request
 from ortools.sat.python import cp_model
 from werkzeug.utils import secure_filename
 
-from excel_importer import ParsedData, parse_excel_to_dicts, persist_parsed_data
+from excel_importer import ParsedData, persist_parsed_data
+from unified_importer import build_parsed_data_from_excel, build_scheduling_input_from_parsed
 from model import (
     BlockedTime,
     CrossListGroup,
@@ -900,7 +901,7 @@ def import_excel():
 
     try:
         file_bytes = file.read()
-        parsed: ParsedData = parse_excel_to_dicts(file_bytes)
+        parsed: ParsedData = build_parsed_data_from_excel(file_bytes)
     except Exception as exc:  # pylint: disable=broad-except
         return (
             jsonify(
@@ -925,7 +926,7 @@ def import_excel():
     if persist_flag:
         persist_parsed_data(parsed)
 
-    scheduling_input = parsed.to_scheduling_input()
+    scheduling_input = build_scheduling_input_from_parsed(parsed)
     return jsonify(
         {
             "status": "ok",
