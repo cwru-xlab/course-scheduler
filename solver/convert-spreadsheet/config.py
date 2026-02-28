@@ -1,9 +1,8 @@
 """
 Mapping configuration: which input file/sheet and columns map to SchedulingInput.
-Based on inspect_sheets.py output for:
-  - xLab_FINAL_WORKING_2025-2026.xlsx (Course Needs_Sp26, SIS Schedule)
-  - CW_SR_SOC_SUMMARY_FOR_EDITORS_357731264 (1).xlsx (sheet1)
-  - CW_SR_SOC_SUMMARY_RESULTS_MGT2_Spring 2026.xlsx (sheet1)
+
+Primary source: SOC Summary Results (CW_SR_SOC_SUMMARY_RESULTS_MGT2). If the
+registrar changes column names, run inspect_sheets.py to rediscover headers.
 """
 
 from pathlib import Path
@@ -12,33 +11,35 @@ INPUT_DIR = Path(__file__).resolve().parent / "input"
 OUTPUT_DIR = Path(__file__).resolve().parent / "output"
 
 # ---------------------------------------------------------------------------
-# Primary source: xLab SIS Schedule (clean columns, one row per section)
+# Primary source: SOC Summary Results (CW_SR_SOC_SUMMARY_RESULTS_MGT2)
+# Row 4 = headers, Row 5+ = data. Columns: Term, Description, Section, Enrl Stat,
+#          Units, Session, Days and Times, Room (Capacity), Instructor,
+#          Enrl Cap (Cmbnd Enrl Cap), Enrl Tot (Cmbnd Enrl Tot), Subject, ...
+# Class number is extracted from Section e.g. "100-LEC(1293)" -> 1293
 # ---------------------------------------------------------------------------
-SIS_SCHEDULE_FILE = "xLab_FINAL_WORKING_2025-2026.xlsx"
-SIS_SCHEDULE_SHEET = "SIS Schedule"
+SOC_SUMMARY_FILE = "CW_SR_SOC_SUMMARY_RESULTS_MGT2 (1).xlsx"
+SOC_SUMMARY_SHEET = "sheet1"
 
-# Column header (row 1) -> section field or internal key
-# Headers: SUBJECT, CATALOG_NBR, CW_CLASS_TITLE, CLASS_SECTION, SSR_COMPONENT,
-#          CLASS_NBR, ENRL_STATUS, CW_SESSION_DESCR, UNITS_RANGE, CW_START_DATE,
-#          CW_END_DATE, CLASS_MTG_DAYS, CW_CLASS_MTG_TIMES, CW_MEETING_ROOM,
-#          INSTR_NAME, ENRL_CAP, ENRL_TOT, ...
+# Legacy: xLab SIS Schedule (kept for reference)
+# SIS_SCHEDULE_FILE = "xLab_FINAL_WORKING_2025-2026.xlsx"
+# SIS_SCHEDULE_SHEET = "SIS Schedule"
+
 SECTIONS_SOURCE = {
-    "file": SIS_SCHEDULE_FILE,
-    "sheet": SIS_SCHEDULE_SHEET,
-    "header_row": 1,
-    "data_start_row": 2,
+    "file": SOC_SUMMARY_FILE,
+    "sheet": SOC_SUMMARY_SHEET,
+    "header_row": 4,
+    "data_start_row": 5,
+    "max_column": 16,  # Required for read_only mode; SOC has columns A-P
     "columns": {
-        "SUBJECT": "subject",
-        "CATALOG_NBR": "catalog_nbr",
-        "CW_CLASS_TITLE": "title",
-        "CLASS_SECTION": "section_code",
-        "CLASS_NBR": "class_nbr",  # use for section id
-        "CLASS_MTG_DAYS": "days",
-        "CW_CLASS_MTG_TIMES": "times",
-        "CW_MEETING_ROOM": "room",
-        "INSTR_NAME": "instructor_name",
-        "ENRL_CAP": "enrollment_cap",
-        "ENRL_TOT": "enrollment_total",
+        # SOC Summary column names (exact headers from row 4)
+        "Subject": "subject",
+        "Description": "title",
+        "Section": "section_code",
+        "Days and Times": "days_and_times",
+        "Room (Capacity)": "room",
+        "Instructor": "instructor_name",
+        "Enrl Cap (Cmbnd Enrl Cap)": "enrollment_cap",
+        "Enrl Tot (Cmbnd Enrl Tot)": "enrollment_total",
     },
 }
 

@@ -14,7 +14,9 @@ from typing import Iterable
 
 from config import INPUT_DIR, SECTIONS_SOURCE  # type: ignore[reportMissingImports]
 from convert import (  # type: ignore[reportMissingImports]
+    _extract_class_nbr_from_section,
     _parse_days,
+    _parse_enrollment_val,
     _parse_time_range,
     _read_sheet_with_headers,
     load_sections_from_sis,
@@ -49,6 +51,7 @@ def _load_raw_rows() -> list[dict]:
         SECTIONS_SOURCE["sheet"],
         SECTIONS_SOURCE["header_row"],
         SECTIONS_SOURCE["data_start_row"],
+        max_column=SECTIONS_SOURCE.get("max_column"),
     )
     return rows
 
@@ -60,6 +63,8 @@ def _audit_record_counts(rows: list[dict], json_sections: list[dict]) -> None:
 
     for row in rows:
         class_nbr = row.get("CLASS_NBR") or row.get("class_nbr")
+        if class_nbr is None:
+            class_nbr = _extract_class_nbr_from_section(row.get("Section"))
 
         if class_nbr is None:
             dropped_missing_class_nbr += 1
@@ -84,7 +89,7 @@ def _audit_record_counts(rows: list[dict], json_sections: list[dict]) -> None:
     print()
 
 
-def _sum_column(rows: Iterable[dict], *keys: str) -> int:
+def _sum_column(rows: Iterable[dict], *keys: str, parse_enrollment: bool = False) -> int:
     """Sum a numeric column from rows, trying alternate keys."""
     total = 0
     for row in rows:
@@ -93,14 +98,26 @@ def _sum_column(rows: Iterable[dict], *keys: str) -> int:
             if k in row:
                 val = row.get(k)
                 break
-        total += _to_int(val)
+        total += _parse_enrollment_val(val) if parse_enrollment else _to_int(val)
     return total
 
 
 def _audit_checksums(rows: list[dict], json_sections: list[dict]) -> None:
     """Compare enrollment capacity/total sums between SIS and JSON."""
-    raw_cap_sum = _sum_column(rows, "ENRL_CAP", "enrollment_cap")
-    raw_tot_sum = _sum_column(rows, "ENRL_TOT", "enrollment_total")
+    raw_cap_sum = _sum_column(
+        rows,
+        "ENRL_CAP",
+        "Enrl Cap (Cmbnd Enrl Cap)",
+        "enrollment_cap",
+        parse_enrollment=True,
+    )
+    raw_tot_sum = _sum_column(
+        rows,
+        "ENRL_TOT",
+        "Enrl Tot (Cmbnd Enrl Tot)",
+        "enrollment_total",
+        parse_enrollment=True,
+    )
 
     json_cap_sum = sum(_to_int(s.get("enrollment_cap")) for s in json_sections)
     json_tot_sum = sum(_to_int(s.get("expected_enrollment")) for s in json_sections)
@@ -131,6 +148,8 @@ def _audit_unique_ids(rows: list[dict], json_sections: list[dict]) -> None:
 
     for row in rows:
         raw_nbr = row.get("CLASS_NBR") or row.get("class_nbr")
+        if raw_nbr is None:
+            raw_nbr = _extract_class_nbr_from_section(row.get("Section"))
         cid = _normalize_class_nbr(raw_nbr)
 
         if cid is not None:
