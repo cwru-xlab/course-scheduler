@@ -1,9 +1,13 @@
 """
 Convert xlsx input files to SchedulingInput JSON for solver app.py.
-Run from convert-spreadsheet: python convert.py [output_label]
+Run from convert-spreadsheet: python convert.py [output_label] [--limit N]
 
 Output: output/scheduling_input_<label>.json (default label: spring2026)
+
+Demo mode: use --limit N to convert only the first N data rows (useful for testing).
+Example: python convert.py demo --limit 20
 """
+import argparse
 import json
 import re
 import sys
@@ -208,10 +212,12 @@ def _sort_slot_ids_by_day_order(slot_ids: list[str]) -> list[str]:
     return sorted(slot_ids, key=day_rank)
 
 
-def load_sections_from_sis() -> tuple[list[dict], list[dict], list[dict], list[dict], list[dict]]:
+def load_sections_from_sis(max_rows: int | None = None) -> tuple[list[dict], list[dict], list[dict], list[dict], list[dict]]:
     """
     Load SIS Schedule and return (sections, instructors, rooms, timeslots, meeting_patterns)
     as lists of dicts matching app.py Pydantic models.
+
+    If max_rows is set, process only the first max_rows data rows (for demo/small datasets).
     """
     path = INPUT_DIR / SECTIONS_SOURCE["file"]
     if not path.exists():
@@ -225,6 +231,8 @@ def load_sections_from_sis() -> tuple[list[dict], list[dict], list[dict], list[d
         SECTIONS_SOURCE["data_start_row"],
         max_column=max_col,
     )
+    if max_rows is not None:
+        rows = rows[:max_rows]
 
     # Collect unique entities
     timeslot_id_to_timeslot: dict[str, dict] = {}
@@ -374,9 +382,9 @@ def load_sections_from_sis() -> tuple[list[dict], list[dict], list[dict], list[d
     return sections, instructors, rooms, timeslots, meeting_patterns
 
 
-def build_scheduling_input() -> dict:
+def build_scheduling_input(max_rows: int | None = None) -> dict:
     """Build full SchedulingInput dict (valid for app.py ScheduleRequest.input)."""
-    sections, instructors, rooms, timeslots, meeting_patterns = load_sections_from_sis()
+    sections, instructors, rooms, timeslots, meeting_patterns = load_sections_from_sis(max_rows=max_rows)
     return {
         "sections": sections,
         "instructors": instructors,
@@ -407,19 +415,38 @@ def validate_with_app(data: dict) -> None:
 
 
 def main() -> None:
-    label = sys.argv[1] if len(sys.argv) > 1 else "spring2026"
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = OUTPUT_DIR / f"scheduling_input_{label}.json"
+    parser = argparse.ArgumentParser(
+        description="Convert xlsx input to SchedulingInput JSON for solver.",
+        epilog="Example (demo): python convert.py demo --limit 20",
+    )
+    parser.add_argument(
+        "label",
+        nargs="?",
+        default="spring2026",
+        help="Output file label (output/scheduling_input_<label>.json)",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Convert only the first N data rows (for demo/test runs)",
+    )
+    args = parser.parse_args()
 
-    data = build_scheduling_input()
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = OUTPUT_DIR / f"scheduling_input_{args.label}.json"
+
+    data = build_scheduling_input(max_rows=args.limit)
     validate_with_app(data)
 
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
+    limit_msg = f" (limited to {args.limit} rows)" if args.limit is not None else ""
     print(f"Wrote {len(data['sections'])} sections, {len(data['instructors'])} instructors, "
           f"{len(data['rooms'])} rooms, {len(data['timeslots'])} timeslots, "
-          f"{len(data['meeting_patterns'])} meeting patterns to {out_path}")
+          f"{len(data['meeting_patterns'])} meeting patterns to {out_path}{limit_msg}")
 
 
 if __name__ == "__main__":
