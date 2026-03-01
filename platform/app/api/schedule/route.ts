@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { mockSchedulingInput } from "@/lib/scheduling/mockData";
 import type { SchedulingInput } from "@/lib/scheduling/types";
 
-const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:8000";
+const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:8001";
 
 export async function POST(request: NextRequest) {
   try {
