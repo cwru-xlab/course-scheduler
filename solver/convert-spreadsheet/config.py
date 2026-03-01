@@ -75,3 +75,17 @@ COURSE_NEEDS_DATA_START = 2
 DEFAULT_ALLOWED_PATTERNS = ["default"]  # single pattern id if we build one pattern per unique slot
 DEFAULT_ROOM_REQUIREMENTS: list[str] = []
 DEFAULT_TAGS: list[str] = []
+
+# ---------------------------------------------------------------------------
+# Timeslot classification rules
+# Applied in convert.py when building Timeslot records from parsed times.
+# A slot's start_time (24h "HH:MM") is checked against these boundaries.
+# ---------------------------------------------------------------------------
+TIMESLOT_CLASSIFICATION = {
+    "standard": {"start_min": "08:00", "start_max": "16:59"},
+    "evening":  {"start_min": "17:00", "start_max": "23:59"},
+}
+
+# Section types (from section code suffix) that classify a slot as "lab"
+# regardless of time. Takes priority over the time-based rules above.
+LAB_SECTION_TYPES = {"LAB", "PRA"}
