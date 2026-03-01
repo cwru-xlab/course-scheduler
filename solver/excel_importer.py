@@ -204,7 +204,11 @@ def parse_excel_to_dicts(excel_bytes: bytes) -> ParsedData:
 
     Columns should match the model fields; extra columns are ignored.
     """
-    xls = pd.ExcelFile(excel_bytes)
+    from io import BytesIO
+    
+    # Wrap bytes in a file-like object for pandas
+    excel_file = BytesIO(excel_bytes)
+    xls = pd.ExcelFile(excel_file)
     sheets = {name.lower(): name for name in xls.sheet_names}
 
     def read_sheet(key: str) -> pd.DataFrame:

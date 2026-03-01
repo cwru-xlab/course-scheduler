@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional, Tuple
 
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 from ortools.sat.python import cp_model
 from werkzeug.utils import secure_filename
 
@@ -26,6 +27,9 @@ from model import (
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///course_scheduler.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+# Enable CORS for all routes
+CORS(app, origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5001"])
 
 db.init_app(app)
 
@@ -962,3 +966,12 @@ def solve():
     input_data = SchedulingInput(data["input"])
     result = _solve_schedule(input_data)
     return jsonify(result)
+
+
+if __name__ == "__main__":
+    # Create tables if they don't exist
+    with app.app_context():
+        db.create_all()
+    
+    # Run the Flask app
+    app.run(debug=True, host="0.0.0.0", port=5001)
