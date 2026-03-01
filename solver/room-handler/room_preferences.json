@@ -1,0 +1,141 @@
+[
+  {
+    "room_id": "PBL_02",
+    "need_projector": true,
+    "need_lab": false,
+    "can_be_outside_weatherhead": false,
+    "other_requirements": {}
+  },
+  {
+    "room_id": "PBL_03",
+    "need_projector": true,
+    "need_lab": false,
+    "can_be_outside_weatherhead": false,
+    "other_requirements": {}
+  },
+  {
+    "room_id": "PBL_04",
+    "need_projector": true,
+    "need_lab": false,
+    "can_be_outside_weatherhead": false,
+    "other_requirements": {}
+  },
+  {
+    "room_id": "PBL_05",
+    "need_projector": true,
+    "need_lab": false,
+    "can_be_outside_weatherhead": false,
+    "other_requirements": {}
+  },
+  {
+    "room_id": "PBL_06",
+    "need_projector": true,
+    "need_lab": false,
+    "can_be_outside_weatherhead": false,
+    "other_requirements": {}
+  },
+  {
+    "room_id": "PBL_07",
+    "need_projector": true,
+    "need_lab": true,
+    "can_be_outside_weatherhead": false,
+    "other_requirements": {
+      "note": "Hosts both standard lectures and lab sections (e.g. ECON 326 LAB). Lab designation takes priority for scheduling."
+    }
+  },
+  {
+    "room_id": "PBL_106",
+    "need_projector": true,
+    "need_lab": false,
+    "can_be_outside_weatherhead": false,
+    "other_requirements": {}
+  },
+  {
+    "room_id": "PBL_118",
+    "need_projector": true,
+    "need_lab": false,
+    "can_be_outside_weatherhead": false,
+    "other_requirements": {}
+  },
+  {
+    "room_id": "PBL_120",
+    "need_projector": true,
+    "need_lab": false,
+    "can_be_outside_weatherhead": false,
+    "other_requirements": {}
+  },
+  {
+    "room_id": "PBL_121",
+    "need_projector": true,
+    "need_lab": false,
+    "can_be_outside_weatherhead": false,
+    "other_requirements": {}
+  },
+  {
+    "room_id": "PBL_201",
+    "need_projector": true,
+    "need_lab": false,
+    "can_be_outside_weatherhead": false,
+    "other_requirements": {}
+  },
+  {
+    "room_id": "PBL_202",
+    "need_projector": true,
+    "need_lab": false,
+    "can_be_outside_weatherhead": false,
+    "other_requirements": {}
+  },
+  {
+    "room_id": "PBL_203",
+    "need_projector": true,
+    "need_lab": false,
+    "can_be_outside_weatherhead": false,
+    "other_requirements": {}
+  },
+  {
+    "room_id": "PBL_220",
+    "need_projector": true,
+    "need_lab": false,
+    "can_be_outside_weatherhead": false,
+    "other_requirements": {}
+  },
+  {
+    "room_id": "PBL_258",
+    "need_projector": true,
+    "need_lab": false,
+    "can_be_outside_weatherhead": false,
+    "other_requirements": {}
+  },
+  {
+    "room_id": "PBL_401",
+    "need_projector": true,
+    "need_lab": false,
+    "can_be_outside_weatherhead": false,
+    "other_requirements": {}
+  },
+  {
+    "room_id": "PBL_418",
+    "need_projector": false,
+    "need_lab": false,
+    "can_be_outside_weatherhead": false,
+    "other_requirements": {
+      "note": "Small coaching/advising room (capacity 3). Not suitable for standard class scheduling."
+    }
+  },
+  {
+    "room_id": "PBL_501",
+    "need_projector": true,
+    "need_lab": false,
+    "can_be_outside_weatherhead": false,
+    "other_requirements": {}
+  },
+  {
+    "room_id": "GUND_HALL",
+    "need_projector": false,
+    "need_lab": false,
+    "can_be_outside_weatherhead": true,
+    "other_requirements": {
+      "note": "Located outside Peter B Lewis / Weatherhead. Only sections explicitly approved for off-site placement should be scheduled here."
+    }
+  }
+]
