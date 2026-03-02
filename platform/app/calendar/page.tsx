@@ -3,21 +3,28 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
   BarChart3,
   Filter,
+  Lock,
   Maximize2,
   Minimize2,
   Palette,
   Printer,
   Rocket,
   Share2,
+  Unlock,
   Undo2,
 } from "lucide-react";
-import type { ScheduleSolution, SchedulingInput } from "@/lib/scheduling/types";
+import type {
+  LockedAssignment,
+  ScheduleSolution,
+  SchedulingInput,
+} from "@/lib/scheduling/types";
 import { MultiSelect } from "@/components/scheduler/MultiSelect";
 import { SCHEDULING_DATA_REFRESH_EVENT } from "@/lib/scheduling/useSchedulingData";
 
@@ -96,9 +103,67 @@ type LastSolverRun = {
   input: SchedulingInput;
   solution: ScheduleSolution;
   createdAt: string;
+  /** Section IDs marked locked in the calendar UI (includes cross-list peers). */
+  lockedSectionIds?: string[];
 };
 
 const LAST_SOLVER_RUN_STORAGE_KEY = "wsom-last-solver-run";
+const LAST_SOLVER_ERROR_STORAGE_KEY = "wsom-last-solver-error";
+
+type CalendarAssignmentMap = Record<
+  string,
+  { timeslot_ids: string[]; room_id: string; meeting_pattern_id: string }
+>;
+
+function crosslistPeerSectionIds(sectionId: string, sections: SectionDto[]): string[] {
+  const section = sections.find((s) => s.id === sectionId);
+  const gid = section?.crosslist_group_id;
+  if (!gid) return [sectionId];
+  const peers = sections.filter((s) => s.crosslist_group_id === gid).map((s) => s.id);
+  return peers.length ? peers : [sectionId];
+}
+
+function mergePlacementLocks(
+  baseLocks: LockedAssignment[],
+  lockedSectionIds: string[],
+  assignments: CalendarAssignmentMap,
+  sections: SectionDto[],
+): LockedAssignment[] {
+  const lockSet = new Set(lockedSectionIds);
+  const byId = new Map<string, LockedAssignment>();
+  for (const lock of baseLocks) {
+    if (!lockSet.has(lock.section_id)) {
+      byId.set(lock.section_id, lock);
+    }
+  }
+  for (const sectionId of Array.from(lockSet)) {
+    const assignment = assignments[sectionId];
+    const ts = [...(assignment?.timeslot_ids ?? [])].filter(Boolean).sort();
+    const room = (assignment?.room_id ?? "").trim();
+    if (!ts.length || !room) continue;
+    for (const sid of crosslistPeerSectionIds(sectionId, sections)) {
+      byId.set(sid, {
+        section_id: sid,
+        fixed_timeslot_set: ts,
+        fixed_room: room,
+      });
+    }
+  }
+  return Array.from(byId.values());
+}
+
+function normalizeAssignmentMapEntry(
+  section: SectionDto,
+  assignments: CalendarAssignmentMap,
+): { timeslot_ids: string[]; room_id: string; meeting_pattern_id: string } {
+  const fromMap = assignments[section.id];
+  return {
+    timeslot_ids:
+      fromMap?.timeslot_ids?.length ? fromMap.timeslot_ids : section.timeslot_id ? [section.timeslot_id] : [],
+    room_id: (fromMap?.room_id ?? section.room_id ?? "").trim(),
+    meeting_pattern_id: fromMap?.meeting_pattern_id ?? "",
+  };
+}
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"] as const;
 type Day = (typeof DAYS)[number];
@@ -501,10 +566,17 @@ function CalendarDragFeedbackToastPortal({
 }
 
 export default function CalendarPage() {
-  type AssignmentMap = Record<
-    string,
-    { timeslot_ids: string[]; room_id: string; meeting_pattern_id: string }
-  >;
+  type AssignmentMap = CalendarAssignmentMap;
+
+  const router = useRouter();
+  const [lockedSectionIds, setLockedSectionIds] = useState<string[]>([]);
+  const [solverRunStatus, setSolverRunStatus] = useState<"idle" | "loading">("idle");
+  const [solverRunError, setSolverRunError] = useState<string | null>(null);
+  const [calendarContextMenu, setCalendarContextMenu] = useState<{
+    clientX: number;
+    clientY: number;
+    sectionId: string;
+  } | null>(null);
 
   const stateKeyForUndo = useCallback(
     (
@@ -733,6 +805,9 @@ export default function CalendarPage() {
                 setAssignmentsBySection(nextAssignments);
                 setBaselineAssignments(nextAssignments);
                 setSolverTimeslotIdsBySection(allTimeslotIdsBySection);
+                setLockedSectionIds(
+                  Array.isArray(parsed.lockedSectionIds) ? parsed.lockedSectionIds : [],
+                );
                 setUndoStack([]);
                 undoStackRef.current = [];
                 setData({
@@ -773,6 +848,7 @@ export default function CalendarPage() {
           );
           setAssignmentsBySection(fallbackAssignments);
           setBaselineAssignments(fallbackAssignments);
+          setLockedSectionIds([]);
           setUndoStack([]);
           undoStackRef.current = [];
           setData(json.data);
@@ -1167,31 +1243,33 @@ export default function CalendarPage() {
     setBackendSaveMessage(snapshot.backendSaveMessage);
   }, []);
 
-  const updateLastRunStorage = (
-    nextInput: SchedulingInput,
-    assignments: AssignmentMap,
-  ) => {
-    if (typeof window === "undefined") return;
-    localStorage.setItem(
-      LAST_SOLVER_RUN_STORAGE_KEY,
-      JSON.stringify({
-        input: nextInput,
-        solution: {
-          status: "ok",
-          assignments: Object.entries(assignments).map(([section_id, value]) => ({
-            section_id,
-            timeslot_ids: value.timeslot_ids,
-            room_id: value.room_id,
-            meeting_pattern_id: value.meeting_pattern_id,
-          })),
-          total_score: 0,
-          penalty_breakdown: {},
-          explanations: [],
-        },
-        createdAt: new Date().toISOString(),
-      }),
-    );
-  };
+  const updateLastRunStorage = useCallback(
+    (nextInput: SchedulingInput, assignments: AssignmentMap, locks?: string[]) => {
+      const lockList = locks ?? lockedSectionIds;
+      if (typeof window === "undefined") return;
+      localStorage.setItem(
+        LAST_SOLVER_RUN_STORAGE_KEY,
+        JSON.stringify({
+          input: nextInput,
+          solution: {
+            status: "ok",
+            assignments: Object.entries(assignments).map(([section_id, value]) => ({
+              section_id,
+              timeslot_ids: value.timeslot_ids,
+              room_id: value.room_id,
+              meeting_pattern_id: value.meeting_pattern_id,
+            })),
+            total_score: 0,
+            penalty_breakdown: {},
+            explanations: [],
+          },
+          lockedSectionIds: lockList,
+          createdAt: new Date().toISOString(),
+        }),
+      );
+    },
+    [lockedSectionIds],
+  );
 
   const hasValidUnsavedEdit = useMemo(() => {
     const normalize = (map: AssignmentMap) =>
@@ -1208,6 +1286,247 @@ export default function CalendarPage() {
       JSON.stringify(normalize(baselineAssignments));
     return changed && dragFeedback.status === "valid";
   }, [assignmentsBySection, baselineAssignments, dragFeedback.status]);
+
+  const isPlacementLocked = useCallback(
+    (sectionId: string) => {
+      if (!data) return false;
+      return crosslistPeerSectionIds(sectionId, data.sections).some((id) =>
+        lockedSectionIds.includes(id),
+      );
+    },
+    [data, lockedSectionIds],
+  );
+
+  const canLockSectionPlacement = useCallback(
+    (sectionId: string) => {
+      if (!data) return false;
+      const section = data.sections.find((s) => s.id === sectionId);
+      if (!section) return false;
+      const a = normalizeAssignmentMapEntry(section, assignmentsBySection);
+      return a.timeslot_ids.length > 0 && !!a.room_id;
+    },
+    [assignmentsBySection, data],
+  );
+
+  const togglePlacementLockForSection = useCallback(
+    (sectionId: string) => {
+      if (!data) return;
+      if (!canLockSectionPlacement(sectionId)) {
+        setDragFeedback({
+          status: "invalid",
+          message: "Assign a room and times before locking this section.",
+        });
+        setCalendarContextMenu(null);
+        return;
+      }
+      const peers = crosslistPeerSectionIds(sectionId, data.sections);
+      setLockedSectionIds((prev) => {
+        const next = new Set(prev);
+        const anyLocked = peers.some((p) => next.has(p));
+        if (anyLocked) peers.forEach((p) => next.delete(p));
+        else peers.forEach((p) => next.add(p));
+        return Array.from(next);
+      });
+      setCalendarContextMenu(null);
+    },
+    [canLockSectionPlacement, data],
+  );
+
+  const lockAllPlacementChanges = useCallback(() => {
+    if (!data) return;
+    const norm = (s: SectionDto, m: AssignmentMap) => {
+      const v = normalizeAssignmentMapEntry(s, m);
+      return JSON.stringify({
+        room_id: v.room_id,
+        meeting_pattern_id: v.meeting_pattern_id,
+        timeslot_ids: [...v.timeslot_ids].sort(),
+      });
+    };
+    const next = new Set(lockedSectionIds);
+    let groupsLocked = 0;
+    for (const s of data.sections) {
+      if (norm(s, assignmentsBySection) === norm(s, baselineAssignments)) continue;
+      const cur = normalizeAssignmentMapEntry(s, assignmentsBySection);
+      if (!cur.timeslot_ids.length || !cur.room_id) continue;
+      const peers = crosslistPeerSectionIds(s.id, data.sections);
+      const before = next.size;
+      peers.forEach((p) => next.add(p));
+      if (next.size > before) groupsLocked += 1;
+    }
+    setLockedSectionIds(Array.from(next));
+    setDragFeedback({
+      status: groupsLocked > 0 ? "valid" : "neutral",
+      message:
+        groupsLocked > 0
+          ? `Locked ${groupsLocked} section group(s) that differ from the baseline. Cross-listed peers lock together.`
+          : "No changed sections with both a room and times to lock.",
+    });
+  }, [assignmentsBySection, baselineAssignments, data, lockedSectionIds]);
+
+  const unlockAllPlacementLocks = useCallback(() => {
+    setLockedSectionIds([]);
+    setDragFeedback({
+      status: "valid",
+      message: "Cleared all placement locks for this calendar session.",
+    });
+  }, []);
+
+  const hasAnyPlacementLock = lockedSectionIds.length > 0;
+
+  const tableSectionsFiltered = useMemo(() => {
+    if (!data) return [];
+    return [...data.sections]
+      .filter((s) => sectionMatchesFilters(s))
+      .sort((a, b) => {
+        const da = (a.department ?? "").localeCompare(b.department ?? "", undefined, {
+          sensitivity: "base",
+        });
+        if (da !== 0) return da;
+        const ca = String(a.course_id).localeCompare(String(b.course_id), undefined, {
+          numeric: true,
+        });
+        if (ca !== 0) return ca;
+        return (a.section_code ?? "").localeCompare(b.section_code ?? "", undefined, {
+          sensitivity: "base",
+        });
+      });
+  }, [data, sectionMatchesFilters]);
+
+  useEffect(() => {
+    if (!solverInput) return;
+    updateLastRunStorage(solverInput, assignmentsBySection, lockedSectionIds);
+    // Intentionally only when locks change — assignment changes persist via other flows.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- assignments read from latest render
+  }, [lockedSectionIds, solverInput, updateLastRunStorage]);
+
+  useEffect(() => {
+    if (!calendarContextMenu) return;
+    const close = () => setCalendarContextMenu(null);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    const t = window.setTimeout(() => {
+      window.addEventListener("click", close, { capture: true });
+    }, 0);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("click", close, { capture: true });
+    };
+  }, [calendarContextMenu]);
+
+  const handleRunSolverFromCalendar = useCallback(async () => {
+    setSolverRunError(null);
+    setSolverRunStatus("loading");
+    try {
+      let input: SchedulingInput | null = solverInput;
+      if (!input) {
+        const res = await fetch("/api/data", { method: "GET" });
+        const json = (await res.json()) as
+          | { status: "ok"; data: SchedulingInput }
+          | { status: "error"; errors: { message?: string }[] };
+        if (!res.ok || json.status !== "ok") {
+          const msg =
+            json.status === "error"
+              ? json.errors.map((e) => e.message).filter(Boolean).join(" | ")
+              : "Failed to load scheduling data.";
+          throw new Error(msg);
+        }
+        input = json.data;
+      }
+      const sectionsForLocks = data?.sections ?? [];
+      const mergedLocks = mergePlacementLocks(
+        input.locked_assignments ?? [],
+        lockedSectionIds,
+        assignmentsBySection,
+        sectionsForLocks,
+      );
+      const nextInput: SchedulingInput = {
+        ...input,
+        locked_assignments: mergedLocks,
+      };
+      const response = await fetch("/api/schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(nextInput),
+      });
+      const raw = await response.text();
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw) as Record<string, unknown>;
+      } catch {
+        throw new Error(`Schedule API returned non-JSON (status ${response.status}).`);
+      }
+      const result = parsed as ScheduleSolution & {
+        status?: string;
+        errors?: { message?: string }[];
+        diagnostics?: unknown;
+      };
+      if (!response.ok || result.status === "error") {
+        if (typeof window !== "undefined") {
+          localStorage.setItem(
+            LAST_SOLVER_ERROR_STORAGE_KEY,
+            JSON.stringify({
+              input: nextInput,
+              errors: result.errors ?? [],
+              diagnostics: result.diagnostics,
+              createdAt: new Date().toISOString(),
+            }),
+          );
+        }
+        router.push("/solver-errors");
+        return;
+      }
+      const assignments = result.assignments ?? [];
+      const nextAssignments: AssignmentMap = Object.fromEntries(
+        assignments.map((assignment) => [
+          assignment.section_id,
+          {
+            timeslot_ids: assignment.timeslot_ids,
+            room_id: assignment.room_id,
+            meeting_pattern_id: assignment.meeting_pattern_id,
+          },
+        ]),
+      );
+      const allTimeslotIdsBySection = Object.fromEntries(
+        assignments.map((assignment) => [assignment.section_id, assignment.timeslot_ids]),
+      );
+      setSolverInput(nextInput);
+      setAssignmentsBySection(nextAssignments);
+      setBaselineAssignments(nextAssignments);
+      setSolverTimeslotIdsBySection(allTimeslotIdsBySection);
+      updateLastRunStorage(nextInput, nextAssignments, lockedSectionIds);
+      if (data) {
+        setData({
+          ...data,
+          sections: data.sections.map((section) => {
+            const assignment = nextAssignments[section.id];
+            return {
+              ...section,
+              room_id: assignment?.room_id ?? section.room_id ?? null,
+              timeslot_id: assignment?.timeslot_ids?.[0] ?? section.timeslot_id ?? null,
+            };
+          }),
+        });
+      }
+      setDragFeedback({
+        status: "valid",
+        message: "Solver finished. Schedule updated on this page.",
+      });
+    } catch (e) {
+      setSolverRunError(e instanceof Error ? e.message : "Failed to run solver.");
+    } finally {
+      setSolverRunStatus("idle");
+    }
+  }, [
+    assignmentsBySection,
+    data,
+    lockedSectionIds,
+    router,
+    solverInput,
+    updateLastRunStorage,
+  ]);
 
   const dayTimeslotBoundaries = useMemo(() => {
     if (!data) return [];
@@ -1817,6 +2136,45 @@ export default function CalendarPage() {
           </button>
           <button
             type="button"
+            onClick={lockAllPlacementChanges}
+            className="flex items-center justify-center rounded-lg h-10 px-4 bg-amber-50 text-amber-900 font-bold gap-2 border border-amber-200 hover:bg-amber-100 transition-colors"
+            title="Hard-lock every section whose placement differs from the saved baseline (needs room + times)"
+          >
+            <Lock className="size-4" />
+            Lock all changes
+          </button>
+          <button
+            type="button"
+            disabled={!hasAnyPlacementLock}
+            onClick={unlockAllPlacementLocks}
+            className={clsx(
+              "flex items-center justify-center rounded-lg h-10 px-4 font-bold gap-2 border transition-colors",
+              hasAnyPlacementLock
+                ? "bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100"
+                : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
+            )}
+            title="Remove all placement locks added from this calendar view"
+          >
+            <Unlock className="size-4" />
+            Unlock all
+          </button>
+          <button
+            type="button"
+            disabled={solverRunStatus === "loading" || !data}
+            onClick={() => void handleRunSolverFromCalendar()}
+            className={clsx(
+              "flex items-center justify-center rounded-lg h-10 px-4 font-bold gap-2 border transition-colors",
+              solverRunStatus !== "loading" && data
+                ? "bg-[#137fec] text-white border-[#137fec] shadow-lg shadow-[#137fec]/20 hover:bg-[#0f6dca]"
+                : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
+            )}
+            title="Run the solver using backend scheduling data and locks from this page"
+          >
+            <Rocket className="size-4" />
+            {solverRunStatus === "loading" ? "Running…" : "Run Solver"}
+          </button>
+          <button
+            type="button"
             disabled={!hasValidUnsavedEdit || isSavingBackend}
             onClick={handleUpdateBackend}
             className={clsx(
@@ -1853,6 +2211,12 @@ export default function CalendarPage() {
           )}
         >
           {backendSaveMessage.text}
+        </div>
+      )}
+
+      {solverRunError && (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-800">
+          {solverRunError}
         </div>
       )}
 
@@ -2295,6 +2659,7 @@ export default function CalendarPage() {
                       activeLegendDepartmentKeys.has(departmentColorKey(section));
 
                 const isDragSource = calendarDrag?.sectionId === section.id;
+                const placementLocked = isPlacementLocked(section.id);
                 return (
                   <div
                     key={`${room.id}-${section.id}`}
@@ -2320,6 +2685,15 @@ export default function CalendarPage() {
                       borderLeftColor: color.cardBorder,
                     }}
                     title={`${title} • ${professor} • ${timeLabel} • Room ${room.id}`}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setCalendarContextMenu({
+                        clientX: e.clientX,
+                        clientY: e.clientY,
+                        sectionId: section.id,
+                      });
+                    }}
                     onPointerDown={(e) => {
                       if (!solverInput || e.button !== 0) return;
                       e.stopPropagation();
@@ -2433,7 +2807,13 @@ export default function CalendarPage() {
                       });
                     }}
                   >
-                      <div className="font-black text-[10px] truncate text-slate-900">
+                    {placementLocked && (
+                      <Lock
+                        className="pointer-events-none absolute right-1 top-1 size-3.5 text-slate-800 drop-shadow-sm opacity-90"
+                        aria-label="Placement locked for solver"
+                      />
+                    )}
+                      <div className="font-black text-[10px] truncate text-slate-900 pr-4">
                         {title}
                       </div>
                     <div className="text-[9px] font-bold leading-tight text-slate-700">
@@ -2538,6 +2918,144 @@ export default function CalendarPage() {
           </div>
         </div>
       </div>
+
+      {/* Table view: placements + lock for solver */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="flex flex-col gap-1 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Schedule table</h3>
+            <p className="text-[11px] text-slate-500">
+              Lock keeps a section on its current room and times when you run the solver. Cross-listed
+              sections lock as a group.
+            </p>
+          </div>
+          {hasAnyPlacementLock && (
+            <span className="text-[10px] font-bold uppercase tracking-wide text-amber-800">
+              {lockedSectionIds.length} locked id(s)
+            </span>
+          )}
+        </div>
+        <div className="overflow-x-auto max-h-[min(480px,55vh)] overflow-y-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="sticky top-0 z-[1] bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Section</th>
+                <th className="px-4 py-3">Course</th>
+                <th className="px-4 py-3">Room</th>
+                <th className="px-4 py-3">Timeslots</th>
+                <th className="px-4 py-3 text-center">Lock</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {tableSectionsFiltered.map((section) => {
+                const a = normalizeAssignmentMapEntry(section, assignmentsBySection);
+                const locked = isPlacementLocked(section.id);
+                const canLock = canLockSectionPlacement(section.id);
+                const peerCount = crosslistPeerSectionIds(section.id, data.sections).length;
+                const slotLabels = a.timeslot_ids
+                  .map((id) => {
+                    const slot = timeslotById.get(id);
+                    if (!slot) return id;
+                    const day = (slot.days ?? slot.day ?? "").toString().trim();
+                    return `${day} ${formatTimeAmPm(slot.start_time)}–${formatTimeAmPm(slot.end_time)}`;
+                  })
+                  .join("; ");
+                return (
+                  <tr key={section.id} className="hover:bg-slate-50/80">
+                    <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-900">
+                      {section.id}
+                      {peerCount > 1 ? (
+                        <span className="ml-1 text-[10px] font-normal text-slate-500">(xlist)</span>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-3 text-slate-800">
+                      {[section.department, String(section.course_id)].filter(Boolean).join(" ")}
+                      {section.section_code ? ` · ${section.section_code}` : ""}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-slate-800">{a.room_id || "—"}</td>
+                    <td className="px-4 py-3 text-xs text-slate-600 max-w-md">{slotLabels || "—"}</td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        type="button"
+                        disabled={!locked && !canLock}
+                        onClick={() => togglePlacementLockForSection(section.id)}
+                        className={clsx(
+                          "inline-flex items-center justify-center rounded-lg border p-2 transition-colors",
+                          locked
+                            ? "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
+                            : canLock
+                              ? "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                              : "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300",
+                        )}
+                        title={
+                          locked
+                            ? "Unlock for solver (cross-listed peers unlock together)"
+                            : canLock
+                              ? "Lock current room and times for solver"
+                              : "Set room and times before locking"
+                        }
+                        aria-label={locked ? "Unlock placement" : "Lock placement"}
+                      >
+                        {locked ? <Lock className="size-4" /> : <Unlock className="size-4 opacity-40" />}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {calendarContextMenu &&
+        dragFeedbackToastMount &&
+        createPortal(
+          <div
+            role="menu"
+            className="fixed z-[60] min-w-[220px] rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-xl"
+            style={{
+              left: Math.min(
+                calendarContextMenu.clientX,
+                (typeof window !== "undefined" ? window.innerWidth : 800) - 240,
+              ),
+              top: Math.min(
+                calendarContextMenu.clientY,
+                (typeof window !== "undefined" ? window.innerHeight : 600) - 120,
+              ),
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center gap-2 px-3 py-2.5 text-left font-semibold text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={
+                !isPlacementLocked(calendarContextMenu.sectionId) &&
+                !canLockSectionPlacement(calendarContextMenu.sectionId)
+              }
+              onClick={() => togglePlacementLockForSection(calendarContextMenu.sectionId)}
+            >
+              {isPlacementLocked(calendarContextMenu.sectionId) ? (
+                <>
+                  <Unlock className="size-4 shrink-0" aria-hidden />
+                  Unlock placement for solver
+                </>
+              ) : (
+                <>
+                  <Lock className="size-4 shrink-0" aria-hidden />
+                  Lock placement for solver
+                </>
+              )}
+            </button>
+            {data &&
+            crosslistPeerSectionIds(calendarContextMenu.sectionId, data.sections).length > 1 ? (
+              <p className="border-t border-slate-100 px-3 py-2 text-[10px] leading-relaxed text-slate-500">
+                Cross-listed: this applies to every section in the group.
+              </p>
+            ) : null}
+          </div>,
+          dragFeedbackToastMount,
+        )}
 
       {sectionModal && (
         <div
