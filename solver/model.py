@@ -219,6 +219,7 @@ class MajorPreferences(db.Model):
     def to_dict(self):
         return {
             "major_id": self.major_id,
+            "no_core_conflicts": self.no_core_conflicts, #Was not exported in the previous version
             "strict_core_scheduling": self.strict_core_scheduling
         }
 

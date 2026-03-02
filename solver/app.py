@@ -1,24 +1,47 @@
+
 from typing import Dict, List, Optional, Tuple
 
 from flask import Flask, request, jsonify
 from ortools.sat.python import cp_model
 
 from model import (
-    db,
-    Section,
-    Instructor,
-    Room,
-    Timeslot,
-    MeetingPattern,
-    CrossListGroup,
-    NoOverlapGroup,
-    BlockedTime,
-    LockedAssignment,
-    SoftLock,
-    ValidationError,
-    ScheduleAssignment,
-    ScheduleSolution,
+     db,
+     Section,
+     Instructor,
+     Room,
+     Timeslot,
+     MeetingPattern,
+     CrossListGroup,
+     NoOverlapGroup,
+     BlockedTime,
+     LockedAssignment,
+     SoftLock,
+     ValidationError,
+     ScheduleAssignment,
+     ScheduleSolution,
 )
+
+
+"""
+CP-SAT course scheduling service:
+This file implements three layers of the scheduling system:
+1. API Layer: exposes the scheduling system to the user (Flask app).
+2. Feasibility Layer: finds feasible schedules (_build_options).
+3. Optimization Engine: finds optimal schedules (_solve_schedule).
+
+Workflow:
+1. The user sends a request to the API Layer.
+2. The API Layer validates the request and sends it to the Feasibility Layer.
+3. The Feasibility Layer finds feasible schedules and sends them to the Optimization Engine.
+4. The Optimization Engine finds optimal schedules and sends them back to the API Layer.
+5. The API Layer returns the schedules to the user.
+
+Expected inputs:
+- SchedulingInput: a  data structure containing all courses, sections, instructors, rooms, timeslots, etc.
+
+Expected outputs:
+- ScheduleSolution: a schedule that is a list of assignments, each assignment is a tuple of (section_id, timeslot_id, room_id).
+"""
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///course_scheduler.db"
@@ -26,18 +49,27 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
 
-ROOM_WASTE_WEIGHT = 1  # penalty per empty seat in assigned room
-PREF_DAY_WEIGHT = 10  # penalty if assigned days don't match instructor preferences
-PREF_PATTERN_WEIGHT = 5  # penalty if assigned pattern isn't preferred
-ADJUNCT_DAY_EXCESS_WEIGHT = 15  # penalty per day beyond adjunct max
-SOFT_LOCK_BASE_WEIGHT = 1  # base multiplier for soft lock penalties
+# Objective weights (Changeable).
+ROOM_WASTE_WEIGHT = 1           # penalty per empty seat in assigned room
+PREF_DAY_WEIGHT = 10            # penalty if days don't match instructor preferences
+PREF_PATTERN_WEIGHT = 5         # penalty if pattern isn't preferred by the instructor
+ADJUNCT_DAY_EXCESS_WEIGHT = 15  # penalty per day beyond adjunct max for adjuncts
+SOFT_LOCK_BASE_WEIGHT = 1       # base multiplier for soft lock penalties
+SECTION_PREF_TIME_WEIGHT = 5    # penalty if section is not assigned to its preferred_time
 
 
-# Helper class to represent scheduling input (not a database model)
-# This works with dictionaries from JSON requests
+# ---------------------------------------------------------------------------
+# Input wrapper
+# ---------------------------------------------------------------------------
+
 class SchedulingInput:
     def __init__(self, data: dict):
-        # Store as dictionaries - the helper functions handle conversion
+        # Store raw JSON-style data; helper functions below normalize dicts from SQLAlchemy classes.
+        self.courses = data.get("courses", [])
+        self.majors = data.get("majors", [])
+        self.major_preferences = data.get("major_preferences", [])
+        self.department_preferences = data.get("department_preferences", [])
+        self.section_preferences = data.get("section_preferences", [])
         self.sections = data.get("sections", [])
         self.instructors = data.get("instructors", [])
         self.rooms = data.get("rooms", [])
@@ -53,13 +85,30 @@ class SchedulingInput:
 def _timeslot_days(timeslots: List[Timeslot]) -> Dict[str, str]:
     """Build a lookup from timeslot ID to day.
 
+    Can now handle timeslots that are either dicts or SQLAlchemy models.
+    If a timeslot is missing an ID or day, it will be skipped.
+
     Args:
         timeslots: All timeslot definitions.
 
     Returns:
         Mapping of timeslot ID to day string.
     """
-    return {slot.id: slot.day for slot in timeslots}
+    result: Dict[str, str] = {}
+    for slot in timeslots:
+        # normalize to dict
+        if isinstance(slot, dict):
+            slot_dict = slot
+        elif hasattr(slot, "to_dict"):
+            slot_dict = slot.to_dict()
+        else:
+            # fallback to attribute access
+            slot_dict = {"id": getattr(slot, "id", None), "day": getattr(slot, "day", None)}
+        slot_id = slot_dict.get("id")
+        day = slot_dict.get("day")
+        if slot_id is not None and day is not None:
+            result[slot_id] = day
+    return result
 
 
 def _section_to_dict(section) -> dict:
@@ -88,6 +137,9 @@ def _room_to_dict(room) -> dict:
         "id": room.id,
         "building": room.building,
         "capacity": room.capacity,
+        "room_type": getattr(room, "room_type", None),
+        "has_av": getattr(room, "has_av", False),
+        "is_accessible": getattr(room, "is_accessible", True),
         "features": getattr(room, "features", []),
     }
 
@@ -102,6 +154,29 @@ def _instructor_to_dict(instructor) -> dict:
         "unavailable_times": getattr(instructor, "unavailable_times", []),
         "preferences": getattr(instructor, "preferences", {}),
     }
+
+def _instructors_by_id(input_data: SchedulingInput) -> Dict[str, dict]:
+    """Build a lookup of instructor_id -> instructor_dict."""
+    result: Dict[str, dict] = {}
+    for inst in input_data.instructors:
+        inst_dict = _instructor_to_dict(inst)
+        inst_id = inst_dict.get("id")
+        if inst_id is not None:
+            result[inst_id] = inst_dict
+    return result
+
+#NEW: grab the section preferences by section ID. section ID -> section preferences dict.
+def _section_prefs_by_section_id(input_data: SchedulingInput) -> Dict[str, dict]:
+    """Build a lookup of section_id -> section_preferences dict."""
+    result: Dict[str, dict] = {}
+    for pref in getattr(input_data, "section_preferences", []) or []:
+        pref_dict = pref.to_dict() if hasattr(pref, "to_dict") else pref
+        if not isinstance(pref_dict, dict):
+            continue
+        section_id = pref_dict.get("section_id")
+        if section_id:
+            result[section_id] = pref_dict
+    return result
 
 
 def _has_required_features(room, required: List[str]) -> bool:
@@ -170,7 +245,6 @@ def _validate_crosslist_capacity(
             })
     return errors
 
-
 def _build_options(
     input_data: SchedulingInput,
     ignore_blocked_times: bool = False,
@@ -223,9 +297,18 @@ def _build_options(
     options_by_section: Dict[str, List[Tuple[str, Tuple[str, ...], str, int]]] = {}
     errors: List[dict] = []
 
+    # Lookups used while generating feasible options.
+    instructors_by_id = _instructors_by_id(input_data)
+    section_prefs_by_id = _section_prefs_by_section_id(input_data)
+
     for section in input_data.sections:
         section_dict = _section_to_dict(section)
         section_id = section_dict["id"]
+        section_prefs = section_prefs_by_id.get(section_id, {})
+        # get the instructor for the section
+        instructor = instructors_by_id.get(section_dict["instructor_id"])
+        # get the unavailable times for the instructor
+        unavailable = instructor.get("unavailable_times", []) if instructor else []
         lock = locked_by_section.get(section_id)
         available_rooms = []
         for room in input_data.rooms:
@@ -236,6 +319,11 @@ def _build_options(
                 room_dict, section_dict.get("room_requirements", [])
             ):
                 continue
+            # Section-specific allowed_rooms constraint (if provided).
+            allowed_rooms = section_prefs.get("allowed_rooms") if isinstance(section_prefs, dict) else None
+            if allowed_rooms:
+                if room_dict["id"] not in allowed_rooms:
+                    continue
             available_rooms.append(room_dict)
         crosslist_id = section_dict.get("crosslist_group_id")
         if crosslist_id:
@@ -257,6 +345,17 @@ def _build_options(
             for timeslot_set in compatible_sets:
                 if any(slot in blocked_times_global for slot in timeslot_set):
                     continue
+                # check if the timeslot is in the instructor's unavailable times
+                if any(slot in unavailable for slot in timeslot_set):
+                    continue
+
+                # Section-specific allowed_times constraint (if provided).
+                allowed_times = section_prefs.get("allowed_times") if isinstance(section_prefs, dict) else None
+                if allowed_times:
+                    # Only allow timeslot sets where every timeslot is explicitly allowed.
+                    if any(slot not in allowed_times for slot in timeslot_set):
+                        continue
+
                 if lock:
                     fixed_timeslot_set = lock.get("fixed_timeslot_set") if isinstance(lock, dict) else getattr(lock, "fixed_timeslot_set", None)
                     if fixed_timeslot_set and set(fixed_timeslot_set) != set(timeslot_set):
@@ -531,10 +630,12 @@ def _solve_schedule(input_data: SchedulingInput):
     if errors:
         return {"status": "error", "errors": errors}
 
+    # ------------------------------------------------------------------
     # Build optimization model
+    # ------------------------------------------------------------------
     model = cp_model.CpModel()
     timeslot_day = _timeslot_days(input_data.timeslots)
-    instructors_by_id = {_instructor_to_dict(inst)["id"]: inst for inst in input_data.instructors}
+    instructors_by_id = _instructors_by_id(input_data)
     sections_by_id = {_section_to_dict(s)["id"]: s for s in input_data.sections}
     crosslist_roomshare = set()
     for group in input_data.crosslist_groups:
@@ -624,6 +725,149 @@ def _solve_schedule(input_data: SchedulingInput):
             if vars_for_slot:
                 model.Add(sum(vars_for_slot) <= 1)
 
+    # Section-specific cannot_collide_with preferences:
+    # For each section, enforce that it does not overlap with explicitly forbidden sections.
+    section_prefs_by_id = _section_prefs_by_section_id(input_data)
+    seen_pairs: set[Tuple[str, str]] = set()
+    for section_id, prefs in section_prefs_by_id.items():
+        if not isinstance(prefs, dict):
+            continue
+        cannot_collide = prefs.get("cannot_collide_with") or {}
+        if not isinstance(cannot_collide, dict):
+            continue
+        for other_id in cannot_collide.keys():
+            if other_id not in options_by_section:
+                continue
+            # Avoid duplicating pair constraints.
+            pair = tuple(sorted((section_id, other_id)))
+            if pair in seen_pairs or pair[0] == pair[1]:
+                continue
+            seen_pairs.add(pair)
+
+            a_id, b_id = pair
+            options_a = options_by_section.get(a_id, [])
+            options_b = options_by_section.get(b_id, [])
+            for idx_a, opt_a in enumerate(options_a):
+                _, timeslot_a, _, _ = opt_a
+                for idx_b, opt_b in enumerate(options_b):
+                    _, timeslot_b, _, _ = opt_b
+                    # If the options share at least one common timeslot, they cannot both be chosen.
+                    if set(timeslot_a) & set(timeslot_b):
+                        model.Add(
+                            option_vars[(a_id, idx_a)]
+                            + option_vars[(b_id, idx_b)]
+                            <= 1
+                        )
+
+    # Major preferences Implementation: prevent core course time overlap.
+    #
+    # Input hirearchy:
+    # major_preferences[].core_section_ids
+    # major_preferences[].core_course_ids:
+    # input_data.courses[].is_core: fallback
+    #
+    # NOTE: MajorPreferences.strict_core_scheduling exists in the data model but not implemented yet.
+    # constraint can be later added in this block.
+    courses_by_id: Dict[str, dict] = {}
+    for course in getattr(input_data, "courses", []) or []:
+        course_dict = course.to_dict() if hasattr(course, "to_dict") else course
+        if isinstance(course_dict, dict) and course_dict.get("id") is not None:
+            courses_by_id[course_dict["id"]] = course_dict
+
+    for major_pref in getattr(input_data, "major_preferences", []) or []:
+        major_pref_dict = major_pref.to_dict() if hasattr(major_pref, "to_dict") else major_pref
+        if not isinstance(major_pref_dict, dict):
+            continue
+        if not major_pref_dict.get("no_core_conflicts"):
+            continue
+
+        core_section_ids = major_pref_dict.get("core_section_ids")
+        if core_section_ids is None:
+            core_course_ids = major_pref_dict.get("core_course_ids")
+            if core_course_ids is None:
+                core_course_ids = [
+                    course_id
+                    for course_id, course_dict in courses_by_id.items()
+                    if course_dict.get("is_core")
+                ]
+            core_course_ids_set = set(core_course_ids or [])
+            if core_course_ids_set:
+                core_section_ids = [
+                    _section_to_dict(s).get("id")
+                    for s in input_data.sections
+                    if _section_to_dict(s).get("course_id") in core_course_ids_set
+                ]
+            else:
+                core_section_ids = []
+
+        # Filter out faulty section IDs. Maybe log a warning if any were found?
+        core_section_ids = [
+            sid for sid in (core_section_ids or []) if sid and sid in options_by_section
+        ]
+        if len(core_section_ids) < 2:
+            continue
+
+        for timeslot in input_data.timeslots:
+            timeslot_dict = timeslot.to_dict() if hasattr(timeslot, "to_dict") else timeslot
+            timeslot_id = timeslot_dict.get("id") if isinstance(timeslot_dict, dict) else timeslot.id
+            vars_for_slot: List[cp_model.IntVar] = []
+            for section_id in core_section_ids:
+                for idx, _ in enumerate(options_by_section.get(section_id, [])):
+                    var = option_vars[(section_id, idx)]
+                    _, timeslot_set, _, _ = option_data[(section_id, idx)]
+                    if timeslot_id in timeslot_set:
+                        vars_for_slot.append(var)
+            if vars_for_slot:
+                model.Add(sum(vars_for_slot) <= 1)
+
+    # Department preferences Implementation: if collide_within_department is False for a department,
+    # then at most one section from that department can be scheduled in any
+    # given timeslot.
+    for dept_pref in getattr(input_data, "department_preferences", []) or []:
+        dept_pref_dict = dept_pref.to_dict() if hasattr(dept_pref, "to_dict") else dept_pref
+        if not isinstance(dept_pref_dict, dict):
+            continue
+
+        department_name = dept_pref_dict.get("department")
+        collide_within = dept_pref_dict.get("collide_within_department", True)
+        if department_name is None or collide_within:
+            # Either no department specified or collisions allowed: skip.
+            continue
+
+        # NOTE: DepartmentPreferences.collide_with_other_departments and
+        # DepartmentPreferences.allow_virtual are currently ignored here.
+        # Later on, implement constraints here.
+
+        # Collect section IDs whose course belongs to this department.
+        dept_section_ids: List[str] = []
+        for s in input_data.sections:
+            s_dict = _section_to_dict(s)
+            course_id = s_dict.get("course_id")
+            course = courses_by_id.get(course_id)
+            if course and course.get("department") == department_name:
+                sid = s_dict.get("id")
+                if sid is not None:
+                    dept_section_ids.append(sid)
+
+        if len(dept_section_ids) < 2:
+            continue
+
+        # For each timeslot, enforce: at most one section from this department.
+        for timeslot in input_data.timeslots:
+            timeslot_dict = timeslot.to_dict() if hasattr(timeslot, "to_dict") else timeslot
+            timeslot_id = timeslot_dict.get("id") if isinstance(timeslot_dict, dict) else timeslot.id
+
+            vars_for_slot: List[cp_model.IntVar] = []
+            for section_id in dept_section_ids:
+                for idx, _ in enumerate(options_by_section.get(section_id, [])):
+                    var = option_vars[(section_id, idx)]
+                    _, timeslot_set, _, _ = option_data[(section_id, idx)]
+                    if timeslot_id in timeslot_set:
+                        vars_for_slot.append(var)
+
+            if vars_for_slot:
+                model.Add(sum(vars_for_slot) <= 1)
+
     # Cross-listed sections share times and (optionally) room.
     for group in input_data.crosslist_groups:
         group_dict = group.to_dict() if hasattr(group, "to_dict") else group
@@ -701,8 +945,19 @@ def _solve_schedule(input_data: SchedulingInput):
         pref_pattern_penalty = (
             0 if pattern_id in preferred_patterns else PREF_PATTERN_WEIGHT
         )
+        # Section level preferred time: penalty calculation.
+        section_prefs = section_prefs_by_id.get(section_id, {})
+        pref_time_penalty = 0
+        if isinstance(section_prefs, dict):
+            preferred_time = section_prefs.get("preferred_time")
+            if preferred_time and preferred_time not in timeslot_set:
+                pref_time_penalty = SECTION_PREF_TIME_WEIGHT
+
         total_penalty = (
-            room_waste * ROOM_WASTE_WEIGHT + pref_day_penalty + pref_pattern_penalty
+            room_waste * ROOM_WASTE_WEIGHT
+            + pref_day_penalty
+            + pref_pattern_penalty
+            + pref_time_penalty
         )
         penalty_terms.append(var * total_penalty)
 
@@ -861,3 +1116,31 @@ def solve():
     input_data = SchedulingInput(data["input"])
     result = _solve_schedule(input_data)
     return jsonify(result)
+
+
+# ---------------------------------------------------------------------------
+# Future work / design notes
+# ---------------------------------------------------------------------------
+# 
+#   Unimplemented feautres:
+# - MajorPreferences.strict_core_scheduling:
+#     Currently unused. Define whether this should enforce stricter timing
+#     (e.g., specific bands) or weighting for core courses for a major.
+# - DepartmentPreferences.collide_with_other_departments:
+#     Currently ignored. Decide whether this forbids overlaps with other
+#     departments entirely or only under certain conditions (e.g., core vs
+#     elective) and extend the departmental constraint block accordingly.
+# - DepartmentPreferences.allow_virtual:
+#     There is no explicit virtual-room concept in the solver. Once a
+#     representation for virtual sections/rooms is chosen (e.g., special room
+#     IDs and capacity rules), room and option-building logic can be updated.
+# - Course.is_new and course_non_conflict_association:
+#     These flags are available in the ORM but not used in the objective or
+#     constraints. When policies for new courses and non-conflicting courses
+#     are finalized, they can be translated into additional no-overlap
+#     constraints or objective terms, similar to section-level overrides.
+# - BlockedTime.scope beyond "global":
+#     Only globally-scoped blocked times are applied. Once the meaning of
+#     department- or room-scoped blocks is nailed down, _build_options can be
+#     extended to apply them during option generation.
+#PS: Cleaning up app.py by adding comments, sections, whitespace. Perhaps split app into multiple files.
