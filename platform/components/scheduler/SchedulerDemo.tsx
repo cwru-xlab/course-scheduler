@@ -47,6 +47,7 @@ export const SchedulerDemo = () => {
   const [errors, setErrors] = useState<ValidationError[]>([]);
   const [diagnostics, setDiagnostics] = useState<ApiError["diagnostics"]>();
   const [solverStatus, setSolverStatus] = useState<"idle" | "loading">("idle");
+  const [updateStatus, setUpdateStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
 
   const timeslotLabelMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -86,6 +87,28 @@ export const SchedulerDemo = () => {
     () => data?.crosslist_groups.map((g) => ({ key: g.id, label: g.id })) ?? [],
     [data]
   );
+
+  const updateSectionsOnServer = async () => {
+    if (!data) return;
+    setUpdateStatus("loading");
+    try {
+      const response = await fetch("/api/update-sections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sections: data.sections }),
+      });
+      const result = await response.json();
+      if (!response.ok || result.status === "error") {
+        setUpdateStatus("error");
+      } else {
+        setUpdateStatus("success");
+      }
+    } catch {
+      setUpdateStatus("error");
+    } finally {
+      setTimeout(() => setUpdateStatus("idle"), 3000);
+    }
+  };
 
   const runSolver = async () => {
     if (!data) return;
@@ -196,13 +219,33 @@ export const SchedulerDemo = () => {
       {/* Tabbed Editors */}
       <Tabs aria-label="Data editors" color="primary" variant="bordered">
         <Tab key="sections" title="Sections">
-          <SectionsEditor
-            sections={data.sections}
-            instructorOptions={instructorOptions}
-            meetingPatternOptions={meetingPatternOptions}
-            crosslistGroupOptions={crosslistGroupOptions}
-            onUpdate={(sections) => updateField("sections", sections)}
-          />
+          <div className="flex flex-col gap-4">
+            <SectionsEditor
+              sections={data.sections}
+              instructorOptions={instructorOptions}
+              meetingPatternOptions={meetingPatternOptions}
+              crosslistGroupOptions={crosslistGroupOptions}
+              onUpdate={(sections) => updateField("sections", sections)}
+            />
+            <div className="flex items-center gap-3">
+              <Button
+                color="primary"
+                variant="solid"
+                onPress={updateSectionsOnServer}
+                isLoading={updateStatus === "loading"}
+              >
+                Update
+              </Button>
+              {updateStatus === "success" && (
+                <span className="text-sm text-success-500">Sections updated.</span>
+              )}
+              {updateStatus === "error" && (
+                <span className="text-sm text-danger-500">
+                  Failed to update sections.
+                </span>
+              )}
+            </div>
+          </div>
         </Tab>
         <Tab key="instructors" title="Instructors">
           <InstructorsEditor

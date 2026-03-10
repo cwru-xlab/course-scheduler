@@ -961,17 +961,93 @@ def import_excel():
 def solve():
     data = request.get_json()
     if not data or "input" not in data:
-        return jsonify({"status": "error", "errors": [{"code": "invalid_request", "message": "Missing 'input' field"}]}), 400
-    
+        return jsonify(
+            {
+                "status": "error",
+                "errors": [
+                    {
+                        "code": "invalid_request",
+                        "message": "Missing 'input' field",
+                    }
+                ],
+            }
+        ), 400
+
     input_data = SchedulingInput(data["input"])
     result = _solve_schedule(input_data)
     return jsonify(result)
+
+
+@app.route("/update-sections", methods=["POST"])
+def update_sections():
+    """
+    Replace all Section rows with the provided list.
+
+    Expects JSON payload: { "sections": [ ... ] } matching the frontend Section type.
+    """
+    data = request.get_json() or {}
+    sections_payload = data.get("sections")
+    if not isinstance(sections_payload, list):
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "invalid_request",
+                            "message": "Request body must include a 'sections' array.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    try:
+        # Clear existing sections
+        Section.query.delete()
+
+        # Insert all provided sections
+        for item in sections_payload:
+            section = Section(
+                id=item.get("id"),
+                course_id=item.get("course_id"),
+                section_code=item.get("section_code"),
+                instructor_id=item.get("instructor_id"),
+                expected_enrollment=item.get("expected_enrollment"),
+                enrollment_cap=item.get("enrollment_cap"),
+                allowed_meeting_patterns=item.get("allowed_meeting_patterns", []),
+                room_requirements=item.get("room_requirements", []),
+                crosslist_group_id=item.get("crosslist_group_id"),
+                tags=item.get("tags", []),
+            )
+            db.session.add(section)
+
+        db.session.commit()
+    except Exception as exc:  # pylint: disable=broad-except
+        db.session.rollback()
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "update_failed",
+                            "message": f"Failed to update sections: {exc}",
+                        }
+                    ],
+                }
+            ),
+            500,
+        )
+
+    return jsonify({"status": "ok"}), 200
 
 
 if __name__ == "__main__":
     # Create tables if they don't exist
     with app.app_context():
         db.create_all()
-    
+
     # Run the Flask app
     app.run(debug=True, host="0.0.0.0", port=5001)
