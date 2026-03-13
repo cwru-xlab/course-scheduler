@@ -481,6 +481,8 @@ def _check_feasible(
     option_vars: Dict[Tuple[str, int], cp_model.IntVar] = {}
     option_data: Dict[Tuple[str, int], Tuple[str, Tuple[str, ...], str, int]] = {}
 
+    section_prefs_by_id_solution = _section_prefs_by_section_id(input_data)
+
     for section_id, options in options_by_section.items():
         section_vars = []
         for idx, option in enumerate(options):
@@ -537,6 +539,135 @@ def _check_feasible(
                 if vars_for_slot:
                     model.Add(sum(vars_for_slot) <= 1)
 
+    # Section-specific cannot_collide_with preferences (simplified version of
+    # the main solver constraints). This is only used for feasibility checks,
+    # not scoring, and can be disabled via the "section_cannot_collide" key.
+    if "section_cannot_collide" not in relax:
+        section_prefs_by_id = _section_prefs_by_section_id(input_data)
+        seen_pairs: set[Tuple[str, str]] = set()
+        for section_id, prefs in section_prefs_by_id.items():
+            if not isinstance(prefs, dict):
+                continue
+            cannot_collide = prefs.get("cannot_collide_with") or {}
+            if not isinstance(cannot_collide, dict):
+                continue
+            for other_id in cannot_collide.keys():
+                if other_id not in options_by_section:
+                    continue
+                pair = tuple(sorted((section_id, other_id)))
+                if pair in seen_pairs or pair[0] == pair[1]:
+                    continue
+                seen_pairs.add(pair)
+
+                a_id, b_id = pair
+                options_a = options_by_section.get(a_id, [])
+                options_b = options_by_section.get(b_id, [])
+                for idx_a, opt_a in enumerate(options_a):
+                    _, timeslot_a, _, _ = opt_a
+                    for idx_b, opt_b in enumerate(options_b):
+                        _, timeslot_b, _, _ = opt_b
+                        if set(timeslot_a) & set(timeslot_b):
+                            model.Add(
+                                option_vars[(a_id, idx_a)]
+                                + option_vars[(b_id, idx_b)]
+                                <= 1
+                            )
+
+    # Major core-course time conflicts: mirror the main solver's behaviour for
+    # feasibility checks, disabled via "major_core_conflicts".
+    courses_by_id: Dict[str, dict] = {}
+    for course in getattr(input_data, "courses", []) or []:
+        course_dict = course.to_dict() if hasattr(course, "to_dict") else course
+        if isinstance(course_dict, dict) and course_dict.get("id") is not None:
+            courses_by_id[course_dict["id"]] = course_dict
+
+    if "major_core_conflicts" not in relax:
+        for major_pref in getattr(input_data, "major_preferences", []) or []:
+            major_pref_dict = major_pref.to_dict() if hasattr(major_pref, "to_dict") else major_pref
+            if not isinstance(major_pref_dict, dict):
+                continue
+            if not major_pref_dict.get("no_core_conflicts"):
+                continue
+
+            core_section_ids = major_pref_dict.get("core_section_ids")
+            if core_section_ids is None:
+                core_course_ids = major_pref_dict.get("core_course_ids")
+                if core_course_ids is None:
+                    core_course_ids = [
+                        course_id
+                        for course_id, course_dict in courses_by_id.items()
+                        if course_dict.get("is_core")
+                    ]
+                core_course_ids_set = set(core_course_ids or [])
+                if core_course_ids_set:
+                    core_section_ids = [
+                        _section_to_dict(s).get("id")
+                        for s in input_data.sections
+                        if _section_to_dict(s).get("course_id") in core_course_ids_set
+                    ]
+                else:
+                    core_section_ids = []
+
+            core_section_ids = [
+                sid for sid in (core_section_ids or []) if sid and sid in options_by_section
+            ]
+            if len(core_section_ids) < 2:
+                continue
+
+            for timeslot in input_data.timeslots:
+                timeslot_dict = timeslot.to_dict() if hasattr(timeslot, "to_dict") else timeslot
+                timeslot_id = timeslot_dict.get("id") if isinstance(timeslot_dict, dict) else timeslot.id
+                vars_for_slot: List[cp_model.IntVar] = []
+                for section_id in core_section_ids:
+                    for idx, _ in enumerate(options_by_section.get(section_id, [])):
+                        var = option_vars[(section_id, idx)]
+                        _, timeslot_set, _, _ = option_data[(section_id, idx)]
+                        if timeslot_id in timeslot_set:
+                            vars_for_slot.append(var)
+                if vars_for_slot:
+                    model.Add(sum(vars_for_slot) <= 1)
+
+    # Departmental within-department collision rules: if collide_within_department
+    # is False, forbid more than one section from that department per timeslot.
+    if "department_conflicts" not in relax:
+        for dept_pref in getattr(input_data, "department_preferences", []) or []:
+            dept_pref_dict = dept_pref.to_dict() if hasattr(dept_pref, "to_dict") else dept_pref
+            if not isinstance(dept_pref_dict, dict):
+                continue
+
+            department_name = dept_pref_dict.get("department")
+            collide_within = dept_pref_dict.get("collide_within_department", True)
+            if department_name is None or collide_within:
+                continue
+
+            dept_section_ids: List[str] = []
+            for s in input_data.sections:
+                s_dict = _section_to_dict(s)
+                course_id = s_dict.get("course_id")
+                course = courses_by_id.get(course_id)
+                if course and course.get("department") == department_name:
+                    sid = s_dict.get("id")
+                    if sid is not None:
+                        dept_section_ids.append(sid)
+
+            if len(dept_section_ids) < 2:
+                continue
+
+            for timeslot in input_data.timeslots:
+                timeslot_dict = timeslot.to_dict() if hasattr(timeslot, "to_dict") else timeslot
+                timeslot_id = timeslot_dict.get("id") if isinstance(timeslot_dict, dict) else timeslot.id
+
+                vars_for_slot: List[cp_model.IntVar] = []
+                for section_id in dept_section_ids:
+                    for idx, _ in enumerate(options_by_section.get(section_id, [])):
+                        var = option_vars[(section_id, idx)]
+                        _, timeslot_set, _, _ = option_data[(section_id, idx)]
+                        if timeslot_id in timeslot_set:
+                            vars_for_slot.append(var)
+
+                if vars_for_slot:
+                    model.Add(sum(vars_for_slot) <= 1)
+
     if "crosslist_time_room" not in relax:
         for group in input_data.crosslist_groups:
             group_dict = group.to_dict() if hasattr(group, "to_dict") else group
@@ -590,6 +721,9 @@ def _diagnose_infeasibility(input_data: SchedulingInput) -> Dict[str, List[str]]
         ("instructor_conflicts", "Instructor overlap constraints"),
         ("no_overlap_groups", "No-overlap groups"),
         ("crosslist_time_room", "Cross-list time/room equality"),
+        ("section_cannot_collide", "Section-level cannot-collide rules"),
+        ("major_core_conflicts", "Major core-course no-conflict rules"),
+        ("department_conflicts", "Departmental within-department collision rules"),
     ]
     feasible_if_relax: List[str] = []
     for relax_key, label in relax_candidates:
@@ -928,10 +1062,10 @@ def _solve_schedule(input_data: SchedulingInput):
         penalty_terms.append(excess * ADJUNCT_DAY_EXCESS_WEIGHT)
 
     # Penalties per assignment: room waste, day preference, pattern preference.
+    section_prefs_by_id = _section_prefs_by_section_id(input_data)
+
     for (section_id, idx), var in option_vars.items():
-        pattern_id, timeslot_set, room_id, room_waste = option_data[
-            (section_id, idx)
-        ]
+        pattern_id, timeslot_set, room_id, room_waste = option_data[(section_id, idx)]
         section = sections_by_id[section_id]
         section_dict = _section_to_dict(section)
         instructor_id = section_dict["instructor_id"]
@@ -975,6 +1109,16 @@ def _solve_schedule(input_data: SchedulingInput):
         section_id = lock_dict.get("section_id") if isinstance(lock_dict, dict) else lock.section_id
         soft_lock_by_section[section_id] = lock_dict if isinstance(lock_dict, dict) else lock
     for (section_id, idx), var in option_vars.items():
+        # If the underlying course is marked as new, ignore any soft-lock
+        # preferences for that section; we want to schedule new courses
+        # without being biased by historical context.
+        section = sections_by_id[section_id]
+        section_dict = _section_to_dict(section)
+        course_id = section_dict.get("course_id")
+        course = courses_by_id.get(course_id) if course_id else None
+        if course and course.get("is_new"):
+            continue
+
         soft_lock = soft_lock_by_section.get(section_id)
         if not soft_lock:
             continue
@@ -1025,6 +1169,7 @@ def _solve_schedule(input_data: SchedulingInput):
         "adjunct_day_excess": 0.0,
         "soft_lock_time": 0.0,
         "soft_lock_room": 0.0,
+        "section_preference_penalty": 0.0,
     }
 
     for section_id, options in options_by_section.items():
@@ -1057,9 +1202,22 @@ def _solve_schedule(input_data: SchedulingInput):
             pref_pattern_penalty
         )
 
-        # Calculate soft lock penalties for this assignment
+        # Section preference penalty breakdown (preferred_time mismatch).
+        section_prefs = section_prefs_by_id_solution.get(section_id, {})
+        if isinstance(section_prefs, dict):
+            preferred_time = section_prefs.get("preferred_time")
+            if preferred_time and preferred_time not in timeslot_set:
+                penalty_breakdown["section_preference_penalty"] += float(
+                    SECTION_PREF_TIME_WEIGHT
+                )
+
+        # Calculate soft lock penalties for this assignment (unless the course is new).
+        course_id = section_dict.get("course_id")
+        course = courses_by_id.get(course_id) if course_id else None
+        is_new_course = bool(course and course.get("is_new"))
+
         soft_lock = soft_lock_by_section.get(section_id)
-        if soft_lock:
+        if soft_lock and not is_new_course:
             preferred_timeslot_set = soft_lock.get("preferred_timeslot_set") if isinstance(soft_lock, dict) else getattr(soft_lock, "preferred_timeslot_set", None)
             if preferred_timeslot_set:
                 if set(timeslot_set) != set(preferred_timeslot_set):
@@ -1116,8 +1274,6 @@ def solve():
     input_data = SchedulingInput(data["input"])
     result = _solve_schedule(input_data)
     return jsonify(result)
-
-
 # ---------------------------------------------------------------------------
 # Future work / design notes
 # ---------------------------------------------------------------------------
@@ -1143,4 +1299,7 @@ def solve():
 #     Only globally-scoped blocked times are applied. Once the meaning of
 #     department- or room-scoped blocks is nailed down, _build_options can be
 #     extended to apply them during option generation.
+# - Infeasibility diagnostics (_diagnose_infeasibility, _check_feasible, relax_candidates list, _strip_section):
+#     The current diagnostics do not consider the new variable constraints added.
+# - penalty_breakdownAdd section_preference_penalty to the penalty_breakdown dictionary in the final output.
 #PS: Cleaning up app.py by adding comments, sections, whitespace. Perhaps split app into multiple files.
