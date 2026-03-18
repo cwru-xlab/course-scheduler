@@ -216,98 +216,105 @@ export const SchedulerDemo = () => {
         </Card>
       )}
 
-      {/* Tabbed Editors */}
-      <Tabs aria-label="Data editors" color="primary" variant="bordered">
-        <Tab key="sections" title="Sections">
-          <div className="flex flex-col gap-4">
-            <SectionsEditor
-              sections={data.sections}
-              instructorOptions={instructorOptions}
-              meetingPatternOptions={meetingPatternOptions}
-              crosslistGroupOptions={crosslistGroupOptions}
-              onUpdate={(sections) => updateField("sections", sections)}
-            />
-            <div className="flex items-center gap-3">
-              <Button
-                color="primary"
-                variant="solid"
-                onPress={updateSectionsOnServer}
-                isLoading={updateStatus === "loading"}
-              >
-                Update
-              </Button>
-              {updateStatus === "success" && (
-                <span className="text-sm text-success-500">Sections updated.</span>
-              )}
-              {updateStatus === "error" && (
-                <span className="text-sm text-danger-500">
-                  Failed to update sections.
-                </span>
-              )}
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void updateSectionsOnServer();
+        }}
+      >
+        <Tabs aria-label="Data editors" color="primary" variant="bordered">
+          <Tab key="sections" title="Sections">
+            <div className="flex flex-col gap-4">
+              <SectionsEditor
+                sections={data.sections}
+                instructorOptions={instructorOptions}
+                meetingPatternOptions={meetingPatternOptions}
+                crosslistGroupOptions={crosslistGroupOptions}
+                onUpdate={(sections) => updateField("sections", sections)}
+              />
             </div>
-          </div>
-        </Tab>
-        <Tab key="instructors" title="Instructors">
-          <InstructorsEditor
-            instructors={data.instructors}
-            meetingPatternOptions={meetingPatternOptions}
-            timeslotOptions={timeslotOptions}
-            onUpdate={(instructors) => updateField("instructors", instructors)}
-          />
-        </Tab>
-        <Tab key="rooms" title="Rooms">
-          <RoomsEditor
-            rooms={data.rooms}
-            onUpdate={(rooms) => updateField("rooms", rooms)}
-          />
-        </Tab>
-        <Tab key="timeslots" title="Timeslots">
-          <TimeslotsEditor
-            timeslots={data.timeslots}
-            onUpdate={(timeslots) => updateField("timeslots", timeslots)}
-          />
-        </Tab>
-        <Tab key="patterns" title="Meeting Patterns">
-          <MeetingPatternsEditor
-            meetingPatterns={data.meeting_patterns}
-            timeslotOptions={timeslotOptions}
-            onUpdate={(patterns) => updateField("meeting_patterns", patterns)}
-          />
-        </Tab>
-        <Tab key="constraints" title="Constraints">
-          <div className="flex flex-col gap-4">
-            <CrossListGroupsEditor
-              groups={data.crosslist_groups}
-              sectionOptions={sectionOptions}
-              onUpdate={(groups) => updateField("crosslist_groups", groups)}
-            />
-            <NoOverlapGroupsEditor
-              groups={data.no_overlap_groups}
-              sectionOptions={sectionOptions}
-              onUpdate={(groups) => updateField("no_overlap_groups", groups)}
-            />
-            <BlockedTimesEditor
-              blockedTimes={data.blocked_times}
+          </Tab>
+          <Tab key="instructors" title="Instructors">
+            <InstructorsEditor
+              instructors={data.instructors}
+              meetingPatternOptions={meetingPatternOptions}
               timeslotOptions={timeslotOptions}
-              onUpdate={(blockedTimes) => updateField("blocked_times", blockedTimes)}
+              onUpdate={(instructors) => updateField("instructors", instructors)}
             />
-            <LockedAssignmentsEditor
-              lockedAssignments={data.locked_assignments}
-              sectionOptions={sectionOptions}
+          </Tab>
+          <Tab key="rooms" title="Rooms">
+            <RoomsEditor
+              rooms={data.rooms}
+              onUpdate={(rooms) => updateField("rooms", rooms)}
+            />
+          </Tab>
+          <Tab key="timeslots" title="Timeslots">
+            <TimeslotsEditor
+              timeslots={data.timeslots}
+              onUpdate={(timeslots) => updateField("timeslots", timeslots)}
+            />
+          </Tab>
+          <Tab key="patterns" title="Meeting Patterns">
+            <MeetingPatternsEditor
+              meetingPatterns={data.meeting_patterns}
               timeslotOptions={timeslotOptions}
-              roomOptions={roomOptions}
-              onUpdate={(locks) => updateField("locked_assignments", locks)}
+              onUpdate={(patterns) => updateField("meeting_patterns", patterns)}
             />
-            <SoftLocksEditor
-              softLocks={data.soft_locks}
-              sectionOptions={sectionOptions}
-              timeslotOptions={timeslotOptions}
-              roomOptions={roomOptions}
-              onUpdate={(locks) => updateField("soft_locks", locks)}
-            />
-          </div>
-        </Tab>
-      </Tabs>
+          </Tab>
+          <Tab key="constraints" title="Constraints">
+            <div className="flex flex-col gap-4">
+              <CrossListGroupsEditor
+                groups={data.crosslist_groups}
+                sectionOptions={sectionOptions}
+                onUpdate={(groups) => updateField("crosslist_groups", groups)}
+              />
+              <NoOverlapGroupsEditor
+                groups={data.no_overlap_groups}
+                sectionOptions={sectionOptions}
+                onUpdate={(groups) => updateField("no_overlap_groups", groups)}
+              />
+              <BlockedTimesEditor
+                blockedTimes={data.blocked_times}
+                timeslotOptions={timeslotOptions}
+                onUpdate={(blockedTimes) => updateField("blocked_times", blockedTimes)}
+              />
+              <LockedAssignmentsEditor
+                lockedAssignments={data.locked_assignments}
+                sectionOptions={sectionOptions}
+                timeslotOptions={timeslotOptions}
+                roomOptions={roomOptions}
+                onUpdate={(locks) => updateField("locked_assignments", locks)}
+              />
+              <SoftLocksEditor
+                softLocks={data.soft_locks}
+                sectionOptions={sectionOptions}
+                timeslotOptions={timeslotOptions}
+                roomOptions={roomOptions}
+                onUpdate={(locks) => updateField("soft_locks", locks)}
+              />
+            </div>
+          </Tab>
+        </Tabs>
+        
+        <div className="mt-4 flex items-center gap-3">
+          <Button
+            type="submit"
+            color="primary"
+            variant="solid"
+            isLoading={updateStatus === "loading"}
+          >
+            Update
+          </Button>
+          {updateStatus === "success" && (
+            <span className="text-sm text-success-500">Sections updated.</span>
+          )}
+          {updateStatus === "error" && (
+            <span className="text-sm text-danger-500">
+              Failed to update sections.
+            </span>
+          )}
+        </div>
+      </form>
 
       {/* Run Solver Button */}
       <div className="flex items-center gap-3">
