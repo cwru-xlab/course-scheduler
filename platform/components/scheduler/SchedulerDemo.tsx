@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, type ChangeEvent } from "react";
 import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Chip } from "@heroui/chip";
@@ -20,7 +20,7 @@ import {
 } from "./editors/ConstraintsEditors";
 
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
-import type { ScheduleSolution, ValidationError } from "@/lib/scheduling/types";
+import type { ScheduleSolution, SchedulingInput, ValidationError } from "@/lib/scheduling/types";
 
 type ApiSuccess = ScheduleSolution & { status: "ok" };
 type ApiError = {
@@ -35,6 +35,9 @@ type ApiError = {
 type UpdateSectionsApiSuccess = { status: "ok" };
 type UpdateSectionsApiError = { status: "error"; errors: ValidationError[] };
 type UpdateSectionsApiResponse = UpdateSectionsApiSuccess | UpdateSectionsApiError;
+type ImportSpreadsheetResponse =
+  | { status: "ok"; scheduling_input: SchedulingInput }
+  | { status: "error"; errors: ValidationError[] };
 
 export const SchedulerDemo = () => {
   const {
@@ -42,6 +45,7 @@ export const SchedulerDemo = () => {
     isLoading,
     error,
     isFromLocalStorage,
+    updateData,
     updateField,
     resetToMockData,
     hasUnsavedChanges,
@@ -52,6 +56,11 @@ export const SchedulerDemo = () => {
   const [diagnostics, setDiagnostics] = useState<ApiError["diagnostics"]>();
   const [solverStatus, setSolverStatus] = useState<"idle" | "loading">("idle");
   const [updateStatus, setUpdateStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [spreadsheetStatus, setSpreadsheetStatus] = useState<
+    "idle" | "importing" | "import-success" | "import-error" | "exporting" | "export-error"
+  >("idle");
+  const [spreadsheetMessage, setSpreadsheetMessage] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const timeslotLabelMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -166,6 +175,98 @@ export const SchedulerDemo = () => {
       setErrors([{ code: "network_error", message }]);
     } finally {
       setSolverStatus("idle");
+    }
+  };
+
+  const handleImportButtonPress = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleSpreadsheetFileSelected = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.set("file", file, file.name);
+
+    setSpreadsheetStatus("importing");
+    setSpreadsheetMessage("");
+    setErrors([]);
+
+    try {
+      const response = await fetch("/api/import-scheduling-spreadsheet", {
+        method: "POST",
+        body: formData,
+      });
+      const result = (await response.json()) as ImportSpreadsheetResponse;
+
+      if (!response.ok || result.status === "error") {
+        const importErrors =
+          result.status === "error" && Array.isArray(result.errors) ? result.errors : [];
+        const message = importErrors[0]?.message ?? "Failed to import spreadsheet.";
+        setErrors(importErrors);
+        setSpreadsheetStatus("import-error");
+        setSpreadsheetMessage(message);
+        return;
+      }
+
+      updateData(result.scheduling_input);
+      setSolution(null);
+      setDiagnostics(undefined);
+      setSpreadsheetStatus("import-success");
+      setSpreadsheetMessage("Spreadsheet imported and loaded into editor state.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to import spreadsheet.";
+      setErrors([{ code: "network_error", message }]);
+      setSpreadsheetStatus("import-error");
+      setSpreadsheetMessage(message);
+    } finally {
+      event.target.value = "";
+      setTimeout(() => setSpreadsheetStatus("idle"), 3000);
+    }
+  };
+
+  const exportSpreadsheet = async () => {
+    if (!data) return;
+    setSpreadsheetStatus("exporting");
+    setSpreadsheetMessage("");
+    try {
+      const response = await fetch("/api/export-scheduling-spreadsheet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: data }),
+      });
+      if (!response.ok) {
+        let message = "Failed to export spreadsheet.";
+        try {
+          const payload = (await response.json()) as { errors?: ValidationError[] };
+          message = payload.errors?.[0]?.message ?? message;
+        } catch {
+          // Keep fallback message.
+        }
+        setSpreadsheetStatus("export-error");
+        setSpreadsheetMessage(message);
+        return;
+      }
+
+      const blob = await response.blob();
+      const disposition = response.headers.get("content-disposition") ?? "";
+      const filenameMatch = disposition.match(/filename="?([^"]+)"?/i);
+      const filename = filenameMatch?.[1] ?? "scheduling_export.xlsx";
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+      setSpreadsheetStatus("idle");
+      setSpreadsheetMessage("");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to export spreadsheet.";
+      setSpreadsheetStatus("export-error");
+      setSpreadsheetMessage(message);
     }
   };
 
@@ -348,6 +449,40 @@ export const SchedulerDemo = () => {
         <span className="text-sm text-default-500">
           Uses current edited data (auto-saved to local storage)
         </span>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".xlsx,.xlsm,.xls"
+          className="hidden"
+          onChange={(event) => {
+            void handleSpreadsheetFileSelected(event);
+          }}
+        />
+        <Button
+          color="secondary"
+          variant="flat"
+          onPress={handleImportButtonPress}
+          isLoading={spreadsheetStatus === "importing"}
+        >
+          Import Spreadsheet
+        </Button>
+        <Button
+          color="secondary"
+          variant="flat"
+          onPress={exportSpreadsheet}
+          isLoading={spreadsheetStatus === "exporting"}
+        >
+          Export Spreadsheet
+        </Button>
+        {spreadsheetStatus === "import-success" && (
+          <span className="text-sm text-success-500">{spreadsheetMessage}</span>
+        )}
+        {(spreadsheetStatus === "import-error" || spreadsheetStatus === "export-error") && (
+          <span className="text-sm text-danger-500">{spreadsheetMessage}</span>
+        )}
       </div>
 
       {/* Solution Display */}

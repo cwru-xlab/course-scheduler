@@ -1,36 +1,27 @@
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
-from datetime import time as dt_time
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, make_response
 from flask_cors import CORS
 from ortools.sat.python import cp_model
 from werkzeug.utils import secure_filename
 
 from excel_importer import ParsedData, persist_parsed_data
 from unified_importer import build_parsed_data_from_excel, build_scheduling_input_from_parsed
+from persistence import replace_scheduling_data
+from spreadsheet_io.export_to_spreadsheet import scheduling_input_to_excel_bytes
+from spreadsheet_io.import_from_spreadsheet import parse_scheduling_input_from_excel_bytes
+from spreadsheet_io.spreadsheet_utils import build_template_bytes
 from model import (
-    BlockedTime,
-    CrossListGroup,
-    Instructor,
-    InstructorPreferences,
-    LockedAssignment,
-    MeetingPattern,
-    NoOverlapGroup,
-    RoomPreferences,
-    Room,
-    SectionPreferences,
-    ScheduleAssignment,
-    ScheduleSolution,
     Section,
-    SoftLock,
     Timeslot,
-    ValidationError,
     db,
 )
 
 app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///course_scheduler.db"
+DB_PATH = (Path(__file__).resolve().parent.parent / "instance" / "course_scheduler.db").as_posix()
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # Enable CORS for all routes
@@ -88,23 +79,6 @@ def _timeslot_days(timeslots: List[Timeslot | dict]) -> Dict[str, str]:
 
         out[str(slot_id)] = str(slot_day)
     return out
-
-
-def _parse_hhmm(value: str) -> dt_time:
-    """
-    Parse timeslot start/end values coming from the frontend.
-
-    The UI uses "HH:MM" (e.g. "09:00"), but we also accept "HH:MM:SS".
-    """
-    if value is None:
-        raise ValueError("Time value cannot be null")
-    value_str = str(value).strip()
-    for fmt in ("%H:%M", "%H:%M:%S"):
-        try:
-            return datetime.strptime(value_str, fmt).time()
-        except ValueError:
-            pass
-    raise ValueError(f"Invalid time format: {value_str!r}")
 
 
 def _section_to_dict(section) -> dict:
@@ -1016,6 +990,144 @@ def solve():
     return jsonify(result)
 
 
+@app.route("/scheduling-spreadsheet-template", methods=["GET"])
+def scheduling_spreadsheet_template():
+    workbook_bytes = build_template_bytes()
+    response = make_response(workbook_bytes)
+    response.headers["Content-Type"] = (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response.headers["Content-Disposition"] = (
+        "attachment; filename=scheduling_template.xlsx"
+    )
+    return response
+
+
+@app.route("/import-scheduling-spreadsheet", methods=["POST"])
+def import_scheduling_spreadsheet():
+    if "file" not in request.files:
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "missing_file",
+                            "message": "Upload an Excel file in form field 'file'.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    file = request.files["file"]
+    filename = secure_filename(file.filename or "")
+    if not filename.lower().endswith((".xlsx", ".xlsm", ".xls")):
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "invalid_file_type",
+                            "message": "Only Excel files (.xlsx, .xlsm, .xls) are supported.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    try:
+        file_bytes = file.read()
+        scheduling_input = parse_scheduling_input_from_excel_bytes(file_bytes)
+    except Exception as exc:  # pylint: disable=broad-except
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "parse_failed",
+                            "message": f"Failed to parse scheduling spreadsheet: {exc}",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    try:
+        replace_scheduling_data(scheduling_input)
+    except Exception as exc:  # pylint: disable=broad-except
+        db.session.rollback()
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "persist_failed",
+                            "message": f"Failed to persist spreadsheet data: {exc}",
+                        }
+                    ],
+                }
+            ),
+            500,
+        )
+
+    return jsonify({"status": "ok", "scheduling_input": scheduling_input}), 200
+
+
+@app.route("/export-scheduling-spreadsheet", methods=["POST"])
+def export_scheduling_spreadsheet():
+    data = request.get_json() or {}
+    input_payload = data.get("input") if isinstance(data, dict) and "input" in data else data
+    if not isinstance(input_payload, dict):
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "invalid_request",
+                            "message": "Request body must be a scheduling input object or { input }.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    try:
+        workbook_bytes = scheduling_input_to_excel_bytes(input_payload)
+    except Exception as exc:  # pylint: disable=broad-except
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "export_failed",
+                            "message": f"Failed to generate spreadsheet: {exc}",
+                        }
+                    ],
+                }
+            ),
+            500,
+        )
+
+    response = make_response(workbook_bytes)
+    response.headers["Content-Type"] = (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response.headers["Content-Disposition"] = (
+        "attachment; filename=scheduling_export.xlsx"
+    )
+    return response
+
+
 @app.route("/update-sections", methods=["POST"])
 def update_sections():
     """
@@ -1036,243 +1148,19 @@ def update_sections():
     }
     """
     data = request.get_json() or {}
-    sections_payload = data.get("sections", [])
-    if not isinstance(sections_payload, list):
+    try:
+        replace_scheduling_data(data)
+    except ValueError as exc:
+        db.session.rollback()
         return (
             jsonify(
                 {
                     "status": "error",
-                    "errors": [
-                        {
-                            "code": "invalid_request",
-                            "message": "Request body must include a 'sections' array.",
-                        }
-                    ],
+                    "errors": [{"code": "invalid_request", "message": str(exc)}],
                 }
             ),
             400,
         )
-
-    try:
-        instructors_payload = data.get("instructors", [])
-        rooms_payload = data.get("rooms", [])
-        timeslots_payload = data.get("timeslots", [])
-        meeting_patterns_payload = data.get("meeting_patterns", [])
-        crosslist_groups_payload = data.get("crosslist_groups", [])
-        no_overlap_groups_payload = data.get("no_overlap_groups", [])
-        blocked_times_payload = data.get("blocked_times", [])
-        locked_assignments_payload = data.get("locked_assignments", [])
-        soft_locks_payload = data.get("soft_locks", [])
-
-        for key, value in [
-            ("instructors", instructors_payload),
-            ("rooms", rooms_payload),
-            ("timeslots", timeslots_payload),
-            ("meeting_patterns", meeting_patterns_payload),
-            ("crosslist_groups", crosslist_groups_payload),
-            ("no_overlap_groups", no_overlap_groups_payload),
-            ("blocked_times", blocked_times_payload),
-            ("locked_assignments", locked_assignments_payload),
-            ("soft_locks", soft_locks_payload),
-        ]:
-            if not isinstance(value, list):
-                return (
-                    jsonify(
-                        {
-                            "status": "error",
-                            "errors": [
-                                {
-                                    "code": "invalid_request",
-                                    "message": f"Request body field '{key}' must be an array.",
-                                }
-                            ],
-                        }
-                    ),
-                    400,
-                )
-
-        # Wipe existing data first (order matters because of foreign keys)
-        ScheduleAssignment.query.delete()
-        ScheduleSolution.query.delete()
-
-        SoftLock.query.delete()
-        LockedAssignment.query.delete()
-        SectionPreferences.query.delete()
-        Section.query.delete()
-
-        InstructorPreferences.query.delete()
-        Instructor.query.delete()
-
-        RoomPreferences.query.delete()
-        Room.query.delete()
-
-        Timeslot.query.delete()
-        MeetingPattern.query.delete()
-        CrossListGroup.query.delete()
-        NoOverlapGroup.query.delete()
-        BlockedTime.query.delete()
-
-        # Insert instructors (and their preferences)
-        for inst in instructors_payload:
-            inst_id = inst.get("id")
-            if not inst_id:
-                continue
-
-            instructor = Instructor(
-                id=inst_id,
-                name=inst.get("name") or inst_id,
-                rank_type=inst.get("rank_type") or "NTT",
-            )
-            db.session.add(instructor)
-
-            pref = inst.get("preferences") or {}
-            instructor_preferences = InstructorPreferences(
-                instructor_id=inst_id,
-                preferred_times=[],  # Frontend does not model fixed preferred times
-                preferred_days=pref.get("preferred_days", []),
-                preferred_patterns=pref.get("preferred_patterns", []),
-                unavailable_times=inst.get("unavailable_times", []),
-                max_teaching_days=pref.get("max_teaching_days"),
-            )
-            db.session.add(instructor_preferences)
-
-        # Insert rooms (frontend stores a smaller subset than the DB schema)
-        for room in rooms_payload:
-            room_id = room.get("id")
-            if not room_id:
-                continue
-
-            db.session.add(
-                Room(
-                    id=room_id,
-                    building=room.get("building") or "",
-                    room_number=str(room_id),
-                    capacity=int(room.get("capacity", 0)),
-                    room_type="standard",
-                    has_av=False,
-                    is_accessible=True,
-                    features=room.get("features", []),
-                )
-            )
-
-        # Insert timeslots
-        for slot in timeslots_payload:
-            slot_id = slot.get("id")
-            if not slot_id:
-                continue
-
-            db.session.add(
-                Timeslot(
-                    id=slot_id,
-                    days=slot.get("day") or "",
-                    start_time=_parse_hhmm(slot.get("start_time")),
-                    end_time=_parse_hhmm(slot.get("end_time")),
-                    slot_type="standard",
-                )
-            )
-
-        # Insert meeting patterns
-        for pattern in meeting_patterns_payload:
-            pattern_id = pattern.get("id")
-            if not pattern_id:
-                continue
-
-            db.session.add(
-                MeetingPattern(
-                    id=pattern_id,
-                    slots_required=int(pattern.get("slots_required", 0)),
-                    allowed_days=pattern.get("allowed_days", []),
-                    compatible_timeslot_sets=pattern.get("compatible_timeslot_sets", []),
-                )
-            )
-
-        # Insert crosslist / no-overlap / blocked-time constraints
-        for group in crosslist_groups_payload:
-            group_id = group.get("id")
-            if not group_id:
-                continue
-            db.session.add(
-                CrossListGroup(
-                    id=group_id,
-                    member_section_ids=group.get("member_section_ids", []),
-                    require_same_room=bool(group.get("require_same_room", False)),
-                )
-            )
-
-        for group in no_overlap_groups_payload:
-            group_id = group.get("id")
-            if not group_id:
-                continue
-            db.session.add(
-                NoOverlapGroup(
-                    id=group_id,
-                    member_section_ids=group.get("member_section_ids", []),
-                    reason=group.get("reason") or "",
-                )
-            )
-
-        for blocked in blocked_times_payload:
-            blocked_scope = blocked.get("scope")
-            if not blocked_scope:
-                continue
-            db.session.add(
-                BlockedTime(
-                    scope=blocked_scope,
-                    timeslot_ids=blocked.get("timeslot_ids", []),
-                    reason=blocked.get("reason") or "",
-                )
-            )
-
-        # Insert sections
-        for item in sections_payload:
-            section_id = item.get("id")
-            if not section_id:
-                continue
-
-            db.session.add(
-                Section(
-                    id=section_id,
-                    course_id=item.get("course_id"),
-                    section_code=item.get("section_code"),
-                    instructor_id=item.get("instructor_id"),
-                    expected_enrollment=item.get("expected_enrollment"),
-                    enrollment_cap=item.get("enrollment_cap"),
-                    section_type=item.get("section_type") or "lecture",
-                    allowed_meeting_patterns=item.get("allowed_meeting_patterns", []),
-                    room_requirements=item.get("room_requirements", []),
-                    crosslist_group_id=item.get("crosslist_group_id"),
-                    tags=item.get("tags", []),
-                )
-            )
-
-        # Insert hard constraints
-        for lock in locked_assignments_payload:
-            section_id = lock.get("section_id")
-            if not section_id:
-                continue
-            db.session.add(
-                LockedAssignment(
-                    section_id=section_id,
-                    fixed_timeslot_set=lock.get("fixed_timeslot_set"),
-                    fixed_room=lock.get("fixed_room"),
-                )
-            )
-
-        # Insert soft constraints
-        for soft in soft_locks_payload:
-            section_id = soft.get("section_id")
-            if not section_id:
-                continue
-            db.session.add(
-                SoftLock(
-                    section_id=section_id,
-                    preferred_timeslot_set=soft.get("preferred_timeslot_set"),
-                    preferred_room=soft.get("preferred_room"),
-                    weight=float(soft.get("weight", 1.0)),
-                )
-            )
-
-        db.session.commit()
     except Exception as exc:  # pylint: disable=broad-except
         db.session.rollback()
         return (
