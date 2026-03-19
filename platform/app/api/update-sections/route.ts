@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import type { Section } from "@/lib/scheduling/types";
+import type { SchedulingInput, ValidationError } from "@/lib/scheduling/types";
 
 const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:8000";
 
-type UpdateSectionsBody = {
-  sections: Section[];
-};
+type UpdateSchedulingBody = Partial<SchedulingInput>;
 
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as Partial<UpdateSectionsBody> | null;
+    const body = (await request.json()) as UpdateSchedulingBody | null;
 
     if (!body || !Array.isArray(body.sections)) {
       return NextResponse.json(
@@ -30,23 +28,29 @@ export async function POST(request: NextRequest) {
     const response = await fetch(`${SOLVER_URL}/update-sections`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sections: body.sections }),
+      body: JSON.stringify(body),
     });
 
-    const data = await response.json();
+    const data = (await response.json()) as
+      | { status: "ok" }
+      | { status: "error"; errors?: ValidationError[] };
 
     if (!response.ok || data.status === "error") {
+      const backendErrors =
+        data.status === "error" && Array.isArray(data.errors) ? data.errors : [];
+
       return NextResponse.json(
         {
           status: "error",
           errors:
-            data.errors ??
-            [
-              {
-                code: "update_failed",
-                message: "Backend failed to update sections.",
-              },
-            ],
+            backendErrors.length > 0
+              ? backendErrors
+              : [
+                  {
+                    code: "update_failed",
+                    message: "Backend failed to update sections.",
+                  },
+                ],
         },
         { status: response.status || 500 },
       );

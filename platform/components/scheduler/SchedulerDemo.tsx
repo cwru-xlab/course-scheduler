@@ -101,7 +101,7 @@ export const SchedulerDemo = () => {
       const response = await fetch("/api/update-sections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sections: data.sections }),
+        body: JSON.stringify(data),
       });
       const result = (await response.json()) as
         | UpdateSectionsApiResponse
@@ -330,7 +330,7 @@ export const SchedulerDemo = () => {
             Update
           </Button>
           {updateStatus === "success" && (
-            <span className="text-sm text-success-500">Sections updated.</span>
+            <span className="text-sm text-success-500">Database Updated.</span>
           )}
           {updateStatus === "error" && (
             <span className="text-sm text-danger-500">
