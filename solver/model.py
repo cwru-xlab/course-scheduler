@@ -653,12 +653,17 @@ class ScheduleSolution(db.Model):
     explanations = Column(JSON, nullable=False)  # List[str] - human-readable explanations
     created_at = Column(DateTime, default=datetime.utcnow)  # Timestamp of when solution was created
 
-    # One-to-many: One solution contains many assignments
-    assignments_rel = relationship("ScheduleAssignment", backref="solution")
+    # NOTE:
+    # We intentionally do NOT declare a relationship to ScheduleAssignment here.
+    # ScheduleAssignment currently has no FK back to ScheduleSolution, so SQLAlchemy
+    # can't infer the join condition (it throws "Could not determine join condition").
+    #
+    # The solver currently returns schedule output without persisting these models,
+    # and /update-sections should not fail due to mapper initialization.
 
     def to_dict(self):
         return {
-            "assignments": [a.to_dict() for a in self.assignments_rel],
+            "assignments": [],
             "total_score": self.total_score,
             "penalty_breakdown": self.penalty_breakdown or {},
             "explanations": self.explanations or [],

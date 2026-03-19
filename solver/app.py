@@ -57,7 +57,7 @@ class SchedulingInput:
         self.soft_locks = data.get("soft_locks", [])
 
 
-def _timeslot_days(timeslots: List[Timeslot]) -> Dict[str, str]:
+def _timeslot_days(timeslots: List[Timeslot | dict]) -> Dict[str, str]:
     """Build a lookup from timeslot ID to day.
 
     Args:
@@ -66,7 +66,23 @@ def _timeslot_days(timeslots: List[Timeslot]) -> Dict[str, str]:
     Returns:
         Mapping of timeslot ID to day string.
     """
-    return {slot.id: slot.day for slot in timeslots}
+    # `SchedulingInput` stores JSON payloads as plain dicts, not ORM objects.
+    # Support both dict-shaped timeslots and ORM-shaped timeslots.
+    out: Dict[str, str] = {}
+    for slot in timeslots:
+        if isinstance(slot, dict):
+            slot_id = slot.get("id")
+            slot_day = slot.get("day")
+        else:
+            slot_id = slot.id
+            slot_day = slot.day
+
+        # Defensive: fail loudly if the payload is malformed.
+        if slot_id is None or slot_day is None:
+            raise ValueError(f"Invalid timeslot payload: {slot!r}")
+
+        out[str(slot_id)] = str(slot_day)
+    return out
 
 
 def _section_to_dict(section) -> dict:
@@ -1016,6 +1032,7 @@ def update_sections():
                 instructor_id=item.get("instructor_id"),
                 expected_enrollment=item.get("expected_enrollment"),
                 enrollment_cap=item.get("enrollment_cap"),
+                section_type=item.get("section_type") or "lecture",
                 allowed_meeting_patterns=item.get("allowed_meeting_patterns", []),
                 room_requirements=item.get("room_requirements", []),
                 crosslist_group_id=item.get("crosslist_group_id"),

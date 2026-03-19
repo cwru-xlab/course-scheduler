@@ -32,6 +32,10 @@ type ApiError = {
   };
 };
 
+type UpdateSectionsApiSuccess = { status: "ok" };
+type UpdateSectionsApiError = { status: "error"; errors: ValidationError[] };
+type UpdateSectionsApiResponse = UpdateSectionsApiSuccess | UpdateSectionsApiError;
+
 export const SchedulerDemo = () => {
   const {
     data,
@@ -91,19 +95,39 @@ export const SchedulerDemo = () => {
   const updateSectionsOnServer = async () => {
     if (!data) return;
     setUpdateStatus("loading");
+    setErrors([]);
+    setDiagnostics(undefined);
     try {
       const response = await fetch("/api/update-sections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sections: data.sections }),
       });
-      const result = await response.json();
+      const result = (await response.json()) as
+        | UpdateSectionsApiResponse
+        | { status?: string; errors?: ValidationError[] };
+
       if (!response.ok || result.status === "error") {
+        const updateErrors =
+          "errors" in result && Array.isArray(result.errors) ? result.errors : [];
+
+        setErrors(
+          updateErrors.length > 0
+            ? updateErrors
+            : [
+                {
+                  code: "update_failed",
+                  message: "Backend failed to update sections.",
+                },
+              ]
+        );
         setUpdateStatus("error");
       } else {
         setUpdateStatus("success");
       }
     } catch {
+      setErrors([{ code: "network_error", message: "Failed to reach solver service." }]);
+      setDiagnostics(undefined);
       setUpdateStatus("error");
     } finally {
       setTimeout(() => setUpdateStatus("idle"), 3000);
@@ -310,7 +334,7 @@ export const SchedulerDemo = () => {
           )}
           {updateStatus === "error" && (
             <span className="text-sm text-danger-500">
-              Failed to update sections.
+              {errors[0]?.message ?? "Failed to update sections."}
             </span>
           )}
         </div>
