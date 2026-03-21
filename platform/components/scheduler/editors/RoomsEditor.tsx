@@ -7,15 +7,17 @@ import { EditableCell } from "../EditableCell";
 import { EditableArrayCell } from "../EditableArrayCell";
 
 import type { Room } from "@/lib/scheduling/types";
+import { nextIntegerId } from "@/lib/scheduling/nextId";
 
 type RoomsEditorProps = {
   rooms: Room[];
   onUpdate: (rooms: Room[]) => void;
 };
 
-const createEmptyRoom = (): Room => ({
-  id: `ROOM-NEW-${Date.now()}`,
+const createEmptyRoom = (existing: Room[]): Room => ({
+  id: nextIntegerId(existing.map((r) => r.id)),
   building: "",
+  room_number: "",
   capacity: 30,
   features: [],
 });
@@ -28,7 +30,7 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
   };
 
   const addRoom = () => {
-    onUpdate([...rooms, createEmptyRoom()]);
+    onUpdate([...rooms, createEmptyRoom(rooms)]);
   };
 
   const deleteRoom = (index: number) => {
@@ -49,6 +51,7 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
             <tr>
               <th className="pb-2 pr-3">ID</th>
               <th className="pb-2 pr-3">Building</th>
+              <th className="pb-2 pr-3">Room #</th>
               <th className="pb-2 pr-3">Capacity</th>
               <th className="pb-2 pr-3">Features</th>
               <th className="pb-2 pr-3"></th>
@@ -62,6 +65,9 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
                 </td>
                 <td className="py-2 pr-3">
                   <EditableCell value={room.building} onChange={(v) => updateRoom(idx, "building", v)} placeholder="Building" />
+                </td>
+                <td className="py-2 pr-3">
+                  <EditableCell value={room.room_number} onChange={(v) => updateRoom(idx, "room_number", v)} placeholder="101" />
                 </td>
                 <td className="py-2 pr-3">
                   <EditableCell type="number" value={room.capacity} onChange={(v) => updateRoom(idx, "capacity", v)} />

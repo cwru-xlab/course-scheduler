@@ -4,9 +4,10 @@ import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 
 import { EditableCell } from "../EditableCell";
-import { EditableSelectCell } from "../EditableSelectCell";
+import { MultiSelect } from "../MultiSelect";
 
 import type { Timeslot } from "@/lib/scheduling/types";
+import { nextIntegerId } from "@/lib/scheduling/nextId";
 
 type TimeslotsEditorProps = {
   timeslots: Timeslot[];
@@ -23,12 +24,22 @@ const DAY_OPTIONS = [
   { key: "Sun", label: "Sun" },
 ];
 
-const createEmptyTimeslot = (): Timeslot => ({
-  id: `TS-NEW-${Date.now()}`,
+const createEmptyTimeslot = (existing: Timeslot[]): Timeslot => ({
+  id: nextIntegerId(existing.map((t) => t.id)),
   day: "Mon",
   start_time: "09:00",
   end_time: "10:00",
 });
+
+const splitDays = (raw: string | string[] | undefined): string[] => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  // Support comma- or slash-separated strings from legacy data
+  return raw
+    .split(/[,/]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+};
 
 export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) => {
   const updateTimeslot = (index: number, field: keyof Timeslot, value: unknown) => {
@@ -38,7 +49,7 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
   };
 
   const addTimeslot = () => {
-    onUpdate([...timeslots, createEmptyTimeslot()]);
+    onUpdate([...timeslots, createEmptyTimeslot(timeslots)]);
   };
 
   const deleteTimeslot = (index: number) => {
@@ -58,7 +69,7 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
           <thead className="text-left text-default-500">
             <tr>
               <th className="pb-2 pr-3">ID</th>
-              <th className="pb-2 pr-3">Day</th>
+              <th className="pb-2 pr-3">Days</th>
               <th className="pb-2 pr-3">Start Time</th>
               <th className="pb-2 pr-3">End Time</th>
               <th className="pb-2 pr-3"></th>
@@ -71,10 +82,11 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
                   <EditableCell value={slot.id} onChange={(v) => updateTimeslot(idx, "id", v)} />
                 </td>
                 <td className="py-2 pr-3">
-                  <EditableSelectCell
-                    value={slot.day}
+                  <MultiSelect
+                    value={splitDays(slot.day)}
                     options={DAY_OPTIONS}
-                    onChange={(v) => updateTimeslot(idx, "day", v)}
+                    onChange={(v) => updateTimeslot(idx, "day", v.join(","))}
+                    placeholder="Select days"
                   />
                 </td>
                 <td className="py-2 pr-3">

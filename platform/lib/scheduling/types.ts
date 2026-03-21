@@ -28,6 +28,7 @@ export type Instructor = {
 export type Room = {
   id: Id;
   building: string;
+  room_number: string;
   capacity: number;
   features: string[];
 };

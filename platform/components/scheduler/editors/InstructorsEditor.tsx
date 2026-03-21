@@ -8,6 +8,7 @@ import { EditableSelectCell } from "../EditableSelectCell";
 import { MultiSelect } from "../MultiSelect";
 
 import type { Instructor } from "@/lib/scheduling/types";
+import { nextIntegerId } from "@/lib/scheduling/nextId";
 
 type InstructorsEditorProps = {
   instructors: Instructor[];
@@ -31,8 +32,8 @@ const DAY_OPTIONS = [
   { key: "Fri", label: "Fri" },
 ];
 
-const createEmptyInstructor = (): Instructor => ({
-  id: `INST-NEW-${Date.now()}`,
+const createEmptyInstructor = (existing: Instructor[]): Instructor => ({
+  id: nextIntegerId(existing.map((i) => i.id)),
   rank_type: "NTT",
   unavailable_times: [],
   preferences: {
@@ -62,7 +63,7 @@ export const InstructorsEditor = ({
   };
 
   const addInstructor = () => {
-    onUpdate([...instructors, createEmptyInstructor()]);
+    onUpdate([...instructors, createEmptyInstructor(instructors)]);
   };
 
   const deleteInstructor = (index: number) => {

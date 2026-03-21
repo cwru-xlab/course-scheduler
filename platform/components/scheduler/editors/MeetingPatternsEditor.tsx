@@ -7,6 +7,7 @@ import { EditableCell } from "../EditableCell";
 import { MultiSelect } from "../MultiSelect";
 
 import type { MeetingPattern } from "@/lib/scheduling/types";
+import { nextIntegerId } from "@/lib/scheduling/nextId";
 
 type MeetingPatternsEditorProps = {
   meetingPatterns: MeetingPattern[];
@@ -24,8 +25,8 @@ const DAY_OPTIONS = [
   { key: "Sun", label: "Sun" },
 ];
 
-const createEmptyMeetingPattern = (): MeetingPattern => ({
-  id: `MP-NEW-${Date.now()}`,
+const createEmptyMeetingPattern = (existing: MeetingPattern[]): MeetingPattern => ({
+  id: nextIntegerId(existing.map((p) => p.id)),
   slots_required: 2,
   allowed_days: [],
   compatible_timeslot_sets: [],
@@ -43,7 +44,7 @@ export const MeetingPatternsEditor = ({
   };
 
   const addPattern = () => {
-    onUpdate([...meetingPatterns, createEmptyMeetingPattern()]);
+    onUpdate([...meetingPatterns, createEmptyMeetingPattern(meetingPatterns)]);
   };
 
   const deletePattern = (index: number) => {

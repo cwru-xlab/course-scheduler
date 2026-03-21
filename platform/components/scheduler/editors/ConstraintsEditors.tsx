@@ -9,6 +9,7 @@ import { EditableSelectCell } from "../EditableSelectCell";
 import { MultiSelect } from "../MultiSelect";
 
 import type { CrossListGroup, NoOverlapGroup, BlockedTime, LockedAssignment, SoftLock } from "@/lib/scheduling/types";
+import { nextIntegerId } from "@/lib/scheduling/nextId";
 
 // CrossList Groups Editor
 type CrossListGroupsEditorProps = {
@@ -17,8 +18,8 @@ type CrossListGroupsEditorProps = {
   onUpdate: (groups: CrossListGroup[]) => void;
 };
 
-const createEmptyCrossListGroup = (): CrossListGroup => ({
-  id: `CLG-NEW-${Date.now()}`,
+const createEmptyCrossListGroup = (existing: CrossListGroup[]): CrossListGroup => ({
+  id: nextIntegerId(existing.map((g) => g.id)),
   member_section_ids: [],
   require_same_room: true,
 });
@@ -30,7 +31,7 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
     onUpdate(newGroups);
   };
 
-  const addGroup = () => onUpdate([...groups, createEmptyCrossListGroup()]);
+  const addGroup = () => onUpdate([...groups, createEmptyCrossListGroup(groups)]);
   const deleteGroup = (index: number) => onUpdate(groups.filter((_, i) => i !== index));
 
   return (
@@ -86,8 +87,8 @@ type NoOverlapGroupsEditorProps = {
   onUpdate: (groups: NoOverlapGroup[]) => void;
 };
 
-const createEmptyNoOverlapGroup = (): NoOverlapGroup => ({
-  id: `NOG-NEW-${Date.now()}`,
+const createEmptyNoOverlapGroup = (existing: NoOverlapGroup[]): NoOverlapGroup => ({
+  id: nextIntegerId(existing.map((g) => g.id)),
   member_section_ids: [],
   reason: "",
 });
@@ -99,7 +100,7 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
     onUpdate(newGroups);
   };
 
-  const addGroup = () => onUpdate([...groups, createEmptyNoOverlapGroup()]);
+  const addGroup = () => onUpdate([...groups, createEmptyNoOverlapGroup(groups)]);
   const deleteGroup = (index: number) => onUpdate(groups.filter((_, i) => i !== index));
 
   return (

@@ -1,84 +1,79 @@
-import {
-  Navbar as HeroUINavbar,
-  NavbarContent,
-  NavbarMenu,
-  NavbarMenuToggle,
-  NavbarBrand,
-  NavbarItem,
-  NavbarMenuItem,
-} from "@heroui/navbar";
-import { Link } from "@heroui/link";
-import { link as linkStyles } from "@heroui/theme";
-import NextLink from "next/link";
-import clsx from "clsx";
+"use client";
 
+import NextLink from "next/link";
+import { Calendar as CalendarIcon, ChevronDown, School } from "lucide-react";
+import clsx from "clsx";
+import { usePathname } from "next/navigation";
 import { siteConfig } from "@/config/site";
-import { ThemeSwitch } from "@/components/theme-switch";
-import { CodeXml } from "lucide-react";
+import {
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownTrigger,
+} from "@heroui/dropdown";
+import { Button } from "@heroui/button";
 
 export const Navbar = () => {
+  const pathname = usePathname();
+  const isEditorActive = pathname.startsWith("/editor");
   return (
-    <HeroUINavbar maxWidth="xl" position="sticky">
-      <NavbarContent className="basis-1/5 sm:basis-full" justify="start">
-        <NavbarBrand as="li" className="gap-3 max-w-fit">
-          <NextLink className="flex justify-start items-center gap-1" href="/">
-            <CodeXml />
-            <p className="font-bold text-inherit">Weatherhead Scheduler</p>
+    <header className="sticky top-0 z-50 w-full border-b border-slate-200 dark:border-default-200 bg-white/80 dark:bg-default-100/80 backdrop-blur-md">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex h-16 items-center justify-between">
+          <NextLink
+            href="/"
+            className="flex items-center gap-3 cursor-pointer"
+          >
+            <div className="flex items-center justify-center size-9 rounded-lg bg-weatherhead-primary text-white">
+              <School className="size-5" />
+            </div>
+            <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-foreground">
+              Weatherhead <span className="text-weatherhead-primary">Scheduler</span>
+            </h1>
           </NextLink>
-        </NavbarBrand>
-        <ul className="hidden lg:flex gap-4 justify-start ml-2">
-          {siteConfig.navItems.map((item) => (
-            <NavbarItem key={item.href}>
-              <NextLink
-                className={clsx(
-                  linkStyles({ color: "foreground" }),
-                  "data-[active=true]:text-primary data-[active=true]:font-medium"
-                )}
-                color="foreground"
-                href={item.href}
-              >
-                {item.label}
-              </NextLink>
-            </NavbarItem>
-          ))}
-        </ul>
-      </NavbarContent>
 
-      <NavbarContent
-        className="hidden sm:flex basis-1/5 sm:basis-full"
-        justify="end"
-      >
-        <NavbarItem className="hidden sm:flex gap-2">
-          <ThemeSwitch />
-        </NavbarItem>
-      </NavbarContent>
+          <nav className="hidden md:flex items-center gap-1">
+            <Dropdown>
+              <DropdownTrigger>
+                <Button
+                  variant="light"
+                  className={clsx(
+                    "px-4 py-2 text-sm font-semibold rounded-lg transition-colors",
+                    isEditorActive
+                      ? "bg-weatherhead-primary/10 text-weatherhead-primary dark:bg-weatherhead-primary/20"
+                      : "text-slate-600 dark:text-default-500 hover:text-weatherhead-primary hover:bg-slate-100 dark:hover:bg-default-50",
+                  )}
+                  endContent={<ChevronDown className="size-4" />}
+                >
+                  Editor
+                </Button>
+              </DropdownTrigger>
+              <DropdownMenu aria-label="Editor pages">
+                {siteConfig.editorItems.map((item) => (
+                  <DropdownItem key={item.href} href={item.href}>
+                    {item.label}
+                  </DropdownItem>
+                ))}
+              </DropdownMenu>
+            </Dropdown>
 
-      <NavbarContent className="sm:hidden basis-1 pl-4" justify="end">
-        <ThemeSwitch />
-        <NavbarMenuToggle />
-      </NavbarContent>
+            <NextLink
+              href="/calendar"
+              className={clsx(
+                "px-4 py-2 text-sm font-semibold rounded-lg transition-colors flex items-center gap-2",
+                pathname === "/calendar"
+                  ? "bg-weatherhead-primary/10 text-weatherhead-primary dark:bg-weatherhead-primary/20"
+                  : "text-slate-600 dark:text-default-500 hover:text-weatherhead-primary hover:bg-slate-100 dark:hover:bg-default-50",
+              )}
+            >
+              <CalendarIcon className="size-4" />
+              Calendar
+            </NextLink>
+          </nav>
 
-      <NavbarMenu>
-        <div className="mx-4 mt-2 flex flex-col gap-2">
-          {siteConfig.navMenuItems.map((item, index) => (
-            <NavbarMenuItem key={`${item}-${index}`}>
-              <Link
-                color={
-                  index === 2
-                    ? "primary"
-                    : index === siteConfig.navMenuItems.length - 1
-                      ? "danger"
-                      : "foreground"
-                }
-                href="#"
-                size="lg"
-              >
-                {item.label}
-              </Link>
-            </NavbarMenuItem>
-          ))}
+          <div className="flex items-center gap-2" />
         </div>
-      </NavbarMenu>
-    </HeroUINavbar>
+      </div>
+    </header>
   );
 };

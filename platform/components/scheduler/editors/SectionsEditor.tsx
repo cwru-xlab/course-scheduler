@@ -9,6 +9,7 @@ import { EditableSelectCell } from "../EditableSelectCell";
 import { MultiSelect } from "../MultiSelect";
 
 import type { Section } from "@/lib/scheduling/types";
+import { nextIntegerId } from "@/lib/scheduling/nextId";
 
 type SectionsEditorProps = {
   sections: Section[];
@@ -18,8 +19,8 @@ type SectionsEditorProps = {
   onUpdate: (sections: Section[]) => void;
 };
 
-const createEmptySection = (): Section => ({
-  id: `SEC-NEW-${Date.now()}`,
+const createEmptySection = (existing: Section[]): Section => ({
+  id: nextIntegerId(existing.map((s) => s.id)),
   course_id: "",
   section_code: "A",
   instructor_id: "",
@@ -45,7 +46,7 @@ export const SectionsEditor = ({
   };
 
   const addSection = () => {
-    onUpdate([...sections, createEmptySection()]);
+    onUpdate([...sections, createEmptySection(sections)]);
   };
 
   const deleteSection = (index: number) => {
