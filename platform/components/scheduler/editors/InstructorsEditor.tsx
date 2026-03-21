@@ -34,6 +34,7 @@ const DAY_OPTIONS = [
 
 const createEmptyInstructor = (existing: Instructor[]): Instructor => ({
   id: nextIntegerId(existing.map((i) => i.id)),
+  name: "",
   rank_type: "NTT",
   unavailable_times: [],
   preferences: {
@@ -83,6 +84,7 @@ export const InstructorsEditor = ({
           <thead className="text-left text-default-500">
             <tr>
               <th className="pb-2 pr-3">ID</th>
+              <th className="pb-2 pr-3">Name</th>
               <th className="pb-2 pr-3">Rank</th>
               <th className="pb-2 pr-3">Unavailable Times</th>
               <th className="pb-2 pr-3">Preferred Days</th>
@@ -96,6 +98,9 @@ export const InstructorsEditor = ({
               <tr key={`${inst.id}-${idx}`} className="border-t border-default-200">
                 <td className="py-2 pr-3">
                   <EditableCell value={inst.id} onChange={(v) => updateInstructor(idx, "id", v)} />
+                </td>
+                <td className="py-2 pr-3">
+                  <EditableCell value={inst.name} onChange={(v) => updateInstructor(idx, "name", v)} />
                 </td>
                 <td className="py-2 pr-3">
                   <EditableSelectCell

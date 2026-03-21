@@ -4,6 +4,7 @@ import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 
 import { EditableCell } from "../EditableCell";
+import { EditableSelectCell } from "../EditableSelectCell";
 import { MultiSelect } from "../MultiSelect";
 
 import type { Timeslot } from "@/lib/scheduling/types";
@@ -40,6 +41,60 @@ const splitDays = (raw: string | string[] | undefined): string[] => {
     .map((s) => s.trim())
     .filter(Boolean);
 };
+
+const HHMM_FALLBACK = "09:00";
+const MIN_TIME = "09:00";
+const MAX_TIME = "21:00";
+
+const toTimeOnly = (value: string | undefined): string => {
+  if (!value) return HHMM_FALLBACK;
+  if (value.includes("T")) {
+    const timePart = value.split("T")[1] ?? HHMM_FALLBACK;
+    return timePart.slice(0, 5);
+  }
+  return value.slice(0, 5);
+};
+
+const fromTimeOnly = (value: string): string => {
+  if (!value) return HHMM_FALLBACK;
+  return value.slice(0, 5);
+};
+
+const clampTimeToBounds = (hhmm: string): string => {
+  if (!hhmm) return HHMM_FALLBACK;
+  const toMinutes = (value: string) => {
+    const [h, m] = value.split(":").map((x) => parseInt(x, 10));
+    return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+  };
+  const toHHMM = (mins: number) => {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+  };
+  const min = toMinutes(MIN_TIME);
+  const max = toMinutes(MAX_TIME);
+  const val = toMinutes(hhmm);
+  if (val < min) return MIN_TIME;
+  if (val > max) return MAX_TIME;
+  return toHHMM(val);
+};
+
+const TIME_OPTIONS = (() => {
+  const options: { key: string; label: string }[] = [];
+  for (let minutes = 9 * 60; minutes <= 21 * 60; minutes += 5) {
+    const h24 = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    const hh = h24.toString().padStart(2, "0");
+    const mm = mins.toString().padStart(2, "0");
+    const suffix = h24 >= 12 ? "PM" : "AM";
+    const h12 = ((h24 + 11) % 12) + 1;
+    options.push({
+      key: `${hh}:${mm}`,
+      label: `${h12}:${mm} ${suffix}`,
+    });
+  }
+  return options;
+})();
 
 export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) => {
   const updateTimeslot = (index: number, field: keyof Timeslot, value: unknown) => {
@@ -90,10 +145,22 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
                   />
                 </td>
                 <td className="py-2 pr-3">
-                  <EditableCell value={slot.start_time} onChange={(v) => updateTimeslot(idx, "start_time", v)} placeholder="HH:MM" />
+                  <EditableSelectCell
+                    value={clampTimeToBounds(toTimeOnly(slot.start_time))}
+                    options={TIME_OPTIONS}
+                    onChange={(v) => updateTimeslot(idx, "start_time", fromTimeOnly(v))}
+                    placeholder="Select time"
+                    isSearchable
+                  />
                 </td>
                 <td className="py-2 pr-3">
-                  <EditableCell value={slot.end_time} onChange={(v) => updateTimeslot(idx, "end_time", v)} placeholder="HH:MM" />
+                  <EditableSelectCell
+                    value={clampTimeToBounds(toTimeOnly(slot.end_time))}
+                    options={TIME_OPTIONS}
+                    onChange={(v) => updateTimeslot(idx, "end_time", fromTimeOnly(v))}
+                    placeholder="Select time"
+                    isSearchable
+                  />
                 </td>
                 <td className="py-2 pr-3">
                   <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteTimeslot(idx)}>

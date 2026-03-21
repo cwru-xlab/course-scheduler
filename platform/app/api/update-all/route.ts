@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import type { SchedulingInput } from "@/lib/scheduling/types";
 
-const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:8000";
+const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:5001";
 
 export async function POST(request: NextRequest) {
   try {
@@ -81,8 +81,7 @@ export async function POST(request: NextRequest) {
     {
       const payload = instructors.map((inst) => ({
         id: inst.id,
-        // Front-end type does not include name; use id as a readable default.
-        name: inst.id,
+        name: inst.name || inst.id,
         rank_type: inst.rank_type,
         preferences: {
           preferred_times: [], // Not modeled on the frontend; keep empty.

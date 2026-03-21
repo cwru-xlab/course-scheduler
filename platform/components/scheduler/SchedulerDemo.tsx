@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@heroui/button";
 import { Tabs, Tab } from "@heroui/tabs";
 import clsx from "clsx";
@@ -32,7 +33,10 @@ type ApiError = {
   };
 };
 
+const LAST_SOLVER_RUN_STORAGE_KEY = "wsom-last-solver-run";
+
 export const SchedulerDemo = () => {
+  const router = useRouter();
   const {
     data,
     isLoading,
@@ -65,7 +69,11 @@ export const SchedulerDemo = () => {
   );
 
   const instructorOptions = useMemo(
-    () => data?.instructors.map((i) => ({ key: i.id, label: `${i.id} (${i.rank_type})` })) ?? [],
+    () =>
+      data?.instructors.map((i) => ({
+        key: i.id,
+        label: `${i.name || i.id} (${i.rank_type})`,
+      })) ?? [],
     [data]
   );
 
@@ -150,6 +158,17 @@ export const SchedulerDemo = () => {
         }
       } else {
         setSolution(result);
+        if (typeof window !== "undefined") {
+          localStorage.setItem(
+            LAST_SOLVER_RUN_STORAGE_KEY,
+            JSON.stringify({
+              input: data,
+              solution: result,
+              createdAt: new Date().toISOString(),
+            }),
+          );
+        }
+        router.push("/calendar");
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to reach solver API.";
@@ -387,7 +406,7 @@ export const SchedulerDemo = () => {
           className="flex items-center gap-2 bg-weatherhead-primary text-white font-bold shadow-lg shadow-weatherhead-primary/20 hover:opacity-90 transition-all"
           onPress={runSolver}
           isLoading={solverStatus === "loading"}
-          startContent={!solverStatus ? <Rocket className="size-4" /> : undefined}
+          startContent={solverStatus === "idle" ? <Rocket className="size-4" /> : undefined}
         >
           Run Solver
         </Button>

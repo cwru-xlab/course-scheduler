@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { Button } from "@heroui/button";
-import { Rocket } from "lucide-react";
 
 import { SectionsEditor } from "@/components/scheduler/editors/SectionsEditor";
+import { SolverActionButton } from "@/components/scheduler/SolverActionButton";
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 
 export default function SectionsPage() {
@@ -15,7 +15,11 @@ export default function SectionsPage() {
   >("idle");
 
   const instructorOptions = useMemo(
-    () => data?.instructors.map((i) => ({ key: i.id, label: i.id })) ?? [],
+    () =>
+      data?.instructors.map((i) => ({
+        key: i.id,
+        label: i.name ? `${i.name} (${i.id})` : i.id,
+      })) ?? [],
     [data],
   );
   const meetingPatternOptions = useMemo(
@@ -77,14 +81,18 @@ export default function SectionsPage() {
           >
             Update Backend
           </Button>
-          <Button
-            variant="flat"
-            className="font-bold"
-            startContent={<Rocket className="size-4" />}
-          >
-            Run Solver
-          </Button>
+          <SolverActionButton data={data} />
         </div>
+        {updateStatus === "success" && (
+          <p className="w-full text-sm text-emerald-600 font-semibold">
+            Backend updated successfully. Changes are stored in solver tables.
+          </p>
+        )}
+        {updateStatus === "error" && (
+          <p className="w-full text-sm text-red-600 font-semibold">
+            Backend update failed. Verify solver service is running on port 5001.
+          </p>
+        )}
       </div>
 
       <SectionsEditor

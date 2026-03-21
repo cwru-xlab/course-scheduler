@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@heroui/button";
 
 import { MeetingPatternsEditor } from "@/components/scheduler/editors/MeetingPatternsEditor";
+import { SolverActionButton } from "@/components/scheduler/SolverActionButton";
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 
 export default function MeetingPatternsPage() {
@@ -56,13 +57,26 @@ export default function MeetingPatternsPage() {
             Define allowed days and compatible timeslot sets.
           </p>
         </div>
-        <Button
-          className="bg-weatherhead-primary text-white font-bold shadow-lg shadow-weatherhead-primary/20 hover:opacity-90"
-          onPress={updateBackend}
-          isLoading={updateStatus === "loading"}
-        >
-          Update Backend
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            className="bg-weatherhead-primary text-white font-bold shadow-lg shadow-weatherhead-primary/20 hover:opacity-90"
+            onPress={updateBackend}
+            isLoading={updateStatus === "loading"}
+          >
+            Update Backend
+          </Button>
+          <SolverActionButton data={data} />
+        </div>
+        {updateStatus === "success" && (
+          <p className="w-full text-sm text-emerald-600 font-semibold">
+            Backend updated successfully. Changes are stored in solver tables.
+          </p>
+        )}
+        {updateStatus === "error" && (
+          <p className="w-full text-sm text-red-600 font-semibold">
+            Backend update failed. Verify solver service is running on port 5001.
+          </p>
+        )}
       </div>
 
       <MeetingPatternsEditor

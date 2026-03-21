@@ -16,6 +16,7 @@ export type Section = {
 
 export type Instructor = {
   id: Id;
+  name: string;
   rank_type: "TT" | "Tenured" | "NTT" | "Adjunct";
   unavailable_times: Id[];
   preferences: {

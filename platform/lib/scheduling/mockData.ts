@@ -66,6 +66,7 @@ export const mockSchedulingInput: SchedulingInput = {
   instructors: [
     {
       id: "INST-ALPHA",
+      name: "Alice Johnson",
       rank_type: "Tenured",
       unavailable_times: [],
       preferences: {
@@ -76,6 +77,7 @@ export const mockSchedulingInput: SchedulingInput = {
     },
     {
       id: "INST-BETA",
+      name: "Brian Lee",
       rank_type: "Adjunct",
       unavailable_times: [],
       preferences: {
@@ -86,6 +88,7 @@ export const mockSchedulingInput: SchedulingInput = {
     },
     {
       id: "INST-GAMMA",
+      name: "Grace Kim",
       rank_type: "TT",
       unavailable_times: [],
       preferences: {
@@ -95,6 +98,7 @@ export const mockSchedulingInput: SchedulingInput = {
     },
     {
       id: "INST-DELTA",
+      name: "Daniel Park",
       rank_type: "NTT",
       unavailable_times: [],
       preferences: {
@@ -107,18 +111,21 @@ export const mockSchedulingInput: SchedulingInput = {
     {
       id: "ROOM-A",
       building: "Peters",
+      room_number: "A-101",
       capacity: 60,
       features: ["projector", "case_room"],
     },
     {
       id: "ROOM-B",
       building: "Smith",
+      room_number: "B-204",
       capacity: 40,
       features: ["projector"],
     },
     {
       id: "ROOM-C",
       building: "Smith",
+      room_number: "C-110",
       capacity: 25,
       features: [],
     },

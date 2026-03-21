@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import type { Section } from "@/lib/scheduling/types";
 
-const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:8000";
+const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:5001";
 
 type UpdateSectionsBody = {
   sections: Section[];
