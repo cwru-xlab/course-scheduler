@@ -5,6 +5,7 @@ import { Button } from "@heroui/button";
 
 import { SectionsEditor } from "@/components/scheduler/editors/SectionsEditor";
 import { SolverActionButton } from "@/components/scheduler/SolverActionButton";
+import { EditorPageTitleDropdown } from "@/components/scheduler/EditorPageTitleDropdown";
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 
 export default function SectionsPage() {
@@ -13,6 +14,7 @@ export default function SectionsPage() {
   const [updateStatus, setUpdateStatus] = useState<
     "idle" | "loading" | "success" | "error"
   >("idle");
+  const [updateErrorMessage, setUpdateErrorMessage] = useState<string | null>(null);
 
   const instructorOptions = useMemo(
     () =>
@@ -38,20 +40,31 @@ export default function SectionsPage() {
   const updateBackend = async () => {
     if (!data) return;
     setUpdateStatus("loading");
+    setUpdateErrorMessage(null);
     try {
       const response = await fetch("/api/update-all", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      const result = await response.json();
+      const result = (await response.json()) as {
+        status?: string;
+        errors?: { code?: string; message?: string }[];
+      };
       if (!response.ok || result.status === "error") {
+        const details =
+          result.errors?.map((e) => e?.message).filter(Boolean).join(" | ") ??
+          `Request failed with status ${response.status}.`;
+        setUpdateErrorMessage(details);
         setUpdateStatus("error");
         return;
       }
       await reloadFromBackend();
       setUpdateStatus("success");
-    } catch {
+    } catch (err) {
+      setUpdateErrorMessage(
+        err instanceof Error ? err.message : "Unexpected error during backend sync.",
+      );
       setUpdateStatus("error");
     } finally {
       setTimeout(() => setUpdateStatus("idle"), 3000);
@@ -66,9 +79,7 @@ export default function SectionsPage() {
     <div className="space-y-6">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">
-            Sections
-          </h1>
+          <EditorPageTitleDropdown current="sections" title="Sections" />
           <p className="text-slate-500 mt-1">
             Add/edit sections, then sync to backend.
           </p>
@@ -90,7 +101,7 @@ export default function SectionsPage() {
         )}
         {updateStatus === "error" && (
           <p className="w-full text-sm text-red-600 font-semibold">
-            Backend update failed. Verify solver service is running on port 5001.
+            Backend update failed. {updateErrorMessage ?? "Verify solver service is running on port 5001."}
           </p>
         )}
       </div>

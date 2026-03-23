@@ -11,6 +11,7 @@ import {
   SoftLocksEditor,
 } from "@/components/scheduler/editors/ConstraintsEditors";
 import { SolverActionButton } from "@/components/scheduler/SolverActionButton";
+import { EditorPageTitleDropdown } from "@/components/scheduler/EditorPageTitleDropdown";
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 
 export default function ConstraintsPage() {
@@ -70,9 +71,7 @@ export default function ConstraintsPage() {
     <div className="space-y-6">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">
-            Constraints
-          </h1>
+          <EditorPageTitleDropdown current="constraints" title="Constraints" />
           <p className="text-slate-500 mt-1">
             Cross-lists, no-overlap groups, blocked times, and locks.
           </p>

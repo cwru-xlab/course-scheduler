@@ -85,19 +85,35 @@ const DAY_LETTER: Record<Day, string> = {
 };
 
 function timeslotMatchesDay(timeslot: TimeslotDto, selected: Day): boolean {
-  const raw = (timeslot.days ?? timeslot.day ?? "").toString();
-  const normalized = raw.toLowerCase();
-  const selectedLower = selected.toLowerCase();
+  const raw = (timeslot.days ?? timeslot.day ?? "").toString().trim();
+  if (!raw) return false;
 
-  // Common cases: "Mon", "Tue", etc
-  if (normalized.includes(selectedLower)) return true;
+  // Canonical aliases (full names + abbreviations) for exact token matching.
+  const aliasesByDay: Record<Day, string[]> = {
+    Mon: ["mon", "monday", "m"],
+    Tue: ["tue", "tues", "tuesday", "tu", "t"],
+    Wed: ["wed", "weds", "wednesday", "w"],
+    Thu: ["thu", "thur", "thur", "thurs", "thursday", "th", "r"],
+    Fri: ["fri", "friday", "f"],
+  };
+  const selectedAliases = new Set(aliasesByDay[selected]);
 
-  // Compact cases: "MWF", "TR"
-  const letter = DAY_LETTER[selected].toLowerCase();
-  if (normalized.includes(letter)) return true;
+  // Tokenized input handles forms like "Mon/Wed", "Tue,Thu", "Thursday".
+  const tokens = raw
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .map((t) => t.trim())
+    .filter(Boolean);
 
-  // If someone uses "th" for Thu
-  if (selected === "Thu" && normalized.includes("th")) return true;
+  for (const token of tokens) {
+    if (selectedAliases.has(token)) return true;
+  }
+
+  // Compact letter form only (e.g. "MWF", "TR"), but avoid words like "fri".
+  const compact = raw.toUpperCase().replace(/[^A-Z]/g, "");
+  if (/^[MTWRFSU]+$/.test(compact)) {
+    return compact.includes(DAY_LETTER[selected]);
+  }
 
   return false;
 }

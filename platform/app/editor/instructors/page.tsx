@@ -5,6 +5,7 @@ import { Button } from "@heroui/button";
 
 import { InstructorsEditor } from "@/components/scheduler/editors/InstructorsEditor";
 import { SolverActionButton } from "@/components/scheduler/SolverActionButton";
+import { EditorPageTitleDropdown } from "@/components/scheduler/EditorPageTitleDropdown";
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 
 export default function InstructorsPage() {
@@ -58,9 +59,7 @@ export default function InstructorsPage() {
     <div className="space-y-6">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">
-            Instructors
-          </h1>
+          <EditorPageTitleDropdown current="instructors" title="Instructors" />
           <p className="text-slate-500 mt-1">
             Add/edit instructors and preferences.
           </p>

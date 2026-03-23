@@ -9,6 +9,21 @@ import type { SchedulingInput, ValidationError } from "@/lib/scheduling/types";
 type SolverDiagnostics = {
   feasible_if_relax?: string[];
   feasible_if_remove_section?: string[];
+  error_codes?: string[];
+  referenced_sections?: string[];
+  busiest_instructors?: { instructor_id: string; section_count: number }[];
+  sections_exceeding_room_capacity?: {
+    section_id: string;
+    expected_enrollment: number;
+    max_room_capacity: number;
+  }[];
+  most_constrained_sections?: {
+    section_id: string;
+    course_id?: string;
+    instructor_id?: string;
+    option_count: number;
+    expected_enrollment?: number;
+  }[];
 };
 
 type StoredSolverError = {
@@ -108,7 +123,52 @@ export default function SolverErrorsPage() {
               <span className="font-semibold">Feasible if remove section:</span>{" "}
               {(stored.diagnostics.feasible_if_remove_section ?? []).join(", ") || "None"}
             </div>
+            <div>
+              <span className="font-semibold">Error codes:</span>{" "}
+              {(stored.diagnostics.error_codes ?? []).join(", ") || "None"}
+            </div>
+            <div>
+              <span className="font-semibold">Referenced sections:</span>{" "}
+              {(stored.diagnostics.referenced_sections ?? []).join(", ") || "None"}
+            </div>
           </div>
+          {(stored.diagnostics.sections_exceeding_room_capacity ?? []).length > 0 && (
+            <div className="mt-5">
+              <h3 className="text-sm font-bold text-slate-900">Sections Exceeding All Room Capacities</h3>
+              <ul className="mt-2 space-y-1 text-sm text-slate-700">
+                {stored.diagnostics.sections_exceeding_room_capacity?.map((x) => (
+                  <li key={`capacity-${x.section_id}`}>
+                    {x.section_id}: enrollment {x.expected_enrollment} &gt; max room capacity {x.max_room_capacity}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {(stored.diagnostics.most_constrained_sections ?? []).length > 0 && (
+            <div className="mt-5">
+              <h3 className="text-sm font-bold text-slate-900">Most Constrained Sections (fewest valid options)</h3>
+              <ul className="mt-2 space-y-1 text-sm text-slate-700">
+                {stored.diagnostics.most_constrained_sections?.slice(0, 8).map((x) => (
+                  <li key={`constrained-${x.section_id}`}>
+                    {x.section_id} ({x.course_id ?? "unknown course"}) - options: {x.option_count}
+                    {x.instructor_id ? `, instructor: ${x.instructor_id}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {(stored.diagnostics.busiest_instructors ?? []).length > 0 && (
+            <div className="mt-5">
+              <h3 className="text-sm font-bold text-slate-900">Busiest Instructors (section count)</h3>
+              <ul className="mt-2 space-y-1 text-sm text-slate-700">
+                {stored.diagnostics.busiest_instructors?.slice(0, 8).map((x) => (
+                  <li key={`busy-${x.instructor_id}`}>
+                    {x.instructor_id}: {x.section_count}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 

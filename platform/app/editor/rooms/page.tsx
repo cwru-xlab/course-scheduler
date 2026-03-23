@@ -5,6 +5,7 @@ import { Button } from "@heroui/button";
 
 import { RoomsEditor } from "@/components/scheduler/editors/RoomsEditor";
 import { SolverActionButton } from "@/components/scheduler/SolverActionButton";
+import { EditorPageTitleDropdown } from "@/components/scheduler/EditorPageTitleDropdown";
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 
 export default function RoomsPage() {
@@ -45,9 +46,7 @@ export default function RoomsPage() {
     <div className="space-y-6">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">
-            Rooms
-          </h1>
+          <EditorPageTitleDropdown current="rooms" title="Rooms" />
           <p className="text-slate-500 mt-1">Add/edit rooms and features.</p>
         </div>
         <div className="flex items-center gap-2">

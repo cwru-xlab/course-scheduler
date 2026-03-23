@@ -44,17 +44,36 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json().catch(() => ({}));
+      const raw = await response.text();
+      let data: Record<string, unknown> = {};
+      try {
+        data = JSON.parse(raw) as Record<string, unknown>;
+      } catch {
+        data = { raw };
+      }
 
       if (!response.ok || data.status === "error") {
-        const errors =
-          data?.errors ??
-          [
-            {
-              code: "update_failed",
-              message: `Backend failed during ${path} update.`,
-            },
-          ];
+        const normalizedErrors = Array.isArray(data?.errors)
+          ? data.errors
+          : [
+              {
+                code: "update_failed",
+                message:
+                  typeof data.raw === "string" && data.raw.length > 0
+                    ? `Backend failed during ${path} update. ${data.raw.slice(0, 240)}`
+                    : `Backend failed during ${path} update.`,
+              },
+            ];
+        const errors = normalizedErrors.map((err) => {
+          const message =
+            typeof err?.message === "string"
+              ? `[${path}] ${err.message}`
+              : `[${path}] Backend update failed.`;
+          return {
+            code: typeof err?.code === "string" ? err.code : "update_failed",
+            message,
+          };
+        });
 
         return {
           ok: false as const,
@@ -85,10 +104,10 @@ export async function POST(request: NextRequest) {
         rank_type: inst.rank_type,
         preferences: {
           preferred_times: [], // Not modeled on the frontend; keep empty.
-          preferred_days: inst.preferences.preferred_days ?? [],
-          preferred_patterns: inst.preferences.preferred_patterns ?? [],
+          preferred_days: inst.preferences?.preferred_days ?? [],
+          preferred_patterns: inst.preferences?.preferred_patterns ?? [],
           unavailable_times: inst.unavailable_times ?? [],
-          max_teaching_days: inst.preferences.max_teaching_days,
+          max_teaching_days: inst.preferences?.max_teaching_days,
         },
       }));
 
@@ -136,7 +155,7 @@ export async function POST(request: NextRequest) {
     {
       const payload = timeslots.map((slot) => ({
         id: slot.id,
-        days: slot.day,
+        days: slot.day ?? slot.days,
         start_time: slot.start_time,
         end_time: slot.end_time,
         slot_type: "standard",

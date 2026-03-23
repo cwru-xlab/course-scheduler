@@ -5,6 +5,7 @@ import { Button } from "@heroui/button";
 
 import { MeetingPatternsEditor } from "@/components/scheduler/editors/MeetingPatternsEditor";
 import { SolverActionButton } from "@/components/scheduler/SolverActionButton";
+import { EditorPageTitleDropdown } from "@/components/scheduler/EditorPageTitleDropdown";
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 
 export default function MeetingPatternsPage() {
@@ -50,9 +51,7 @@ export default function MeetingPatternsPage() {
     <div className="space-y-6">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">
-            Meeting Patterns
-          </h1>
+          <EditorPageTitleDropdown current="meeting-patterns" title="Meeting Patterns" />
           <p className="text-slate-500 mt-1">
             Define allowed days and compatible timeslot sets.
           </p>

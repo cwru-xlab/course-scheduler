@@ -618,12 +618,14 @@ class ScheduleAssignment(db.Model):
     __tablename__ = "schedule_assignments"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    solution_id = Column(Integer, ForeignKey("schedule_solutions.id"), nullable=True)
     section_id = Column(String, ForeignKey("sections.id"), nullable=False)
     meeting_pattern_id = Column(String, ForeignKey("meeting_patterns.id"), nullable=False)
     timeslot_ids = Column(JSON, nullable=False)  # List[str] - assigned timeslot IDs
     room_id = Column(String, ForeignKey("rooms.id"), nullable=False)  # Assigned room
 
     # Relationships to related models
+    solution = relationship("ScheduleSolution", back_populates="assignments_rel")
     section = relationship("Section", backref="schedule_assignments")
     meeting_pattern = relationship("MeetingPattern", backref="schedule_assignments")
     room = relationship("Room", backref="schedule_assignments")
@@ -654,7 +656,7 @@ class ScheduleSolution(db.Model):
     created_at = Column(DateTime, default=datetime.utcnow)  # Timestamp of when solution was created
 
     # One-to-many: One solution contains many assignments
-    assignments_rel = relationship("ScheduleAssignment", backref="solution")
+    assignments_rel = relationship("ScheduleAssignment", back_populates="solution")
 
     def to_dict(self):
         return {
