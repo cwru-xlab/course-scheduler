@@ -530,7 +530,7 @@ export default function CalendarPage() {
         boundaries.add(parseMinutes(slot.start_time));
         boundaries.add(parseMinutes(slot.end_time));
       });
-    return [...boundaries]
+    return Array.from(boundaries)
       .filter((m) => m >= axisStart && m <= axisEnd)
       .sort((a, b) => a - b);
   }, [data, selectedDay, axisStart, axisEnd]);
@@ -582,7 +582,7 @@ export default function CalendarPage() {
       }
       return id;
     });
-    const uniqueNextTimeslotIds = [...new Set(nextTimeslotIds)];
+    const uniqueNextTimeslotIds = Array.from(new Set(nextTimeslotIds));
 
     const nextInput = JSON.parse(JSON.stringify(solverInput)) as SchedulingInput;
     const otherLocks = nextInput.locked_assignments.filter(
