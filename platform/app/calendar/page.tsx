@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
 import {
@@ -24,6 +24,8 @@ type TimeslotDto = {
   end_time: string;
   slot_type?: string;
 };
+
+type TimeslotWithMinutes = TimeslotDto & { start: number; end: number };
 
 type InstructorDto = {
   id: string;
@@ -162,6 +164,26 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
+function selectSlotNearMinutes(
+  timeslots: TimeslotDto[],
+  selectedDay: Day,
+  durationMinutes: number,
+  dropMinutes: number,
+): TimeslotWithMinutes | null {
+  const daySlots = timeslots
+    .filter((slot) => timeslotMatchesDay(slot, selectedDay))
+    .map((slot) => ({
+      ...slot,
+      start: parseMinutes(slot.start_time),
+      end: parseMinutes(slot.end_time),
+    }))
+    .filter((slot) => Math.abs(slot.end - slot.start - durationMinutes) <= 5);
+  if (daySlots.length === 0) return null;
+  return daySlots.sort(
+    (a, b) => Math.abs(a.start - dropMinutes) - Math.abs(b.start - dropMinutes),
+  )[0];
+}
+
 const EVENT_HEIGHT_PX = 70;
 const EVENT_GAP_PX = 8;
 const EVENT_TOP_PADDING_PX = 12;
@@ -235,12 +257,33 @@ export default function CalendarPage() {
   const [solverTimeslotIdsBySection, setSolverTimeslotIdsBySection] = useState<
     Record<string, string[]>
   >({});
-  const [draggedSectionId, setDraggedSectionId] = useState<string | null>(null);
   const [dragError, setDragError] = useState<string | null>(null);
   const [dragFeedback, setDragFeedback] = useState<{
     status: "neutral" | "valid" | "invalid";
     message: string | null;
   }>({ status: "neutral", message: null });
+  /** Pointer-driven drag: no HTML5 ghost; block snaps on the grid. */
+  type CalendarDragPreview = {
+    targetRoomId: string;
+    slotId: string;
+    startMin: number;
+    endMin: number;
+  };
+  type CalendarDragState = {
+    sectionId: string;
+    pointerId: number;
+    startX: number;
+    startY: number;
+    hasMoved: boolean;
+    originLane: number;
+    preview: CalendarDragPreview;
+  };
+  const [calendarDrag, setCalendarDrag] = useState<CalendarDragState | null>(null);
+  const roomTrackRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const suppressCardClickRef = useRef(false);
+  const setRoomTrackRef = useCallback((roomId: string, el: HTMLDivElement | null) => {
+    roomTrackRefs.current[roomId] = el;
+  }, []);
   const [isSavingBackend, setIsSavingBackend] = useState(false);
   const [backendSaveMessage, setBackendSaveMessage] = useState<{
     type: "success" | "error";
@@ -646,117 +689,109 @@ export default function CalendarPage() {
       .sort((a, b) => a - b);
   }, [data, selectedDay, axisStart, axisEnd]);
 
-  const handleDropOnRoomRow = (event: React.DragEvent<HTMLDivElement>, targetRoomId: string) => {
-    event.preventDefault();
-    if (!data || !draggedSectionId) return;
+  const commitCalendarPlacement = useCallback(
+    (sectionId: string, targetRoomId: string, selectedSlot: TimeslotWithMinutes) => {
+      if (!data) return;
+      const dragged = dayEvents.find((x) => x.section.id === sectionId && x.timeslot);
+      if (!dragged || !dragged.timeslot) return;
 
-    const dragged = dayEvents.find((x) => x.section.id === draggedSectionId && x.timeslot);
-    if (!dragged || !dragged.timeslot) return;
-
-    const rowRect = event.currentTarget.getBoundingClientRect();
-    const x = event.clientX - rowRect.left;
-    const pct = clamp(x / rowRect.width, 0, 1);
-    const dropMinutes = axisStart + pct * axisRange;
-    const duration = dragged.end - dragged.start;
-
-    const daySlots = data.timeslots
-      .filter((slot) => timeslotMatchesDay(slot, selectedDay))
-      .map((slot) => ({
-        ...slot,
-        start: parseMinutes(slot.start_time),
-        end: parseMinutes(slot.end_time),
-      }))
-      .filter((slot) => Math.abs(slot.end - slot.start - duration) <= 5);
-
-    const selectedSlot = daySlots.sort(
-      (a, b) => Math.abs(a.start - dropMinutes) - Math.abs(b.start - dropMinutes),
-    )[0];
-
-    if (!selectedSlot) {
-      setDragFeedback({
-        status: "invalid",
-        message: `Unable to place ${dragged.section.course_id}: no compatible ${selectedDay} timeslot found for this class duration.`,
-      });
-      setDraggedSectionId(null);
-      return;
-    }
-
-    const currentAssignment = assignmentsBySection[draggedSectionId];
-    const currentRoomId = currentAssignment?.room_id ?? dragged.section.room_id ?? "";
-    const targetRoom = data.rooms.find((room) => room.id === targetRoomId);
-    const requiredSeats =
-      dragged.section.enrollment_cap ??
-      dragged.section.expected_enrollment ??
-      0;
-    if (
-      targetRoomId !== currentRoomId &&
-      Number.isFinite(targetRoom?.capacity) &&
-      requiredSeats > (targetRoom?.capacity ?? 0)
-    ) {
-      setDragFeedback({
-        status: "invalid",
-        message: `Invalid: ${dragged.section.department ?? ""} ${dragged.section.course_id} requires ${requiredSeats} seats, but room ${targetRoomId} capacity is ${targetRoom?.capacity}.`,
-      });
-      setDraggedSectionId(null);
-      return;
-    }
-
-    const currentTimeslotIds =
-      currentAssignment?.timeslot_ids ??
-      (dragged.section.timeslot_id ? [dragged.section.timeslot_id] : []);
-
-    const nextTimeslotIds = currentTimeslotIds.map((id) => {
-      const slot = timeslotById.get(id);
-      if (slot && timeslotMatchesDay(slot, selectedDay)) {
-        return selectedSlot.id;
+      const currentAssignment = assignmentsBySection[sectionId];
+      const currentRoomId = currentAssignment?.room_id ?? dragged.section.room_id ?? "";
+      const targetRoom = data.rooms.find((room) => room.id === targetRoomId);
+      const requiredSeats =
+        dragged.section.enrollment_cap ?? dragged.section.expected_enrollment ?? 0;
+      if (
+        targetRoomId !== currentRoomId &&
+        Number.isFinite(targetRoom?.capacity) &&
+        requiredSeats > (targetRoom?.capacity ?? 0)
+      ) {
+        setDragFeedback({
+          status: "invalid",
+          message: `Invalid: ${dragged.section.department ?? ""} ${dragged.section.course_id} requires ${requiredSeats} seats, but room ${targetRoomId} capacity is ${targetRoom?.capacity}.`,
+        });
+        return;
       }
-      return id;
-    });
-    const uniqueNextTimeslotIds = Array.from(new Set(nextTimeslotIds));
-    const nextAssignments: AssignmentMap = {
-      ...assignmentsBySection,
-      [draggedSectionId]: {
-        timeslot_ids: uniqueNextTimeslotIds,
-        room_id: targetRoomId,
-        meeting_pattern_id: currentAssignment?.meeting_pattern_id ?? "",
-      },
-    };
-    setAssignmentsBySection(nextAssignments);
-    setSolverTimeslotIdsBySection((prev) => ({
-      ...prev,
-      [draggedSectionId]: uniqueNextTimeslotIds,
-    }));
 
-    const selectedStart = parseMinutes(selectedSlot.start_time);
-    const selectedEnd = parseMinutes(selectedSlot.end_time);
-    const conflicts = dayEvents.filter((eventItem) => {
-      if (eventItem.section.id === draggedSectionId) return false;
-      const itemRoomId =
-        nextAssignments[eventItem.section.id]?.room_id ?? eventItem.section.room_id ?? "";
-      if (itemRoomId !== targetRoomId) return false;
-      // Conflict if the intervals overlap in the same room on the selected day.
-      return selectedStart < eventItem.end && selectedEnd > eventItem.start;
-    });
+      const currentTimeslotIds =
+        currentAssignment?.timeslot_ids ??
+        (dragged.section.timeslot_id ? [dragged.section.timeslot_id] : []);
 
-    if (conflicts.length > 0) {
-      const conflictNames = conflicts
-        .map((c) => `${c.section.department ?? ""} ${c.section.course_id}`.trim())
-        .filter(Boolean)
-        .slice(0, 3)
-        .join(", ");
-      setDragFeedback({
-        status: "invalid",
-        message: `Invalid: ${dragged.section.department ?? ""} ${dragged.section.course_id} conflicts with ${conflictNames || "another class"} in room ${targetRoomId} at ${formatTimeAmPm(selectedSlot.start_time)}-${formatTimeAmPm(selectedSlot.end_time)}.`,
+      const nextTimeslotIds = currentTimeslotIds.map((id) => {
+        const slot = timeslotById.get(id);
+        if (slot && timeslotMatchesDay(slot, selectedDay)) {
+          return selectedSlot.id;
+        }
+        return id;
       });
-    } else {
-      setDragFeedback({
-        status: "valid",
-        message: `Valid: moved to room ${targetRoomId}, ${selectedDay} ${formatTimeAmPm(selectedSlot.start_time)}-${formatTimeAmPm(selectedSlot.end_time)}. This change can be persisted.`,
+      const uniqueNextTimeslotIds = Array.from(new Set(nextTimeslotIds));
+      const nextAssignments: AssignmentMap = {
+        ...assignmentsBySection,
+        [sectionId]: {
+          timeslot_ids: uniqueNextTimeslotIds,
+          room_id: targetRoomId,
+          meeting_pattern_id: currentAssignment?.meeting_pattern_id ?? "",
+        },
+      };
+      setAssignmentsBySection(nextAssignments);
+      setSolverTimeslotIdsBySection((prev) => ({
+        ...prev,
+        [sectionId]: uniqueNextTimeslotIds,
+      }));
+
+      const selectedStart = selectedSlot.start;
+      const selectedEnd = selectedSlot.end;
+      const conflicts = dayEvents.filter((eventItem) => {
+        if (eventItem.section.id === sectionId) return false;
+        const itemRoomId =
+          nextAssignments[eventItem.section.id]?.room_id ?? eventItem.section.room_id ?? "";
+        if (itemRoomId !== targetRoomId) return false;
+        return selectedStart < eventItem.end && selectedEnd > eventItem.start;
       });
-      setDragError(null);
-    }
-    setDraggedSectionId(null);
-  };
+
+      if (conflicts.length > 0) {
+        const conflictNames = conflicts
+          .map((c) => `${c.section.department ?? ""} ${c.section.course_id}`.trim())
+          .filter(Boolean)
+          .slice(0, 3)
+          .join(", ");
+        setDragFeedback({
+          status: "invalid",
+          message: `Invalid: ${dragged.section.department ?? ""} ${dragged.section.course_id} conflicts with ${conflictNames || "another class"} in room ${targetRoomId} at ${formatTimeAmPm(selectedSlot.start_time)}-${formatTimeAmPm(selectedSlot.end_time)}.`,
+        });
+      } else {
+        setDragFeedback({
+          status: "valid",
+          message: `Valid: moved to room ${targetRoomId}, ${selectedDay} ${formatTimeAmPm(selectedSlot.start_time)}-${formatTimeAmPm(selectedSlot.end_time)}. This change can be persisted.`,
+        });
+        setDragError(null);
+      }
+    },
+    [assignmentsBySection, data, dayEvents, selectedDay, timeslotById],
+  );
+
+  const findRoomIdAtClientY = useCallback(
+    (clientY: number): string | null => {
+      for (const { room } of roomRows) {
+        const el = roomTrackRefs.current[room.id];
+        if (!el) continue;
+        const r = el.getBoundingClientRect();
+        if (clientY >= r.top && clientY <= r.bottom) return room.id;
+      }
+      return null;
+    },
+    [roomRows],
+  );
+
+  const minutesFromPointerInRoom = useCallback(
+    (clientX: number, roomId: string): number | null => {
+      const el = roomTrackRefs.current[roomId];
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      const pct = clamp((clientX - r.left) / r.width, 0, 1);
+      return axisStart + pct * axisRange;
+    },
+    [axisRange, axisStart],
+  );
 
   const handleUpdateBackend = async () => {
     if (!solverInput || !hasValidUnsavedEdit) return;
@@ -1019,14 +1054,13 @@ export default function CalendarPage() {
                 );
               })}
             </div>
-            <div className="flex-1">
+            <div className="flex-1 relative">
               {roomRows.map(({ room, events, rowHeight }) => (
                 <div
                   key={room.id}
+                  ref={(el) => setRoomTrackRef(room.id, el)}
                   className="relative border-b border-slate-200/80 last:border-b-0"
                   style={{ minHeight: rowHeight }}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => void handleDropOnRoomRow(e, room.id)}
                 >
                   <div
                     className="absolute inset-0 grid pointer-events-none"
@@ -1039,7 +1073,7 @@ export default function CalendarPage() {
                   />
                 ))}
               </div>
-                  {draggedSectionId &&
+                  {calendarDrag?.sectionId &&
                     dayTimeslotBoundaries.map((minute) => {
                       const leftPct = ((minute - axisStart) / axisRange) * 100;
                       return (
@@ -1066,37 +1100,137 @@ export default function CalendarPage() {
                     const timeLabel = `${formatTimeAmPm(timeslot?.start_time ?? "00:00")} - ${formatTimeAmPm(timeslot?.end_time ?? "00:00")}`;
                     const color = colorClassForScheduleSection(section);
 
+                const isDragSource = calendarDrag?.sectionId === section.id;
                 return (
                   <div
-                        key={`${room.id}-${section.id}`}
+                    key={`${room.id}-${section.id}`}
                     className={clsx(
-                      "absolute border-l-4 rounded-lg p-2.5 flex flex-col justify-between cursor-pointer transition-all z-10 shadow-sm hover:shadow-md",
-                          "active:cursor-grabbing",
-                          color.bg,
-                          color.border,
-                        )}
-                        draggable={!!solverInput}
-                        onDragStart={() => {
-                          setDraggedSectionId(section.id);
-                          setDragError(null);
-                          setBackendSaveMessage(null);
-                        }}
-                        onDragEnd={() => setDraggedSectionId(null)}
+                      "absolute border-l-4 rounded-lg p-2.5 flex flex-col justify-between z-10 shadow-sm select-none",
+                      solverInput && "cursor-grab touch-none active:cursor-grabbing",
+                      !isDragSource && "hover:shadow-md",
+                      isDragSource &&
+                        calendarDrag?.hasMoved &&
+                        "opacity-[0.12] pointer-events-none",
+                      color.bg,
+                      color.border,
+                    )}
                     style={{
                       left: `${leftPct * 100}%`,
-                          width: `${Math.max(widthPct * 100, 0.5)}%`,
-                          top,
-                          height: EVENT_HEIGHT_PX,
-                        }}
-                        onClick={() =>
-                          setSelectedEvent({
-                            section,
-                            timeslot: timeslot!,
-                            room,
-                            professor: inst ?? null,
-                          })
+                      width: `${Math.max(widthPct * 100, 0.5)}%`,
+                      top,
+                      height: EVENT_HEIGHT_PX,
+                    }}
+                    title={`${title} • ${professor} • ${timeLabel} • Room ${room.id}`}
+                    onPointerDown={(e) => {
+                      if (!solverInput || e.button !== 0) return;
+                      e.stopPropagation();
+                      e.preventDefault();
+                      const targetEl = e.currentTarget;
+                      targetEl.setPointerCapture(e.pointerId);
+                      setDragError(null);
+                      setBackendSaveMessage(null);
+                      setCalendarDrag({
+                        sectionId: section.id,
+                        pointerId: e.pointerId,
+                        startX: e.clientX,
+                        startY: e.clientY,
+                        hasMoved: false,
+                        originLane: lane,
+                        preview: {
+                          targetRoomId: room.id,
+                          slotId: timeslot!.id,
+                          startMin: start,
+                          endMin: end,
+                        },
+                      });
+                    }}
+                    onPointerMove={(e) => {
+                      setCalendarDrag((prev) => {
+                        if (!prev || e.pointerId !== prev.pointerId) return prev;
+                        const dist = Math.hypot(e.clientX - prev.startX, e.clientY - prev.startY);
+                        const hasMoved = prev.hasMoved || dist > 8;
+                        if (!data) return { ...prev, hasMoved };
+                        const draggedE = dayEvents.find(
+                          (x) => x.section.id === prev.sectionId && x.timeslot,
+                        );
+                        if (!draggedE) return { ...prev, hasMoved };
+                        const duration = draggedE.end - draggedE.start;
+                        let roomId =
+                          findRoomIdAtClientY(e.clientY) ??
+                          draggedE.section.room_id ??
+                          "";
+                        if (!roomId) return { ...prev, hasMoved };
+                        const mins = minutesFromPointerInRoom(e.clientX, roomId);
+                        if (mins === null) return { ...prev, hasMoved };
+                        const slot = selectSlotNearMinutes(
+                          data.timeslots,
+                          selectedDay,
+                          duration,
+                          mins,
+                        );
+                        if (!slot) return { ...prev, hasMoved };
+                        return {
+                          ...prev,
+                          hasMoved,
+                          preview: {
+                            targetRoomId: roomId,
+                            slotId: slot.id,
+                            startMin: slot.start,
+                            endMin: slot.end,
+                          },
+                        };
+                      });
+                    }}
+                    onPointerUp={(e) => {
+                      setCalendarDrag((prev) => {
+                        if (!prev || e.pointerId !== prev.pointerId) return prev;
+                        try {
+                          (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+                        } catch {
+                          /* noop */
                         }
-                        title={`${title} • ${professor} • ${timeLabel} • Room ${room.id}`}
+                        const moved =
+                          prev.hasMoved ||
+                          Math.hypot(e.clientX - prev.startX, e.clientY - prev.startY) > 8;
+                        if (!moved) {
+                          suppressCardClickRef.current = false;
+                        } else {
+                          suppressCardClickRef.current = true;
+                          const slotFull = timeslotById.get(prev.preview.slotId);
+                          if (slotFull) {
+                            commitCalendarPlacement(prev.sectionId, prev.preview.targetRoomId, {
+                              ...slotFull,
+                              start: prev.preview.startMin,
+                              end: prev.preview.endMin,
+                            });
+                          }
+                        }
+                        return null;
+                      });
+                    }}
+                    onPointerCancel={(e) => {
+                      setCalendarDrag((prev) => {
+                        if (!prev || e.pointerId !== prev.pointerId) return prev;
+                        try {
+                          (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+                        } catch {
+                          /* noop */
+                        }
+                        return null;
+                      });
+                    }}
+                    onClick={() => {
+                      if (suppressCardClickRef.current) {
+                        suppressCardClickRef.current = false;
+                        return;
+                      }
+                      setSelectedEvent({
+                        section,
+                        timeslot: timeslot!,
+                        room,
+                        professor: inst ?? null,
+                      });
+                    }}
                   >
                       <div className="font-black text-[10px] truncate text-slate-900">
                         {title}
@@ -1110,6 +1244,52 @@ export default function CalendarPage() {
               })}
                 </div>
               ))}
+
+              {calendarDrag?.hasMoved &&
+                calendarDrag &&
+                data &&
+                (() => {
+                  const d = calendarDrag;
+                  const ix = roomRows.findIndex((rr) => rr.room.id === d.preview.targetRoomId);
+                  if (ix < 0) return null;
+                  let topPx = 0;
+                  for (let i = 0; i < ix; i += 1) topPx += roomRows[i].rowHeight;
+                  topPx +=
+                    EVENT_TOP_PADDING_PX + d.originLane * (EVENT_HEIGHT_PX + EVENT_GAP_PX);
+                  const leftPct = ((d.preview.startMin - axisStart) / axisRange) * 100;
+                  const widthPct =
+                    ((d.preview.endMin - d.preview.startMin) / axisRange) * 100;
+                  const st = timeslotById.get(d.preview.slotId);
+                  const section = data.sections.find((s) => s.id === d.sectionId);
+                  if (!section || !st) return null;
+                  const instPv = instructorById.get(section.instructor_id);
+                  const professorPv = instPv?.name ?? section.instructor_id ?? "—";
+                  const ttlPv = `${section.department} ${section.course_id}`;
+                  const timeLabelPv = `${formatTimeAmPm(st.start_time)} - ${formatTimeAmPm(st.end_time)}`;
+                  const colorPv = colorClassForScheduleSection(section);
+                  return (
+                    <div
+                      key="calendar-drag-preview"
+                      className={clsx(
+                        "absolute pointer-events-none z-[25] border-l-4 rounded-lg p-2.5 flex flex-col justify-between shadow-sm ring-2 ring-[#137fec]/40 ring-inset",
+                        colorPv.bg,
+                        colorPv.border,
+                      )}
+                      style={{
+                        left: `${leftPct}%`,
+                        width: `${Math.max(widthPct, 0.5)}%`,
+                        top: topPx,
+                        height: EVENT_HEIGHT_PX,
+                      }}
+                    >
+                      <div className="font-black text-[10px] truncate text-slate-900">{ttlPv}</div>
+                      <div className="text-[9px] font-bold leading-tight text-slate-700">
+                        <div className="truncate">{professorPv}</div>
+                        <div className="text-[8px] leading-snug truncate">{timeLabelPv}</div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
               {dayEvents.length === 0 && (
                 <div className="flex min-h-[180px] items-center justify-center text-slate-400 text-sm font-medium">
