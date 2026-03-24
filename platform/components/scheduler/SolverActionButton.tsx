@@ -99,7 +99,7 @@ export const SolverActionButton = ({ data }: { data: SchedulingInput | null }) =
     <div className="flex flex-col items-end gap-1">
       <Button
         variant="flat"
-        className="font-bold"
+        className="font-bold border border-weatherhead-primary/25 bg-weatherhead-primary/15 text-weatherhead-primary shadow-sm hover:bg-weatherhead-primary/25"
         startContent={solverStatus === "idle" ? <Rocket className="size-4" /> : undefined}
         isLoading={solverStatus === "loading"}
         onPress={runSolver}
