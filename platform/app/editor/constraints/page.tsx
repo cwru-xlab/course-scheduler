@@ -10,6 +10,7 @@ import {
   LockedAssignmentsEditor,
   SoftLocksEditor,
 } from "@/components/scheduler/editors/ConstraintsEditors";
+import { SpreadsheetImportExportButtons } from "@/components/scheduler/SpreadsheetImportExportButtons";
 import { SolverActionButton } from "@/components/scheduler/SolverActionButton";
 import { EditorPageTitleDropdown } from "@/components/scheduler/EditorPageTitleDropdown";
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
@@ -76,7 +77,7 @@ export default function ConstraintsPage() {
             Cross-lists, no-overlap groups, blocked times, and locks.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <Button
             className="bg-weatherhead-primary text-white font-bold shadow-lg shadow-weatherhead-primary/20 hover:opacity-90"
             onPress={updateBackend}
@@ -84,6 +85,7 @@ export default function ConstraintsPage() {
           >
             Update Backend
           </Button>
+          <SpreadsheetImportExportButtons data={data} />
           <SolverActionButton data={data} />
         </div>
         {updateStatus === "success" && (

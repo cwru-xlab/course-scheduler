@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@heroui/button";
 
 import { RoomsEditor } from "@/components/scheduler/editors/RoomsEditor";
+import { SpreadsheetImportExportButtons } from "@/components/scheduler/SpreadsheetImportExportButtons";
 import { SolverActionButton } from "@/components/scheduler/SolverActionButton";
 import { EditorPageTitleDropdown } from "@/components/scheduler/EditorPageTitleDropdown";
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
@@ -49,7 +50,7 @@ export default function RoomsPage() {
           <EditorPageTitleDropdown current="rooms" title="Rooms" />
           <p className="text-slate-500 mt-1">Add/edit rooms and features.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <Button
             className="bg-weatherhead-primary text-white font-bold shadow-lg shadow-weatherhead-primary/20 hover:opacity-90"
             onPress={updateBackend}
@@ -57,6 +58,7 @@ export default function RoomsPage() {
           >
             Update Backend
           </Button>
+          <SpreadsheetImportExportButtons data={data} />
           <SolverActionButton data={data} />
         </div>
         {updateStatus === "success" && (

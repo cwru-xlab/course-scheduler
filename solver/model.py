@@ -663,7 +663,7 @@ class ScheduleSolution(db.Model):
 
     def to_dict(self):
         return {
-            "assignments": [a.to_dict() for a in self.assignments_rel],
+            "assignments": [],
             "total_score": self.total_score,
             "penalty_breakdown": self.penalty_breakdown or {},
             "explanations": self.explanations or [],

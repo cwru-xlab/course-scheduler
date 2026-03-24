@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import inspect, text
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, make_response, request
 from flask_cors import CORS
 from ortools.sat.python import cp_model
 from werkzeug.utils import secure_filename
@@ -24,6 +24,11 @@ except ModuleNotFoundError:
     persist_parsed_data = None
     build_parsed_data_from_excel = None
     build_scheduling_input_from_parsed = None
+
+from spreadsheet_io.export_to_spreadsheet import scheduling_input_to_excel_bytes
+from spreadsheet_io.import_from_spreadsheet import parse_scheduling_input_from_excel_bytes
+from spreadsheet_io.spreadsheet_utils import build_template_bytes
+
 from model import (
     BlockedTime,
     CrossListGroup,
@@ -1163,6 +1168,125 @@ def solve():
     input_data = SchedulingInput(data["input"])
     result = _solve_schedule(input_data)
     return jsonify(result)
+
+
+@app.route("/scheduling-spreadsheet-template", methods=["GET"])
+def scheduling_spreadsheet_template():
+    workbook_bytes = build_template_bytes()
+    response = make_response(workbook_bytes)
+    response.headers["Content-Type"] = (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response.headers["Content-Disposition"] = (
+        "attachment; filename=scheduling_template.xlsx"
+    )
+    return response
+
+
+@app.route("/import-scheduling-spreadsheet", methods=["POST"])
+def import_scheduling_spreadsheet():
+    if "file" not in request.files:
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "missing_file",
+                            "message": "Upload an Excel file in form field 'file'.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    file = request.files["file"]
+    filename = secure_filename(file.filename or "")
+    if not filename.lower().endswith((".xlsx", ".xlsm", ".xls")):
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "invalid_file_type",
+                            "message": "Only Excel files (.xlsx, .xlsm, .xls) are supported.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    try:
+        file_bytes = file.read()
+        scheduling_input = parse_scheduling_input_from_excel_bytes(file_bytes)
+    except Exception as exc:  # pylint: disable=broad-except
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "parse_failed",
+                            "message": f"Failed to parse scheduling spreadsheet: {exc}",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    return jsonify({"status": "ok", "scheduling_input": scheduling_input}), 200
+
+
+@app.route("/export-scheduling-spreadsheet", methods=["POST"])
+def export_scheduling_spreadsheet():
+    data = request.get_json() or {}
+    input_payload = data.get("input") if isinstance(data, dict) and "input" in data else data
+    if not isinstance(input_payload, dict):
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "invalid_request",
+                            "message": "Request body must be a scheduling input object or { input }.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    try:
+        workbook_bytes = scheduling_input_to_excel_bytes(input_payload)
+    except Exception as exc:  # pylint: disable=broad-except
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "export_failed",
+                            "message": f"Failed to generate spreadsheet: {exc}",
+                        }
+                    ],
+                }
+            ),
+            500,
+        )
+
+    response = make_response(workbook_bytes)
+    response.headers["Content-Type"] = (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response.headers["Content-Disposition"] = (
+        "attachment; filename=scheduling_export.xlsx"
+    )
+    return response
 
 
 @app.route("/update-sections", methods=["POST"])
