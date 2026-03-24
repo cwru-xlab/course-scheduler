@@ -5,6 +5,7 @@ import { Card, CardBody, CardHeader } from "@heroui/card";
 
 import { EditableCell } from "../EditableCell";
 import { EditableArrayCell } from "../EditableArrayCell";
+import { RowNotesButton } from "../RowNotesButton";
 
 import type { Room } from "@/lib/scheduling/types";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
@@ -54,12 +55,17 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
               <th className="pb-2 pr-3">Room #</th>
               <th className="pb-2 pr-3">Capacity</th>
               <th className="pb-2 pr-3">Features</th>
+              <th className="pb-2 pr-3">View Notes</th>
               <th className="pb-2 pr-3"></th>
             </tr>
           </thead>
           <tbody>
             {rooms.map((room, idx) => (
-              <tr key={`${room.id}-${idx}`} className="border-t border-default-200">
+              <tr
+                key={`${room.id}-${idx}`}
+                id={`note-rooms-${encodeURIComponent(String(room.id))}`}
+                className="border-t border-default-200"
+              >
                 <td className="py-2 pr-3">
                   <EditableCell value={room.id} onChange={(v) => updateRoom(idx, "id", v)} />
                 </td>
@@ -74,6 +80,13 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
                 </td>
                 <td className="py-2 pr-3">
                   <EditableArrayCell value={room.features} onChange={(v) => updateRoom(idx, "features", v)} placeholder="projector, etc" />
+                </td>
+                <td className="py-2 pr-3">
+                  <RowNotesButton
+                    scope="rooms"
+                    rowId={String(room.id)}
+                    title={`Room Notes - ${room.building} ${room.room_number}`.trim()}
+                  />
                 </td>
                 <td className="py-2 pr-3">
                   <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteRoom(idx)}>

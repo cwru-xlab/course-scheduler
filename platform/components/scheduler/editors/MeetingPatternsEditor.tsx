@@ -5,6 +5,7 @@ import { Card, CardBody, CardHeader } from "@heroui/card";
 
 import { EditableCell } from "../EditableCell";
 import { MultiSelect } from "../MultiSelect";
+import { RowNotesButton } from "../RowNotesButton";
 
 import type { MeetingPattern } from "@/lib/scheduling/types";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
@@ -87,7 +88,11 @@ export const MeetingPatternsEditor = ({
       </CardHeader>
       <CardBody className="space-y-4 text-sm">
         {meetingPatterns.map((pattern, idx) => (
-          <div key={`${pattern.id}-${idx}`} className="border border-default-200 rounded-lg p-3">
+          <div
+            key={`${pattern.id}-${idx}`}
+            id={`note-meeting-patterns-${encodeURIComponent(String(pattern.id))}`}
+            className="border border-default-200 rounded-lg p-3"
+          >
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-4 flex-wrap">
                 <div className="flex items-center gap-2">
@@ -108,9 +113,16 @@ export const MeetingPatternsEditor = ({
                   />
                 </div>
               </div>
-              <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deletePattern(idx)}>
-                ✕
-              </Button>
+              <div className="flex items-center gap-2">
+                <RowNotesButton
+                  scope="meeting-patterns"
+                  rowId={String(pattern.id)}
+                  title={`Meeting Pattern Notes - ${pattern.id}`}
+                />
+                <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deletePattern(idx)}>
+                  ✕
+                </Button>
+              </div>
             </div>
             <div className="mt-2">
               <div className="flex items-center justify-between mb-1">

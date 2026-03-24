@@ -6,6 +6,7 @@ import { Card, CardBody, CardHeader } from "@heroui/card";
 import { EditableCell } from "../EditableCell";
 import { EditableSelectCell } from "../EditableSelectCell";
 import { MultiSelect } from "../MultiSelect";
+import { RowNotesButton } from "../RowNotesButton";
 
 import type { Instructor } from "@/lib/scheduling/types";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
@@ -90,12 +91,17 @@ export const InstructorsEditor = ({
               <th className="pb-2 pr-3 w-[14%]">Preferred Days</th>
               <th className="pb-2 pr-3 w-[20%]">Preferred Patterns</th>
               <th className="pb-2 pr-3 w-[8%]">Max Days</th>
+              <th className="pb-2 pr-3 w-[14%]">View Notes</th>
               <th className="pb-2 pr-3 w-[4%]"></th>
             </tr>
           </thead>
           <tbody>
             {instructors.map((inst, idx) => (
-              <tr key={`${inst.id}-${idx}`} className="border-t border-default-200">
+              <tr
+                key={`${inst.id}-${idx}`}
+                id={`note-instructors-${encodeURIComponent(String(inst.id))}`}
+                className="border-t border-default-200"
+              >
                 <td className="py-2 pr-3 align-top">
                   <EditableCell value={inst.id} onChange={(v) => updateInstructor(idx, "id", v)} />
                 </td>
@@ -139,6 +145,13 @@ export const InstructorsEditor = ({
                     value={inst.preferences.max_teaching_days ?? ""}
                     onChange={(v) => updateInstructor(idx, "preferences.max_teaching_days", v || undefined)}
                     placeholder="—"
+                  />
+                </td>
+                <td className="py-2 pr-3 align-top">
+                  <RowNotesButton
+                    scope="instructors"
+                    rowId={String(inst.id)}
+                    title={`Instructor Notes - ${inst.name || inst.id}`}
                   />
                 </td>
                 <td className="py-2 pr-3 align-top">

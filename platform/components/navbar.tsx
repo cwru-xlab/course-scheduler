@@ -9,7 +9,7 @@ import {
   DropdownTrigger,
 } from "@heroui/dropdown";
 import clsx from "clsx";
-import { Calendar as CalendarIcon, ChevronDown } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronDown, MessageSquare } from "lucide-react";
 import NextLink from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -70,6 +70,18 @@ export const Navbar = () => {
             >
               <CalendarIcon className="size-4" />
               Calendar
+            </NextLink>
+            <NextLink
+              href="/notes"
+              className={clsx(
+                "px-4 py-2 text-sm font-semibold rounded-lg transition-colors flex items-center gap-2",
+                pathname === "/notes"
+                  ? "bg-weatherhead-primary/10 text-weatherhead-primary dark:bg-weatherhead-primary/20"
+                  : "text-slate-600 dark:text-default-500 hover:text-weatherhead-primary hover:bg-slate-100 dark:hover:bg-default-50",
+              )}
+            >
+              <MessageSquare className="size-4" />
+              Notes Feed
             </NextLink>
           </nav>
 

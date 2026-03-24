@@ -6,6 +6,7 @@ import { Card, CardBody, CardHeader } from "@heroui/card";
 import { EditableCell } from "../EditableCell";
 import { EditableSelectCell } from "../EditableSelectCell";
 import { MultiSelect } from "../MultiSelect";
+import { RowNotesButton } from "../RowNotesButton";
 
 import type { Timeslot } from "@/lib/scheduling/types";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
@@ -127,12 +128,17 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
               <th className="pb-2 pr-3">Days</th>
               <th className="pb-2 pr-3">Start Time</th>
               <th className="pb-2 pr-3">End Time</th>
+              <th className="pb-2 pr-3">View Notes</th>
               <th className="pb-2 pr-3"></th>
             </tr>
           </thead>
           <tbody>
             {timeslots.map((slot, idx) => (
-              <tr key={`${slot.id}-${idx}`} className="border-t border-default-200">
+              <tr
+                key={`${slot.id}-${idx}`}
+                id={`note-timeslots-${encodeURIComponent(String(slot.id))}`}
+                className="border-t border-default-200"
+              >
                 <td className="py-2 pr-3">
                   <EditableCell value={slot.id} onChange={(v) => updateTimeslot(idx, "id", v)} />
                 </td>
@@ -160,6 +166,13 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
                     onChange={(v) => updateTimeslot(idx, "end_time", fromTimeOnly(v))}
                     placeholder="Select time"
                     isSearchable
+                  />
+                </td>
+                <td className="py-2 pr-3">
+                  <RowNotesButton
+                    scope="timeslots"
+                    rowId={String(slot.id)}
+                    title={`Timeslot Notes - ${slot.id}`}
                   />
                 </td>
                 <td className="py-2 pr-3">

@@ -7,6 +7,7 @@ import { EditableCell } from "../EditableCell";
 import { EditableArrayCell } from "../EditableArrayCell";
 import { EditableSelectCell } from "../EditableSelectCell";
 import { MultiSelect } from "../MultiSelect";
+import { RowNotesButton } from "../RowNotesButton";
 
 import type { Section } from "@/lib/scheduling/types";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
@@ -82,12 +83,17 @@ export const SectionsEditor = ({
               <th className="pb-2 pr-3">Room Req</th>
               <th className="pb-2 pr-3">Crosslist Group</th>
               <th className="pb-2 pr-3">Tags</th>
+              <th className="pb-2 pr-3">View Notes</th>
               <th className="pb-2 pr-3"></th>
             </tr>
           </thead>
           <tbody>
             {sections.map((section, idx) => (
-              <tr key={`${section.id}-${idx}`} className="border-t border-default-200">
+              <tr
+                key={`${section.id}-${idx}`}
+                id={`note-sections-${encodeURIComponent(String(section.id))}`}
+                className="border-t border-default-200"
+              >
                 <td className="py-2 pr-3">
                   <EditableCell value={section.id} onChange={(v) => updateSection(idx, "id", v)} />
                 </td>
@@ -139,6 +145,13 @@ export const SectionsEditor = ({
                 </td>
                 <td className="py-2 pr-3">
                   <EditableArrayCell value={section.tags} onChange={(v) => updateSection(idx, "tags", v)} placeholder="tags" />
+                </td>
+                <td className="py-2 pr-3">
+                  <RowNotesButton
+                    scope="sections"
+                    rowId={String(section.id)}
+                    title={`Section Notes - ${section.department ?? ""} ${section.course_id}`.trim()}
+                  />
                 </td>
                 <td className="py-2 pr-3">
                   <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteSection(idx)}>
