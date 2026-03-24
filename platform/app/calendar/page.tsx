@@ -868,9 +868,6 @@ export default function CalendarPage() {
                     <span className="font-bold text-xs text-slate-900">
                       {roomLabel || room.id}
               </span>
-              <span className="text-[9px] text-slate-500 uppercase tracking-wider font-bold mt-1">
-                      {room.id}
-                    </span>
                     <span className="text-[9px] text-slate-500 mt-1">
                       Capacity: {room.capacity ?? "N/A"}
               </span>
@@ -1139,7 +1136,6 @@ export default function CalendarPage() {
                       <div className="font-bold">
                         {[room.building, room.room_number].filter(Boolean).join(" ") || room.id}
                       </div>
-                      <div className="text-[10px] text-slate-600">{room.id}</div>
                       <div className="text-[10px] text-slate-600">
                         Capacity: {room.capacity ?? "N/A"}
                       </div>
