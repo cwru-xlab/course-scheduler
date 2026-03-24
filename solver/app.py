@@ -2,6 +2,8 @@ from datetime import datetime
 from importlib import import_module
 from typing import Any, Dict, List, Optional, Tuple
 
+from sqlalchemy import inspect, text
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from ortools.sat.python import cp_model
@@ -47,6 +49,31 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 CORS(app, origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5001"])
 
 db.init_app(app)
+
+
+def _ensure_sqlite_schema() -> None:
+    """Apply lightweight migrations for SQLite (e.g. new columns on existing DBs)."""
+    try:
+        engine = db.engine
+        if engine.dialect.name != "sqlite":
+            return
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        if "sections" not in tables:
+            return
+        col_names = {c["name"] for c in inspector.get_columns("sections")}
+        if "department" in col_names:
+            return
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "ALTER TABLE sections ADD COLUMN department VARCHAR(128) NOT NULL DEFAULT ''"
+                )
+            )
+    except Exception:  # pylint: disable=broad-except
+        # Best-effort; create_all / manual migration can fix schema issues.
+        pass
+
 
 ROOM_WASTE_WEIGHT = 1  # penalty per empty seat in assigned room
 PREF_DAY_WEIGHT = 10  # penalty if assigned days don't match instructor preferences
@@ -109,6 +136,7 @@ def _section_to_dict(section) -> dict:
         "room_requirements": getattr(section, "room_requirements", []),
         "crosslist_group_id": getattr(section, "crosslist_group_id", None),
         "tags": getattr(section, "tags", []),
+        "department": getattr(section, "department", "") or "",
     }
 
 
@@ -1168,6 +1196,9 @@ def update_sections():
 
         # Insert all provided sections
         for item in sections_payload:
+            dept_raw = item.get("department")
+            department = (str(dept_raw).strip() if dept_raw is not None else "") or ""
+
             section = Section(
                 id=item.get("id"),
                 course_id=item.get("course_id"),
@@ -1186,6 +1217,7 @@ def update_sections():
                 room_requirements=item.get("room_requirements", []),
                 crosslist_group_id=item.get("crosslist_group_id"),
                 tags=item.get("tags", []),
+                department=department,
             )
             db.session.add(section)
 
@@ -1519,10 +1551,12 @@ def update_constraints():
     return jsonify({"status": "ok"}), 200
 
 
-if __name__ == "__main__":
-    # Create tables if they don't exist
-    with app.app_context():
-        db.create_all()
+# Ensure schema on import (covers `flask run` / gunicorn, not only `python app.py`).
+with app.app_context():
+    db.create_all()
+    _ensure_sqlite_schema()
 
+
+if __name__ == "__main__":
     # Run the Flask app
     app.run(debug=True, host="0.0.0.0", port=5001)

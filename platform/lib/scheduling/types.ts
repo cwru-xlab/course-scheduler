@@ -3,6 +3,8 @@ export type Id = string;
 export type Section = {
   id: Id;
   course_id: Id;
+  /** Department code or name; used for calendar color-coding */
+  department?: string;
   section_code: string;
   instructor_id: Id;
   expected_enrollment: number;

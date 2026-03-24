@@ -383,6 +383,8 @@ class Section(db.Model):
     allowed_meeting_patterns = Column(JSON, nullable=False)  # List[str] - pattern IDs
     room_requirements = Column(JSON, nullable=False)  # List[str] - required room features
     tags = Column(JSON, nullable=False)  # List[str] - additional tags/metadata
+    # Denormalized for scheduling UI / exports (editable independently of Course.department)
+    department = Column(String(128), nullable=False, default="")
 
     # ========================================================================
     # RELATIONSHIPS
@@ -428,6 +430,7 @@ class Section(db.Model):
             "allowed_meeting_patterns": self.allowed_meeting_patterns or [],
             "room_requirements": self.room_requirements or [],
             "tags": self.tags or [],
+            "department": self.department or "",
         }
 
 

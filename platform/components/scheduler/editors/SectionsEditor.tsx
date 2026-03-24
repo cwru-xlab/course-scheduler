@@ -22,6 +22,7 @@ type SectionsEditorProps = {
 const createEmptySection = (existing: Section[]): Section => ({
   id: nextIntegerId(existing.map((s) => s.id)),
   course_id: "",
+  department: "",
   section_code: "A",
   instructor_id: "",
   expected_enrollment: 20,
@@ -71,6 +72,7 @@ export const SectionsEditor = ({
           <thead className="text-left text-default-500">
             <tr>
               <th className="pb-2 pr-3">ID</th>
+              <th className="pb-2 pr-3">Department</th>
               <th className="pb-2 pr-3">Course</th>
               <th className="pb-2 pr-3">Code</th>
               <th className="pb-2 pr-3">Instructor</th>
@@ -88,6 +90,13 @@ export const SectionsEditor = ({
               <tr key={`${section.id}-${idx}`} className="border-t border-default-200">
                 <td className="py-2 pr-3">
                   <EditableCell value={section.id} onChange={(v) => updateSection(idx, "id", v)} />
+                </td>
+                <td className="py-2 pr-3">
+                  <EditableCell
+                    value={section.department ?? ""}
+                    onChange={(v) => updateSection(idx, "department", v)}
+                    placeholder="e.g. FIN"
+                  />
                 </td>
                 <td className="py-2 pr-3">
                   <EditableCell value={section.course_id} onChange={(v) => updateSection(idx, "course_id", v)} placeholder="COURSE-XXX" />

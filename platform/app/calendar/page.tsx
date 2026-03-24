@@ -9,6 +9,7 @@ import {
   Filter,
   Maximize2,
   Minimize2,
+  Palette,
   Printer,
   Rocket,
   Share2,
@@ -38,7 +39,9 @@ type InstructorDto = {
 
 type SectionDto = {
   id: string;
-  course_id: string;
+  course_id: string | number;
+  /** Calendar colors use this explicit department value. */
+  department?: string | null;
   section_code: string;
   instructor_id: string;
   timeslot_id?: string | null;
@@ -182,18 +185,34 @@ const COURSE_PRINT_COLORS = [
   { bg: "#ffedd5", border: "#f97316" },
 ];
 
-function courseColorForId(courseId: string) {
+/** Single normalized key per academic department (not per course). */
+function departmentColorKey(section: { department?: string | null; course_id: string | number }): string {
+  const d = (section.department ?? "").trim();
+  if (d) return d.toUpperCase();
+  return "UNSPECIFIED";
+}
+
+/** Label for legend: explicit department text only. */
+function departmentLegendLabel(section: { department?: string | null; course_id: string | number }): string {
+  const d = (section.department ?? "").trim();
+  if (d) return d;
+  return "Unspecified";
+}
+
+function colorClassForScheduleSection(section: { department?: string | null; course_id: string | number }) {
+  const key = departmentColorKey(section);
   let hash = 0;
-  for (let i = 0; i < courseId.length; i += 1) {
-    hash = (hash * 31 + courseId.charCodeAt(i)) >>> 0;
+  for (let i = 0; i < key.length; i += 1) {
+    hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
   }
   return COURSE_COLOR_CLASSES[hash % COURSE_COLOR_CLASSES.length];
 }
 
-function coursePrintColorForId(courseId: string) {
+function printColorForScheduleSection(section: { department?: string | null; course_id: string | number }) {
+  const key = departmentColorKey(section);
   let hash = 0;
-  for (let i = 0; i < courseId.length; i += 1) {
-    hash = (hash * 31 + courseId.charCodeAt(i)) >>> 0;
+  for (let i = 0; i < key.length; i += 1) {
+    hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
   }
   return COURSE_PRINT_COLORS[hash % COURSE_PRINT_COLORS.length];
 }
@@ -255,6 +274,7 @@ export default function CalendarPage() {
                 return {
                   id: section.id,
                   course_id: section.course_id,
+                  department: section.department ?? "",
                   section_code: section.section_code,
                   instructor_id: section.instructor_id,
                   room_id: assignment?.room_id ?? null,
@@ -352,6 +372,25 @@ export default function CalendarPage() {
     const map = new Map<string, InstructorDto>();
     data?.instructors.forEach((i) => map.set(i.id, i));
     return map;
+  }, [data]);
+
+  /** One swatch per department code (shared across all courses in that dept). */
+  const departmentColorLegend = useMemo(() => {
+    if (!data?.sections.length) return [];
+    const byKey = new Map<
+      string,
+      { colorKey: string; label: string; swatch: { bg: string; border: string } }
+    >();
+    for (const s of data.sections) {
+      const colorKey = departmentColorKey(s);
+      if (byKey.has(colorKey)) continue;
+      const swatch = colorClassForScheduleSection(s);
+      const label = departmentLegendLabel(s);
+      byKey.set(colorKey, { colorKey, label, swatch });
+    }
+    return Array.from(byKey.values()).sort((a, b) =>
+      a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
+    );
   }, [data]);
 
   const dayEvents = useMemo(() => {
@@ -744,6 +783,45 @@ export default function CalendarPage() {
         </div>
       </div>
 
+      {/* Department / course color legend */}
+      {departmentColorLegend.length > 0 && (
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex flex-wrap items-center gap-x-1 gap-y-2">
+            <div className="flex items-center gap-2 mb-1 w-full sm:w-auto sm:mb-0 sm:mr-2">
+              <Palette className="size-4 text-slate-400 shrink-0" aria-hidden />
+              <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest">
+                Department colors
+              </span>
+            </div>
+            {departmentColorLegend.map((item) => (
+              <div
+                key={item.colorKey}
+                className="flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50/80 px-2.5 py-1.5 mr-1 mb-1"
+              >
+                <span
+                  className={clsx(
+                    "h-3.5 w-6 shrink-0 rounded border-l-[3px] shadow-sm",
+                    item.swatch.bg,
+                    item.swatch.border,
+                  )}
+                  aria-hidden
+                />
+                <span
+                  className="text-xs font-semibold text-slate-800 max-w-[12rem] truncate"
+                  title={item.label}
+                >
+                  {item.label}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[10px] text-slate-500 leading-relaxed">
+            Colors are per <span className="font-semibold">department</span> only. Populate the
+            department field (e.g. ECON, OPRE, FAFE) to control color grouping.
+          </p>
+        </div>
+      )}
+
       {/* Main calendar grid */}
       <div
         className={clsx(
@@ -843,10 +921,9 @@ export default function CalendarPage() {
 
                 const inst = instructorById.get(section.instructor_id);
                 const professor = inst?.name ?? section.instructor_id ?? "—";
-                const title = section.course_id;
-                const sub = section.id;
+                const title = section.department + " " + section.course_id;
                     const timeLabel = `${formatTimeAmPm(timeslot?.start_time ?? "00:00")} - ${formatTimeAmPm(timeslot?.end_time ?? "00:00")}`;
-                    const color = courseColorForId(title);
+                    const color = colorClassForScheduleSection(section);
 
                 return (
                   <div
@@ -877,20 +954,14 @@ export default function CalendarPage() {
                             professor: inst ?? null,
                           })
                         }
-                        title={`${title} • ${sub} • ${professor} • ${timeLabel} • Room ${room.id}`}
+                        title={`${title} • ${professor} • ${timeLabel} • Room ${room.id}`}
                   >
-                    <div>
                       <div className="font-black text-[10px] truncate text-slate-900">
                         {title}
                       </div>
-                      <div className="text-[9px] font-bold text-slate-500">
-                        {sub}
-                      </div>
-                    </div>
                     <div className="text-[9px] font-bold leading-tight text-slate-700">
-                      {professor}
-                      <br />
-                      {timeLabel}
+                      <div className="truncate">{professor}</div>
+                      <div className="text-[8px] leading-snug truncate">{timeLabel}</div>
                     </div>
                   </div>
                 );
@@ -920,7 +991,8 @@ export default function CalendarPage() {
           <div className="text-sm text-slate-600">
             Showing <span className="font-bold">{dayEvents.length}</span>{" "}
             scheduled section(s) across <span className="font-bold">{roomRows.length}</span>{" "}
-            room(s) for <span className="font-bold">{selectedDay}</span>.
+            room(s) for <span className="font-bold">{selectedDay}</span>. Use the{" "}
+            <span className="font-bold">department colors</span> legend above to match swatches to departments.
           </div>
         </div>
 
@@ -964,6 +1036,10 @@ export default function CalendarPage() {
                 </h4>
                 <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <div><span className="font-semibold">Section ID:</span> {selectedEvent.section.id}</div>
+                  <div>
+                    <span className="font-semibold">Department:</span>{" "}
+                    {(selectedEvent.section.department ?? "").trim() || "—"}
+                  </div>
                   <div><span className="font-semibold">Course ID:</span> {selectedEvent.section.course_id}</div>
                   <div><span className="font-semibold">Section Code:</span> {selectedEvent.section.section_code}</div>
                   <div><span className="font-semibold">Instructor ID:</span> {selectedEvent.section.instructor_id}</div>
@@ -1089,7 +1165,7 @@ export default function CalendarPage() {
                             axisRange) *
                           100;
                         const top = EVENT_TOP_PADDING_PX + lane * (EVENT_HEIGHT_PX + EVENT_GAP_PX);
-                        const color = coursePrintColorForId(section.course_id);
+                        const color = printColorForScheduleSection(section);
                         const professorName =
                           instructorById.get(section.instructor_id)?.name ??
                           section.instructor_id;

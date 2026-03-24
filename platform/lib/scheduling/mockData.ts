@@ -5,6 +5,7 @@ export const mockSchedulingInput: SchedulingInput = {
     {
       id: "SEC-101-A",
       course_id: "COURSE-101",
+      department: "FIN",
       section_code: "A",
       instructor_id: "INST-ALPHA",
       expected_enrollment: 28,
@@ -17,6 +18,7 @@ export const mockSchedulingInput: SchedulingInput = {
     {
       id: "SEC-550-A",
       course_id: "COURSE-550",
+      department: "ACCT",
       section_code: "A",
       instructor_id: "INST-GAMMA",
       expected_enrollment: 18,
@@ -29,6 +31,7 @@ export const mockSchedulingInput: SchedulingInput = {
     {
       id: "SEC-220-A",
       course_id: "COURSE-220",
+      department: "OB",
       section_code: "A",
       instructor_id: "INST-BETA",
       expected_enrollment: 20,
@@ -41,6 +44,7 @@ export const mockSchedulingInput: SchedulingInput = {
     {
       id: "SEC-221-A",
       course_id: "COURSE-221",
+      department: "OB",
       section_code: "A",
       instructor_id: "INST-BETA",
       expected_enrollment: 16,
@@ -53,6 +57,7 @@ export const mockSchedulingInput: SchedulingInput = {
     {
       id: "SEC-330-A",
       course_id: "COURSE-330",
+      department: "MKTG",
       section_code: "A",
       instructor_id: "INST-DELTA",
       expected_enrollment: 22,
