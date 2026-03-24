@@ -290,6 +290,12 @@ export default function CalendarPage() {
                   department: section.department ?? "",
                   section_code: section.section_code,
                   instructor_id: section.instructor_id,
+                  expected_enrollment: section.expected_enrollment,
+                  enrollment_cap: section.enrollment_cap,
+                  allowed_meeting_patterns: section.allowed_meeting_patterns ?? [],
+                  room_requirements: section.room_requirements ?? [],
+                  crosslist_group_id: section.crosslist_group_id ?? null,
+                  tags: section.tags ?? [],
                   room_id: assignment?.room_id ?? null,
                   // Legacy field retained for compatibility with existing rendering.
                   timeslot_id: assignment?.timeslot_ids?.[0] ?? null,
@@ -654,6 +660,25 @@ export default function CalendarPage() {
     }
 
     const currentAssignment = assignmentsBySection[draggedSectionId];
+    const currentRoomId = currentAssignment?.room_id ?? dragged.section.room_id ?? "";
+    const targetRoom = data.rooms.find((room) => room.id === targetRoomId);
+    const requiredSeats =
+      dragged.section.enrollment_cap ??
+      dragged.section.expected_enrollment ??
+      0;
+    if (
+      targetRoomId !== currentRoomId &&
+      Number.isFinite(targetRoom?.capacity) &&
+      requiredSeats > (targetRoom?.capacity ?? 0)
+    ) {
+      setDragFeedback({
+        status: "invalid",
+        message: `Invalid: ${dragged.section.department ?? ""} ${dragged.section.course_id} requires ${requiredSeats} seats, but room ${targetRoomId} capacity is ${targetRoom?.capacity}.`,
+      });
+      setDraggedSectionId(null);
+      return;
+    }
+
     const currentTimeslotIds =
       currentAssignment?.timeslot_ids ??
       (dragged.section.timeslot_id ? [dragged.section.timeslot_id] : []);
