@@ -1,17 +1,17 @@
 "use client";
 
-import NextLink from "next/link";
-import { Calendar as CalendarIcon, ChevronDown, School } from "lucide-react";
-import clsx from "clsx";
-import { usePathname } from "next/navigation";
 import { siteConfig } from "@/config/site";
+import { Button } from "@heroui/button";
 import {
   Dropdown,
   DropdownItem,
   DropdownMenu,
   DropdownTrigger,
 } from "@heroui/dropdown";
-import { Button } from "@heroui/button";
+import clsx from "clsx";
+import { Calendar as CalendarIcon, ChevronDown } from "lucide-react";
+import NextLink from "next/link";
+import { usePathname } from "next/navigation";
 
 export const Navbar = () => {
   const pathname = usePathname();
@@ -24,9 +24,11 @@ export const Navbar = () => {
             href="/"
             className="flex items-center gap-3 cursor-pointer"
           >
-            <div className="flex items-center justify-center size-9 rounded-lg bg-weatherhead-primary text-white">
-              <School className="size-5" />
-            </div>
+            <img
+              src="/cwru.jpeg"
+              alt="CWRU logo"
+              className="h-9 w-auto object-contain"
+            />
             <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-foreground">
               Weatherhead <span className="text-weatherhead-primary">Scheduler</span>
             </h1>
