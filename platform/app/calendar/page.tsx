@@ -218,18 +218,31 @@ function printColorForScheduleSection(section: { department?: string | null; cou
 }
 
 export default function CalendarPage() {
+  type AssignmentMap = Record<
+    string,
+    { timeslot_ids: string[]; room_id: string; meeting_pattern_id: string }
+  >;
+
   const [selectedDay, setSelectedDay] = useState<Day>("Mon");
   const [data, setData] = useState<SolverDataDto | null>(null);
   const [solverInput, setSolverInput] = useState<SchedulingInput | null>(null);
-  const [assignmentsBySection, setAssignmentsBySection] = useState<
-    Record<string, { timeslot_ids: string[]; room_id: string; meeting_pattern_id: string }>
-  >({});
+  const [assignmentsBySection, setAssignmentsBySection] = useState<AssignmentMap>({});
+  const [baselineAssignments, setBaselineAssignments] = useState<AssignmentMap>({});
   const [error, setError] = useState<string | null>(null);
   const [solverTimeslotIdsBySection, setSolverTimeslotIdsBySection] = useState<
     Record<string, string[]>
   >({});
   const [draggedSectionId, setDraggedSectionId] = useState<string | null>(null);
   const [dragError, setDragError] = useState<string | null>(null);
+  const [dragFeedback, setDragFeedback] = useState<{
+    status: "neutral" | "valid" | "invalid";
+    message: string | null;
+  }>({ status: "neutral", message: null });
+  const [isSavingBackend, setIsSavingBackend] = useState(false);
+  const [backendSaveMessage, setBackendSaveMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<{
     section: SectionDto;
     timeslot: TimeslotDto;
@@ -306,6 +319,7 @@ export default function CalendarPage() {
               if (mounted) {
                 setSolverInput(parsed.input);
                 setAssignmentsBySection(nextAssignments);
+                setBaselineAssignments(nextAssignments);
                 setSolverTimeslotIdsBySection(allTimeslotIdsBySection);
                 setData({
                   sections: sectionsFromSolver,
@@ -332,7 +346,21 @@ export default function CalendarPage() {
               : "Failed to load data.";
           throw new Error(message);
         }
-        if (mounted) setData(json.data);
+        if (mounted) {
+          const fallbackAssignments: AssignmentMap = Object.fromEntries(
+            json.data.sections.map((section) => [
+              section.id,
+              {
+                timeslot_ids: section.timeslot_id ? [section.timeslot_id] : [],
+                room_id: section.room_id ?? "",
+                meeting_pattern_id: "",
+              },
+            ]),
+          );
+          setAssignmentsBySection(fallbackAssignments);
+          setBaselineAssignments(fallbackAssignments);
+          setData(json.data);
+        }
       } catch (e) {
         if (mounted) setError(e instanceof Error ? e.message : "Failed to load data.");
       }
@@ -536,7 +564,7 @@ export default function CalendarPage() {
 
   const updateLastRunStorage = (
     nextInput: SchedulingInput,
-    assignments: Record<string, { timeslot_ids: string[]; room_id: string; meeting_pattern_id: string }>,
+    assignments: AssignmentMap,
   ) => {
     if (typeof window === "undefined") return;
     localStorage.setItem(
@@ -560,6 +588,22 @@ export default function CalendarPage() {
     );
   };
 
+  const hasValidUnsavedEdit = useMemo(() => {
+    const normalize = (map: AssignmentMap) =>
+      Object.entries(map)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([sectionId, v]) => ({
+          sectionId,
+          room_id: v.room_id || "",
+          meeting_pattern_id: v.meeting_pattern_id || "",
+          timeslot_ids: [...(v.timeslot_ids ?? [])].sort(),
+        }));
+    const changed =
+      JSON.stringify(normalize(assignmentsBySection)) !==
+      JSON.stringify(normalize(baselineAssignments));
+    return changed && dragFeedback.status === "valid";
+  }, [assignmentsBySection, baselineAssignments, dragFeedback.status]);
+
   const dayTimeslotBoundaries = useMemo(() => {
     if (!data) return [];
     const boundaries = new Set<number>();
@@ -574,14 +618,12 @@ export default function CalendarPage() {
       .sort((a, b) => a - b);
   }, [data, selectedDay, axisStart, axisEnd]);
 
-  const handleDropOnRoomRow = async (event: React.DragEvent<HTMLDivElement>) => {
+  const handleDropOnRoomRow = (event: React.DragEvent<HTMLDivElement>, targetRoomId: string) => {
     event.preventDefault();
-    if (!data || !solverInput || !draggedSectionId) return;
+    if (!data || !draggedSectionId) return;
 
     const dragged = dayEvents.find((x) => x.section.id === draggedSectionId && x.timeslot);
     if (!dragged || !dragged.timeslot) return;
-    const fixedRoomId = dragged.section.room_id;
-    if (!fixedRoomId) return;
 
     const rowRect = event.currentTarget.getBoundingClientRect();
     const x = event.clientX - rowRect.left;
@@ -603,9 +645,11 @@ export default function CalendarPage() {
     )[0];
 
     if (!selectedSlot) {
-      setDragError(
-        `Unable to place ${dragged.section.course_id}: no compatible ${selectedDay} timeslot found for this class duration.`,
-      );
+      setDragFeedback({
+        status: "invalid",
+        message: `Unable to place ${dragged.section.course_id}: no compatible ${selectedDay} timeslot found for this class duration.`,
+      });
+      setDraggedSectionId(null);
       return;
     }
 
@@ -622,82 +666,95 @@ export default function CalendarPage() {
       return id;
     });
     const uniqueNextTimeslotIds = Array.from(new Set(nextTimeslotIds));
-
-    const nextInput = JSON.parse(JSON.stringify(solverInput)) as SchedulingInput;
-    const otherLocks = nextInput.locked_assignments.filter(
-      (lock) => lock.section_id !== draggedSectionId,
-    );
-    nextInput.locked_assignments = [
-      ...otherLocks,
-      {
-        section_id: draggedSectionId,
-        fixed_room: fixedRoomId,
-        fixed_timeslot_set: uniqueNextTimeslotIds,
+    const nextAssignments: AssignmentMap = {
+      ...assignmentsBySection,
+      [draggedSectionId]: {
+        timeslot_ids: uniqueNextTimeslotIds,
+        room_id: targetRoomId,
+        meeting_pattern_id: currentAssignment?.meeting_pattern_id ?? "",
       },
-    ];
+    };
+    setAssignmentsBySection(nextAssignments);
+    setSolverTimeslotIdsBySection((prev) => ({
+      ...prev,
+      [draggedSectionId]: uniqueNextTimeslotIds,
+    }));
 
+    const selectedStart = parseMinutes(selectedSlot.start_time);
+    const selectedEnd = parseMinutes(selectedSlot.end_time);
+    const conflicts = dayEvents.filter((eventItem) => {
+      if (eventItem.section.id === draggedSectionId) return false;
+      const itemRoomId =
+        nextAssignments[eventItem.section.id]?.room_id ?? eventItem.section.room_id ?? "";
+      if (itemRoomId !== targetRoomId) return false;
+      // Conflict if the intervals overlap in the same room on the selected day.
+      return selectedStart < eventItem.end && selectedEnd > eventItem.start;
+    });
+
+    if (conflicts.length > 0) {
+      const conflictNames = conflicts
+        .map((c) => `${c.section.department ?? ""} ${c.section.course_id}`.trim())
+        .filter(Boolean)
+        .slice(0, 3)
+        .join(", ");
+      setDragFeedback({
+        status: "invalid",
+        message: `Invalid: ${dragged.section.department ?? ""} ${dragged.section.course_id} conflicts with ${conflictNames || "another class"} in room ${targetRoomId} at ${formatTimeAmPm(selectedSlot.start_time)}-${formatTimeAmPm(selectedSlot.end_time)}.`,
+      });
+    } else {
+      setDragFeedback({
+        status: "valid",
+        message: `Valid: moved to room ${targetRoomId}, ${selectedDay} ${formatTimeAmPm(selectedSlot.start_time)}-${formatTimeAmPm(selectedSlot.end_time)}. This change can be persisted.`,
+      });
+      setDragError(null);
+    }
+    setDraggedSectionId(null);
+  };
+
+  const handleUpdateBackend = async () => {
+    if (!solverInput || !hasValidUnsavedEdit) return;
+    setIsSavingBackend(true);
+    setBackendSaveMessage(null);
     try {
-      const response = await fetch("/api/schedule", {
+      const mergedSections = solverInput.sections.map((section) => {
+        const assignment = assignmentsBySection[section.id];
+        return {
+          ...section,
+          room_id: assignment?.room_id ?? (section as unknown as { room_id?: string | null }).room_id ?? null,
+          timeslot_id:
+            assignment?.timeslot_ids?.[0] ??
+            (section as unknown as { timeslot_id?: string | null }).timeslot_id ??
+            null,
+        };
+      });
+      const response = await fetch("/api/update-sections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(nextInput),
+        body: JSON.stringify({ sections: mergedSections }),
       });
-      const result = (await response.json()) as
-        | (ScheduleSolution & { status: "ok" })
-        | {
-            status: "error";
-            errors: { code: string; message: string }[];
-            diagnostics?: {
-              feasible_if_relax?: string[];
-              feasible_if_remove_section?: string[];
-            };
-          };
-
-      if (!response.ok || result.status === "error") {
-        const errorMessage =
-          result.status === "error"
-            ? result.errors.map((e) => e.message).join(" ")
-            : "Unknown validation error.";
-        const conflictHint =
-          result.status === "error" && result.diagnostics?.feasible_if_relax?.length
-            ? ` Try relaxing: ${result.diagnostics.feasible_if_relax.join(", ")}.`
-            : "";
-        setDragError(
-          `Invalid move for ${dragged.section.course_id} to ${formatTimeAmPm(selectedSlot.start_time)}-${formatTimeAmPm(selectedSlot.end_time)} in room ${fixedRoomId}. ${errorMessage}${conflictHint}`,
-        );
-        return;
+      const payload = (await response.json()) as
+        | { status: "ok" }
+        | { status: "error"; errors?: { message?: string }[] };
+      if (!response.ok || payload.status === "error") {
+        const message =
+          payload.status === "error" && payload.errors?.length
+            ? payload.errors.map((e) => e.message).filter(Boolean).join(" | ")
+            : "Backend failed to update sections.";
+        throw new Error(message);
       }
-
-      const nextAssignments = Object.fromEntries(
-        result.assignments.map((assignment) => [
-          assignment.section_id,
-          {
-            timeslot_ids: assignment.timeslot_ids,
-            room_id: assignment.room_id,
-            meeting_pattern_id: assignment.meeting_pattern_id,
-          },
-        ]),
-      );
-      setAssignmentsBySection(nextAssignments);
-      setSolverTimeslotIdsBySection(
-        Object.fromEntries(
-          result.assignments.map((assignment) => [
-            assignment.section_id,
-            assignment.timeslot_ids,
-          ]),
-        ),
-      );
-      setSolverInput(nextInput);
-      updateLastRunStorage(nextInput, nextAssignments);
-      setDragError(null);
+      setBaselineAssignments(assignmentsBySection);
+      updateLastRunStorage(solverInput, assignmentsBySection);
+      setBackendSaveMessage({
+        type: "success",
+        text: "Backend updated with the current valid calendar edits.",
+      });
     } catch (err) {
-      setDragError(
-        err instanceof Error
-          ? err.message
-          : "Drag validation failed because solver could not be reached.",
-      );
+      setBackendSaveMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to update backend.",
+      });
     } finally {
-      setDraggedSectionId(null);
+      setIsSavingBackend(false);
     }
   };
 
@@ -728,13 +785,31 @@ export default function CalendarPage() {
             Click through Monday–Friday to view scheduled sections.
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <button
             className="flex items-center justify-center rounded-lg h-10 px-4 bg-slate-100 text-slate-900 font-bold gap-2 border border-slate-200"
             onClick={handleExportPdf}
           >
             <Share2 className="size-4" />
             Export PDF
+          </button>
+          <button
+            type="button"
+            disabled={!hasValidUnsavedEdit || isSavingBackend}
+            onClick={handleUpdateBackend}
+            className={clsx(
+              "flex items-center justify-center rounded-lg h-10 px-4 font-bold gap-2 border transition-colors",
+              hasValidUnsavedEdit && !isSavingBackend
+                ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
+                : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
+            )}
+            title={
+              hasValidUnsavedEdit
+                ? "Persist valid calendar edits to backend"
+                : "Make a valid edit first to enable backend update"
+            }
+          >
+            Update Backend
           </button>
           <Link
             href="/editor/sections"
@@ -745,6 +820,19 @@ export default function CalendarPage() {
           </Link>
         </div>
       </div>
+
+      {backendSaveMessage && (
+        <div
+          className={clsx(
+            "rounded-lg border px-4 py-2 text-sm font-medium",
+            backendSaveMessage.type === "success"
+              ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+              : "bg-rose-50 border-rose-200 text-rose-800",
+          )}
+        >
+          {backendSaveMessage.text}
+        </div>
+      )}
 
       {/* Day selector (Mon-Fri) */}
       <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
@@ -826,14 +914,23 @@ export default function CalendarPage() {
       <div
         className={clsx(
           "rounded-xl border shadow-lg overflow-hidden flex flex-col min-h-[600px]",
-          dragError
+          dragFeedback.status === "invalid" || dragError
             ? "bg-red-50/40 border-red-200"
+            : dragFeedback.status === "valid"
+              ? "bg-emerald-50/35 border-emerald-200"
             : "bg-white border-slate-200",
         )}
       >
-        {dragError && (
-          <div className="border-b border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 font-medium">
-            {dragError}
+        {(dragFeedback.message || dragError) && (
+          <div
+            className={clsx(
+              "border-b px-4 py-3 text-sm font-medium",
+              dragFeedback.status === "valid"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : "border-red-200 bg-red-50 text-red-700",
+            )}
+          >
+            {dragFeedback.message ?? dragError}
           </div>
         )}
         <div className="flex bg-slate-50 border-b border-slate-200">
@@ -853,7 +950,7 @@ export default function CalendarPage() {
         </div>
 
         <div className="flex-1 overflow-y-auto relative">
-          <div className="flex border-b border-slate-100 min-h-[240px]">
+          <div className="flex border-b border-slate-200/80 min-h-[240px]">
             <div className="w-40 flex-shrink-0 border-r border-slate-200 bg-slate-50/30">
               {roomRows.map(({ room, rowHeight }) => {
                 const roomLabel = [room.building, room.room_number]
@@ -862,7 +959,7 @@ export default function CalendarPage() {
                 return (
                   <div
                     key={`label-${room.id}`}
-                    className="border-b border-slate-100 last:border-b-0 px-3 py-3 flex flex-col justify-center"
+                    className="border-b border-slate-200/80 last:border-b-0 px-3 py-3 flex flex-col justify-center"
                     style={{ minHeight: rowHeight }}
                   >
                     <span className="font-bold text-xs text-slate-900">
@@ -879,10 +976,10 @@ export default function CalendarPage() {
               {roomRows.map(({ room, events, rowHeight }) => (
                 <div
                   key={room.id}
-                  className="relative border-b border-slate-100 last:border-b-0"
+                  className="relative border-b border-slate-200/80 last:border-b-0"
                   style={{ minHeight: rowHeight }}
                   onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => void handleDropOnRoomRow(e)}
+                  onDrop={(e) => void handleDropOnRoomRow(e, room.id)}
                 >
                   <div
                     className="absolute inset-0 grid pointer-events-none"
@@ -935,6 +1032,7 @@ export default function CalendarPage() {
                         onDragStart={() => {
                           setDraggedSectionId(section.id);
                           setDragError(null);
+                          setBackendSaveMessage(null);
                         }}
                         onDragEnd={() => setDraggedSectionId(null)}
                     style={{
