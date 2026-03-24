@@ -30,7 +30,10 @@ type InstructorDto = {
   name?: string;
   rank_type?: string;
   unavailable_times?: string[];
+  max_teaching_days?: number;
   preferences?: {
+    preferred_times?: string[];
+    unavailable_times?: string[];
     preferred_days?: string[];
     preferred_patterns?: string[];
     max_teaching_days?: number;
@@ -310,10 +313,29 @@ export default function CalendarPage() {
               }));
 
               const instructorsFromSolver = parsed.input.instructors.map(
-                (instructor) => ({
-                  id: instructor.id,
-                  name: instructor.name || instructor.id,
-                }),
+                (instructor) => {
+                  const prefs = (instructor.preferences ?? {}) as {
+                    preferred_times?: string[];
+                    preferred_days?: string[];
+                    preferred_patterns?: string[];
+                    max_teaching_days?: number;
+                    unavailable_times?: string[];
+                  };
+                  return {
+                    id: instructor.id,
+                    name: instructor.name || instructor.id,
+                    rank_type: instructor.rank_type,
+                    unavailable_times: instructor.unavailable_times ?? prefs.unavailable_times ?? [],
+                    max_teaching_days: prefs.max_teaching_days,
+                    preferences: {
+                      unavailable_times: prefs.unavailable_times ?? [],
+                      preferred_times: prefs.preferred_times ?? [],
+                      preferred_days: prefs.preferred_days ?? [],
+                      preferred_patterns: prefs.preferred_patterns ?? [],
+                      max_teaching_days: prefs.max_teaching_days,
+                    },
+                  };
+                },
               );
               const roomsFromSolver = parsed.input.rooms.map((room) => ({
                 id: room.id,
@@ -1192,7 +1214,19 @@ export default function CalendarPage() {
                   <div><span className="font-semibold">Rank:</span> {selectedEvent.professor?.rank_type || "N/A"}</div>
                   <div>
                     <span className="font-semibold">Max Teaching Days:</span>{" "}
-                    {selectedEvent.professor?.preferences?.max_teaching_days ?? "N/A"}
+                    {selectedEvent.professor?.preferences?.max_teaching_days ??
+                      selectedEvent.professor?.max_teaching_days ??
+                      "N/A"}
+                  </div>
+                  <div className="sm:col-span-2">
+                    <span className="font-semibold">Unavailable Times:</span>{" "}
+                    {selectedEvent.professor?.unavailable_times?.join(", ") ||
+                      selectedEvent.professor?.preferences?.unavailable_times?.join(", ") ||
+                      "N/A"}
+                  </div>
+                  <div className="sm:col-span-2">
+                    <span className="font-semibold">Preferred Times:</span>{" "}
+                    {selectedEvent.professor?.preferences?.preferred_times?.join(", ") || "N/A"}
                   </div>
                   <div className="sm:col-span-2">
                     <span className="font-semibold">Preferred Days:</span>{" "}
