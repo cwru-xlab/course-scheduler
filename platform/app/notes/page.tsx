@@ -91,6 +91,9 @@ export default function NotesFeedPage() {
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [scheduleData, setScheduleData] = useState<SchedulingInput | null>(null);
   const [selectedItem, setSelectedItem] = useState<FeedItem | null>(null);
+  const [filterScope, setFilterScope] = useState<string>("all");
+  const [filterAuthor, setFilterAuthor] = useState<string>("all");
+  const [filterKind, setFilterKind] = useState<"all" | "note" | "reply">("all");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -175,12 +178,41 @@ export default function NotesFeedPage() {
     return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
   }, [feedItems]);
 
+  const filteredFeedItems = useMemo(() => {
+    return feedItems.filter((item) => {
+      if (filterScope !== "all" && item.scope !== filterScope) return false;
+      if (filterAuthor !== "all" && item.author !== filterAuthor) return false;
+      if (filterKind !== "all" && item.kind !== filterKind) return false;
+      return true;
+    });
+  }, [feedItems, filterScope, filterAuthor, filterKind]);
+
+  const filteredGroupedCount = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of filteredFeedItems) {
+      map.set(item.scope, (map.get(item.scope) ?? 0) + 1);
+    }
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+  }, [filteredFeedItems]);
+
+  const uniqueAuthors = useMemo(() => {
+    const set = new Set<string>();
+    for (const item of feedItems) set.add(item.author);
+    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  }, [feedItems]);
+
   const getIndexFromRowId = (rowId: string): number | null => {
     const lastDash = rowId.lastIndexOf("-");
     if (lastDash === -1) return null;
     const maybeIndex = parseInt(rowId.slice(lastDash + 1), 10);
     return Number.isFinite(maybeIndex) ? maybeIndex : null;
   };
+
+  useEffect(() => {
+    if (!selectedItem) return;
+    const stillVisible = filteredFeedItems.some((i) => i.id === selectedItem.id);
+    if (!stillVisible) setSelectedItem(null);
+  }, [filteredFeedItems, selectedItem]);
 
   const buildRowPreview = (item: FeedItem, data: SchedulingInput | null): RowPreview | null => {
     if (!data) return null;
@@ -338,37 +370,119 @@ export default function NotesFeedPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 p-4">
-        <div className="flex flex-wrap gap-2">
-          {groupedCount.length === 0 ? (
-            <span className="text-sm text-slate-400">No notes yet.</span>
-          ) : (
-            groupedCount.map(([scope, count]) => (
-              <span
-                key={scope}
-                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600"
-              >
-                {scopeToLabel[scope] ?? scope}: {count}
-              </span>
-            ))
-          )}
+      <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
+              Table
+            </div>
+            <select
+              value={filterScope}
+              onChange={(e) => setFilterScope(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-weatherhead-primary/25"
+            >
+              <option value="all">All tables</option>
+              {groupedCount.map(([scope]) => (
+                <option key={scope} value={scope}>
+                  {scopeToLabel[scope] ?? scope}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
+              User
+            </div>
+            <select
+              value={filterAuthor}
+              onChange={(e) => setFilterAuthor(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-weatherhead-primary/25"
+            >
+              <option value="all">All users</option>
+              {uniqueAuthors.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
+              Notes vs Replies
+            </div>
+            <select
+              value={filterKind}
+              onChange={(e) => setFilterKind(e.target.value as "all" | "note" | "reply")}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-weatherhead-primary/25"
+            >
+              <option value="all">All</option>
+              <option value="note">Notes</option>
+              <option value="reply">Replies</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex flex-wrap gap-2">
+            {filteredGroupedCount.length === 0 ? (
+              <span className="text-sm text-slate-400">No notes match filters.</span>
+            ) : (
+              filteredGroupedCount.map(([scope, count]) => (
+                <span
+                  key={scope}
+                  className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600"
+                >
+                  {scopeToLabel[scope] ?? scope}: {count}
+                </span>
+              ))
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setFilterScope("all");
+              setFilterAuthor("all");
+              setFilterKind("all");
+            }}
+            className="text-xs font-semibold text-slate-600 hover:text-weatherhead-primary transition-colors"
+            disabled={filterScope === "all" && filterAuthor === "all" && filterKind === "all"}
+          >
+            Clear filters
+          </button>
         </div>
       </div>
 
       <div className="space-y-3">
-        {feedItems.length === 0 ? (
+        {filteredFeedItems.length === 0 ? (
           <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-400">
-            No recent note activity found.
+            No recent note activity found for the selected filters.
           </div>
         ) : (
-          feedItems.map((item) => {
+          filteredFeedItems.map((item) => {
             const href = editorHrefWithNotesModal(item);
             return (
               <div
                 key={item.id}
-                className="rounded-xl border border-slate-200 bg-white p-4 hover:border-[#137fec]/40 hover:bg-[#137fec]/[0.03] transition-colors"
+                className="relative rounded-xl border border-slate-200 bg-white p-4 hover:border-[#137fec]/40 hover:bg-[#137fec]/[0.03] transition-colors"
                 onClick={() => setSelectedItem(item)}
               >
+                {item.kind === "note" && typeof item.completed === "boolean" && (
+                  <div className="absolute top-3 right-3 z-0 pointer-events-none">
+                    <span
+                      className={[
+                        "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold",
+                        item.completed
+                          ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                          : "bg-amber-50 border-amber-200 text-amber-700",
+                      ].join(" ")}
+                    >
+                      {item.completed ? "Completed" : "Open"}
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-start gap-3">
                   <div className="mt-0.5 text-slate-500">
                     {item.kind === "reply" ? (
@@ -386,18 +500,6 @@ export default function NotesFeedPage() {
                       <span>{new Date(item.createdAt).toLocaleString()}</span>
                       <span>-</span>
                       <span>{item.author}</span>
-                      {item.kind === "note" && typeof item.completed === "boolean" && (
-                        <>
-                          <span>-</span>
-                          <span
-                            className={
-                              item.completed ? "text-emerald-600 font-semibold" : "text-amber-600 font-semibold"
-                            }
-                          >
-                            {item.completed ? "Completed" : "Open"}
-                          </span>
-                        </>
-                      )}
                     </div>
                     <div
                       className="mt-1 text-sm text-slate-800 line-clamp-2"

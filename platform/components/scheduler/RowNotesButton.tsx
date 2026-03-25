@@ -278,10 +278,7 @@ export const RowNotesButton = ({ scope, rowId, title }: RowNotesButtonProps) => 
                     <div
                       key={n.id}
                       id={`row-note-thread-${n.id}`}
-                      className="rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 cursor-pointer"
-                      onClick={() =>
-                        setExpandedNoteId((current) => (current === n.id ? null : n.id))
-                      }
+                      className="rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-2.5"
                     >
                       <div className="flex items-start gap-2">
                         <Checkbox
@@ -297,16 +294,28 @@ export const RowNotesButton = ({ scope, rowId, title }: RowNotesButtonProps) => 
                             Signed by {n.author} on {new Date(n.createdAt).toLocaleString()}
                           </div>
                         </div>
-                        <Button
-                          size="sm"
-                          color="danger"
-                          variant="light"
-                          onPress={() => setPendingDeleteNote(n)}
-                          className="shrink-0"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          Delete
-                        </Button>
+                        <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-start">
+                          <Button
+                            size="sm"
+                            color="primary"
+                            variant="flat"
+                            className="h-7 min-w-0 px-2 text-[11px] font-semibold"
+                            onPress={() =>
+                              setExpandedNoteId((current) => (current === n.id ? null : n.id))
+                            }
+                          >
+                            {expandedNoteId === n.id ? "Hide replies" : "Reply"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            color="danger"
+                            variant="light"
+                            onPress={() => setPendingDeleteNote(n)}
+                            className="h-7 min-w-0 px-2 text-[11px] font-semibold"
+                          >
+                            Delete
+                          </Button>
+                        </div>
                       </div>
                       {expandedNoteId === n.id && (
                         <div className="mt-3 border-t border-slate-200 pt-3 space-y-3">
@@ -357,7 +366,7 @@ export const RowNotesButton = ({ scope, rowId, title }: RowNotesButtonProps) => 
                               onPress={() => addReply(n.id)}
                               isDisabled={!replyDraft.trim() || !replyAuthorDraft.trim()}
                             >
-                              Reply
+                              Send reply
                             </Button>
                           </div>
                         </div>
