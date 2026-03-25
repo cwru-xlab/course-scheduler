@@ -31,6 +31,7 @@ const createEmptyTimeslot = (existing: Timeslot[]): Timeslot => ({
   day: "Mon",
   start_time: "09:00",
   end_time: "10:00",
+  slot_type: "standard",
 });
 
 const splitDays = (raw: string | string[] | undefined): string[] => {
@@ -104,6 +105,11 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
     onUpdate(newTimeslots);
   };
 
+  const BLOCK_TYPE_OPTIONS = [
+    { key: "standard", label: "Short block" },
+    { key: "evening", label: "Long block" },
+  ];
+
   const addTimeslot = () => {
     onUpdate([...timeslots, createEmptyTimeslot(timeslots)]);
   };
@@ -128,6 +134,7 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
               <th className="pb-2 pr-3">Days</th>
               <th className="pb-2 pr-3">Start Time</th>
               <th className="pb-2 pr-3">End Time</th>
+              <th className="pb-2 pr-3">Block Type</th>
               <th className="pb-2 pr-3">View Notes</th>
               <th className="pb-2 pr-3"></th>
             </tr>
@@ -166,6 +173,14 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
                     onChange={(v) => updateTimeslot(idx, "end_time", fromTimeOnly(v))}
                     placeholder="Select time"
                     isSearchable
+                  />
+                </td>
+                <td className="py-2 pr-3">
+                  <EditableSelectCell
+                    value={slot.slot_type ?? "standard"}
+                    options={BLOCK_TYPE_OPTIONS}
+                    onChange={(v) => updateTimeslot(idx, "slot_type", v)}
+                    placeholder="Select block type"
                   />
                 </td>
                 <td className="py-2 pr-3">

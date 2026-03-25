@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
         days: slot.day ?? slot.days,
         start_time: slot.start_time,
         end_time: slot.end_time,
-        slot_type: "standard",
+        slot_type: slot.slot_type ?? "standard",
       }));
 
       const result = await callSolver("/update-timeslots", {

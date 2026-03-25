@@ -41,6 +41,11 @@ export type Timeslot = {
   day: string;
   start_time: string;
   end_time: string;
+  /**
+   * Timeslot "block type" classification used by the solver (stored as `slot_type`).
+   * Frontend maps "Short block" -> `standard` and "Long block" -> `evening`.
+   */
+  slot_type?: string;
 };
 
 export type MeetingPattern = {

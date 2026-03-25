@@ -305,6 +305,23 @@ export default function CalendarPage() {
           if (raw) {
             try {
               const parsed = JSON.parse(raw) as LastSolverRun;
+              // Prefer the latest editor draft for `slot_type` so UI updates
+              // (short vs long blocks) reflect immediately without rerunning solver.
+              let slotTypeByTimeslotId = new Map<string, string>();
+              try {
+                const draftRaw = localStorage.getItem("wsom-scheduling-data");
+                if (draftRaw) {
+                  const draft = JSON.parse(draftRaw) as Partial<SchedulingInput>;
+                  const draftSlots = (draft?.timeslots ?? []) as Array<{ id: string; slot_type?: string }>;
+                  slotTypeByTimeslotId = new Map(
+                    draftSlots
+                      .filter((t) => !!t?.id && typeof t.slot_type === "string" && t.slot_type.trim())
+                      .map((t) => [String(t.id), String(t.slot_type)]),
+                  );
+                }
+              } catch {
+                // Ignore malformed local draft payload.
+              }
               const assignmentBySectionId = new Map(
                 parsed.solution.assignments.map((assignment) => [
                   assignment.section_id,
@@ -353,6 +370,7 @@ export default function CalendarPage() {
                 day: timeslot.day,
                 start_time: timeslot.start_time,
                 end_time: timeslot.end_time,
+                slot_type: slotTypeByTimeslotId.get(timeslot.id) ?? timeslot.slot_type ?? "standard",
               }));
 
               const instructorsFromSolver = parsed.input.instructors.map(
@@ -688,6 +706,35 @@ export default function CalendarPage() {
       .filter((m) => m >= axisStart && m <= axisEnd)
       .sort((a, b) => a - b);
   }, [data, selectedDay, axisStart, axisEnd]);
+
+  /** When dragging starts, show ONLY timeslots that match this class' duration. */
+  const dragPossibleTimeslots = useMemo(() => {
+    if (!data || !calendarDrag?.sectionId) return [];
+    const dragged = dayEvents.find((x) => x.section.id === calendarDrag.sectionId && x.timeslot);
+    if (!dragged || !dragged.timeslot) return [];
+    const durationMinutes = dragged.end - dragged.start;
+
+    return data.timeslots
+      .filter((slot) => timeslotMatchesDay(slot, selectedDay))
+      .map((slot) => ({
+        ...slot,
+        start: parseMinutes(slot.start_time),
+        end: parseMinutes(slot.end_time),
+      }))
+      .filter((slot) => Math.abs(slot.end - slot.start - durationMinutes) <= 5);
+  }, [calendarDrag?.sectionId, data, dayEvents, selectedDay, axisStart, axisEnd]);
+
+  const dragPossibleTimeslotBoundaries = useMemo(() => {
+    if (!dragPossibleTimeslots.length) return [];
+    const boundaries = new Set<number>();
+    dragPossibleTimeslots.forEach((slot) => {
+      boundaries.add(slot.start);
+      boundaries.add(slot.end);
+    });
+    return Array.from(boundaries)
+      .filter((m) => m >= axisStart && m <= axisEnd)
+      .sort((a, b) => a - b);
+  }, [dragPossibleTimeslots, axisStart, axisEnd]);
 
   const commitCalendarPlacement = useCallback(
     (sectionId: string, targetRoomId: string, selectedSlot: TimeslotWithMinutes) => {
@@ -1074,16 +1121,84 @@ export default function CalendarPage() {
                 ))}
               </div>
                   {calendarDrag?.sectionId &&
-                    dayTimeslotBoundaries.map((minute) => {
+                    dragPossibleTimeslots.map((slot) => {
+                      const slotType = (slot.slot_type ?? "").toString().trim().toLowerCase();
+                      const isLong =
+                        slotType === "evening" || slotType === "long" || slotType === "long_block";
+                      const bg = isLong
+                        ? "rgba(250, 204, 21, 0.18)" // light yellow fill
+                        : "rgba(19, 127, 236, 0.14)"; // light blue fill
+                      const leftPct =
+                        (clamp(slot.start, axisStart, axisEnd) - axisStart) / axisRange;
+                      const widthPct =
+                        (clamp(slot.end, axisStart, axisEnd) -
+                          clamp(slot.start, axisStart, axisEnd)) /
+                        axisRange;
+                      return (
+                        <div
+                          key={`${room.id}-slot-fill-${slot.id}`}
+                          className="absolute top-0 bottom-0 pointer-events-none"
+                          style={{
+                            left: `${leftPct * 100}%`,
+                            width: `${Math.max(widthPct * 100, 0.5)}%`,
+                            backgroundColor: bg,
+                            zIndex: 1,
+                          }}
+                        />
+                      );
+                    })}
+                  {calendarDrag?.sectionId &&
+                    dragPossibleTimeslotBoundaries.map((minute) => {
                       const leftPct = ((minute - axisStart) / axisRange) * 100;
                       return (
                         <div
                           key={`${room.id}-boundary-${minute}`}
                           className="absolute top-0 bottom-0 border-l border-red-300/70 pointer-events-none"
-                          style={{ left: `${leftPct}%` }}
+                          style={{ left: `${leftPct}%`, zIndex: 2 }}
                         />
                       );
                     })}
+                  {calendarDrag?.hasMoved &&
+                    calendarDrag.preview &&
+                    room.id === calendarDrag.preview.targetRoomId &&
+                    (() => {
+                      const slot = timeslotById.get(calendarDrag.preview.slotId);
+                      if (!slot) return null;
+                      const slotType = (slot.slot_type ?? "").toString().trim().toLowerCase();
+                      const isLong =
+                        slotType === "evening" || slotType === "long" || slotType === "long_block";
+                      const bg = isLong
+                        ? "rgba(250, 204, 21, 0.22)" // light yellow
+                        : "rgba(19, 127, 236, 0.18)"; // light blue
+                      const border = isLong
+                        ? "rgba(234, 179, 8, 0.55)"
+                        : "rgba(19, 127, 236, 0.45)";
+                      const slotStartM = parseMinutes(slot.start_time);
+                      const slotEndM = parseMinutes(slot.end_time);
+                      const leftPct =
+                        (clamp(slotStartM, axisStart, axisEnd) - axisStart) / axisRange;
+                      const widthPct =
+                        (clamp(slotEndM, axisStart, axisEnd) -
+                          clamp(slotStartM, axisStart, axisEnd)) /
+                        axisRange;
+                      const highlightTop =
+                        0;
+                      return (
+                        <div
+                          key={`${room.id}-slot-highlight-${calendarDrag.preview.slotId}`}
+                          className="absolute rounded-md pointer-events-none"
+                          style={{
+                            left: `${leftPct * 100}%`,
+                            width: `${Math.max(widthPct * 100, 0.5)}%`,
+                            top: highlightTop,
+                            height: "100%",
+                            backgroundColor: bg,
+                            border: `1px solid ${border}`,
+                            zIndex: 3,
+                          }}
+                        />
+                      );
+                    })()}
 
                   {events.map(({ section, timeslot, start, end, lane }) => {
                 const leftPct =
