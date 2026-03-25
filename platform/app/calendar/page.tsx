@@ -1519,7 +1519,14 @@ export default function CalendarPage() {
                               borderLeftColor: color.border,
                             }}
                           >
-                            <div className="font-bold truncate">{section.course_id}</div>
+                            {(() => {
+                              const dept = (section.department ?? "").toString().trim();
+                              return (
+                                <div className="font-bold truncate">
+                                  {(dept ? `${dept} ` : "") + section.course_id}
+                                </div>
+                              );
+                            })()}
                             <div className="truncate">{professorLastName}</div>
                           </div>
                         );
