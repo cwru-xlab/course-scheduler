@@ -15,21 +15,27 @@ export default function RoomsPage() {
   const [updateStatus, setUpdateStatus] = useState<
     "idle" | "loading" | "success" | "error"
   >("idle");
+  const [updateWarnings, setUpdateWarnings] = useState<string[]>([]);
 
   const updateBackend = async () => {
     if (!data) return;
     setUpdateStatus("loading");
+    setUpdateWarnings([]);
     try {
       const response = await fetch("/api/update-all", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      const result = await response.json();
+      const result = (await response.json()) as {
+        status?: string;
+        warnings?: string[];
+      };
       if (!response.ok || result.status === "error") {
         setUpdateStatus("error");
         return;
       }
+      setUpdateWarnings(Array.isArray(result.warnings) ? result.warnings : []);
       await reloadFromBackend();
       setUpdateStatus("success");
     } catch {
@@ -62,9 +68,16 @@ export default function RoomsPage() {
           <SolverActionButton data={data} />
         </div>
         {updateStatus === "success" && (
-          <p className="w-full text-sm text-emerald-600 font-semibold">
-            Backend updated successfully. Changes are stored in solver tables.
-          </p>
+          <div className="w-full space-y-2">
+            <p className="text-sm text-emerald-600 font-semibold">
+              Backend updated successfully. Changes are stored in solver tables.
+            </p>
+            {updateWarnings.map((warning) => (
+              <p key={warning} className="text-sm text-amber-700 font-semibold">
+                Warning: {warning}
+              </p>
+            ))}
+          </div>
         )}
         {updateStatus === "error" && (
           <p className="w-full text-sm text-red-600 font-semibold">

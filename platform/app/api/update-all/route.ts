@@ -36,6 +36,8 @@ export async function POST(request: NextRequest) {
       soft_locks = [],
     } = body;
 
+    const warnings: string[] = [];
+
     // Helper to call solver endpoints and normalize error responses
     const callSolver = async (path: string, payload: unknown) => {
       const response = await fetch(`${SOLVER_URL}${path}`, {
@@ -82,7 +84,7 @@ export async function POST(request: NextRequest) {
         };
       }
 
-      return { ok: true as const };
+      return { ok: true as const, data };
     };
 
     // 1) Sections
@@ -92,6 +94,17 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { status: "error", errors: result.errors },
           { status: result.status },
+        );
+      }
+      const skippedSections = Array.isArray(result.data?.skipped_sections)
+        ? (result.data.skipped_sections as Array<Record<string, unknown>>)
+        : [];
+      const duplicateIds = skippedSections
+        .filter((row) => row.duplicate === true && typeof row.id === "string")
+        .map((row) => row.id as string);
+      if (duplicateIds.length > 0) {
+        warnings.push(
+          `Duplicate section IDs were skipped: ${duplicateIds.join(", ")}.`,
         );
       }
     }
@@ -212,6 +225,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         status: "ok",
+        warnings,
       },
       { status: 200 },
     );

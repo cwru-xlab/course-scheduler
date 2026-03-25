@@ -42,6 +42,7 @@ def _rows_for_sheet(sheet_name: str, payload: Dict[str, Any]) -> list[Dict[str, 
             {
                 "id": item.get("id", ""),
                 "course_id": item.get("course_id", ""),
+                "department": item.get("department") or "",
                 "section_code": item.get("section_code", ""),
                 "instructor_id": item.get("instructor_id", ""),
                 "expected_enrollment": item.get("expected_enrollment", ""),
@@ -52,6 +53,7 @@ def _rows_for_sheet(sheet_name: str, payload: Dict[str, Any]) -> list[Dict[str, 
                 "room_requirements": serialize_list_cell(item.get("room_requirements")),
                 "crosslist_group_id": item.get("crosslist_group_id") or "",
                 "tags": serialize_list_cell(item.get("tags")),
+                "previous_meeting_pattern": item.get("previous_meeting_pattern") or "",
             }
             for item in payload.get("sections", [])
         ]
@@ -62,6 +64,7 @@ def _rows_for_sheet(sheet_name: str, payload: Dict[str, Any]) -> list[Dict[str, 
             rows.append(
                 {
                     "id": item.get("id", ""),
+                    "name": item.get("name") or "",
                     "rank_type": item.get("rank_type", ""),
                     "unavailable_times": serialize_list_cell(item.get("unavailable_times")),
                     "preferred_days": serialize_list_cell(preferences.get("preferred_days")),
@@ -77,6 +80,7 @@ def _rows_for_sheet(sheet_name: str, payload: Dict[str, Any]) -> list[Dict[str, 
             {
                 "id": item.get("id", ""),
                 "building": item.get("building", ""),
+                "room_number": item.get("room_number", ""),
                 "capacity": item.get("capacity", ""),
                 "features": serialize_list_cell(item.get("features")),
             }
@@ -89,6 +93,7 @@ def _rows_for_sheet(sheet_name: str, payload: Dict[str, Any]) -> list[Dict[str, 
                 "day": item.get("day", ""),
                 "start_time": item.get("start_time", ""),
                 "end_time": item.get("end_time", ""),
+                "slot_type": item.get("slot_type", "") or "",
             }
             for item in payload.get("timeslots", [])
         ]

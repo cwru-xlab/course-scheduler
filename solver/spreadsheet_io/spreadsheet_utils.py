@@ -23,6 +23,7 @@ SPREADSHEET_SPECS: List[SheetSpec] = [
         columns=[
             "id",
             "course_id",
+            "department",
             "section_code",
             "instructor_id",
             "expected_enrollment",
@@ -31,12 +32,14 @@ SPREADSHEET_SPECS: List[SheetSpec] = [
             "room_requirements",
             "crosslist_group_id",
             "tags",
+            "previous_meeting_pattern",
         ],
     ),
     SheetSpec(
         name="Instructors",
         columns=[
             "id",
+            "name",
             "rank_type",
             "unavailable_times",
             "preferred_days",
@@ -46,11 +49,11 @@ SPREADSHEET_SPECS: List[SheetSpec] = [
     ),
     SheetSpec(
         name="Rooms",
-        columns=["id", "building", "capacity", "features"],
+        columns=["id", "building", "room_number", "capacity", "features"],
     ),
     SheetSpec(
         name="Timeslots",
-        columns=["id", "day", "start_time", "end_time"],
+        columns=["id", "day", "start_time", "end_time", "slot_type"],
     ),
     SheetSpec(
         name="MeetingPatterns",
@@ -79,6 +82,51 @@ SPREADSHEET_SPECS: List[SheetSpec] = [
 ]
 
 SHEET_NAME_TO_SPEC: Dict[str, SheetSpec] = {spec.name: spec for spec in SPREADSHEET_SPECS}
+
+LEGACY_SHEET_COLUMNS: Dict[str, List[str]] = {
+    "Sections": [
+        "id",
+        "course_id",
+        "section_code",
+        "instructor_id",
+        "expected_enrollment",
+        "enrollment_cap",
+        "allowed_meeting_patterns",
+        "room_requirements",
+        "crosslist_group_id",
+        "tags",
+    ],
+    "Instructors": [
+        "id",
+        "rank_type",
+        "unavailable_times",
+        "preferred_days",
+        "preferred_patterns",
+        "max_teaching_days",
+    ],
+    "Rooms": ["id", "building", "capacity", "features"],
+    "Timeslots": ["id", "day", "start_time", "end_time"],
+}
+
+
+def normalize_sheet_headers(sheet_name: str, headers: List[str]) -> List[str]:
+    """
+    Accept either the current schema or a legacy schema for certain sheets.
+
+    Returns the canonical header list for the sheet if the provided headers are compatible.
+    """
+    spec = SHEET_NAME_TO_SPEC[sheet_name]
+    expected = spec.columns
+    if headers[: len(expected)] == expected:
+        return expected
+
+    legacy = LEGACY_SHEET_COLUMNS.get(sheet_name)
+    if legacy and headers[: len(legacy)] == legacy:
+        return legacy
+
+    raise ValueError(
+        f"Sheet '{sheet_name}' has invalid headers. Expected: {expected}. Found: {headers[:len(expected)]}"
+    )
 
 
 def parse_list_cell(value: Any) -> List[str]:

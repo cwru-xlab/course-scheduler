@@ -1318,21 +1318,53 @@ def update_sections():
         # Clear existing sections
         Section.query.delete()
 
+        skipped_sections: List[Dict[str, Any]] = []
+        seen_section_ids = set()
+
         # Insert all provided sections
         for item in sections_payload:
+            # The DB model requires these fields; skip partial spreadsheet rows instead
+            # of failing the entire backend update.
+            required_keys = ("id", "course_id", "section_code", "instructor_id")
+            missing_keys = [
+                key
+                for key in required_keys
+                if item.get(key) is None or str(item.get(key)).strip() == ""
+            ]
+            if missing_keys:
+                skipped_sections.append(
+                    {
+                        "id": item.get("id"),
+                        "missing_required_fields": missing_keys,
+                    }
+                )
+                continue
+
+            section_id = str(item.get("id")).strip()
+            if section_id in seen_section_ids:
+                skipped_sections.append(
+                    {
+                        "id": section_id,
+                        "duplicate": True,
+                        "message": "Duplicate section id in payload; kept first occurrence.",
+                    }
+                )
+                continue
+            seen_section_ids.add(section_id)
+
             dept_raw = item.get("department")
             department = (str(dept_raw).strip() if dept_raw is not None else "") or ""
 
             section = Section(
-                id=item.get("id"),
+                id=section_id,
                 course_id=item.get("course_id"),
                 section_code=item.get("section_code"),
                 instructor_id=item.get("instructor_id"),
                 room_id=item.get("room_id"),
                 timeslot_id=item.get("timeslot_id"),
                 crosslisting_id=item.get("crosslisting_id"),
-                expected_enrollment=item.get("expected_enrollment"),
-                enrollment_cap=item.get("enrollment_cap"),
+                expected_enrollment=int(item.get("expected_enrollment") or 0),
+                enrollment_cap=int(item.get("enrollment_cap") or 0),
                 section_type=item.get("section_type") or "lecture",
                 is_crosslisted=bool(item.get("is_crosslisted", False)),
                 last_year_time=item.get("last_year_time"),
@@ -1363,7 +1395,15 @@ def update_sections():
             500,
         )
 
-    return jsonify({"status": "ok"}), 200
+    return (
+        jsonify(
+            {
+                "status": "ok",
+                "skipped_sections": skipped_sections,
+            }
+        ),
+        200,
+    )
 
 
 def _parse_time(value):

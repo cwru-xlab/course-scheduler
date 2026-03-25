@@ -5,12 +5,16 @@ from typing import Any, Dict, List
 
 from openpyxl import load_workbook
 
+DEFAULT_ALLOWED_MEETING_PATTERNS = ["MP-A-50", "MP-B-75"]
+
+
 try:
     from spreadsheet_io.spreadsheet_utils import (
         SHEET_NAME_TO_SPEC,
         maybe_float,
         maybe_int,
         maybe_str,
+        normalize_sheet_headers,
         parse_bool_cell,
         parse_list_cell,
         parse_nested_list_cell,
@@ -21,6 +25,7 @@ except ModuleNotFoundError:
         maybe_float,
         maybe_int,
         maybe_str,
+        normalize_sheet_headers,
         parse_bool_cell,
         parse_list_cell,
         parse_nested_list_cell,
@@ -42,20 +47,31 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
     soft_rows = _read_rows(wb, "SoftLocks")
 
     sections: List[Dict[str, Any]] = []
+    seen_section_ids = set()
     for row in sections_rows:
         section_id = _required_str(row, "id", "Sections")
+        if section_id in seen_section_ids:
+            continue
+        seen_section_ids.add(section_id)
         sections.append(
             {
                 "id": section_id,
-                "course_id": _required_str(row, "course_id", "Sections"),
-                "section_code": _required_str(row, "section_code", "Sections"),
-                "instructor_id": _required_str(row, "instructor_id", "Sections"),
-                "expected_enrollment": _required_int(row, "expected_enrollment", "Sections"),
-                "enrollment_cap": _required_int(row, "enrollment_cap", "Sections"),
-                "allowed_meeting_patterns": parse_list_cell(row.get("allowed_meeting_patterns")),
+                "course_id": _str_with_default(row, "course_id", "Sections", default=""),
+                "department": maybe_str(row.get("department")),
+                "section_code": _str_with_default(row, "section_code", "Sections", default=""),
+                "instructor_id": _str_with_default(row, "instructor_id", "Sections", default=""),
+                "expected_enrollment": _int_with_default(
+                    row, "expected_enrollment", "Sections", default=0
+                ),
+                "enrollment_cap": _int_with_default(row, "enrollment_cap", "Sections", default=0),
+                "allowed_meeting_patterns": (
+                    parse_list_cell(row.get("allowed_meeting_patterns"))
+                    or DEFAULT_ALLOWED_MEETING_PATTERNS.copy()
+                ),
                 "room_requirements": parse_list_cell(row.get("room_requirements")),
                 "crosslist_group_id": maybe_str(row.get("crosslist_group_id")),
                 "tags": parse_list_cell(row.get("tags")),
+                "previous_meeting_pattern": maybe_str(row.get("previous_meeting_pattern")),
             }
         )
 
@@ -65,7 +81,8 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
         instructors.append(
             {
                 "id": instructor_id,
-                "rank_type": _required_str(row, "rank_type", "Instructors"),
+                "name": maybe_str(row.get("name")) or instructor_id,
+                "rank_type": _str_with_default(row, "rank_type", "Instructors", default="Adjunct"),
                 "unavailable_times": parse_list_cell(row.get("unavailable_times")),
                 "preferences": {
                     "preferred_days": parse_list_cell(row.get("preferred_days")),
@@ -81,8 +98,9 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
         rooms.append(
             {
                 "id": room_id,
-                "building": _required_str(row, "building", "Rooms"),
-                "capacity": _required_int(row, "capacity", "Rooms"),
+                "building": _str_with_default(row, "building", "Rooms", default=""),
+                "room_number": maybe_str(row.get("room_number")) or "",
+                "capacity": _int_with_default(row, "capacity", "Rooms", default=0),
                 "features": parse_list_cell(row.get("features")),
             }
         )
@@ -93,9 +111,10 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
         timeslots.append(
             {
                 "id": slot_id,
-                "day": _required_str(row, "day", "Timeslots"),
-                "start_time": _required_str(row, "start_time", "Timeslots"),
-                "end_time": _required_str(row, "end_time", "Timeslots"),
+                "day": _str_with_default(row, "day", "Timeslots", default=""),
+                "start_time": _str_with_default(row, "start_time", "Timeslots", default=""),
+                "end_time": _str_with_default(row, "end_time", "Timeslots", default=""),
+                "slot_type": maybe_str(row.get("slot_type")),
             }
         )
 
@@ -105,7 +124,9 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
         meeting_patterns.append(
             {
                 "id": pattern_id,
-                "slots_required": _required_int(row, "slots_required", "MeetingPatterns"),
+                "slots_required": _int_with_default(
+                    row, "slots_required", "MeetingPatterns", default=1
+                ),
                 "allowed_days": parse_list_cell(row.get("allowed_days")),
                 "compatible_timeslot_sets": parse_nested_list_cell(
                     row.get("compatible_timeslot_sets")
@@ -129,7 +150,7 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
             {
                 "id": _required_str(row, "id", "NoOverlapGroups"),
                 "member_section_ids": parse_list_cell(row.get("member_section_ids")),
-                "reason": _required_str(row, "reason", "NoOverlapGroups"),
+                "reason": _str_with_default(row, "reason", "NoOverlapGroups", default="constraint"),
             }
         )
 
@@ -137,9 +158,9 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
     for row in blocked_rows:
         blocked_times.append(
             {
-                "scope": _required_str(row, "scope", "BlockedTimes"),
+                "scope": _str_with_default(row, "scope", "BlockedTimes", default="global"),
                 "timeslot_ids": parse_list_cell(row.get("timeslot_ids")),
-                "reason": _required_str(row, "reason", "BlockedTimes"),
+                "reason": _str_with_default(row, "reason", "BlockedTimes", default="blocked"),
             }
         )
 
@@ -186,27 +207,24 @@ def _read_rows(workbook, sheet_name: str) -> List[Dict[str, Any]]:
         raise ValueError(f"Missing required sheet: {sheet_name}")
 
     ws = workbook[sheet_name]
-    spec = SHEET_NAME_TO_SPEC[sheet_name]
     header_cells = next(ws.iter_rows(min_row=1, max_row=1, values_only=True), None)
     if header_cells is None:
         raise ValueError(f"Sheet '{sheet_name}' is empty.")
 
     headers = [str(v).strip() if v is not None else "" for v in header_cells]
-    expected = spec.columns
-    if headers[: len(expected)] != expected:
-        raise ValueError(
-            f"Sheet '{sheet_name}' has invalid headers. "
-            f"Expected: {expected}. Found: {headers[:len(expected)]}"
-        )
+    active_columns = normalize_sheet_headers(sheet_name, headers)
 
     rows: List[Dict[str, Any]] = []
     for values in ws.iter_rows(min_row=2, values_only=True):
         if values is None:
             continue
-        active_values = values[: len(expected)]
+        active_values = values[: len(active_columns)]
         if all(v is None or str(v).strip() == "" for v in active_values):
             continue
-        row = {column: active_values[idx] if idx < len(active_values) else None for idx, column in enumerate(expected)}
+        row = {
+            column: active_values[idx] if idx < len(active_values) else None
+            for idx, column in enumerate(active_columns)
+        }
         rows.append(row)
     return rows
 
@@ -218,8 +236,11 @@ def _required_str(row: Dict[str, Any], key: str, sheet: str) -> str:
     return value
 
 
-def _required_int(row: Dict[str, Any], key: str, sheet: str) -> int:
+def _int_with_default(row: Dict[str, Any], key: str, sheet: str, default: int) -> int:
     value = maybe_int(row.get(key))
-    if value is None:
-        raise ValueError(f"Sheet '{sheet}' has invalid or empty integer '{key}'.")
-    return value
+    return default if value is None else value
+
+
+def _str_with_default(row: Dict[str, Any], key: str, sheet: str, default: str) -> str:
+    value = maybe_str(row.get(key))
+    return default if value is None else value

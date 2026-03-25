@@ -13,19 +13,19 @@ This workbook format is the interchange schema for the scheduler UI's `Schedulin
 ## Required sheets and columns
 
 ### `Sections`
-`id`, `course_id`, `section_code`, `instructor_id`, `expected_enrollment`,
-`enrollment_cap`, `allowed_meeting_patterns`, `room_requirements`,
-`crosslist_group_id`, `tags`
+`id`, `course_id`, `department`, `section_code`, `instructor_id`,
+`expected_enrollment`, `enrollment_cap`, `allowed_meeting_patterns`,
+`room_requirements`, `crosslist_group_id`, `tags`, `previous_meeting_pattern`
 
 ### `Instructors`
-`id`, `rank_type`, `unavailable_times`, `preferred_days`,
+`id`, `name`, `rank_type`, `unavailable_times`, `preferred_days`,
 `preferred_patterns`, `max_teaching_days`
 
 ### `Rooms`
-`id`, `building`, `capacity`, `features`
+`id`, `building`, `room_number`, `capacity`, `features`
 
 ### `Timeslots`
-`id`, `day`, `start_time`, `end_time`
+`id`, `day`, `start_time`, `end_time`, `slot_type`
 
 ### `MeetingPatterns`
 `id`, `slots_required`, `allowed_days`, `compatible_timeslot_sets`
