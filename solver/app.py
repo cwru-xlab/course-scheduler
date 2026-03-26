@@ -329,14 +329,29 @@ def _has_required_features(room, required: List[str]) -> bool:
     return all(feature in room_features for feature in required)
 
 
+def _required_section_capacity(section: Any) -> int:
+    """Return the minimum room capacity required for a section.
+
+    Prefer enrollment_cap when provided, otherwise fall back to expected_enrollment.
+    """
+    section_dict = _section_to_dict(section)
+    enrollment_cap = section_dict.get("enrollment_cap")
+    expected_enrollment = section_dict.get("expected_enrollment")
+    if isinstance(enrollment_cap, (int, float)) and enrollment_cap > 0:
+        return int(enrollment_cap)
+    if isinstance(expected_enrollment, (int, float)) and expected_enrollment > 0:
+        return int(expected_enrollment)
+    return 0
+
+
 def _build_crosslist_totals(sections: List) -> Dict[str, int]:
-    """Compute total expected enrollment per cross-list group.
+    """Compute total required seats per cross-list group.
 
     Args:
         sections: All section definitions.
 
     Returns:
-        Mapping of cross-list group ID to summed expected enrollment.
+        Mapping of cross-list group ID to summed required section capacity.
     """
     totals: Dict[str, int] = {}
     for section in sections:
@@ -344,7 +359,7 @@ def _build_crosslist_totals(sections: List) -> Dict[str, int]:
         crosslist_id = section_dict.get("crosslist_group_id")
         if crosslist_id:
             totals.setdefault(crosslist_id, 0)
-            totals[crosslist_id] += section_dict.get("expected_enrollment", 0)
+            totals[crosslist_id] += _required_section_capacity(section_dict)
     return totals
 
 
@@ -441,6 +456,7 @@ def _build_options(
     for section in input_data.sections:
         section_dict = _section_to_dict(section)
         section_id = section_dict["id"]
+        required_capacity = _required_section_capacity(section_dict)
         section_prefs = section_prefs_by_id.get(section_id, {})
         # get the instructor for the section
         instructor = instructors_by_id.get(section_dict["instructor_id"])
@@ -450,7 +466,7 @@ def _build_options(
         available_rooms = []
         for room in input_data.rooms:
             room_dict = _room_to_dict(room)
-            if not ignore_room_capacity and room_dict["capacity"] < section_dict["expected_enrollment"]:
+            if not ignore_room_capacity and room_dict["capacity"] < required_capacity:
                 continue
             if not ignore_room_features and not _has_required_features(
                 room_dict, section_dict.get("room_requirements", [])
@@ -507,7 +523,7 @@ def _build_options(
                             pattern_id,
                             tuple(timeslot_set),
                             room["id"],
-                            room["capacity"] - section_dict["expected_enrollment"],
+                            room["capacity"] - required_capacity,
                         )
                     )
 
@@ -940,17 +956,17 @@ def _build_run_diagnostics(
     for section in input_data.sections:
         section_dict = _section_to_dict(section)
         section_id = section_dict.get("id")
-        enrollment = section_dict.get("expected_enrollment")
+        enrollment = _required_section_capacity(section_dict)
         if (
             section_id
-            and isinstance(enrollment, (int, float))
+            and isinstance(enrollment, int)
             and max_room_capacity is not None
             and enrollment > max_room_capacity
         ):
             sections_exceeding_room_capacity.append(
                 {
                     "section_id": section_id,
-                    "expected_enrollment": int(enrollment),
+                    "required_capacity": int(enrollment),
                     "max_room_capacity": int(max_room_capacity),
                 }
             )
