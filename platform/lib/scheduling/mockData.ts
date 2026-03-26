@@ -5,6 +5,7 @@ export const mockSchedulingInput: SchedulingInput = {
     {
       id: "SEC-101-A",
       course_id: "COURSE-101",
+      department: "FIN",
       section_code: "A",
       instructor_id: "INST-ALPHA",
       expected_enrollment: 28,
@@ -17,6 +18,7 @@ export const mockSchedulingInput: SchedulingInput = {
     {
       id: "SEC-550-A",
       course_id: "COURSE-550",
+      department: "ACCT",
       section_code: "A",
       instructor_id: "INST-GAMMA",
       expected_enrollment: 18,
@@ -29,6 +31,7 @@ export const mockSchedulingInput: SchedulingInput = {
     {
       id: "SEC-220-A",
       course_id: "COURSE-220",
+      department: "OB",
       section_code: "A",
       instructor_id: "INST-BETA",
       expected_enrollment: 20,
@@ -41,6 +44,7 @@ export const mockSchedulingInput: SchedulingInput = {
     {
       id: "SEC-221-A",
       course_id: "COURSE-221",
+      department: "OB",
       section_code: "A",
       instructor_id: "INST-BETA",
       expected_enrollment: 16,
@@ -53,6 +57,7 @@ export const mockSchedulingInput: SchedulingInput = {
     {
       id: "SEC-330-A",
       course_id: "COURSE-330",
+      department: "MKTG",
       section_code: "A",
       instructor_id: "INST-DELTA",
       expected_enrollment: 22,
@@ -66,6 +71,7 @@ export const mockSchedulingInput: SchedulingInput = {
   instructors: [
     {
       id: "INST-ALPHA",
+      name: "Alice Johnson",
       rank_type: "Tenured",
       unavailable_times: [],
       preferences: {
@@ -76,6 +82,7 @@ export const mockSchedulingInput: SchedulingInput = {
     },
     {
       id: "INST-BETA",
+      name: "Brian Lee",
       rank_type: "Adjunct",
       unavailable_times: [],
       preferences: {
@@ -86,6 +93,7 @@ export const mockSchedulingInput: SchedulingInput = {
     },
     {
       id: "INST-GAMMA",
+      name: "Grace Kim",
       rank_type: "TT",
       unavailable_times: [],
       preferences: {
@@ -95,6 +103,7 @@ export const mockSchedulingInput: SchedulingInput = {
     },
     {
       id: "INST-DELTA",
+      name: "Daniel Park",
       rank_type: "NTT",
       unavailable_times: [],
       preferences: {
@@ -107,32 +116,35 @@ export const mockSchedulingInput: SchedulingInput = {
     {
       id: "ROOM-A",
       building: "Peters",
+      room_number: "A-101",
       capacity: 60,
       features: ["projector", "case_room"],
     },
     {
       id: "ROOM-B",
       building: "Smith",
+      room_number: "B-204",
       capacity: 40,
       features: ["projector"],
     },
     {
       id: "ROOM-C",
       building: "Smith",
+      room_number: "C-110",
       capacity: 25,
       features: [],
     },
   ],
   timeslots: [
-    { id: "TS-M-0900", day: "Mon", start_time: "09:00", end_time: "10:00" },
-    { id: "TS-M-1030", day: "Mon", start_time: "10:30", end_time: "11:30" },
-    { id: "TS-W-0900", day: "Wed", start_time: "09:00", end_time: "10:00" },
-    { id: "TS-W-1030", day: "Wed", start_time: "10:30", end_time: "11:30" },
-    { id: "TS-T-0900", day: "Tue", start_time: "09:00", end_time: "10:15" },
-    { id: "TS-T-1030", day: "Tue", start_time: "10:30", end_time: "11:45" },
-    { id: "TS-TH-0900", day: "Thu", start_time: "09:00", end_time: "10:15" },
-    { id: "TS-TH-1030", day: "Thu", start_time: "10:30", end_time: "11:45" },
-    { id: "TS-F-0900", day: "Fri", start_time: "09:00", end_time: "10:30" },
+    { id: "TS-M-0900", day: "Mon", start_time: "09:00", end_time: "10:00", slot_type: "standard" },
+    { id: "TS-M-1030", day: "Mon", start_time: "10:30", end_time: "11:30", slot_type: "standard" },
+    { id: "TS-W-0900", day: "Wed", start_time: "09:00", end_time: "10:00", slot_type: "standard" },
+    { id: "TS-W-1030", day: "Wed", start_time: "10:30", end_time: "11:30", slot_type: "standard" },
+    { id: "TS-T-0900", day: "Tue", start_time: "09:00", end_time: "10:15", slot_type: "standard" },
+    { id: "TS-T-1030", day: "Tue", start_time: "10:30", end_time: "11:45", slot_type: "standard" },
+    { id: "TS-TH-0900", day: "Thu", start_time: "09:00", end_time: "10:15", slot_type: "standard" },
+    { id: "TS-TH-1030", day: "Thu", start_time: "10:30", end_time: "11:45", slot_type: "standard" },
+    { id: "TS-F-0900", day: "Fri", start_time: "09:00", end_time: "10:30", slot_type: "standard" },
   ],
   meeting_patterns: [
     {

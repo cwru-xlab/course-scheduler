@@ -1,3 +1,49 @@
 @import "tailwindcss";
 
-@config "../tailwind.config.mjs"
+@config "../tailwind.config.mjs";
+
+/* Weatherhead Scheduler design: light surface background */
+:root {
+  --weatherhead-primary: #137fec;
+  --weatherhead-surface: #f6f7f8;
+}
+
+/* Highlight note-linked editor rows/cards when navigating from Notes Feed. */
+@keyframes note-target-pulse {
+  0% {
+    background-color: rgba(19, 127, 236, 0.55);
+    outline-color: #0a4a9e;
+  }
+  35% {
+    background-color: rgba(19, 127, 236, 0.4);
+    outline-color: #137fec;
+  }
+  100% {
+    background-color: rgba(19, 127, 236, 0.3);
+    outline-color: #137fec;
+  }
+}
+
+:target[id^="note-"] {
+  scroll-margin-top: 96px; /* keeps target visible below sticky navbar */
+  outline: 4px solid #137fec;
+  outline-offset: 0;
+  animation: note-target-pulse 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0s 2 forwards;
+  background-color: rgba(19, 127, 236, 0.3);
+  position: relative;
+  z-index: 1;
+}
+
+/* Table rows need td-level background to visibly highlight the full row. */
+:target[id^="note-"] > td {
+  background-color: rgba(19, 127, 236, 0.38) !important;
+  border-top: 2px solid rgba(19, 127, 236, 0.85) !important;
+  border-bottom: 2px solid rgba(19, 127, 236, 0.85) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+:target[id^="note-"] > td:first-child {
+  box-shadow:
+    inset 6px 0 0 0 #137fec,
+    inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}

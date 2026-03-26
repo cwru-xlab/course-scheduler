@@ -13,6 +13,14 @@ const config = {
         sans: ["var(--font-sans)"],
         mono: ["var(--font-mono)"],
       },
+      colors: {
+        weatherhead: {
+          primary: "#137fec",
+          "primary/10": "rgba(19, 127, 236, 0.1)",
+          "primary/20": "rgba(19, 127, 236, 0.2)",
+          surface: "#f6f7f8",
+        },
+      },
     },
   },
   darkMode: "class",

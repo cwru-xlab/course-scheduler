@@ -3,6 +3,8 @@ export type Id = string;
 export type Section = {
   id: Id;
   course_id: Id;
+  /** Department code or name; used for calendar color-coding */
+  department?: string;
   section_code: string;
   instructor_id: Id;
   expected_enrollment: number;
@@ -11,10 +13,12 @@ export type Section = {
   room_requirements: string[];
   crosslist_group_id?: Id | null;
   tags: string[];
+  previous_meeting_pattern?: Id;
 };
 
 export type Instructor = {
   id: Id;
+  name: string;
   rank_type: "TT" | "Tenured" | "NTT" | "Adjunct";
   unavailable_times: Id[];
   preferences: {
@@ -27,6 +31,7 @@ export type Instructor = {
 export type Room = {
   id: Id;
   building: string;
+  room_number: string;
   capacity: number;
   features: string[];
 };
@@ -36,6 +41,11 @@ export type Timeslot = {
   day: string;
   start_time: string;
   end_time: string;
+  /**
+   * Timeslot "block type" classification used by the solver (stored as `slot_type`).
+   * Frontend maps "Short block" -> `standard` and "Long block" -> `evening`.
+   */
+  slot_type?: string;
 };
 
 export type MeetingPattern = {

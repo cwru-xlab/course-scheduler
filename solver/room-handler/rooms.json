@@ -1,0 +1,194 @@
+[
+  {
+    "id": "PBL_02",
+    "building": "Peter B Lewis",
+    "room_number": "02",
+    "capacity": 100,
+    "room_type": "lecture",
+    "has_av": true,
+    "is_accessible": true,
+    "features": []
+  },
+  {
+    "id": "PBL_03",
+    "building": "Peter B Lewis",
+    "room_number": "03",
+    "capacity": 100,
+    "room_type": "lecture",
+    "has_av": true,
+    "is_accessible": true,
+    "features": []
+  },
+  {
+    "id": "PBL_04",
+    "building": "Peter B Lewis",
+    "room_number": "04",
+    "capacity": 100,
+    "room_type": "lecture",
+    "has_av": true,
+    "is_accessible": true,
+    "features": []
+  },
+  {
+    "id": "PBL_05",
+    "building": "Peter B Lewis",
+    "room_number": "05",
+    "capacity": 100,
+    "room_type": "lecture",
+    "has_av": true,
+    "is_accessible": true,
+    "features": []
+  },
+  {
+    "id": "PBL_06",
+    "building": "Peter B Lewis",
+    "room_number": "06",
+    "capacity": 100,
+    "room_type": "seminar",
+    "has_av": true,
+    "is_accessible": true,
+    "features": []
+  },
+  {
+    "id": "PBL_07",
+    "building": "Peter B Lewis",
+    "room_number": "07",
+    "capacity": 100,
+    "room_type": "lab",
+    "has_av": true,
+    "is_accessible": true,
+    "features": [
+      "computer_stations"
+    ]
+  },
+  {
+    "id": "PBL_106",
+    "building": "Peter B Lewis",
+    "room_number": "106",
+    "capacity": 100,
+    "room_type": "lecture",
+    "has_av": true,
+    "is_accessible": true,
+    "features": []
+  },
+  {
+    "id": "PBL_118",
+    "building": "Peter B Lewis",
+    "room_number": "118",
+    "capacity": 100,
+    "room_type": "lecture",
+    "has_av": true,
+    "is_accessible": true,
+    "features": []
+  },
+  {
+    "id": "PBL_120",
+    "building": "Peter B Lewis",
+    "room_number": "120",
+    "capacity": 100,
+    "room_type": "seminar",
+    "has_av": true,
+    "is_accessible": true,
+    "features": []
+  },
+  {
+    "id": "PBL_121",
+    "building": "Peter B Lewis",
+    "room_number": "121",
+    "capacity": 100,
+    "room_type": "seminar",
+    "has_av": true,
+    "is_accessible": true,
+    "features": []
+  },
+  {
+    "id": "PBL_201",
+    "building": "Peter B Lewis",
+    "room_number": "201",
+    "capacity": 100,
+    "room_type": "lecture",
+    "has_av": true,
+    "is_accessible": true,
+    "features": []
+  },
+  {
+    "id": "PBL_202",
+    "building": "Peter B Lewis",
+    "room_number": "202",
+    "capacity": 100,
+    "room_type": "lecture",
+    "has_av": true,
+    "is_accessible": true,
+    "features": []
+  },
+  {
+    "id": "PBL_203",
+    "building": "Peter B Lewis",
+    "room_number": "203",
+    "capacity": 100,
+    "room_type": "lecture",
+    "has_av": true,
+    "is_accessible": true,
+    "features": []
+  },
+  {
+    "id": "PBL_220",
+    "building": "Peter B Lewis",
+    "room_number": "220",
+    "capacity": 100,
+    "room_type": "seminar",
+    "has_av": true,
+    "is_accessible": true,
+    "features": []
+  },
+  {
+    "id": "PBL_258",
+    "building": "Peter B Lewis",
+    "room_number": "258",
+    "capacity": 100,
+    "room_type": "lecture",
+    "has_av": true,
+    "is_accessible": true,
+    "features": []
+  },
+  {
+    "id": "PBL_401",
+    "building": "Peter B Lewis",
+    "room_number": "401",
+    "capacity": 100,
+    "room_type": "lecture",
+    "has_av": true,
+    "is_accessible": true,
+    "features": []
+  },
+  {
+    "id": "PBL_418",
+    "building": "Peter B Lewis",
+    "room_number": "418",
+    "capacity": 100,
+    "room_type": "seminar",
+    "has_av": false,
+    "is_accessible": true,
+    "features": []
+  },
+  {
+    "id": "PBL_501",
+    "building": "Peter B Lewis",
+    "room_number": "501",
+    "capacity": 100,
+    "room_type": "lecture",
+    "has_av": true,
+    "is_accessible": true,
+    "features": []
+  },
+  {
+    "id": "GUND_HALL",
+    "building": "Gund Hall",
+    "room_number": "",
+    "capacity": 100,
+    "room_type": "seminar",
+    "has_av": false,
+    "is_accessible": true,
+    "features": []
+  }
+]

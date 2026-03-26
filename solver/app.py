@@ -1,30 +1,83 @@
-from typing import Dict, List, Optional, Tuple
+from datetime import datetime
+from importlib import import_module
+from typing import Any, Dict, List, Optional, Tuple
 
-from flask import Flask, request, jsonify
+from sqlalchemy import inspect, text
+
+from flask import Flask, jsonify, make_response, request
+from flask_cors import CORS
 from ortools.sat.python import cp_model
+from werkzeug.utils import secure_filename
+
+try:
+    excel_importer = import_module("excel_importer")
+    unified_importer = import_module("unified_importer")
+    ParsedData = excel_importer.ParsedData
+    persist_parsed_data = excel_importer.persist_parsed_data
+    build_parsed_data_from_excel = unified_importer.build_parsed_data_from_excel
+    build_scheduling_input_from_parsed = (
+        unified_importer.build_scheduling_input_from_parsed
+    )
+except ModuleNotFoundError:
+    # Excel import is optional in this branch; keep solver app bootable.
+    ParsedData = Any
+    persist_parsed_data = None
+    build_parsed_data_from_excel = None
+    build_scheduling_input_from_parsed = None
+
+from spreadsheet_io.export_to_spreadsheet import scheduling_input_to_excel_bytes
+from spreadsheet_io.import_from_spreadsheet import parse_scheduling_input_from_excel_bytes
+from spreadsheet_io.spreadsheet_utils import build_template_bytes
 
 from model import (
-    db,
-    Section,
-    Instructor,
-    Room,
-    Timeslot,
-    MeetingPattern,
-    CrossListGroup,
-    NoOverlapGroup,
     BlockedTime,
+    CrossListGroup,
+    Instructor,
     LockedAssignment,
-    SoftLock,
-    ValidationError,
+    MeetingPattern,
+    NoOverlapGroup,
+    Room,
     ScheduleAssignment,
     ScheduleSolution,
+    Section,
+    SoftLock,
+    Timeslot,
+    ValidationError,
+    db,
 )
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///course_scheduler.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+# Enable CORS for all routes
+CORS(app, origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5001"])
+
 db.init_app(app)
+
+
+def _ensure_sqlite_schema() -> None:
+    """Apply lightweight migrations for SQLite (e.g. new columns on existing DBs)."""
+    try:
+        engine = db.engine
+        if engine.dialect.name != "sqlite":
+            return
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        if "sections" not in tables:
+            return
+        col_names = {c["name"] for c in inspector.get_columns("sections")}
+        if "department" in col_names:
+            return
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "ALTER TABLE sections ADD COLUMN department VARCHAR(128) NOT NULL DEFAULT ''"
+                )
+            )
+    except Exception:  # pylint: disable=broad-except
+        # Best-effort; create_all / manual migration can fix schema issues.
+        pass
 
 ROOM_WASTE_WEIGHT = 1  # penalty per empty seat in assigned room
 PREF_DAY_WEIGHT = 10  # penalty if assigned days don't match instructor preferences
@@ -59,7 +112,17 @@ def _timeslot_days(timeslots: List[Timeslot]) -> Dict[str, str]:
     Returns:
         Mapping of timeslot ID to day string.
     """
-    return {slot.id: slot.day for slot in timeslots}
+    days_by_id: Dict[str, str] = {}
+    for slot in timeslots:
+        if isinstance(slot, dict):
+            slot_id = slot.get("id")
+            day = slot.get("day") or slot.get("days")
+        else:
+            slot_id = getattr(slot, "id", None)
+            day = getattr(slot, "day", None) or getattr(slot, "days", None)
+        if slot_id and day:
+            days_by_id[slot_id] = day
+    return days_by_id
 
 
 def _section_to_dict(section) -> dict:
@@ -77,6 +140,7 @@ def _section_to_dict(section) -> dict:
         "room_requirements": getattr(section, "room_requirements", []),
         "crosslist_group_id": getattr(section, "crosslist_group_id", None),
         "tags": getattr(section, "tags", []),
+        "department": getattr(section, "department", "") or "",
     }
 
 
@@ -393,11 +457,24 @@ def _check_feasible(
 
     if "room_conflicts" not in relax:
         for room in input_data.rooms:
+            room_dict = _room_to_dict(room)
+            room_id = room_dict.get("id")
             for timeslot in input_data.timeslots:
+                timeslot_dict = (
+                    timeslot.to_dict() if hasattr(timeslot, "to_dict") else timeslot
+                )
+                current_timeslot_id = (
+                    timeslot_dict.get("id")
+                    if isinstance(timeslot_dict, dict)
+                    else getattr(timeslot, "id", None)
+                )
                 vars_for_slot = []
                 for (section_id, idx), var in option_vars.items():
-                    _, timeslot_set, room_id, _ = option_data[(section_id, idx)]
-                    if room_id == room.id and timeslot.id in timeslot_set:
+                    _, option_timeslot_set, option_room_id, _ = option_data[(section_id, idx)]
+                    if (
+                        option_room_id == room_id
+                        and current_timeslot_id in option_timeslot_set
+                    ):
                         vars_for_slot.append(var)
                 if vars_for_slot:
                     model.Add(sum(vars_for_slot) <= 1)
@@ -511,6 +588,93 @@ def _diagnose_infeasibility(input_data: SchedulingInput) -> Dict[str, List[str]]
     }
 
 
+def _extract_referenced_section_ids(
+    input_data: SchedulingInput, errors: List[dict]
+) -> List[str]:
+    section_ids = [_section_to_dict(s).get("id") for s in input_data.sections]
+    section_ids = [sid for sid in section_ids if sid]
+    referenced: List[str] = []
+    for sid in section_ids:
+        for err in errors:
+            message = str(err.get("message", ""))
+            if sid in message:
+                referenced.append(sid)
+                break
+    return referenced
+
+
+def _build_run_diagnostics(
+    input_data: SchedulingInput, options_by_section: Optional[Dict[str, list]] = None
+) -> Dict[str, Any]:
+    diagnostics: Dict[str, Any] = {}
+
+    room_caps = []
+    for room in input_data.rooms:
+        room_dict = _room_to_dict(room)
+        cap = room_dict.get("capacity")
+        if isinstance(cap, (int, float)):
+            room_caps.append(int(cap))
+    max_room_capacity = max(room_caps) if room_caps else None
+
+    instructor_load: Dict[str, int] = {}
+    for section in input_data.sections:
+        section_dict = _section_to_dict(section)
+        inst_id = section_dict.get("instructor_id")
+        if inst_id:
+            instructor_load[inst_id] = instructor_load.get(inst_id, 0) + 1
+    busiest_instructors = sorted(
+        (
+            {"instructor_id": inst_id, "section_count": count}
+            for inst_id, count in instructor_load.items()
+        ),
+        key=lambda x: x["section_count"],
+        reverse=True,
+    )[:8]
+    diagnostics["busiest_instructors"] = busiest_instructors
+
+    sections_exceeding_room_capacity = []
+    for section in input_data.sections:
+        section_dict = _section_to_dict(section)
+        section_id = section_dict.get("id")
+        enrollment = section_dict.get("expected_enrollment")
+        if (
+            section_id
+            and isinstance(enrollment, (int, float))
+            and max_room_capacity is not None
+            and enrollment > max_room_capacity
+        ):
+            sections_exceeding_room_capacity.append(
+                {
+                    "section_id": section_id,
+                    "expected_enrollment": int(enrollment),
+                    "max_room_capacity": int(max_room_capacity),
+                }
+            )
+    diagnostics["sections_exceeding_room_capacity"] = sections_exceeding_room_capacity[:10]
+
+    if options_by_section is not None:
+        constrained_sections = []
+        for section in input_data.sections:
+            section_dict = _section_to_dict(section)
+            section_id = section_dict.get("id")
+            if not section_id:
+                continue
+            option_count = len(options_by_section.get(section_id, []))
+            constrained_sections.append(
+                {
+                    "section_id": section_id,
+                    "course_id": section_dict.get("course_id"),
+                    "instructor_id": section_dict.get("instructor_id"),
+                    "option_count": option_count,
+                    "expected_enrollment": section_dict.get("expected_enrollment"),
+                }
+            )
+        constrained_sections.sort(key=lambda x: (x["option_count"], x["section_id"]))
+        diagnostics["most_constrained_sections"] = constrained_sections[:10]
+
+    return diagnostics
+
+
 def _solve_schedule(input_data: SchedulingInput):
     """Solve the schedule using CP-SAT.
 
@@ -530,6 +694,16 @@ def _solve_schedule(input_data: SchedulingInput):
     errors.extend(option_errors)
     if errors:
         return {"status": "error", "errors": errors}
+        error_codes = sorted({str(err.get("code", "unknown")) for err in errors})
+        return {
+            "status": "error",
+            "errors": errors,
+            "diagnostics": {
+                **_build_run_diagnostics(input_data, options_by_section),
+                "error_codes": error_codes,
+                "referenced_sections": _extract_referenced_section_ids(input_data, errors),
+            },
+        }
 
     # Build optimization model
     model = cp_model.CpModel()
@@ -748,8 +922,10 @@ def _solve_schedule(input_data: SchedulingInput):
     solver.parameters.max_time_in_seconds = 5.0
     status = solver.Solve(model)
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-        diagnostics = _diagnose_infeasibility(input_data)
-        print(diagnostics)
+        diagnostics = {
+            **_diagnose_infeasibility(input_data),
+            **_build_run_diagnostics(input_data, options_by_section),
+        }
         return {
             "status": "error",
             "errors": [
@@ -852,12 +1028,699 @@ def read_root():
     return jsonify({"service": "weatherhead-solver", "status": "ok"})
 
 
+@app.route("/import-excel", methods=["POST"])
+def import_excel():
+    """
+    Accept an Excel file and convert it into data-model-shaped JSON.
+
+    - Multipart/form-data with field name 'file'
+    - Optional query param ?persist=true to upsert into the database
+    - Response contains both raw records and a 'scheduling_input' payload
+      ready to pass to /solve.
+    """
+    if (
+        build_parsed_data_from_excel is None
+        or build_scheduling_input_from_parsed is None
+        or persist_parsed_data is None
+    ):
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "excel_import_unavailable",
+                            "message": (
+                                "Excel import modules are not available in this branch. "
+                                "Add excel_importer.py and unified_importer.py to enable /import-excel."
+                            ),
+                        }
+                    ],
+                }
+            ),
+            501,
+        )
+
+    if "file" not in request.files:
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "missing_file",
+                            "message": "Upload an Excel file in form field 'file'.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    file = request.files["file"]
+    filename = secure_filename(file.filename or "")
+    if not filename.lower().endswith((".xlsx", ".xlsm", ".xls")):
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "invalid_file_type",
+                            "message": "Only Excel files (.xlsx, .xlsm, .xls) are supported.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    try:
+        file_bytes = file.read()
+        parsed: ParsedData = build_parsed_data_from_excel(file_bytes)
+    except Exception as exc:  # pylint: disable=broad-except
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "parse_failed",
+                            "message": f"Failed to parse Excel file: {exc}",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    persist_flag = str(request.args.get("persist", "false")).lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if persist_flag:
+        persist_parsed_data(parsed)
+
+    scheduling_input = build_scheduling_input_from_parsed(parsed)
+    return jsonify(
+        {
+            "status": "ok",
+            "persisted": persist_flag,
+            "records": {
+                "courses": parsed.courses,
+                "instructors": parsed.instructors,
+                "rooms": parsed.rooms,
+                "timeslots": [
+                    {
+                        "id": t["id"],
+                        "days": t["days"],
+                        "start_time": t["start_time"].strftime("%H:%M"),
+                        "end_time": t["end_time"].strftime("%H:%M"),
+                        "slot_type": t["slot_type"],
+                    }
+                    for t in parsed.timeslots
+                ],
+                "meeting_patterns": parsed.meeting_patterns,
+                "sections": parsed.sections,
+            },
+            "scheduling_input": scheduling_input,
+        }
+    )
+
+
 @app.route("/solve", methods=["POST"])
 def solve():
     data = request.get_json()
     if not data or "input" not in data:
-        return jsonify({"status": "error", "errors": [{"code": "invalid_request", "message": "Missing 'input' field"}]}), 400
-    
+        return jsonify(
+            {
+                "status": "error",
+                "errors": [
+                    {
+                        "code": "invalid_request",
+                        "message": "Missing 'input' field",
+                    }
+                ],
+            }
+        ), 400
+
     input_data = SchedulingInput(data["input"])
     result = _solve_schedule(input_data)
     return jsonify(result)
+
+
+@app.route("/scheduling-spreadsheet-template", methods=["GET"])
+def scheduling_spreadsheet_template():
+    workbook_bytes = build_template_bytes()
+    response = make_response(workbook_bytes)
+    response.headers["Content-Type"] = (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response.headers["Content-Disposition"] = (
+        "attachment; filename=scheduling_template.xlsx"
+    )
+    return response
+
+
+@app.route("/import-scheduling-spreadsheet", methods=["POST"])
+def import_scheduling_spreadsheet():
+    if "file" not in request.files:
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "missing_file",
+                            "message": "Upload an Excel file in form field 'file'.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    file = request.files["file"]
+    filename = secure_filename(file.filename or "")
+    if not filename.lower().endswith((".xlsx", ".xlsm", ".xls")):
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "invalid_file_type",
+                            "message": "Only Excel files (.xlsx, .xlsm, .xls) are supported.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    try:
+        file_bytes = file.read()
+        scheduling_input = parse_scheduling_input_from_excel_bytes(file_bytes)
+    except Exception as exc:  # pylint: disable=broad-except
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "parse_failed",
+                            "message": f"Failed to parse scheduling spreadsheet: {exc}",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    return jsonify({"status": "ok", "scheduling_input": scheduling_input}), 200
+
+
+@app.route("/export-scheduling-spreadsheet", methods=["POST"])
+def export_scheduling_spreadsheet():
+    data = request.get_json() or {}
+    input_payload = data.get("input") if isinstance(data, dict) and "input" in data else data
+    if not isinstance(input_payload, dict):
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "invalid_request",
+                            "message": "Request body must be a scheduling input object or { input }.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    try:
+        workbook_bytes = scheduling_input_to_excel_bytes(input_payload)
+    except Exception as exc:  # pylint: disable=broad-except
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "export_failed",
+                            "message": f"Failed to generate spreadsheet: {exc}",
+                        }
+                    ],
+                }
+            ),
+            500,
+        )
+
+    response = make_response(workbook_bytes)
+    response.headers["Content-Type"] = (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response.headers["Content-Disposition"] = (
+        "attachment; filename=scheduling_export.xlsx"
+    )
+    return response
+
+
+@app.route("/update-sections", methods=["POST"])
+def update_sections():
+    """
+    Replace all Section rows with the provided list.
+
+    Expects JSON payload: { "sections": [ ... ] } matching the frontend Section type.
+    """
+    data = request.get_json() or {}
+    sections_payload = data.get("sections")
+    if not isinstance(sections_payload, list):
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "invalid_request",
+                            "message": "Request body must include a 'sections' array.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    try:
+        # Clear existing sections
+        Section.query.delete()
+
+        skipped_sections: List[Dict[str, Any]] = []
+        seen_section_ids = set()
+
+        # Insert all provided sections
+        for item in sections_payload:
+            # The DB model requires these fields; skip partial spreadsheet rows instead
+            # of failing the entire backend update.
+            required_keys = ("id", "course_id", "section_code", "instructor_id")
+            missing_keys = [
+                key
+                for key in required_keys
+                if item.get(key) is None or str(item.get(key)).strip() == ""
+            ]
+            if missing_keys:
+                skipped_sections.append(
+                    {
+                        "id": item.get("id"),
+                        "missing_required_fields": missing_keys,
+                    }
+                )
+                continue
+
+            section_id = str(item.get("id")).strip()
+            if section_id in seen_section_ids:
+                skipped_sections.append(
+                    {
+                        "id": section_id,
+                        "duplicate": True,
+                        "message": "Duplicate section id in payload; kept first occurrence.",
+                    }
+                )
+                continue
+            seen_section_ids.add(section_id)
+
+            dept_raw = item.get("department")
+            department = (str(dept_raw).strip() if dept_raw is not None else "") or ""
+
+            section = Section(
+                id=section_id,
+                course_id=item.get("course_id"),
+                section_code=item.get("section_code"),
+                instructor_id=item.get("instructor_id"),
+                room_id=item.get("room_id"),
+                timeslot_id=item.get("timeslot_id"),
+                crosslisting_id=item.get("crosslisting_id"),
+                expected_enrollment=int(item.get("expected_enrollment") or 0),
+                enrollment_cap=int(item.get("enrollment_cap") or 0),
+                section_type=item.get("section_type") or "lecture",
+                is_crosslisted=bool(item.get("is_crosslisted", False)),
+                last_year_time=item.get("last_year_time"),
+                last_year_room=item.get("last_year_room"),
+                allowed_meeting_patterns=item.get("allowed_meeting_patterns", []),
+                room_requirements=item.get("room_requirements", []),
+                crosslist_group_id=item.get("crosslist_group_id"),
+                tags=item.get("tags", []),
+                department=department,
+            )
+            db.session.add(section)
+
+        db.session.commit()
+    except Exception as exc:  # pylint: disable=broad-except
+        db.session.rollback()
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "update_failed",
+                            "message": f"Failed to update sections: {exc}",
+                        }
+                    ],
+                }
+            ),
+            500,
+        )
+
+    return (
+        jsonify(
+            {
+                "status": "ok",
+                "skipped_sections": skipped_sections,
+            }
+        ),
+        200,
+    )
+
+
+def _parse_time(value):
+    if value is None:
+        return None
+    if hasattr(value, "hour") and hasattr(value, "minute"):
+        return value
+    raw = str(value).strip()
+    for fmt in ("%H:%M", "%H:%M:%S", "%I:%M %p"):
+        try:
+            return datetime.strptime(raw, fmt).time()
+        except ValueError:
+            continue
+    raise ValueError(f"Invalid time value '{value}'. Expected HH:MM.")
+
+
+@app.route("/update-instructors", methods=["POST"])
+def update_instructors():
+    data = request.get_json() or {}
+    instructors_payload = data.get("instructors")
+    if not isinstance(instructors_payload, list):
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "invalid_request",
+                            "message": "Request body must include an 'instructors' array.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    try:
+        Instructor.query.delete()
+        for item in instructors_payload:
+            prefs = item.get("preferences", {}) or {}
+            instructor = Instructor(
+                id=item.get("id"),
+                name=item.get("name") or item.get("id"),
+                rank_type=item.get("rank_type") or "Adjunct",
+            )
+            db.session.add(instructor)
+            db.session.flush()
+            if prefs:
+                pref_model = instructor.preferences
+                if pref_model is None:
+                    from model import InstructorPreferences
+
+                    pref_model = InstructorPreferences(instructor_id=instructor.id)
+                    instructor.preferences = pref_model
+                    db.session.add(pref_model)
+                pref_model.preferred_times = prefs.get("preferred_times", []) or []
+                pref_model.preferred_days = prefs.get("preferred_days", []) or []
+                pref_model.preferred_patterns = prefs.get("preferred_patterns", []) or []
+                pref_model.unavailable_times = prefs.get("unavailable_times", []) or []
+                pref_model.max_teaching_days = prefs.get("max_teaching_days")
+        db.session.commit()
+    except Exception as exc:  # pylint: disable=broad-except
+        db.session.rollback()
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "update_failed",
+                            "message": f"Failed to update instructors: {exc}",
+                        }
+                    ],
+                }
+            ),
+            500,
+        )
+    return jsonify({"status": "ok"}), 200
+
+
+@app.route("/update-rooms", methods=["POST"])
+def update_rooms():
+    data = request.get_json() or {}
+    rooms_payload = data.get("rooms")
+    if not isinstance(rooms_payload, list):
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "invalid_request",
+                            "message": "Request body must include a 'rooms' array.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    try:
+        Room.query.delete()
+        for item in rooms_payload:
+            room = Room(
+                id=item.get("id"),
+                building=item.get("building") or "Unknown",
+                room_number=item.get("room_number") or item.get("id") or "TBD",
+                capacity=int(item.get("capacity") or 0),
+                room_type=item.get("room_type") or "lecture",
+                has_av=bool(item.get("has_av", False)),
+                is_accessible=bool(item.get("is_accessible", True)),
+                features=item.get("features", []) or [],
+            )
+            db.session.add(room)
+        db.session.commit()
+    except Exception as exc:  # pylint: disable=broad-except
+        db.session.rollback()
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "update_failed",
+                            "message": f"Failed to update rooms: {exc}",
+                        }
+                    ],
+                }
+            ),
+            500,
+        )
+    return jsonify({"status": "ok"}), 200
+
+
+@app.route("/update-timeslots", methods=["POST"])
+def update_timeslots():
+    data = request.get_json() or {}
+    slots_payload = data.get("timeslots")
+    if not isinstance(slots_payload, list):
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "invalid_request",
+                            "message": "Request body must include a 'timeslots' array.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    try:
+        Timeslot.query.delete()
+        for item in slots_payload:
+            slot = Timeslot(
+                id=item.get("id"),
+                days=item.get("days") or item.get("day") or "",
+                start_time=_parse_time(item.get("start_time")),
+                end_time=_parse_time(item.get("end_time")),
+                slot_type=item.get("slot_type") or "standard",
+            )
+            db.session.add(slot)
+        db.session.commit()
+    except Exception as exc:  # pylint: disable=broad-except
+        db.session.rollback()
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "update_failed",
+                            "message": f"Failed to update timeslots: {exc}",
+                        }
+                    ],
+                }
+            ),
+            500,
+        )
+    return jsonify({"status": "ok"}), 200
+
+
+@app.route("/update-meeting-patterns", methods=["POST"])
+def update_meeting_patterns():
+    data = request.get_json() or {}
+    patterns_payload = data.get("meeting_patterns")
+    if not isinstance(patterns_payload, list):
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "invalid_request",
+                            "message": "Request body must include a 'meeting_patterns' array.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    try:
+        MeetingPattern.query.delete()
+        for item in patterns_payload:
+            pattern = MeetingPattern(
+                id=item.get("id"),
+                slots_required=int(item.get("slots_required") or 1),
+                allowed_days=item.get("allowed_days", []) or [],
+                compatible_timeslot_sets=item.get("compatible_timeslot_sets", []) or [],
+            )
+            db.session.add(pattern)
+        db.session.commit()
+    except Exception as exc:  # pylint: disable=broad-except
+        db.session.rollback()
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "update_failed",
+                            "message": f"Failed to update meeting patterns: {exc}",
+                        }
+                    ],
+                }
+            ),
+            500,
+        )
+    return jsonify({"status": "ok"}), 200
+
+
+@app.route("/update-constraints", methods=["POST"])
+def update_constraints():
+    data = request.get_json() or {}
+    try:
+        CrossListGroup.query.delete()
+        NoOverlapGroup.query.delete()
+        BlockedTime.query.delete()
+        LockedAssignment.query.delete()
+        SoftLock.query.delete()
+
+        for item in data.get("crosslist_groups", []) or []:
+            db.session.add(
+                CrossListGroup(
+                    id=item.get("id"),
+                    member_section_ids=item.get("member_section_ids", []) or [],
+                    require_same_room=bool(item.get("require_same_room", False)),
+                )
+            )
+
+        for item in data.get("no_overlap_groups", []) or []:
+            db.session.add(
+                NoOverlapGroup(
+                    id=item.get("id"),
+                    member_section_ids=item.get("member_section_ids", []) or [],
+                    reason=item.get("reason") or "constraint",
+                )
+            )
+
+        for item in data.get("blocked_times", []) or []:
+            db.session.add(
+                BlockedTime(
+                    scope=item.get("scope") or "global",
+                    timeslot_ids=item.get("timeslot_ids", []) or [],
+                    reason=item.get("reason") or "blocked",
+                )
+            )
+
+        for item in data.get("locked_assignments", []) or []:
+            db.session.add(
+                LockedAssignment(
+                    section_id=item.get("section_id"),
+                    fixed_timeslot_set=item.get("fixed_timeslot_set"),
+                    fixed_room=item.get("fixed_room"),
+                )
+            )
+
+        for item in data.get("soft_locks", []) or []:
+            db.session.add(
+                SoftLock(
+                    section_id=item.get("section_id"),
+                    preferred_timeslot_set=item.get("preferred_timeslot_set"),
+                    preferred_room=item.get("preferred_room"),
+                    weight=float(item.get("weight", 1.0)),
+                )
+            )
+
+        db.session.commit()
+    except Exception as exc:  # pylint: disable=broad-except
+        db.session.rollback()
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "update_failed",
+                            "message": f"Failed to update constraints: {exc}",
+                        }
+                    ],
+                }
+            ),
+            500,
+        )
+    return jsonify({"status": "ok"}), 200
+
+
+# Ensure schema on import (covers `flask run` / gunicorn, not only `python app.py`).
+with app.app_context():
+    db.create_all()
+    _ensure_sqlite_schema()
+
+
+if __name__ == "__main__":
+    # Run the Flask app
+    app.run(debug=True, host="0.0.0.0", port=5001)
