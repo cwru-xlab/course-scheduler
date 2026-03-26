@@ -286,6 +286,8 @@ def _validate_crosslist_capacity(
     for group in crosslists:
         group_dict = group.to_dict() if hasattr(group, "to_dict") else group
         group_id = group_dict.get("id") if isinstance(group_dict, dict) else group.id
+        if group_id is None:
+            continue
         total = total_by_group.get(group_id, 0)
         if total > max_room_capacity:
             errors.append({
@@ -533,8 +535,6 @@ def _check_feasible(
     option_vars: Dict[Tuple[str, int], cp_model.IntVar] = {}
     option_data: Dict[Tuple[str, int], Tuple[str, Tuple[str, ...], str, int]] = {}
 
-    section_prefs_by_id_solution = _section_prefs_by_section_id(input_data)
-
     for section_id, options in options_by_section.items():
         section_vars = []
         for idx, option in enumerate(options):
@@ -619,7 +619,7 @@ def _check_feasible(
             for other_id in cannot_collide.keys():
                 if other_id not in options_by_section:
                     continue
-                pair = tuple(sorted((section_id, other_id)))
+                pair: Tuple[str, str] = (min(section_id, other_id), max(section_id, other_id))
                 if pair in seen_pairs or pair[0] == pair[1]:
                     continue
                 seen_pairs.add(pair)
@@ -709,7 +709,7 @@ def _check_feasible(
             for s in input_data.sections:
                 s_dict = _section_to_dict(s)
                 course_id = s_dict.get("course_id")
-                course = courses_by_id.get(course_id)
+                course = courses_by_id.get(course_id) if course_id else None
                 if course and course.get("department") == department_name:
                     sid = s_dict.get("id")
                     if sid is not None:
@@ -945,7 +945,7 @@ def _solve_schedule(input_data: SchedulingInput):
         section_dict = _section_to_dict(section)
         section_id = section_dict["id"]
         crosslist_id = section_dict.get("crosslist_group_id")
-        if crosslist_id in crosslist_roomshare:
+        if crosslist_id and crosslist_id in crosslist_roomshare:
             section_to_roomshare_group[section_id] = crosslist_id
         else:
             section_to_roomshare_group[section_id] = f"sec:{section_id}"
@@ -1035,7 +1035,7 @@ def _solve_schedule(input_data: SchedulingInput):
             if other_id not in options_by_section:
                 continue
             # Avoid duplicating pair constraints.
-            pair = tuple(sorted((section_id, other_id)))
+            pair: Tuple[str, str] = (min(section_id, other_id), max(section_id, other_id))
             if pair in seen_pairs or pair[0] == pair[1]:
                 continue
             seen_pairs.add(pair)
@@ -1139,7 +1139,7 @@ def _solve_schedule(input_data: SchedulingInput):
         for s in input_data.sections:
             s_dict = _section_to_dict(s)
             course_id = s_dict.get("course_id")
-            course = courses_by_id.get(course_id)
+            course = courses_by_id.get(course_id) if course_id else None
             if course and course.get("department") == department_name:
                 sid = s_dict.get("id")
                 if sid is not None:
@@ -1290,13 +1290,13 @@ def _solve_schedule(input_data: SchedulingInput):
         preferred_timeslot_set = soft_lock.get("preferred_timeslot_set") if isinstance(soft_lock, dict) else getattr(soft_lock, "preferred_timeslot_set", None)
         if preferred_timeslot_set:
             if set(timeslot_set) != set(preferred_timeslot_set):
-                weight = soft_lock.get("weight") if isinstance(soft_lock, dict) else getattr(soft_lock, "weight", 1.0)
+                weight = (soft_lock.get("weight") if isinstance(soft_lock, dict) else getattr(soft_lock, "weight", 1.0)) or 1.0
                 soft_penalty += weight * SOFT_LOCK_BASE_WEIGHT
         # Penalize if room doesn't match preference
         preferred_room = soft_lock.get("preferred_room") if isinstance(soft_lock, dict) else getattr(soft_lock, "preferred_room", None)
         if preferred_room:
             if room_id != preferred_room:
-                weight = soft_lock.get("weight") if isinstance(soft_lock, dict) else getattr(soft_lock, "weight", 1.0)
+                weight = (soft_lock.get("weight") if isinstance(soft_lock, dict) else getattr(soft_lock, "weight", 1.0)) or 1.0
                 soft_penalty += weight * SOFT_LOCK_BASE_WEIGHT
         if soft_penalty > 0:
             penalty_terms.append(var * int(soft_penalty))
@@ -1367,7 +1367,7 @@ def _solve_schedule(input_data: SchedulingInput):
         )
 
         # Section preference penalty breakdown (preferred_time mismatch).
-        section_prefs = section_prefs_by_id_solution.get(section_id, {})
+        section_prefs = section_prefs_by_id.get(section_id, {})
         if isinstance(section_prefs, dict):
             preferred_time = section_prefs.get("preferred_time")
             if preferred_time and preferred_time not in timeslot_set:
@@ -1385,14 +1385,14 @@ def _solve_schedule(input_data: SchedulingInput):
             preferred_timeslot_set = soft_lock.get("preferred_timeslot_set") if isinstance(soft_lock, dict) else getattr(soft_lock, "preferred_timeslot_set", None)
             if preferred_timeslot_set:
                 if set(timeslot_set) != set(preferred_timeslot_set):
-                    weight = soft_lock.get("weight") if isinstance(soft_lock, dict) else getattr(soft_lock, "weight", 1.0)
+                    weight = (soft_lock.get("weight") if isinstance(soft_lock, dict) else getattr(soft_lock, "weight", 1.0)) or 1.0
                     penalty_breakdown["soft_lock_time"] += float(
                         weight * SOFT_LOCK_BASE_WEIGHT
                     )
             preferred_room = soft_lock.get("preferred_room") if isinstance(soft_lock, dict) else getattr(soft_lock, "preferred_room", None)
             if preferred_room:
                 if room_id != preferred_room:
-                    weight = soft_lock.get("weight") if isinstance(soft_lock, dict) else getattr(soft_lock, "weight", 1.0)
+                    weight = (soft_lock.get("weight") if isinstance(soft_lock, dict) else getattr(soft_lock, "weight", 1.0)) or 1.0
                     penalty_breakdown["soft_lock_room"] += float(
                         weight * SOFT_LOCK_BASE_WEIGHT
                     )
@@ -1498,7 +1498,7 @@ def import_excel():
 
     try:
         file_bytes = file.read()
-        parsed: ParsedData = build_parsed_data_from_excel(file_bytes)
+        parsed = build_parsed_data_from_excel(file_bytes)
     except Exception as exc:  # pylint: disable=broad-except
         return (
             jsonify(
