@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 
 import type { SchedulingInput, ValidationError } from "@/lib/scheduling/types";
@@ -14,7 +14,8 @@ type SolverDiagnostics = {
   busiest_instructors?: { instructor_id: string; section_count: number }[];
   sections_exceeding_room_capacity?: {
     section_id: string;
-    expected_enrollment: number;
+    required_capacity?: number;
+    expected_enrollment?: number;
     max_room_capacity: number;
   }[];
   most_constrained_sections?: {
@@ -47,7 +48,13 @@ function readStoredError(): StoredSolverError | null {
 }
 
 export default function SolverErrorsPage() {
-  const stored = useMemo(() => readStoredError(), []);
+  const [stored, setStored] = useState<StoredSolverError | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    setStored(readStoredError());
+    setIsHydrated(true);
+  }, []);
 
   const referencedSectionIds = useMemo(() => {
     if (!stored) return [];
@@ -66,7 +73,7 @@ export default function SolverErrorsPage() {
     return stored.input.sections.filter((s) => referencedSectionIds.includes(s.id));
   }, [stored, referencedSectionIds]);
 
-  if (!stored) {
+  if (!isHydrated || !stored) {
     return (
       <div className="space-y-6">
         <div className="rounded-xl border border-slate-200 bg-white p-6">
@@ -138,7 +145,9 @@ export default function SolverErrorsPage() {
               <ul className="mt-2 space-y-1 text-sm text-slate-700">
                 {stored.diagnostics.sections_exceeding_room_capacity?.map((x) => (
                   <li key={`capacity-${x.section_id}`}>
-                    {x.section_id}: enrollment {x.expected_enrollment} &gt; max room capacity {x.max_room_capacity}
+                    {x.section_id}: required capacity{" "}
+                    {x.required_capacity ?? x.expected_enrollment ?? "unknown"} &gt; max room capacity{" "}
+                    {x.max_room_capacity}
                   </li>
                 ))}
               </ul>
