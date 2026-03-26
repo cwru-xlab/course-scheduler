@@ -5,17 +5,20 @@ import { Card, CardBody, CardHeader } from "@heroui/card";
 
 import { EditableCell } from "../EditableCell";
 import { EditableArrayCell } from "../EditableArrayCell";
+import { RowNotesButton } from "../RowNotesButton";
 
 import type { Room } from "@/lib/scheduling/types";
+import { nextIntegerId } from "@/lib/scheduling/nextId";
 
 type RoomsEditorProps = {
   rooms: Room[];
   onUpdate: (rooms: Room[]) => void;
 };
 
-const createEmptyRoom = (): Room => ({
-  id: `ROOM-NEW-${Date.now()}`,
+const createEmptyRoom = (existing: Room[]): Room => ({
+  id: nextIntegerId(existing.map((r) => r.id)),
   building: "",
+  room_number: "",
   capacity: 30,
   features: [],
 });
@@ -28,7 +31,7 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
   };
 
   const addRoom = () => {
-    onUpdate([...rooms, createEmptyRoom()]);
+    onUpdate([...rooms, createEmptyRoom(rooms)]);
   };
 
   const deleteRoom = (index: number) => {
@@ -49,14 +52,20 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
             <tr>
               <th className="pb-2 pr-3">ID</th>
               <th className="pb-2 pr-3">Building</th>
+              <th className="pb-2 pr-3">Room #</th>
               <th className="pb-2 pr-3">Capacity</th>
               <th className="pb-2 pr-3">Features</th>
+              <th className="pb-2 pr-3">View Notes</th>
               <th className="pb-2 pr-3"></th>
             </tr>
           </thead>
           <tbody>
             {rooms.map((room, idx) => (
-              <tr key={`${room.id}-${idx}`} className="border-t border-default-200">
+              <tr
+                key={`${room.id}-${idx}`}
+                id={`note-rooms-${encodeURIComponent(String(room.id))}`}
+                className="border-t border-default-200"
+              >
                 <td className="py-2 pr-3">
                   <EditableCell value={room.id} onChange={(v) => updateRoom(idx, "id", v)} />
                 </td>
@@ -64,10 +73,20 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
                   <EditableCell value={room.building} onChange={(v) => updateRoom(idx, "building", v)} placeholder="Building" />
                 </td>
                 <td className="py-2 pr-3">
+                  <EditableCell value={room.room_number} onChange={(v) => updateRoom(idx, "room_number", v)} placeholder="101" />
+                </td>
+                <td className="py-2 pr-3">
                   <EditableCell type="number" value={room.capacity} onChange={(v) => updateRoom(idx, "capacity", v)} />
                 </td>
                 <td className="py-2 pr-3">
                   <EditableArrayCell value={room.features} onChange={(v) => updateRoom(idx, "features", v)} placeholder="projector, etc" />
+                </td>
+                <td className="py-2 pr-3">
+                  <RowNotesButton
+                    scope="rooms"
+                    rowId={String(room.id)}
+                    title={`Room Notes - ${room.building} ${room.room_number}`.trim()}
+                  />
                 </td>
                 <td className="py-2 pr-3">
                   <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteRoom(idx)}>

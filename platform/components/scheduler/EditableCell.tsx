@@ -6,9 +6,13 @@ import { Input } from "@heroui/input";
 type EditableCellProps = {
   value: string | number;
   onChange: (value: string | number) => void;
-  type?: "text" | "number";
+  type?: "text" | "number" | "time" | "datetime-local";
   className?: string;
   placeholder?: string;
+  displayValue?: string;
+  min?: string | number;
+  max?: string | number;
+  step?: string | number;
 };
 
 export const EditableCell = ({
@@ -17,6 +21,10 @@ export const EditableCell = ({
   type = "text",
   className = "",
   placeholder = "",
+  displayValue,
+  min,
+  max,
+  step,
 }: EditableCellProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(String(value));
@@ -65,6 +73,9 @@ export const EditableCell = ({
         onKeyDown={handleKeyDown}
         className={`min-w-[60px] ${className}`}
         placeholder={placeholder}
+        min={min}
+        max={max}
+        step={step}
       />
     );
   }
@@ -75,7 +86,7 @@ export const EditableCell = ({
       className={`cursor-pointer rounded px-1 py-0.5 hover:bg-default-100 ${className}`}
       title="Click to edit"
     >
-      {value || <span className="text-default-400">{placeholder || "—"}</span>}
+      {(displayValue ?? value) || <span className="text-default-400">{placeholder || "—"}</span>}
     </div>
   );
 };

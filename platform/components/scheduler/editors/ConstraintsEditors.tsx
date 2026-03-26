@@ -7,8 +7,10 @@ import { EditableCell } from "../EditableCell";
 import { EditableCheckbox } from "../EditableCheckbox";
 import { EditableSelectCell } from "../EditableSelectCell";
 import { MultiSelect } from "../MultiSelect";
+import { RowNotesButton } from "../RowNotesButton";
 
 import type { CrossListGroup, NoOverlapGroup, BlockedTime, LockedAssignment, SoftLock } from "@/lib/scheduling/types";
+import { nextIntegerId } from "@/lib/scheduling/nextId";
 
 // CrossList Groups Editor
 type CrossListGroupsEditorProps = {
@@ -17,8 +19,8 @@ type CrossListGroupsEditorProps = {
   onUpdate: (groups: CrossListGroup[]) => void;
 };
 
-const createEmptyCrossListGroup = (): CrossListGroup => ({
-  id: `CLG-NEW-${Date.now()}`,
+const createEmptyCrossListGroup = (existing: CrossListGroup[]): CrossListGroup => ({
+  id: nextIntegerId(existing.map((g) => g.id)),
   member_section_ids: [],
   require_same_room: true,
 });
@@ -30,7 +32,7 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
     onUpdate(newGroups);
   };
 
-  const addGroup = () => onUpdate([...groups, createEmptyCrossListGroup()]);
+  const addGroup = () => onUpdate([...groups, createEmptyCrossListGroup(groups)]);
   const deleteGroup = (index: number) => onUpdate(groups.filter((_, i) => i !== index));
 
   return (
@@ -46,12 +48,17 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
               <th className="pb-2 pr-3">ID</th>
               <th className="pb-2 pr-3">Member Sections</th>
               <th className="pb-2 pr-3">Same Room</th>
+              <th className="pb-2 pr-3">View Notes</th>
               <th className="pb-2 pr-3"></th>
             </tr>
           </thead>
           <tbody>
             {groups.map((group, idx) => (
-              <tr key={`${group.id}-${idx}`} className="border-t border-default-200">
+              <tr
+                key={`${group.id}-${idx}`}
+                id={`note-constraints-crosslist-groups-${encodeURIComponent(String(group.id))}`}
+                className="border-t border-default-200"
+              >
                 <td className="py-2 pr-3">
                   <EditableCell value={group.id} onChange={(v) => updateGroup(idx, "id", v)} />
                 </td>
@@ -65,6 +72,13 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
                 </td>
                 <td className="py-2 pr-3">
                   <EditableCheckbox value={group.require_same_room} onChange={(v) => updateGroup(idx, "require_same_room", v)} />
+                </td>
+                <td className="py-2 pr-3">
+                  <RowNotesButton
+                    scope="constraints-crosslist-groups"
+                    rowId={String(group.id)}
+                    title={`Cross-List Group Notes - ${group.id}`}
+                  />
                 </td>
                 <td className="py-2 pr-3">
                   <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteGroup(idx)}>✕</Button>
@@ -86,8 +100,8 @@ type NoOverlapGroupsEditorProps = {
   onUpdate: (groups: NoOverlapGroup[]) => void;
 };
 
-const createEmptyNoOverlapGroup = (): NoOverlapGroup => ({
-  id: `NOG-NEW-${Date.now()}`,
+const createEmptyNoOverlapGroup = (existing: NoOverlapGroup[]): NoOverlapGroup => ({
+  id: nextIntegerId(existing.map((g) => g.id)),
   member_section_ids: [],
   reason: "",
 });
@@ -99,7 +113,7 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
     onUpdate(newGroups);
   };
 
-  const addGroup = () => onUpdate([...groups, createEmptyNoOverlapGroup()]);
+  const addGroup = () => onUpdate([...groups, createEmptyNoOverlapGroup(groups)]);
   const deleteGroup = (index: number) => onUpdate(groups.filter((_, i) => i !== index));
 
   return (
@@ -115,12 +129,17 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
               <th className="pb-2 pr-3">ID</th>
               <th className="pb-2 pr-3">Member Sections</th>
               <th className="pb-2 pr-3">Reason</th>
+              <th className="pb-2 pr-3">View Notes</th>
               <th className="pb-2 pr-3"></th>
             </tr>
           </thead>
           <tbody>
             {groups.map((group, idx) => (
-              <tr key={`${group.id}-${idx}`} className="border-t border-default-200">
+              <tr
+                key={`${group.id}-${idx}`}
+                id={`note-constraints-no-overlap-groups-${encodeURIComponent(String(group.id))}`}
+                className="border-t border-default-200"
+              >
                 <td className="py-2 pr-3">
                   <EditableCell value={group.id} onChange={(v) => updateGroup(idx, "id", v)} />
                 </td>
@@ -134,6 +153,13 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
                 </td>
                 <td className="py-2 pr-3">
                   <EditableCell value={group.reason} onChange={(v) => updateGroup(idx, "reason", v)} placeholder="reason" />
+                </td>
+                <td className="py-2 pr-3">
+                  <RowNotesButton
+                    scope="constraints-no-overlap-groups"
+                    rowId={String(group.id)}
+                    title={`No-Overlap Group Notes - ${group.id}`}
+                  />
                 </td>
                 <td className="py-2 pr-3">
                   <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteGroup(idx)}>✕</Button>
@@ -191,12 +217,17 @@ export const BlockedTimesEditor = ({ blockedTimes, timeslotOptions, onUpdate }: 
               <th className="pb-2 pr-3">Scope</th>
               <th className="pb-2 pr-3">Timeslots</th>
               <th className="pb-2 pr-3">Reason</th>
+              <th className="pb-2 pr-3">View Notes</th>
               <th className="pb-2 pr-3"></th>
             </tr>
           </thead>
           <tbody>
             {blockedTimes.map((blocked, idx) => (
-              <tr key={idx} className="border-t border-default-200">
+              <tr
+                key={idx}
+                id={`note-constraints-blocked-times-${encodeURIComponent(`${blocked.scope}-${blocked.reason || "row"}-${idx}`)}`}
+                className="border-t border-default-200"
+              >
                 <td className="py-2 pr-3">
                   <EditableSelectCell
                     value={blocked.scope}
@@ -214,6 +245,13 @@ export const BlockedTimesEditor = ({ blockedTimes, timeslotOptions, onUpdate }: 
                 </td>
                 <td className="py-2 pr-3">
                   <EditableCell value={blocked.reason} onChange={(v) => updateBlockedTime(idx, "reason", v)} placeholder="reason" />
+                </td>
+                <td className="py-2 pr-3">
+                  <RowNotesButton
+                    scope="constraints-blocked-times"
+                    rowId={`${blocked.scope}-${blocked.reason || "row"}-${idx}`}
+                    title={`Blocked Time Notes - Row ${idx + 1}`}
+                  />
                 </td>
                 <td className="py-2 pr-3">
                   <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteBlockedTime(idx)}>✕</Button>
@@ -277,12 +315,17 @@ export const LockedAssignmentsEditor = ({
               <th className="pb-2 pr-3">Section</th>
               <th className="pb-2 pr-3">Fixed Timeslots</th>
               <th className="pb-2 pr-3">Fixed Room</th>
+              <th className="pb-2 pr-3">View Notes</th>
               <th className="pb-2 pr-3"></th>
             </tr>
           </thead>
           <tbody>
             {lockedAssignments.map((lock, idx) => (
-              <tr key={idx} className="border-t border-default-200">
+              <tr
+                key={idx}
+                id={`note-constraints-locked-assignments-${encodeURIComponent(`${lock.section_id || "row"}-${idx}`)}`}
+                className="border-t border-default-200"
+              >
                 <td className="py-2 pr-3">
                   <EditableSelectCell
                     value={lock.section_id}
@@ -305,6 +348,13 @@ export const LockedAssignmentsEditor = ({
                     options={roomOptionsWithNone}
                     onChange={(v) => updateLock(idx, "fixed_room", v === "__none__" ? undefined : v)}
                     placeholder="Select room"
+                  />
+                </td>
+                <td className="py-2 pr-3">
+                  <RowNotesButton
+                    scope="constraints-locked-assignments"
+                    rowId={`${lock.section_id || "row"}-${idx}`}
+                    title={`Locked Assignment Notes - ${lock.section_id || `Row ${idx + 1}`}`}
                   />
                 </td>
                 <td className="py-2 pr-3">
@@ -371,12 +421,17 @@ export const SoftLocksEditor = ({
               <th className="pb-2 pr-3">Preferred Timeslots</th>
               <th className="pb-2 pr-3">Preferred Room</th>
               <th className="pb-2 pr-3">Weight</th>
+              <th className="pb-2 pr-3">View Notes</th>
               <th className="pb-2 pr-3"></th>
             </tr>
           </thead>
           <tbody>
             {softLocks.map((lock, idx) => (
-              <tr key={idx} className="border-t border-default-200">
+              <tr
+                key={idx}
+                id={`note-constraints-soft-locks-${encodeURIComponent(`${lock.section_id || "row"}-${idx}`)}`}
+                className="border-t border-default-200"
+              >
                 <td className="py-2 pr-3">
                   <EditableSelectCell
                     value={lock.section_id}
@@ -403,6 +458,13 @@ export const SoftLocksEditor = ({
                 </td>
                 <td className="py-2 pr-3">
                   <EditableCell type="number" value={lock.weight} onChange={(v) => updateLock(idx, "weight", v)} />
+                </td>
+                <td className="py-2 pr-3">
+                  <RowNotesButton
+                    scope="constraints-soft-locks"
+                    rowId={`${lock.section_id || "row"}-${idx}`}
+                    title={`Soft Lock Notes - ${lock.section_id || `Row ${idx + 1}`}`}
+                  />
                 </td>
                 <td className="py-2 pr-3">
                   <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteLock(idx)}>✕</Button>

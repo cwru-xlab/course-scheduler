@@ -6,8 +6,10 @@ import { Card, CardBody, CardHeader } from "@heroui/card";
 import { EditableCell } from "../EditableCell";
 import { EditableSelectCell } from "../EditableSelectCell";
 import { MultiSelect } from "../MultiSelect";
+import { RowNotesButton } from "../RowNotesButton";
 
 import type { Instructor } from "@/lib/scheduling/types";
+import { nextIntegerId } from "@/lib/scheduling/nextId";
 
 type InstructorsEditorProps = {
   instructors: Instructor[];
@@ -31,8 +33,9 @@ const DAY_OPTIONS = [
   { key: "Fri", label: "Fri" },
 ];
 
-const createEmptyInstructor = (): Instructor => ({
-  id: `INST-NEW-${Date.now()}`,
+const createEmptyInstructor = (existing: Instructor[]): Instructor => ({
+  id: nextIntegerId(existing.map((i) => i.id)),
+  name: "",
   rank_type: "NTT",
   unavailable_times: [],
   preferences: {
@@ -62,7 +65,7 @@ export const InstructorsEditor = ({
   };
 
   const addInstructor = () => {
-    onUpdate([...instructors, createEmptyInstructor()]);
+    onUpdate([...instructors, createEmptyInstructor(instructors)]);
   };
 
   const deleteInstructor = (index: number) => {
@@ -78,32 +81,41 @@ export const InstructorsEditor = ({
         </Button>
       </CardHeader>
       <CardBody className="overflow-x-auto text-sm">
-        <table className="min-w-full">
+        <table className="w-full table-fixed">
           <thead className="text-left text-default-500">
             <tr>
-              <th className="pb-2 pr-3">ID</th>
-              <th className="pb-2 pr-3">Rank</th>
-              <th className="pb-2 pr-3">Unavailable Times</th>
-              <th className="pb-2 pr-3">Preferred Days</th>
-              <th className="pb-2 pr-3">Preferred Patterns</th>
-              <th className="pb-2 pr-3">Max Days</th>
-              <th className="pb-2 pr-3"></th>
+              <th className="pb-2 pr-3 w-[8%]">ID</th>
+              <th className="pb-2 pr-3 w-[14%]">Name</th>
+              <th className="pb-2 pr-3 w-[10%]">Rank</th>
+              <th className="pb-2 pr-3 w-[22%]">Unavailable Times</th>
+              <th className="pb-2 pr-3 w-[14%]">Preferred Days</th>
+              <th className="pb-2 pr-3 w-[20%]">Preferred Patterns</th>
+              <th className="pb-2 pr-3 w-[8%]">Max Days</th>
+              <th className="pb-2 pr-3 w-[14%]">View Notes</th>
+              <th className="pb-2 pr-3 w-[4%]"></th>
             </tr>
           </thead>
           <tbody>
             {instructors.map((inst, idx) => (
-              <tr key={`${inst.id}-${idx}`} className="border-t border-default-200">
-                <td className="py-2 pr-3">
+              <tr
+                key={`${inst.id}-${idx}`}
+                id={`note-instructors-${encodeURIComponent(String(inst.id))}`}
+                className="border-t border-default-200"
+              >
+                <td className="py-2 pr-3 align-top">
                   <EditableCell value={inst.id} onChange={(v) => updateInstructor(idx, "id", v)} />
                 </td>
-                <td className="py-2 pr-3">
+                <td className="py-2 pr-3 align-top">
+                  <EditableCell value={inst.name} onChange={(v) => updateInstructor(idx, "name", v)} />
+                </td>
+                <td className="py-2 pr-3 align-top">
                   <EditableSelectCell
                     value={inst.rank_type}
                     options={RANK_OPTIONS}
                     onChange={(v) => updateInstructor(idx, "rank_type", v)}
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className="py-2 pr-3 align-top">
                   <MultiSelect
                     value={inst.unavailable_times}
                     options={timeslotOptions}
@@ -111,7 +123,7 @@ export const InstructorsEditor = ({
                     placeholder="Select timeslots"
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className="py-2 pr-3 align-top">
                   <MultiSelect
                     value={inst.preferences.preferred_days}
                     options={DAY_OPTIONS}
@@ -119,7 +131,7 @@ export const InstructorsEditor = ({
                     placeholder="Select days"
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className="py-2 pr-3 align-top">
                   <MultiSelect
                     value={inst.preferences.preferred_patterns}
                     options={meetingPatternOptions}
@@ -127,7 +139,7 @@ export const InstructorsEditor = ({
                     placeholder="Select patterns"
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className="py-2 pr-3 align-top">
                   <EditableCell
                     type="number"
                     value={inst.preferences.max_teaching_days ?? ""}
@@ -135,7 +147,14 @@ export const InstructorsEditor = ({
                     placeholder="—"
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className="py-2 pr-3 align-top">
+                  <RowNotesButton
+                    scope="instructors"
+                    rowId={String(inst.id)}
+                    title={`Instructor Notes - ${inst.name || inst.id}`}
+                  />
+                </td>
+                <td className="py-2 pr-3 align-top">
                   <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteInstructor(idx)}>
                     ✕
                   </Button>

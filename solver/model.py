@@ -406,6 +406,8 @@ class Section(db.Model):
     allowed_meeting_patterns = Column(JSON, nullable=False)  # List[str] - pattern IDs
     room_requirements = Column(JSON, nullable=False)  # List[str] - required room features
     tags = Column(JSON, nullable=False)  # List[str] - additional tags/metadata
+    # Denormalized for scheduling UI / exports (editable independently of Course.department)
+    department = Column(String(128), nullable=False, default="")
 
     # ========================================================================
     # RELATIONSHIPS
@@ -451,6 +453,7 @@ class Section(db.Model):
             "allowed_meeting_patterns": self.allowed_meeting_patterns or [],
             "room_requirements": self.room_requirements or [],
             "tags": self.tags or [],
+            "department": self.department or "",
         }
 
 
@@ -467,7 +470,7 @@ class SectionPreferences(db.Model):
     section_id = Column(String, ForeignKey("sections.id"), nullable=False, unique=True)
     
     # JSON columns can store complex data structures
-    cannot_collide_with = Column(JSON, nullable=False)  #Dict[str, str] - section_id: collision type
+    cannot_collide_with = Column(JSON, nullable=False)  # List[str] - section IDs that cannot conflict
     preferred_time = Column(String, nullable=True)  # Preferred timeslot ID (optional)
     allowed_times = Column(JSON, nullable=True)  # Dict[str, float] - timeslot_id: weight mapping
     allowed_rooms = Column(JSON, nullable=True)  # List[str] - allowed room IDs (or "virtual")
@@ -480,7 +483,7 @@ class SectionPreferences(db.Model):
     def to_dict(self):
         return {
             "section_id": self.section_id,
-            "cannot_collide_with": self.cannot_collide_with or {}, #a dict
+            "cannot_collide_with": self.cannot_collide_with or [],
             "preferred_time": self.preferred_time,
             "allowed_times": self.allowed_times or {},
             "allowed_rooms": self.allowed_rooms or [],
@@ -490,19 +493,18 @@ class SectionPreferences(db.Model):
 
 class CrossListGroup(db.Model):
     """
-    Updated Cross-list group to include both Room and Time.
-    This allows us to enforce that cross-listed sections share the same time and/or room.
+    Cross-list group for sections that must be scheduled together.
+    
+    Groups multiple sections that share the same meeting time/room.
+    One-to-many with Section (one group has many sections).
     """
     __tablename__ = "crosslist_groups"
 
     id = Column(String, primary_key=True)
-    member_section_ids = Column(JSON, nullable=False)  # List of section IDs
-    
-    # set to true as crosslist usually requires same room and time.
-    require_same_room = Column(Boolean, nullable=False, default=True)
-    require_same_time = Column(Boolean, nullable=False, default=True) 
+    member_section_ids = Column(JSON, nullable=False)  # List[str] - section IDs in this group
+    require_same_room = Column(Boolean, nullable=False, default=False)  # Must share same room?
 
-    # One-to-many relationship with Section
+    # One-to-many: One group contains many sections
     sections = relationship("Section", back_populates="crosslist_group")
 
     def to_dict(self):
@@ -510,7 +512,6 @@ class CrossListGroup(db.Model):
             "id": self.id,
             "member_section_ids": self.member_section_ids or [],
             "require_same_room": self.require_same_room,
-            "require_same_time": self.require_same_time,
         }
 
 
@@ -643,12 +644,14 @@ class ScheduleAssignment(db.Model):
     __tablename__ = "schedule_assignments"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    solution_id = Column(Integer, ForeignKey("schedule_solutions.id"), nullable=True)
     section_id = Column(String, ForeignKey("sections.id"), nullable=False)
     meeting_pattern_id = Column(String, ForeignKey("meeting_patterns.id"), nullable=False)
     timeslot_ids = Column(JSON, nullable=False)  # List[str] - assigned timeslot IDs
     room_id = Column(String, ForeignKey("rooms.id"), nullable=False)  # Assigned room
 
     # Relationships to related models
+    solution = relationship("ScheduleSolution", back_populates="assignments_rel")
     section = relationship("Section", backref="schedule_assignments")
     meeting_pattern = relationship("MeetingPattern", backref="schedule_assignments")
     room = relationship("Room", backref="schedule_assignments")
@@ -679,7 +682,7 @@ class ScheduleSolution(db.Model):
     created_at = Column(DateTime, default=datetime.utcnow)  # Timestamp of when solution was created
 
     # One-to-many: One solution contains many assignments
-    assignments_rel = relationship("ScheduleAssignment", backref="solution")
+    assignments_rel = relationship("ScheduleAssignment", back_populates="solution")
 
     def to_dict(self):
         return {

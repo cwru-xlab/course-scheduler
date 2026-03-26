@@ -8,6 +8,7 @@ import { Providers } from "./providers";
 import { siteConfig } from "@/config/site";
 import { fontSans } from "@/config/fonts";
 import { Navbar } from "@/components/navbar";
+import { SchedulingDataProvider } from "@/lib/scheduling/useSchedulingData";
 
 export const metadata: Metadata = {
   title: {
@@ -41,13 +42,15 @@ export default function RootLayout({
           fontSans.variable
         )}
       >
-        <Providers themeProps={{ attribute: "class", defaultTheme: "dark" }}>
-          <div className="relative flex flex-col h-screen">
-            <Navbar />
-            <main className="container mx-auto max-w-7xl pt-16 px-6 grow">
-              {children}
-            </main>
-          </div>
+        <Providers themeProps={{ attribute: "class", defaultTheme: "light" }}>
+          <SchedulingDataProvider>
+            <div className="relative flex flex-col min-h-screen bg-[var(--weatherhead-surface)] dark:bg-default-100">
+              <Navbar />
+              <main className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-16 pb-8 grow">
+                {children}
+              </main>
+            </div>
+          </SchedulingDataProvider>
         </Providers>
       </body>
     </html>

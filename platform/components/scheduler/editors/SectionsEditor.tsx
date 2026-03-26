@@ -7,8 +7,10 @@ import { EditableCell } from "../EditableCell";
 import { EditableArrayCell } from "../EditableArrayCell";
 import { EditableSelectCell } from "../EditableSelectCell";
 import { MultiSelect } from "../MultiSelect";
+import { RowNotesButton } from "../RowNotesButton";
 
 import type { Section } from "@/lib/scheduling/types";
+import { nextIntegerId } from "@/lib/scheduling/nextId";
 
 type SectionsEditorProps = {
   sections: Section[];
@@ -18,9 +20,10 @@ type SectionsEditorProps = {
   onUpdate: (sections: Section[]) => void;
 };
 
-const createEmptySection = (): Section => ({
-  id: `SEC-NEW-${Date.now()}`,
+const createEmptySection = (existing: Section[]): Section => ({
+  id: nextIntegerId(existing.map((s) => s.id)),
   course_id: "",
+  department: "",
   section_code: "A",
   instructor_id: "",
   expected_enrollment: 20,
@@ -45,7 +48,7 @@ export const SectionsEditor = ({
   };
 
   const addSection = () => {
-    onUpdate([...sections, createEmptySection()]);
+    onUpdate([...sections, createEmptySection(sections)]);
   };
 
   const deleteSection = (index: number) => {
@@ -70,6 +73,7 @@ export const SectionsEditor = ({
           <thead className="text-left text-default-500">
             <tr>
               <th className="pb-2 pr-3">ID</th>
+              <th className="pb-2 pr-3">Department</th>
               <th className="pb-2 pr-3">Course</th>
               <th className="pb-2 pr-3">Code</th>
               <th className="pb-2 pr-3">Instructor</th>
@@ -79,14 +83,26 @@ export const SectionsEditor = ({
               <th className="pb-2 pr-3">Room Req</th>
               <th className="pb-2 pr-3">Crosslist Group</th>
               <th className="pb-2 pr-3">Tags</th>
+              <th className="pb-2 pr-3">View Notes</th>
               <th className="pb-2 pr-3"></th>
             </tr>
           </thead>
           <tbody>
             {sections.map((section, idx) => (
-              <tr key={`${section.id}-${idx}`} className="border-t border-default-200">
+              <tr
+                key={`${section.id}-${idx}`}
+                id={`note-sections-${encodeURIComponent(String(section.id))}`}
+                className="border-t border-default-200"
+              >
                 <td className="py-2 pr-3">
                   <EditableCell value={section.id} onChange={(v) => updateSection(idx, "id", v)} />
+                </td>
+                <td className="py-2 pr-3">
+                  <EditableCell
+                    value={section.department ?? ""}
+                    onChange={(v) => updateSection(idx, "department", v)}
+                    placeholder="e.g. FIN"
+                  />
                 </td>
                 <td className="py-2 pr-3">
                   <EditableCell value={section.course_id} onChange={(v) => updateSection(idx, "course_id", v)} placeholder="COURSE-XXX" />
@@ -129,6 +145,13 @@ export const SectionsEditor = ({
                 </td>
                 <td className="py-2 pr-3">
                   <EditableArrayCell value={section.tags} onChange={(v) => updateSection(idx, "tags", v)} placeholder="tags" />
+                </td>
+                <td className="py-2 pr-3">
+                  <RowNotesButton
+                    scope="sections"
+                    rowId={String(section.id)}
+                    title={`Section Notes - ${section.department ?? ""} ${section.course_id}`.trim()}
+                  />
                 </td>
                 <td className="py-2 pr-3">
                   <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteSection(idx)}>

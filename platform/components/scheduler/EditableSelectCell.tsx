@@ -1,6 +1,7 @@
 "use client";
 
 import { Select, SelectItem } from "@heroui/select";
+import { Autocomplete, AutocompleteItem } from "@heroui/autocomplete";
 
 type EditableSelectCellProps = {
   value: string;
@@ -8,6 +9,7 @@ type EditableSelectCellProps = {
   onChange: (value: string) => void;
   className?: string;
   placeholder?: string;
+  isSearchable?: boolean;
 };
 
 export const EditableSelectCell = ({
@@ -16,7 +18,31 @@ export const EditableSelectCell = ({
   onChange,
   className = "",
   placeholder = "Select...",
+  isSearchable = false,
 }: EditableSelectCellProps) => {
+  if (isSearchable) {
+    return (
+      <Autocomplete
+        size="sm"
+        selectedKey={value || null}
+        onSelectionChange={(key) => {
+          const selected = key ? String(key) : "";
+          if (selected && selected !== value) {
+            onChange(selected);
+          }
+        }}
+        className={`min-w-[140px] ${className}`}
+        placeholder={placeholder}
+        aria-label={placeholder}
+        defaultItems={options}
+      >
+        {(option) => (
+          <AutocompleteItem key={option.key}>{option.label}</AutocompleteItem>
+        )}
+      </Autocomplete>
+    );
+  }
+
   return (
     <Select
       size="sm"
