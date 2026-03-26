@@ -329,6 +329,63 @@ def _has_required_features(room, required: List[str]) -> bool:
     return all(feature in room_features for feature in required)
 
 
+def _normalize_day_tokens(value: Any) -> set:
+    """Normalize day strings/lists into a canonical token set."""
+    if value is None:
+        return set()
+    if isinstance(value, list):
+        tokens = [str(v).strip() for v in value]
+    else:
+        normalized = str(value).replace("/", ",")
+        tokens = [part.strip() for part in normalized.split(",")]
+    return {token for token in tokens if token}
+
+
+def _normalize_compatible_timeslot_sets(
+    pattern_dict: dict,
+    timeslots: List,
+) -> List[List[str]]:
+    """Normalize meeting-pattern timeslot sets for known flattened legacy shape.
+
+    Some datasets store alternatives as a single flat set, e.g. [[6,7,8]], where each
+    timeslot already represents a full Tue/Thu block. In that case, split to
+    [[6],[7],[8]] so each item is treated as an alternative, not one combined meeting.
+    """
+    raw_sets = pattern_dict.get("compatible_timeslot_sets", [])
+    cleaned: List[List[str]] = []
+    for item in raw_sets if isinstance(raw_sets, list) else []:
+        if isinstance(item, list):
+            cleaned.append([str(slot_id) for slot_id in item if slot_id is not None])
+    if len(cleaned) != 1:
+        return cleaned
+
+    only_set = cleaned[0]
+    if len(only_set) <= 1:
+        return cleaned
+
+    allowed_days = _normalize_day_tokens(pattern_dict.get("allowed_days", []))
+    if not allowed_days:
+        return cleaned
+
+    timeslot_days_by_id: Dict[str, set] = {}
+    for timeslot in timeslots:
+        slot_dict = timeslot.to_dict() if hasattr(timeslot, "to_dict") else timeslot
+        if not isinstance(slot_dict, dict):
+            continue
+        slot_id = slot_dict.get("id")
+        if not slot_id:
+            continue
+        slot_days = slot_dict.get("day")
+        if slot_days is None:
+            slot_days = slot_dict.get("days")
+        timeslot_days_by_id[str(slot_id)] = _normalize_day_tokens(slot_days)
+
+    if all(timeslot_days_by_id.get(slot_id) == allowed_days for slot_id in only_set):
+        return [[slot_id] for slot_id in only_set]
+
+    return cleaned
+
+
 def _required_section_capacity(section: Any) -> int:
     """Return the minimum room capacity required for a section.
 
@@ -494,7 +551,9 @@ def _build_options(
             if not pattern:
                 continue
             pattern_dict = pattern if isinstance(pattern, dict) else (pattern.to_dict() if hasattr(pattern, "to_dict") else pattern)
-            compatible_sets = pattern_dict.get("compatible_timeslot_sets", [])
+            compatible_sets = _normalize_compatible_timeslot_sets(
+                pattern_dict, input_data.timeslots
+            )
             for timeslot_set in compatible_sets:
                 if any(slot in blocked_times_global for slot in timeslot_set):
                     continue
