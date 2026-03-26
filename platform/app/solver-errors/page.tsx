@@ -58,7 +58,7 @@ export default function SolverErrorsPage() {
         if (err.message.includes(id)) ids.add(id);
       });
     });
-    return [...ids];
+    return Array.from(ids);
   }, [stored]);
 
   const problematicSections = useMemo(() => {

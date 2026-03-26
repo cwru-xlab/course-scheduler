@@ -198,7 +198,7 @@ export async function POST(request: NextRequest) {
     {
       const payload = timeslots.map((slot) => ({
         id: slot.id,
-        days: slot.day ?? slot.days,
+        days: slot.day,
         start_time: slot.start_time,
         end_time: slot.end_time,
         slot_type: slot.slot_type ?? "standard",
