@@ -707,21 +707,16 @@ export default function CalendarPage() {
       .sort((a, b) => a - b);
   }, [data, selectedDay, axisStart, axisEnd]);
 
-  /** When dragging starts, show ONLY timeslots that match this class' duration. */
+  /** When dragging starts, show ALL timeslots for the selected day. */
   const dragPossibleTimeslots = useMemo(() => {
     if (!data || !calendarDrag?.sectionId) return [];
-    const dragged = dayEvents.find((x) => x.section.id === calendarDrag.sectionId && x.timeslot);
-    if (!dragged || !dragged.timeslot) return [];
-    const durationMinutes = dragged.end - dragged.start;
-
     return data.timeslots
       .filter((slot) => timeslotMatchesDay(slot, selectedDay))
       .map((slot) => ({
         ...slot,
         start: parseMinutes(slot.start_time),
         end: parseMinutes(slot.end_time),
-      }))
-      .filter((slot) => Math.abs(slot.end - slot.start - durationMinutes) <= 5);
+      }));
   }, [calendarDrag?.sectionId, data, dayEvents, selectedDay, axisStart, axisEnd]);
 
   const dragPossibleTimeslotBoundaries = useMemo(() => {
