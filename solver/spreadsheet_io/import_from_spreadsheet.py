@@ -5,8 +5,9 @@ from typing import Any, Dict, List
 
 from openpyxl import load_workbook
 
-DEFAULT_ALLOWED_MEETING_PATTERNS = ["MP-A-50", "MP-B-75"]
+import datetime
 
+DEFAULT_ALLOWED_MEETING_PATTERNS = ["MP-A-50", "MP-B-75"]
 
 try:
     from spreadsheet_io.spreadsheet_utils import (
@@ -46,6 +47,28 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
     locked_rows = _read_rows(wb, "LockedAssignments")
     soft_rows = _read_rows(wb, "SoftLocks")
 
+    for row in timeslots_rows:
+        for col in ["start_time", "end_time"]:
+            val = row.get(col)
+            
+            # Handle actual Excel time objects
+            if isinstance(val, datetime.time):
+                # Only flip hours 1-7 (afternoon classes)
+                if 1 <= val.hour <= 7:
+                    row[col] = val.replace(hour=val.hour + 12)
+                # Keep 8:25 AM exactly as is
+                continue 
+                    
+            # Handle potential string fallbacks
+            elif isinstance(val, str) and ":" in val:
+                parts = val.strip().split(":")
+                if parts[0].isdigit():
+                    hour = int(parts[0])
+                    if 1 <= hour <= 7:
+                        hour += 12
+                        parts[0] = str(hour).zfill(2)
+                        row[col] = ":".join(parts)
+
     sections: List[Dict[str, Any]] = []
     seen_section_ids = set()
     for row in sections_rows:
@@ -64,10 +87,7 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
                     row, "expected_enrollment", "Sections", default=0
                 ),
                 "enrollment_cap": _int_with_default(row, "enrollment_cap", "Sections", default=0),
-                "allowed_meeting_patterns": (
-                    parse_list_cell(row.get("allowed_meeting_patterns"))
-                    or DEFAULT_ALLOWED_MEETING_PATTERNS.copy()
-                ),
+                "allowed_meeting_patterns": parse_list_cell(row.get("allowed_meeting_patterns")),
                 "room_requirements": parse_list_cell(row.get("room_requirements")),
                 "crosslist_group_id": maybe_str(row.get("crosslist_group_id")),
                 "tags": parse_list_cell(row.get("tags")),
@@ -207,7 +227,18 @@ def _read_rows(workbook, sheet_name: str) -> List[Dict[str, Any]]:
         raise ValueError(f"Missing required sheet: {sheet_name}")
 
     ws = workbook[sheet_name]
-    header_cells = next(ws.iter_rows(min_row=1, max_row=1, values_only=True), None)
+    
+    header_row_index = 1
+    for row in ws.iter_rows(min_row=1, max_row=5, values_only=True):
+        if "id" in [str(v).lower().strip() if v else "" for v in row]:
+            header_cells = row
+            break
+        header_row_index += 1
+    else:
+        # Fallback to row 1 if 'id' isn't found in the first 5 rows
+        header_cells = next(ws.iter_rows(min_row=1, max_row=1, values_only=True), None)
+        header_row_index = 1
+
     if header_cells is None:
         raise ValueError(f"Sheet '{sheet_name}' is empty.")
 
@@ -215,7 +246,8 @@ def _read_rows(workbook, sheet_name: str) -> List[Dict[str, Any]]:
     active_columns = normalize_sheet_headers(sheet_name, headers)
 
     rows: List[Dict[str, Any]] = []
-    for values in ws.iter_rows(min_row=2, values_only=True):
+    # Start reading from the row immediately AFTER the detected header
+    for values in ws.iter_rows(min_row=header_row_index + 1, values_only=True):
         if values is None:
             continue
         active_values = values[: len(active_columns)]
