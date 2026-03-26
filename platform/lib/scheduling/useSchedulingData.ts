@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 
 import type { SchedulingInput } from "./types";
 
@@ -19,81 +26,84 @@ type UseSchedulingDataReturn = {
   resetToMockData: () => Promise<void>;
   saveToLocalStorage: () => void;
   hasUnsavedChanges: boolean;
+  reloadFromBackend: () => Promise<void>;
 };
 
-export const useSchedulingData = (): UseSchedulingDataReturn => {
+const SchedulingDataContext = createContext<UseSchedulingDataReturn | null>(
+  null,
+);
+
+const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
   const [data, setData] = useState<SchedulingInput | null>(null);
-  const [mockData, setMockData] = useState<SchedulingInput | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isFromLocalStorage, setIsFromLocalStorage] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Load data on mount
-  useEffect(() => {
+  const loadData = useCallback(async () => {
     let isMounted = true;
-
-    const loadData = async () => {
+    try {
       setIsLoading(true);
       setError(null);
 
-      try {
-        // First, try to load from localStorage
-        const storedData = localStorage.getItem(STORAGE_KEY);
-
-        if (storedData) {
+      // If there's a saved draft in localStorage, prefer that so unsaved edits
+      // survive a full page refresh until the backend is explicitly updated.
+      if (typeof window !== "undefined") {
+        const draftRaw = localStorage.getItem(STORAGE_KEY);
+        if (draftRaw) {
           try {
-            const parsed = JSON.parse(storedData) as SchedulingInput;
+            const draft = JSON.parse(draftRaw) as SchedulingInput;
             if (isMounted) {
-              setData(parsed);
+              setData(draft);
               setIsFromLocalStorage(true);
+              setHasUnsavedChanges(false);
             }
+            return;
           } catch {
-            // Invalid JSON in localStorage, will fall back to mock data
-            localStorage.removeItem(STORAGE_KEY);
+            // Corrupt draft; fall through to backend fetch.
           }
-        }
-
-        // Always fetch mock data as fallback/reference
-        const response = await fetch("/api/mock-data", { method: "GET" });
-        const result = (await response.json()) as {
-          status: "ok" | "error";
-          data?: SchedulingInput;
-          error?: string;
-        };
-
-        if (!response.ok || result.status !== "ok" || !result.data) {
-          throw new Error(result.error ?? "Failed to load mock data.");
-        }
-
-        if (isMounted) {
-          setMockData(result.data);
-
-          // If no localStorage data, use mock data
-          if (!storedData) {
-            setData(result.data);
-            setIsFromLocalStorage(false);
-          }
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError(
-            err instanceof Error ? err.message : "Failed to load data."
-          );
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
         }
       }
-    };
 
-    loadData();
+      // Primary source: backend persisted data
+      const response = await fetch("/api/data", { method: "GET" });
+      const result = (await response.json()) as
+        | { status: "ok"; data: SchedulingInput }
+        | { status: "error"; errors: { code: string; message: string }[] };
 
-    return () => {
-      isMounted = false;
-    };
+      if (!response.ok || result.status !== "ok") {
+        const message =
+          result.status === "error" && result.errors?.length
+            ? result.errors.map((e) => `${e.code}: ${e.message}`).join(" | ")
+            : "Failed to load persisted data.";
+        throw new Error(message);
+      }
+
+      if (isMounted) {
+        setData(result.data);
+        setIsFromLocalStorage(false);
+        setHasUnsavedChanges(false);
+        if (typeof window !== "undefined") {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      }
+    } catch (err) {
+      if (isMounted) {
+        setError(
+          err instanceof Error ? err.message : "Failed to load data.",
+        );
+      }
+    } finally {
+      if (isMounted) {
+        setIsLoading(false);
+      }
+    }
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // Save to localStorage
   const saveToLocalStorage = useCallback(() => {
@@ -124,38 +134,13 @@ export const useSchedulingData = (): UseSchedulingDataReturn => {
 
   // Reset to mock data
   const resetToMockData = useCallback(async () => {
-    if (mockData) {
-      setData(mockData);
-      localStorage.removeItem(STORAGE_KEY);
-      setIsFromLocalStorage(false);
-      setHasUnsavedChanges(false);
-    } else {
-      // Refetch mock data if not available
-      setIsLoading(true);
-      try {
-        const response = await fetch("/api/mock-data", { method: "GET" });
-        const result = (await response.json()) as {
-          status: "ok" | "error";
-          data?: SchedulingInput;
-          error?: string;
-        };
-
-        if (!response.ok || result.status !== "ok" || !result.data) {
-          throw new Error(result.error ?? "Failed to load mock data.");
-        }
-
-        setData(result.data);
-        setMockData(result.data);
-        localStorage.removeItem(STORAGE_KEY);
-        setIsFromLocalStorage(false);
-        setHasUnsavedChanges(false);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to reset data.");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-  }, [mockData]);
+    // Legacy: keep behavior but simply clear local storage drafts.
+    localStorage.removeItem(STORAGE_KEY);
+    setIsFromLocalStorage(false);
+    setHasUnsavedChanges(false);
+    // Reload from backend
+    await loadData();
+  }, [loadData]);
 
   // Auto-save to localStorage when data changes
   useEffect(() => {
@@ -180,5 +165,28 @@ export const useSchedulingData = (): UseSchedulingDataReturn => {
     resetToMockData,
     saveToLocalStorage,
     hasUnsavedChanges,
+    reloadFromBackend: () => loadData(),
   };
 };
+
+export const SchedulingDataProvider = ({
+  children,
+}: {
+  children: ReactNode;
+}) => {
+  const value = useSchedulingDataInternal();
+  return React.createElement(
+    SchedulingDataContext.Provider,
+    { value },
+    children,
+  );
+};
+
+export const useSchedulingData = (): UseSchedulingDataReturn => {
+  const ctx = useContext(SchedulingDataContext);
+  if (!ctx) {
+    throw new Error("useSchedulingData must be used within SchedulingDataProvider");
+  }
+  return ctx;
+};
+

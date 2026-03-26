@@ -1,0 +1,166 @@
+[
+  {
+    "id": "MWF_50MIN",
+    "slots_required": 1,
+    "allowed_days": [
+      "M",
+      "W",
+      "F"
+    ],
+    "compatible_timeslot_sets": [
+      [
+        "A1"
+      ],
+      [
+        "A2"
+      ],
+      [
+        "A3"
+      ],
+      [
+        "A4"
+      ],
+      [
+        "A5"
+      ],
+      [
+        "A6"
+      ],
+      [
+        "A7"
+      ]
+    ]
+  },
+  {
+    "id": "TR_75MIN",
+    "slots_required": 1,
+    "allowed_days": [
+      "T",
+      "R"
+    ],
+    "compatible_timeslot_sets": [
+      [
+        "B4"
+      ],
+      [
+        "B5"
+      ],
+      [
+        "B6"
+      ],
+      [
+        "B8"
+      ],
+      [
+        "B9"
+      ],
+      [
+        "B11"
+      ]
+    ]
+  },
+  {
+    "id": "MW_75MIN",
+    "slots_required": 1,
+    "allowed_days": [
+      "M",
+      "W"
+    ],
+    "compatible_timeslot_sets": [
+      [
+        "B1"
+      ],
+      [
+        "B7"
+      ],
+      [
+        "B10"
+      ]
+    ]
+  },
+  {
+    "id": "MF_75MIN",
+    "slots_required": 1,
+    "allowed_days": [
+      "M",
+      "F"
+    ],
+    "compatible_timeslot_sets": [
+      [
+        "B2"
+      ]
+    ]
+  },
+  {
+    "id": "WF_75MIN",
+    "slots_required": 1,
+    "allowed_days": [
+      "W",
+      "F"
+    ],
+    "compatible_timeslot_sets": [
+      [
+        "B3"
+      ]
+    ]
+  },
+  {
+    "id": "MW_EVENING",
+    "slots_required": 1,
+    "allowed_days": [
+      "M",
+      "W"
+    ],
+    "compatible_timeslot_sets": [
+      [
+        "B12"
+      ],
+      [
+        "B13"
+      ],
+      [
+        "B15"
+      ]
+    ]
+  },
+  {
+    "id": "TR_EVENING",
+    "slots_required": 1,
+    "allowed_days": [
+      "T",
+      "R"
+    ],
+    "compatible_timeslot_sets": [
+      [
+        "B14"
+      ],
+      [
+        "B16"
+      ]
+    ]
+  },
+  {
+    "id": "SINGLE_DAY_LAB",
+    "slots_required": 1,
+    "allowed_days": [
+      "M",
+      "T",
+      "W",
+      "R"
+    ],
+    "compatible_timeslot_sets": [
+      [
+        "C1"
+      ],
+      [
+        "C2"
+      ],
+      [
+        "C3"
+      ],
+      [
+        "C4"
+      ]
+    ]
+  }
+]

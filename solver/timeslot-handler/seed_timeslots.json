@@ -1,0 +1,191 @@
+[
+  {
+    "id": "A1",
+    "days": "MWF",
+    "start_time": "08:25:00",
+    "end_time": "09:15:00",
+    "slot_type": "standard"
+  },
+  {
+    "id": "A2",
+    "days": "MWF",
+    "start_time": "09:30:00",
+    "end_time": "10:20:00",
+    "slot_type": "standard"
+  },
+  {
+    "id": "A3",
+    "days": "MWF",
+    "start_time": "10:35:00",
+    "end_time": "11:25:00",
+    "slot_type": "standard"
+  },
+  {
+    "id": "A4",
+    "days": "MWF",
+    "start_time": "11:40:00",
+    "end_time": "12:30:00",
+    "slot_type": "standard"
+  },
+  {
+    "id": "A5",
+    "days": "MWF",
+    "start_time": "14:15:00",
+    "end_time": "15:05:00",
+    "slot_type": "standard"
+  },
+  {
+    "id": "A6",
+    "days": "MWF",
+    "start_time": "15:20:00",
+    "end_time": "16:10:00",
+    "slot_type": "standard"
+  },
+  {
+    "id": "A7",
+    "days": "MWF",
+    "start_time": "16:25:00",
+    "end_time": "17:15:00",
+    "slot_type": "standard"
+  },
+  {
+    "id": "B1",
+    "days": "MW",
+    "start_time": "08:00:00",
+    "end_time": "09:15:00",
+    "slot_type": "standard"
+  },
+  {
+    "id": "B2",
+    "days": "MF",
+    "start_time": "08:00:00",
+    "end_time": "09:15:00",
+    "slot_type": "standard"
+  },
+  {
+    "id": "B3",
+    "days": "WF",
+    "start_time": "08:00:00",
+    "end_time": "09:15:00",
+    "slot_type": "standard"
+  },
+  {
+    "id": "B4",
+    "days": "TR",
+    "start_time": "08:30:00",
+    "end_time": "09:45:00",
+    "slot_type": "standard"
+  },
+  {
+    "id": "B5",
+    "days": "TR",
+    "start_time": "10:00:00",
+    "end_time": "11:15:00",
+    "slot_type": "standard"
+  },
+  {
+    "id": "B6",
+    "days": "TR",
+    "start_time": "11:30:00",
+    "end_time": "12:45:00",
+    "slot_type": "standard"
+  },
+  {
+    "id": "B7",
+    "days": "MW",
+    "start_time": "12:45:00",
+    "end_time": "14:00:00",
+    "slot_type": "standard"
+  },
+  {
+    "id": "B8",
+    "days": "TR",
+    "start_time": "13:00:00",
+    "end_time": "14:15:00",
+    "slot_type": "standard"
+  },
+  {
+    "id": "B9",
+    "days": "TR",
+    "start_time": "14:30:00",
+    "end_time": "15:45:00",
+    "slot_type": "standard"
+  },
+  {
+    "id": "B10",
+    "days": "MW",
+    "start_time": "15:20:00",
+    "end_time": "16:35:00",
+    "slot_type": "standard"
+  },
+  {
+    "id": "B11",
+    "days": "TR",
+    "start_time": "16:00:00",
+    "end_time": "17:15:00",
+    "slot_type": "standard"
+  },
+  {
+    "id": "B12",
+    "days": "MW",
+    "start_time": "16:50:00",
+    "end_time": "18:05:00",
+    "slot_type": "evening"
+  },
+  {
+    "id": "B13",
+    "days": "MW",
+    "start_time": "17:30:00",
+    "end_time": "18:45:00",
+    "slot_type": "evening"
+  },
+  {
+    "id": "B14",
+    "days": "TR",
+    "start_time": "17:30:00",
+    "end_time": "18:45:00",
+    "slot_type": "evening"
+  },
+  {
+    "id": "B15",
+    "days": "MW",
+    "start_time": "19:00:00",
+    "end_time": "20:15:00",
+    "slot_type": "evening"
+  },
+  {
+    "id": "B16",
+    "days": "TR",
+    "start_time": "19:00:00",
+    "end_time": "20:15:00",
+    "slot_type": "evening"
+  },
+  {
+    "id": "C1",
+    "days": "M",
+    "start_time": "19:00:00",
+    "end_time": "21:30:00",
+    "slot_type": "lab"
+  },
+  {
+    "id": "C2",
+    "days": "T",
+    "start_time": "19:00:00",
+    "end_time": "21:30:00",
+    "slot_type": "lab"
+  },
+  {
+    "id": "C3",
+    "days": "W",
+    "start_time": "19:00:00",
+    "end_time": "21:30:00",
+    "slot_type": "lab"
+  },
+  {
+    "id": "C4",
+    "days": "R",
+    "start_time": "19:00:00",
+    "end_time": "21:30:00",
+    "slot_type": "lab"
+  }
+]
