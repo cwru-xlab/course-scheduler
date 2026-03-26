@@ -347,3 +347,687 @@ Fail fast with actionable errors.
 ## 13. One-Paragraph Summary
 
 > This system schedules rooms and times for predefined instructor–section pairs using a constraint-based optimization approach. Sections are the atomic units; cross-listed courses are independent sections bound by shared scheduling decisions. Hard constraints ensure feasibility, soft constraints express preferences via penalties, and all logic is explicit, inspectable, and overrideable. The solver must support partial locking and explanation generation, enabling a human-centered workflow rather than full automation.
+
+---
+
+## 14. End-to-End Functional Runthrough
+
+This repo is a two-service system:
+
+- **Frontend (Next.js)**: lets users edit scheduling inputs, run the solver, and interact with the resulting schedule (calendar drag/drop, PDF export, and notes).
+- **Solver (Flask + OR-Tools CP-SAT)**: stores scheduling data in SQLite, validates inputs, and produces schedule assignments.
+
+### 14.1 Frontend navigation (what exists in the UI)
+
+The main routes exposed by the frontend:
+
+- `/` redirects to `/editor/sections`
+- `/editor/*` (data entry tables)
+  - `/editor/sections`
+  - `/editor/instructors`
+  - `/editor/rooms`
+  - `/editor/timeslots`
+  - `/editor/meeting-patterns`
+  - `/editor/constraints` (cross-list groups, no-overlap groups, blocked times, locked assignments, soft locks)
+- `/calendar` (schedule output + manual adjustments)
+- `/notes` (row notes and replies)
+- `/solver-errors` (last solver failure diagnostics)
+
+The navbar also links to:
+
+- `Editor` (dropdown with the `/editor/*` pages)
+- `Calendar`
+- `Notes Feed`
+
+### 14.2 Editing scheduling inputs (`/editor/*`)
+
+Each editor page follows the same high-level flow:
+
+1. UI loads current scheduling data from the backend via `GET /api/data`.
+2. UI renders an editable table for a specific slice of scheduling input.
+3. Clicking **`Update Backend`** sends the *entire* current scheduling dataset to `POST /api/update-all`.
+4. `POST /api/update-all` calls multiple solver endpoints (replace rows in SQLite).
+5. The editor page calls `GET /api/data` again (`reloadFromBackend`) to refresh the UI.
+
+Each editor page also provides:
+
+- **Spreadsheet import/export** (`Import Spreadsheet`, `Export Spreadsheet`) on the current `SchedulingInput`.
+- **Run Solver** (`Run Solver`) which schedules and navigates to `/calendar`.
+
+#### What gets updated in the solver DB?
+
+Solver update endpoints are **replace-all** semantics:
+
+- `/update-sections` clears and replaces the `sections` table
+- `/update-instructors` clears and replaces the `instructors` table
+- `/update-rooms` clears and replaces the `rooms` table
+- `/update-timeslots` clears and replaces the `timeslots` table
+- `/update-meeting-patterns` clears and replaces the `meeting_patterns` table
+- `/update-constraints` clears and replaces all constraint tables:
+  - `crosslist_groups`
+  - `no_overlap_groups`
+  - `blocked_times`
+  - `locked_assignments`
+  - `soft_locks`
+
+### 14.3 Running the solver (`Run Solver`)
+
+Clicking **`Run Solver`**:
+
+1. Frontend calls `POST /api/schedule` with the current `SchedulingInput`.
+2. `POST /api/schedule` forwards the solver request as `POST ${SOLVER_URL}/solve` with payload `{ "input": SchedulingInput }`.
+3. If the solver succeeds, the response includes assignments + penalty details and frontend navigates to `/calendar`.
+4. If the solver fails, the frontend stores a snapshot of:
+   - the input that failed
+   - `errors`
+   - `diagnostics` (when provided)
+   in `localStorage`, then navigates to `/solver-errors`.
+
+Important UX warning:
+
+- `/calendar` manual adjustments can be overwritten by a subsequent solver run. This is explicitly called out in the Run Solver confirmation dialog.
+
+### 14.4 Output calendar (`/calendar`) and manual edits
+
+After a successful solver run, the calendar renders a Monday–Friday grid:
+
+- Rows = **rooms**
+- Columns = **time slots**
+- Each scheduled **section** is drawn as an “event” on its chosen room + time.
+
+#### Calendar features in detail
+
+1. **Day switching (Mon–Fri)**: the calendar filters events/timeslots for the selected day.
+2. **Drag preview + pointer-driven snapping**:
+   - Dragging is pointer-driven and snaps to available timeslots for the selected day.
+   - Long/long-block timeslots are visually distinguished based on `timeslot.slot_type`.
+3. **Immediate client-side validation feedback**:
+   When you drag a section to a room + time, the UI checks:
+   - **Room capacity** against the section’s `enrollment_cap` (fallback to `expected_enrollment`).
+   - **Room-time conflicts**: it only checks overlap with other events in the *same target room* on the same day.
+
+   If any conflicts are found, the drag feedback turns invalid and shows a short conflict list.
+
+   Note: the client-side check is room/time overlap only; other solver constraints (e.g., instructor conflicts, cross-list rules) are not fully validated until you run the solver.
+4. **Undo stack**:
+   - Manual drag commits are pushable into an undo stack (up to 25 snapshots).
+   - “Undo” restores the previous manual state (assignments and drag feedback state).
+5. **Update Backend (persist manual edits)**:
+   - If the current manual edit differs from the solver baseline and is “valid”, the **`Update Backend`** button becomes enabled.
+   - Clicking it calls `POST /api/update-sections` to persist the manual placement back into the solver DB.
+
+#### What does “persist manual edits” actually write?
+
+On save, the frontend merges current editor sections with:
+
+- `room_id`: from the calendar assignment state
+- `timeslot_id`: from the calendar assignment state **using only the first element** of `timeslot_ids` (`timeslot_ids[0]`)
+
+This means:
+
+- If a meeting pattern spans multiple timeslots, the calendar persistence mechanism currently only persists the first timeslot id.
+- Re-running the solver may re-align (or overwrite) the multi-slot structure based on meeting pattern constraints.
+
+### 14.5 Solver error page (`/solver-errors`)
+
+If solver execution fails, the frontend:
+
+- Stores the last failure snapshot in `localStorage` under `wsom-last-solver-error`.
+- `/solver-errors` reads that snapshot and displays:
+  - returned `errors` (a list of `{ code, message }`)
+  - `diagnostics` (when present)
+
+Diagnostics shown in the UI can include:
+
+- `feasible_if_relax` (human-readable suggestions)
+- `feasible_if_remove_section` (human-readable suggestions)
+- `error_codes`
+- `referenced_sections`
+- `sections_exceeding_room_capacity`
+- `most_constrained_sections`
+- `busiest_instructors`
+
+### 14.6 Notes feed (`/notes`) and row notes modal
+
+Notes are implemented entirely on the client using `localStorage`:
+
+- Each row’s notes are stored under keys like:
+  - `wsom-row-notes::<scope>::<rowId>`
+- Notes support:
+  - notes
+  - replies
+  - completion checkbox (per note)
+  - deletion
+- The `/editor/*` pages show a “View Notes” button per row. Opening it uses a modal.
+
+The notes modal also supports deep links:
+
+- The editor pages can open `/editor/*?openRowNotes=1&noteScope=...&noteRow=...&focusNote=...`
+- The modal then auto-scrolls to the requested note/reply.
+
+These notes are **not persisted to the solver backend**.
+
+---
+
+## 15. Canonical Scheduling Input Model (Frontend + Solver)
+
+The frontend uses `SchedulingInput` (see `platform/lib/scheduling/types.ts`) as the single contract object passed into:
+
+- `POST /api/schedule`
+- `POST /api/export-scheduling-spreadsheet`
+- spreadsheet import/export
+- `POST /api/update-all`
+
+### 15.1 `SchedulingInput` (top-level)
+
+`SchedulingInput` has these arrays:
+
+- `sections[]`
+- `instructors[]`
+- `rooms[]`
+- `timeslots[]`
+- `meeting_patterns[]`
+- `crosslist_groups[]`
+- `no_overlap_groups[]`
+- `blocked_times[]`
+- `locked_assignments[]`
+- `soft_locks[]`
+
+#### Important: solver may accept additional fields
+
+The solver’s `SchedulingInput` wrapper (in `solver/app.py`) also reads additional keys like `courses`, `majors`, and various preference structures.
+
+The current frontend `SchedulingInput` type does not populate these extra keys, so they are effectively “optional/ignored by UI” today.
+
+### 15.2 Entity field semantics
+
+Below is the meaning of fields as used by the scheduling system:
+
+- `sections[]`
+  - `allowed_meeting_patterns`: ids of `meeting_patterns` this section is allowed to use
+  - `room_requirements[]`: room feature names that must be present on the assigned room
+  - `crosslist_group_id`: cross-list grouping id (bindings are enforced by constraints)
+  - `tags[]`: used for UI coloring and may be used by solver extensions
+- `instructors[]`
+  - `unavailable_times[]`: hard constraints against time ids
+  - `preferences.preferred_days[]` / `preferences.preferred_patterns[]`: soft constraints for the objective
+  - `preferences.max_teaching_days`: soft penalty beyond this for adjuncts
+- `rooms[]`
+  - `features[]`: must satisfy all `room_requirements`
+  - `capacity`: used as a feasibility check for room assignment
+- `timeslots[]`
+  - `day`, `start_time`, `end_time`: define the grid + exact time alignment
+  - `slot_type`: used by the UI to distinguish “short” vs “long” rendering; solver also uses it during option building
+- `meeting_patterns[]`
+  - `slots_required`: how many timeslots are required for the meeting pattern option
+  - `allowed_days[]`: which day tokens the pattern allows
+  - `compatible_timeslot_sets[]`: **a list of alternatives**, where each alternative is an array of timeslot ids that the meeting consumes
+- `crosslist_groups[]`
+  - `member_section_ids[]`: which sections are cross-listed together
+  - `require_same_room`: when `true`, cross-listed sections must share the same room in addition to time
+- `no_overlap_groups[]`
+  - `member_section_ids[]`: sections that must not overlap
+  - `reason`: human label for why the group exists
+- `blocked_times[]`
+  - `scope`: one of `global | instructor | room | program`
+  - `timeslot_ids[]`: timeslot ids to block
+  - `reason`: human label
+
+  Note: in the current solver code, only `scope="global"` is applied during option generation (see solver design notes in `solver/app.py`).
+- `locked_assignments[]`
+  - `fixed_timeslot_set[]`: locks the exact timeslot-set alternative
+  - `fixed_room`: locks room assignment
+
+  Locked assignments reduce search space and are treated as constants.
+- `soft_locks[]`
+  - `preferred_timeslot_set[]` and/or `preferred_room`
+  - `weight`: larger weights add stronger objective penalties when the preferred selection is not matched
+
+### 15.3 Scheduling output (`ScheduleSolution`)
+
+On success, solver returns `ScheduleSolution` with:
+
+- `assignments[]`
+  - `section_id`
+  - `meeting_pattern_id`
+  - `timeslot_ids[]`
+  - `room_id`
+- `total_score` (objective value)
+- `penalty_breakdown` (per-category numeric totals)
+- `explanations[]` (human-readable strings)
+
+---
+
+## 16. Spreadsheet Contract (Import/Export)
+
+The Excel workbook format is the interchange schema for the UI’s `SchedulingInput`.
+
+Contract file: `solver/spreadsheet_io/README.md`.
+
+### 16.1 Delimiters (how lists are encoded)
+
+- Simple list fields use `;` separators.
+  - Example: `TS-M-0900;TS-W-0900`
+- Nested list fields (`compatible_timeslot_sets`) use:
+  - `;` between set alternatives
+  - `|` between ids inside a set
+  - Example: `TS-M-0900|TS-W-0900;TS-M-1030|TS-W-1030`
+
+### 16.2 Required sheets and columns
+
+The workbook must include these sheets and columns:
+
+- `Sections`
+  - `id`, `course_id`, `department`, `section_code`, `instructor_id`,
+    `expected_enrollment`, `enrollment_cap`, `allowed_meeting_patterns`,
+    `room_requirements`, `crosslist_group_id`, `tags`, `previous_meeting_pattern`
+- `Instructors`
+  - `id`, `name`, `rank_type`, `unavailable_times`, `preferred_days`,
+    `preferred_patterns`, `max_teaching_days`
+- `Rooms`
+  - `id`, `building`, `room_number`, `capacity`, `features`
+- `Timeslots`
+  - `id`, `day`, `start_time`, `end_time`, `slot_type`
+- `MeetingPatterns`
+  - `id`, `slots_required`, `allowed_days`, `compatible_timeslot_sets`
+- `CrosslistGroups`
+  - `id`, `member_section_ids`, `require_same_room`
+- `NoOverlapGroups`
+  - `id`, `member_section_ids`, `reason`
+- `BlockedTimes`
+  - `scope`, `timeslot_ids`, `reason`
+- `LockedAssignments`
+  - `section_id`, `fixed_timeslot_set`, `fixed_room`
+- `SoftLocks`
+  - `section_id`, `preferred_timeslot_set`, `preferred_room`, `weight`
+
+### 16.3 Template generation
+
+To generate a fresh template workbook:
+
+- `GET /api/scheduling-spreadsheet-template` (frontend route)
+  - internally calls solver `GET /scheduling-spreadsheet-template`
+- or directly use solver `GET /scheduling-spreadsheet-template`
+
+---
+
+## 17. API Reference (Frontend Proxies + Flask Solver)
+
+The frontend exposes a set of Next.js routes under `/api/*`. These are thin proxy handlers around the solver Flask service under `${SOLVER_URL}`.
+
+### 17.1 Frontend routes (Next.js)
+
+#### `GET /api/data`
+
+Response:
+
+```json
+{
+  "status": "ok",
+  "data": {
+    "sections": [],
+    "instructors": [],
+    "rooms": [],
+    "timeslots": [],
+    "meeting_patterns": [],
+    "crosslist_groups": [],
+    "no_overlap_groups": [],
+    "blocked_times": [],
+    "locked_assignments": [],
+    "soft_locks": []
+  }
+}
+```
+
+Failure:
+
+```json
+{
+  "status": "error",
+  "errors": [{ "code": "read_failed", "message": "..." }]
+}
+```
+
+#### `POST /api/schedule`
+
+Request body:
+
+- expects a `SchedulingInput` object (the frontend sends the request JSON as-is)
+
+Response on success:
+
+```json
+{
+  "status": "ok",
+  "assignments": [],
+  "total_score": 123,
+  "penalty_breakdown": { "...": 0 },
+  "explanations": ["..."]
+}
+```
+
+Response on failure:
+
+```json
+{
+  "status": "error",
+  "errors": [{ "code": "infeasible", "message": "No feasible schedule found." }],
+  "diagnostics": { "feasible_if_relax": [], "feasible_if_remove_section": [] }
+}
+```
+
+#### `POST /api/update-all`
+
+Request body:
+
+- typically the full `SchedulingInput` object from the editor page (but only the arrays are extracted)
+
+Semantics:
+
+- calls the solver update endpoints in this order:
+  1. `/update-sections`
+  2. `/update-instructors`
+  3. `/update-rooms`
+  4. `/update-timeslots`
+  5. `/update-meeting-patterns`
+  6. `/update-constraints`
+
+Response:
+
+```json
+{ "status": "ok", "warnings": ["..."] }
+```
+
+On failure:
+
+```json
+{
+  "status": "error",
+  "errors": [{ "code": "invalid_request", "message": "..." }]
+}
+```
+
+#### `POST /api/update-sections`
+
+Used by the calendar to persist manual edits.
+
+Request body:
+
+```json
+{ "sections": [ /* array of Section objects */ ] }
+```
+
+Response:
+
+```json
+{ "status": "ok" }
+```
+
+#### `POST /api/import-scheduling-spreadsheet`
+
+Request:
+
+- `multipart/form-data` with a file in the form field `file`
+
+Response on success:
+
+```json
+{
+  "status": "ok",
+  "scheduling_input": { /* SchedulingInput object */ }
+}
+```
+
+Response on failure:
+
+```json
+{ "status": "error", "errors": [{ "code": "parse_failed", "message": "..." }] }
+```
+
+#### `POST /api/export-scheduling-spreadsheet`
+
+Request body:
+
+```json
+{ "input": { /* SchedulingInput object */ } }
+```
+
+Response:
+
+- returns `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` bytes
+
+#### `GET /api/scheduling-spreadsheet-template`
+
+Response:
+
+- returns xlsx bytes for the scheduling template
+
+#### `GET /api/mock-data`
+
+Returns a mock `SchedulingInput` for UI/testing.
+
+### 17.2 Solver routes (Flask)
+
+All solver routes are rooted under `${SOLVER_URL}`.
+
+The solver service runs by default on:
+
+- `http://localhost:5001`
+
+It uses SQLite:
+
+- `sqlite:///course_scheduler.db`
+
+#### `GET /` (health)
+
+Returns:
+
+```json
+{ "service": "weather-solver", "status": "ok" }
+```
+
+#### `GET /data`
+
+Response:
+
+- `status: ok`
+- `data` in SchedulingInput shape (sections/instructors/rooms/timeslots/meeting_patterns/constraints)
+
+#### `POST /solve`
+
+Request body:
+
+```json
+{ "input": { /* SchedulingInput */ } }
+```
+
+Success response:
+
+```json
+{
+  "status": "ok",
+  "assignments": [
+    {
+      "section_id": "SEC-1",
+      "meeting_pattern_id": "MP-1",
+      "timeslot_ids": ["TS-1", "TS-2"],
+      "room_id": "ROOM-1"
+    }
+  ],
+  "total_score": 0,
+  "penalty_breakdown": { "...": 0 },
+  "explanations": ["..."]
+}
+```
+
+Failure response:
+
+```json
+{
+  "status": "error",
+  "errors": [{ "code": "infeasible", "message": "No feasible schedule found." }],
+  "diagnostics": {
+    "feasible_if_relax": [],
+    "feasible_if_remove_section": [],
+    "error_codes": [],
+    "referenced_sections": []
+  }
+}
+```
+
+#### Spreadsheet routes
+
+`GET /scheduling-spreadsheet-template`
+
+- returns xlsx bytes
+
+`POST /import-scheduling-spreadsheet`
+
+- `multipart/form-data` with `file`
+- returns `{ "status": "ok", "scheduling_input": SchedulingInput }`
+
+`POST /export-scheduling-spreadsheet`
+
+- accepts either:
+  - a raw SchedulingInput JSON object
+  - or `{ "input": SchedulingInput }`
+- returns xlsx bytes
+
+#### Data update routes
+
+All update routes are replace-all semantics:
+
+`POST /update-sections`
+
+- request:
+
+```json
+{ "sections": [ /* Section objects */ ] }
+```
+
+- response:
+
+```json
+{
+  "status": "ok",
+  "skipped_sections": [
+    { "id": "SEC-1", "missing_required_fields": ["..."] }
+  ]
+}
+```
+
+Required keys for each section payload in `/update-sections`:
+
+- `id`, `course_id`, `section_code`, `instructor_id`
+
+If duplicates exist, solver skips duplicates and returns them in `skipped_sections`.
+
+`POST /update-instructors`, `/update-rooms`, `/update-timeslots`, `/update-meeting-patterns`
+
+- each expects `{ "instructors": [...] }`, `{ "rooms": [...] }`, etc.
+
+`POST /update-constraints`
+
+- expects:
+
+```json
+{
+  "crosslist_groups": [],
+  "no_overlap_groups": [],
+  "blocked_times": [],
+  "locked_assignments": [],
+  "soft_locks": []
+}
+```
+
+#### Optional solver Excel import (not used by the UI)
+
+Solver also has `POST /import-excel`, which depends on optional excel importer modules.
+
+If those modules are missing, the solver responds with `excel_import_unavailable` and HTTP `501`.
+
+---
+
+## 18. Error Handling and Diagnostics (What you’ll see)
+
+There are two broad failure modes:
+
+1. **Input validation / parsing failures**
+   - import endpoints return `status: error` with `errors[]`
+   - update endpoints return `status: error` (usually with `invalid_request` or `update_failed`)
+2. **Scheduling infeasibility**
+   - `/solve` returns:
+     - `status: error`
+     - `errors: [{ code: "infeasible", message: "No feasible schedule found." }]`
+     - plus `diagnostics` (including relaxation/remove suggestions)
+
+Frontend always expects `errors` as an array of `{ code, message }`.
+
+---
+
+## 19. Requirements, Setup, and How to Run
+
+### 19.1 Solver requirements
+
+- Python >= 3.12
+- Dependencies (from `solver/pyproject.toml`):
+  - `flask`
+  - `flask-sqlalchemy`
+  - `flask-cors`
+  - `openpyxl`
+  - `ortools`
+
+Run:
+
+- `cd solver`
+- `python -m pip install flask flask-sqlalchemy flask-cors openpyxl ortools`
+- `python app.py`
+
+The solver listens on:
+
+- `http://0.0.0.0:5001`
+
+On first run, it will:
+
+- create the SQLite DB (`course_scheduler.db`) if missing
+- attempt to create required tables
+- seed timeslots/meeting patterns/instructors (and room-related data) if the DB is empty
+
+### 19.2 Frontend requirements
+
+- Node.js (the Dockerfile uses `node:24-alpine`)
+- Next.js + React + TypeScript (see `platform/package.json`)
+
+Run:
+
+- `cd platform`
+- `npm install`
+- `npm run dev`
+
+The Dockerfile exposes port `3002` (for the production image).
+
+### 19.3 Environment variables
+
+Frontend needs to know how to reach the solver:
+
+- `SOLVER_URL` (used by the Next.js server-side proxy routes)
+  - defaults to `http://localhost:5001` in most routes
+  - some routes include fallback to `http://localhost:8000`
+
+Optional environment variables exist for the LLM integration library, but the current UI you see here uses notes stored in `localStorage` (not an LLM-backed system).
+
+---
+
+## 20. Practical Troubleshooting
+
+- Solver won’t start:
+  - ensure you installed OR-Tools (`ortools`) and are using Python >= 3.12
+  - confirm you can import dependencies from the `solver` environment
+- Calendar drag feels too permissive:
+  - remember the client-side validation checks only room/time overlap and room capacity; the solver enforces instructor overlap, blocked times, crosslists, etc.
+- Solver errors without “what to change”:
+  - open `/solver-errors`; use `diagnostics.feasible_if_relax` and/or `diagnostics.feasible_if_remove_section` if present
+- Spreadsheet import fails:
+  - ensure your workbook includes all required sheets and column names from `solver/spreadsheet_io/README.md`
+  - check delimiter encoding rules for `allowed_meeting_patterns`, `compatible_timeslot_sets`, `member_section_ids`, etc.
+
