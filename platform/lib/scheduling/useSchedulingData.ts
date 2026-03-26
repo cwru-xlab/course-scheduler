@@ -40,33 +40,17 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
   const [isFromLocalStorage, setIsFromLocalStorage] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // Load data on mount
+  // Always fetch from the backend (no localStorage cache)
   const loadData = useCallback(async () => {
     let isMounted = true;
     try {
       setIsLoading(true);
       setError(null);
 
-      // If there's a saved draft in localStorage, prefer that so unsaved edits
-      // survive a full page refresh until the backend is explicitly updated.
       if (typeof window !== "undefined") {
-        const draftRaw = localStorage.getItem(STORAGE_KEY);
-        if (draftRaw) {
-          try {
-            const draft = JSON.parse(draftRaw) as SchedulingInput;
-            if (isMounted) {
-              setData(draft);
-              setIsFromLocalStorage(true);
-              setHasUnsavedChanges(false);
-            }
-            return;
-          } catch {
-            // Corrupt draft; fall through to backend fetch.
-          }
-        }
+        localStorage.removeItem(STORAGE_KEY);
       }
 
-      // Primary source: backend persisted data
       const response = await fetch("/api/data", { method: "GET" });
       const result = (await response.json()) as
         | { status: "ok"; data: SchedulingInput }
@@ -84,9 +68,6 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
         setData(result.data);
         setIsFromLocalStorage(false);
         setHasUnsavedChanges(false);
-        if (typeof window !== "undefined") {
-          localStorage.removeItem(STORAGE_KEY);
-        }
       }
     } catch (err) {
       if (isMounted) {
@@ -105,14 +86,9 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
     loadData();
   }, [loadData]);
 
-  // Save to localStorage
   const saveToLocalStorage = useCallback(() => {
-    if (data) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      setIsFromLocalStorage(true);
-      setHasUnsavedChanges(false);
-    }
-  }, [data]);
+    // no-op: localStorage cache disabled
+  }, []);
 
   // Update entire data object
   const updateData = useCallback((newData: SchedulingInput) => {
@@ -134,26 +110,11 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
 
   // Reset to mock data
   const resetToMockData = useCallback(async () => {
-    // Legacy: keep behavior but simply clear local storage drafts.
     localStorage.removeItem(STORAGE_KEY);
     setIsFromLocalStorage(false);
     setHasUnsavedChanges(false);
-    // Reload from backend
     await loadData();
   }, [loadData]);
-
-  // Auto-save to localStorage when data changes
-  useEffect(() => {
-    if (data && hasUnsavedChanges) {
-      const timeoutId = setTimeout(() => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        setIsFromLocalStorage(true);
-        setHasUnsavedChanges(false);
-      }, 500); // Debounce saves by 500ms
-
-      return () => clearTimeout(timeoutId);
-    }
-  }, [data, hasUnsavedChanges]);
 
   return {
     data,

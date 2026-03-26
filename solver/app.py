@@ -85,6 +85,89 @@ ADJUNCT_DAY_EXCESS_WEIGHT = 15  # penalty per day beyond adjunct max for adjunct
 SOFT_LOCK_BASE_WEIGHT = 1       # base multiplier for soft lock penalties
 SECTION_PREF_TIME_WEIGHT = 5    # penalty if section is not assigned to its preferred_time
 
+def _seed_if_empty() -> None:
+    """Auto-seed timeslots, meeting patterns, rooms, and instructors when DB is empty."""
+    import json
+    from pathlib import Path
+    from datetime import time as dt_time
+
+    base = Path(__file__).resolve().parent
+
+    if Timeslot.query.first() is None:
+        ts_path = base / "timeslot-handler" / "seed_timeslots.json"
+        if ts_path.exists():
+            for row in json.loads(ts_path.read_text()):
+                h1, m1, s1 = row["start_time"].split(":")
+                h2, m2, s2 = row["end_time"].split(":")
+                db.session.add(Timeslot(
+                    id=row["id"],
+                    days=row["days"],
+                    start_time=dt_time(int(h1), int(m1), int(s1)),
+                    end_time=dt_time(int(h2), int(m2), int(s2)),
+                    slot_type=row["slot_type"],
+                ))
+            db.session.flush()
+            print(f"[seed] Timeslots seeded from {ts_path}")
+
+    if MeetingPattern.query.first() is None:
+        mp_path = base / "timeslot-handler" / "seed_meeting_patterns.json"
+        if mp_path.exists():
+            for row in json.loads(mp_path.read_text()):
+                db.session.add(MeetingPattern(
+                    id=row["id"],
+                    slots_required=row["slots_required"],
+                    allowed_days=row["allowed_days"],
+                    compatible_timeslot_sets=row["compatible_timeslot_sets"],
+                ))
+            db.session.flush()
+            print(f"[seed] MeetingPatterns seeded from {mp_path}")
+
+    if Room.query.first() is None:
+        rooms_path = base / "room-handler" / "rooms.json"
+        if rooms_path.exists():
+            for row in json.loads(rooms_path.read_text()):
+                db.session.add(Room(
+                    id=row["id"],
+                    building=row["building"],
+                    room_number=row["room_number"],
+                    capacity=row["capacity"],
+                    room_type=row["room_type"],
+                    has_av=row["has_av"],
+                    is_accessible=row["is_accessible"],
+                    features=row.get("features", []),
+                ))
+            db.session.flush()
+            print(f"[seed] Rooms seeded from {rooms_path}")
+
+        prefs_path = base / "room-handler" / "room_preferences.json"
+        if prefs_path.exists():
+            from model import RoomPreferences
+            for row in json.loads(prefs_path.read_text()):
+                db.session.add(RoomPreferences(
+                    room_id=row["room_id"],
+                    need_projector=row["need_projector"],
+                    need_lab=row["need_lab"],
+                    can_be_outside_weatherhead=row["can_be_outside_weatherhead"],
+                    other_requirements=row.get("other_requirements") or {},
+                ))
+            db.session.flush()
+            print(f"[seed] RoomPreferences seeded from {prefs_path}")
+
+    if Instructor.query.first() is None:
+        inst_path = base / "instructor-handler" / "seed_instructors.json"
+        if inst_path.exists():
+            for row in json.loads(inst_path.read_text()):
+                db.session.add(Instructor(
+                    id=row["id"],
+                    name=row["name"],
+                    rank_type=row["rank_type"],
+                ))
+            db.session.flush()
+            print(f"[seed] Instructors seeded from {inst_path}")
+
+    db.session.commit()
+
+
 def _ensure_sqlite_schema() -> None:
     """Apply lightweight migrations for SQLite (e.g. new columns on existing DBs)."""
     try:
@@ -1429,6 +1512,91 @@ def read_root():
     return jsonify({"service": "weatherhead-solver", "status": "ok"})
 
 
+@app.route("/data", methods=["GET"])
+def get_data():
+    """Return all scheduling data from the database in SchedulingInput shape."""
+    try:
+        sections = [
+            {
+                **s.to_dict(),
+                "previous_meeting_pattern": None,
+            }
+            for s in Section.query.all()
+        ]
+
+        instructors = []
+        for inst in Instructor.query.all():
+            d = inst.to_dict()
+            prefs = d.pop("preferences", {}) or {}
+            instructors.append({
+                "id": d["id"],
+                "name": d["name"],
+                "rank_type": d["rank_type"],
+                "unavailable_times": prefs.get("unavailable_times", []),
+                "preferences": {
+                    "preferred_days": prefs.get("preferred_days", []),
+                    "preferred_patterns": prefs.get("preferred_patterns", []),
+                    "max_teaching_days": prefs.get("max_teaching_days"),
+                },
+            })
+
+        rooms = [
+            {
+                "id": r.id,
+                "building": r.building,
+                "room_number": r.room_number,
+                "capacity": r.capacity,
+                "features": r.features or [],
+            }
+            for r in Room.query.all()
+        ]
+
+        timeslots = [
+            {
+                "id": t.id,
+                "day": t.days,
+                "start_time": t.to_dict()["start_time"],
+                "end_time": t.to_dict()["end_time"],
+                "slot_type": t.slot_type,
+            }
+            for t in Timeslot.query.all()
+        ]
+
+        meeting_patterns = [mp.to_dict() for mp in MeetingPattern.query.all()]
+        crosslist_groups = [cg.to_dict() for cg in CrossListGroup.query.all()]
+        no_overlap_groups = [nog.to_dict() for nog in NoOverlapGroup.query.all()]
+        blocked_times = [bt.to_dict() for bt in BlockedTime.query.all()]
+        locked_assignments = [la.to_dict() for la in LockedAssignment.query.all()]
+        soft_locks = [sl.to_dict() for sl in SoftLock.query.all()]
+
+        return jsonify({
+            "status": "ok",
+            "data": {
+                "sections": sections,
+                "instructors": instructors,
+                "rooms": rooms,
+                "timeslots": timeslots,
+                "meeting_patterns": meeting_patterns,
+                "crosslist_groups": crosslist_groups,
+                "no_overlap_groups": no_overlap_groups,
+                "blocked_times": blocked_times,
+                "locked_assignments": locked_assignments,
+                "soft_locks": soft_locks,
+            },
+        })
+    except Exception as exc:
+        return (
+            jsonify({
+                "status": "error",
+                "errors": [{
+                    "code": "read_failed",
+                    "message": f"Failed to read scheduling data: {exc}",
+                }],
+            }),
+            500,
+        )
+
+
 @app.route("/import-excel", methods=["POST"])
 def import_excel():
     """
@@ -2149,6 +2317,7 @@ def update_constraints():
 with app.app_context():
     db.create_all()
     _ensure_sqlite_schema()
+    _seed_if_empty()
 
 
 if __name__ == "__main__":
