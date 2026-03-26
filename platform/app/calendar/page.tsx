@@ -249,7 +249,32 @@ export default function CalendarPage() {
     { timeslot_ids: string[]; room_id: string; meeting_pattern_id: string }
   >;
 
+  const stateKeyForUndo = useCallback(
+    (
+      a: AssignmentMap,
+      solverTs: Record<string, string[]>,
+    ): string => {
+      const normalizeAssignments = Object.entries(a)
+        .sort(([sa], [sb]) => sa.localeCompare(sb))
+        .map(([sectionId, v]) => ({
+          sectionId,
+          room_id: v.room_id || "",
+          meeting_pattern_id: v.meeting_pattern_id || "",
+          timeslot_ids: [...(v.timeslot_ids ?? [])].slice().sort(),
+        }));
+      const normalizeSolverTs = Object.entries(solverTs)
+        .sort(([sa], [sb]) => sa.localeCompare(sb))
+        .map(([sectionId, ids]) => ({
+          sectionId,
+          timeslot_ids: [...(ids ?? [])].slice().sort(),
+        }));
+      return JSON.stringify({ a: normalizeAssignments, s: normalizeSolverTs });
+    },
+    [],
+  );
+
   type UndoSnapshot = {
+    key: string;
     assignmentsBySection: AssignmentMap;
     solverTimeslotIdsBySection: Record<string, string[]>;
     dragFeedback: { status: "neutral" | "valid" | "invalid"; message: string | null };
@@ -267,6 +292,7 @@ export default function CalendarPage() {
     Record<string, string[]>
   >({});
   const [undoStack, setUndoStack] = useState<UndoSnapshot[]>([]);
+  const undoStackRef = useRef<UndoSnapshot[]>([]);
   const [dragError, setDragError] = useState<string | null>(null);
   const [dragFeedback, setDragFeedback] = useState<{
     status: "neutral" | "valid" | "invalid";
@@ -421,6 +447,7 @@ export default function CalendarPage() {
                 setBaselineAssignments(nextAssignments);
                 setSolverTimeslotIdsBySection(allTimeslotIdsBySection);
                 setUndoStack([]);
+                undoStackRef.current = [];
                 setData({
                   sections: sectionsFromSolver,
                   timeslots: timeslotsFromSolver,
@@ -460,6 +487,7 @@ export default function CalendarPage() {
           setAssignmentsBySection(fallbackAssignments);
           setBaselineAssignments(fallbackAssignments);
           setUndoStack([]);
+          undoStackRef.current = [];
           setData(json.data);
         }
       } catch (e) {
@@ -664,16 +692,18 @@ export default function CalendarPage() {
   };
 
   const handleUndo = useCallback(() => {
-    setUndoStack((prev) => {
-      if (!prev.length) return prev;
-      const snapshot = prev[prev.length - 1];
-      setAssignmentsBySection(snapshot.assignmentsBySection);
-      setSolverTimeslotIdsBySection(snapshot.solverTimeslotIdsBySection);
-      setDragFeedback(snapshot.dragFeedback);
-      setDragError(snapshot.dragError);
-      setBackendSaveMessage(snapshot.backendSaveMessage);
-      return prev.slice(0, -1);
-    });
+    const stack = undoStackRef.current;
+    const snapshot = stack[stack.length - 1];
+    if (!snapshot) return;
+    const nextStack = stack.slice(0, -1);
+    // Update ref first so a second click can't read a stale stack.
+    undoStackRef.current = nextStack;
+    setUndoStack(nextStack);
+    setAssignmentsBySection(snapshot.assignmentsBySection);
+    setSolverTimeslotIdsBySection(snapshot.solverTimeslotIdsBySection);
+    setDragFeedback(snapshot.dragFeedback);
+    setDragError(snapshot.dragError);
+    setBackendSaveMessage(snapshot.backendSaveMessage);
   }, []);
 
   const updateLastRunStorage = (
@@ -797,9 +827,13 @@ export default function CalendarPage() {
           JSON.stringify([...(currentAssignment?.timeslot_ids ?? currentTimeslotIds)].sort());
       if (!alreadyPlaced) {
         setUndoStack((prev) => {
+          const key = stateKeyForUndo(assignmentsBySection, solverTimeslotIdsBySection);
+          const lastKey = prev.length ? prev[prev.length - 1]?.key : null;
+          if (lastKey === key) return prev;
           const next = [
             ...prev,
             {
+              key,
               assignmentsBySection,
               solverTimeslotIdsBySection,
               dragFeedback,
@@ -807,7 +841,9 @@ export default function CalendarPage() {
               backendSaveMessage,
             },
           ];
-          return next.length > 25 ? next.slice(next.length - 25) : next;
+          const trimmed = next.length > 25 ? next.slice(next.length - 25) : next;
+          undoStackRef.current = trimmed;
+          return trimmed;
         });
       }
       const nextAssignments: AssignmentMap = {
