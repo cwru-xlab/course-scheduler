@@ -13,6 +13,7 @@ import {
   Printer,
   Rocket,
   Share2,
+  Undo2,
 } from "lucide-react";
 import type { ScheduleSolution, SchedulingInput } from "@/lib/scheduling/types";
 
@@ -248,6 +249,14 @@ export default function CalendarPage() {
     { timeslot_ids: string[]; room_id: string; meeting_pattern_id: string }
   >;
 
+  type UndoSnapshot = {
+    assignmentsBySection: AssignmentMap;
+    solverTimeslotIdsBySection: Record<string, string[]>;
+    dragFeedback: { status: "neutral" | "valid" | "invalid"; message: string | null };
+    dragError: string | null;
+    backendSaveMessage: { type: "success" | "error"; text: string } | null;
+  };
+
   const [selectedDay, setSelectedDay] = useState<Day>("Mon");
   const [data, setData] = useState<SolverDataDto | null>(null);
   const [solverInput, setSolverInput] = useState<SchedulingInput | null>(null);
@@ -257,6 +266,7 @@ export default function CalendarPage() {
   const [solverTimeslotIdsBySection, setSolverTimeslotIdsBySection] = useState<
     Record<string, string[]>
   >({});
+  const [undoStack, setUndoStack] = useState<UndoSnapshot[]>([]);
   const [dragError, setDragError] = useState<string | null>(null);
   const [dragFeedback, setDragFeedback] = useState<{
     status: "neutral" | "valid" | "invalid";
@@ -410,6 +420,7 @@ export default function CalendarPage() {
                 setAssignmentsBySection(nextAssignments);
                 setBaselineAssignments(nextAssignments);
                 setSolverTimeslotIdsBySection(allTimeslotIdsBySection);
+                setUndoStack([]);
                 setData({
                   sections: sectionsFromSolver,
                   timeslots: timeslotsFromSolver,
@@ -448,6 +459,7 @@ export default function CalendarPage() {
           );
           setAssignmentsBySection(fallbackAssignments);
           setBaselineAssignments(fallbackAssignments);
+          setUndoStack([]);
           setData(json.data);
         }
       } catch (e) {
@@ -651,6 +663,19 @@ export default function CalendarPage() {
     window.print();
   };
 
+  const handleUndo = useCallback(() => {
+    setUndoStack((prev) => {
+      if (!prev.length) return prev;
+      const snapshot = prev[prev.length - 1];
+      setAssignmentsBySection(snapshot.assignmentsBySection);
+      setSolverTimeslotIdsBySection(snapshot.solverTimeslotIdsBySection);
+      setDragFeedback(snapshot.dragFeedback);
+      setDragError(snapshot.dragError);
+      setBackendSaveMessage(snapshot.backendSaveMessage);
+      return prev.slice(0, -1);
+    });
+  }, []);
+
   const updateLastRunStorage = (
     nextInput: SchedulingInput,
     assignments: AssignmentMap,
@@ -766,6 +791,25 @@ export default function CalendarPage() {
         return id;
       });
       const uniqueNextTimeslotIds = Array.from(new Set(nextTimeslotIds));
+      const alreadyPlaced =
+        targetRoomId === (currentRoomId ?? "") &&
+        JSON.stringify([...uniqueNextTimeslotIds].sort()) ===
+          JSON.stringify([...(currentAssignment?.timeslot_ids ?? currentTimeslotIds)].sort());
+      if (!alreadyPlaced) {
+        setUndoStack((prev) => {
+          const next = [
+            ...prev,
+            {
+              assignmentsBySection,
+              solverTimeslotIdsBySection,
+              dragFeedback,
+              dragError,
+              backendSaveMessage,
+            },
+          ];
+          return next.length > 25 ? next.slice(next.length - 25) : next;
+        });
+      }
       const nextAssignments: AssignmentMap = {
         ...assignmentsBySection,
         [sectionId]: {
@@ -808,7 +852,17 @@ export default function CalendarPage() {
         setDragError(null);
       }
     },
-    [assignmentsBySection, data, dayEvents, selectedDay, timeslotById],
+    [
+      assignmentsBySection,
+      backendSaveMessage,
+      data,
+      dayEvents,
+      dragError,
+      dragFeedback,
+      selectedDay,
+      solverTimeslotIdsBySection,
+      timeslotById,
+    ],
   );
 
   const findRoomIdAtClientY = useCallback(
@@ -910,6 +964,21 @@ export default function CalendarPage() {
           </p>
         </div>
         <div className="flex gap-3 flex-wrap">
+          <button
+            type="button"
+            disabled={!undoStack.length}
+            onClick={handleUndo}
+            className={clsx(
+              "flex items-center justify-center rounded-lg h-10 px-4 font-bold gap-2 border transition-colors",
+              undoStack.length
+                ? "bg-slate-100 text-slate-900 border-slate-200 hover:bg-slate-200"
+                : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
+            )}
+            title={undoStack.length ? "Undo last manual calendar change" : "Nothing to undo"}
+          >
+            <Undo2 className="size-4" />
+            Undo
+          </button>
           <button
             className="flex items-center justify-center rounded-lg h-10 px-4 bg-slate-100 text-slate-900 font-bold gap-2 border border-slate-200"
             onClick={handleExportPdf}
