@@ -665,6 +665,7 @@ def _check_feasible(
     Returns:
         True if a feasible assignment exists, else False.
     """
+    input_data = _split_placeholder_instructors(input_data, quiet=True)
     relax = relax or set()
     errors: List[dict] = []
     if "crosslist_capacity" not in relax:
@@ -702,64 +703,58 @@ def _check_feasible(
             section_vars.append(var)
         model.Add(sum(section_vars) == 1)
 
+    # Pre-index for O(1) lookups (same approach as _solve_schedule).
+    vars_by_room_timeslot: Dict[Tuple[str, str], List[Tuple[str, int, cp_model.IntVar]]] = {}
+    vars_by_instructor_timeslot: Dict[Tuple[str, str], List[cp_model.IntVar]] = {}
+    vars_by_section_timeslot: Dict[Tuple[str, str], List[cp_model.IntVar]] = {}
+
+    for (section_id, idx), var in option_vars.items():
+        _, timeslot_set, room_id, _ = option_data[(section_id, idx)]
+        section_dict = _section_to_dict(sections_by_id[section_id])
+        instructor_id = section_dict["instructor_id"]
+        for ts_id in timeslot_set:
+            vars_by_room_timeslot.setdefault((room_id, ts_id), []).append(
+                (section_id, idx, var)
+            )
+            vars_by_instructor_timeslot.setdefault((instructor_id, ts_id), []).append(var)
+            vars_by_section_timeslot.setdefault((section_id, ts_id), []).append(var)
+
+    all_timeslot_ids = []
+    for timeslot in input_data.timeslots:
+        timeslot_dict = timeslot.to_dict() if hasattr(timeslot, "to_dict") else timeslot
+        all_timeslot_ids.append(
+            timeslot_dict.get("id") if isinstance(timeslot_dict, dict) else timeslot.id
+        )
+
     if "room_conflicts" not in relax:
         for room in input_data.rooms:
-            room_dict = _room_to_dict(room)
-            room_id = room_dict.get("id")
-            for timeslot in input_data.timeslots:
-                timeslot_dict = (
-                    timeslot.to_dict() if hasattr(timeslot, "to_dict") else timeslot
-                )
-                current_timeslot_id = (
-                    timeslot_dict.get("id")
-                    if isinstance(timeslot_dict, dict)
-                    else getattr(timeslot, "id", None)
-                )
-                vars_for_slot = []
-                for (section_id, idx), var in option_vars.items():
-                    _, option_timeslot_set, option_room_id, _ = option_data[(section_id, idx)]
-                    if (
-                        option_room_id == room_id
-                        and current_timeslot_id in option_timeslot_set
-                    ):
-                        vars_for_slot.append(var)
-                if vars_for_slot:
-                    model.Add(sum(vars_for_slot) <= 1)
+            room_id = (_room_to_dict(room)).get("id")
+            for timeslot_id in all_timeslot_ids:
+                entries = vars_by_room_timeslot.get((room_id, timeslot_id))
+                if not entries or len(entries) <= 1:
+                    continue
+                vars_for_slot = [var for _, _, var in entries]
+                model.Add(sum(vars_for_slot) <= 1)
 
     if "instructor_conflicts" not in relax:
         for instructor in input_data.instructors:
-            instructor_dict = _instructor_to_dict(instructor)
-            instructor_id = instructor_dict["id"]
-            for timeslot in input_data.timeslots:
-                timeslot_dict = timeslot.to_dict() if hasattr(timeslot, "to_dict") else timeslot
-                timeslot_id = timeslot_dict.get("id") if isinstance(timeslot_dict, dict) else timeslot.id
-                vars_for_slot = []
-                for (section_id, idx), var in option_vars.items():
-                    section = sections_by_id[section_id]
-                    section_dict = _section_to_dict(section)
-                    if section_dict["instructor_id"] != instructor_id:
-                        continue
-                    _, timeslot_set, _, _ = option_data[(section_id, idx)]
-                    if timeslot_id in timeslot_set:
-                        vars_for_slot.append(var)
-                if vars_for_slot:
+            instructor_id = (_instructor_to_dict(instructor))["id"]
+            for timeslot_id in all_timeslot_ids:
+                vars_for_slot = vars_by_instructor_timeslot.get((instructor_id, timeslot_id))
+                if vars_for_slot and len(vars_for_slot) > 1:
                     model.Add(sum(vars_for_slot) <= 1)
 
     if "no_overlap_groups" not in relax:
         for group in input_data.no_overlap_groups:
             group_dict = group.to_dict() if hasattr(group, "to_dict") else group
             member_ids = group_dict.get("member_section_ids", []) if isinstance(group_dict, dict) else group.member_section_ids
-            for timeslot in input_data.timeslots:
-                timeslot_dict = timeslot.to_dict() if hasattr(timeslot, "to_dict") else timeslot
-                timeslot_id = timeslot_dict.get("id") if isinstance(timeslot_dict, dict) else timeslot.id
+            for timeslot_id in all_timeslot_ids:
                 vars_for_slot = []
                 for section_id in member_ids:
-                    for idx, _ in enumerate(options_by_section.get(section_id, [])):
-                        var = option_vars[(section_id, idx)]
-                        _, timeslot_set, _, _ = option_data[(section_id, idx)]
-                        if timeslot_id in timeslot_set:
-                            vars_for_slot.append(var)
-                if vars_for_slot:
+                    slot_vars = vars_by_section_timeslot.get((section_id, timeslot_id))
+                    if slot_vars:
+                        vars_for_slot.extend(slot_vars)
+                if len(vars_for_slot) > 1:
                     model.Add(sum(vars_for_slot) <= 1)
 
     # Section-specific cannot_collide_with preferences (simplified version of
@@ -837,17 +832,13 @@ def _check_feasible(
             if len(core_section_ids) < 2:
                 continue
 
-            for timeslot in input_data.timeslots:
-                timeslot_dict = timeslot.to_dict() if hasattr(timeslot, "to_dict") else timeslot
-                timeslot_id = timeslot_dict.get("id") if isinstance(timeslot_dict, dict) else timeslot.id
+            for timeslot_id in all_timeslot_ids:
                 vars_for_slot: List[cp_model.IntVar] = []
                 for section_id in core_section_ids:
-                    for idx, _ in enumerate(options_by_section.get(section_id, [])):
-                        var = option_vars[(section_id, idx)]
-                        _, timeslot_set, _, _ = option_data[(section_id, idx)]
-                        if timeslot_id in timeslot_set:
-                            vars_for_slot.append(var)
-                if vars_for_slot:
+                    slot_vars = vars_by_section_timeslot.get((section_id, timeslot_id))
+                    if slot_vars:
+                        vars_for_slot.extend(slot_vars)
+                if len(vars_for_slot) > 1:
                     model.Add(sum(vars_for_slot) <= 1)
 
     # Departmental within-department collision rules: if collide_within_department
@@ -876,19 +867,13 @@ def _check_feasible(
             if len(dept_section_ids) < 2:
                 continue
 
-            for timeslot in input_data.timeslots:
-                timeslot_dict = timeslot.to_dict() if hasattr(timeslot, "to_dict") else timeslot
-                timeslot_id = timeslot_dict.get("id") if isinstance(timeslot_dict, dict) else timeslot.id
-
+            for timeslot_id in all_timeslot_ids:
                 vars_for_slot: List[cp_model.IntVar] = []
                 for section_id in dept_section_ids:
-                    for idx, _ in enumerate(options_by_section.get(section_id, [])):
-                        var = option_vars[(section_id, idx)]
-                        _, timeslot_set, _, _ = option_data[(section_id, idx)]
-                        if timeslot_id in timeslot_set:
-                            vars_for_slot.append(var)
-
-                if vars_for_slot:
+                    slot_vars = vars_by_section_timeslot.get((section_id, timeslot_id))
+                    if slot_vars:
+                        vars_for_slot.extend(slot_vars)
+                if len(vars_for_slot) > 1:
                     model.Add(sum(vars_for_slot) <= 1)
 
     if "crosslist_time_room" not in relax:
@@ -918,7 +903,8 @@ def _check_feasible(
                                 )
 
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 2.0
+    solver.parameters.max_time_in_seconds = 5.0
+    solver.parameters.num_workers = 1
     status = solver.Solve(model)
     return status in (cp_model.OPTIMAL, cp_model.FEASIBLE)
 
@@ -950,16 +936,26 @@ def _diagnose_infeasibility(input_data: SchedulingInput) -> Dict[str, List[str]]
     ]
     feasible_if_relax: List[str] = []
     for relax_key, label in relax_candidates:
+        print(f"[diagnose] Testing relaxation: {label}...", flush=True)
         if _check_feasible(input_data, {relax_key}):
             feasible_if_relax.append(label)
 
     feasible_if_remove_section: List[str] = []
-    for section in input_data.sections:
-        section_dict = _section_to_dict(section)
-        section_id = section_dict["id"]
-        stripped = _strip_section(input_data, section_id)
-        if _check_feasible(stripped):
-            feasible_if_remove_section.append(section_id)
+    sections = input_data.sections
+    MAX_SECTION_TESTS = 20
+    if len(sections) > MAX_SECTION_TESTS:
+        print(
+            f"[diagnose] Skipping per-section removal test ({len(sections)} sections, limit {MAX_SECTION_TESTS})",
+            flush=True,
+        )
+    else:
+        print(f"[diagnose] Testing {len(sections)} section removals...", flush=True)
+        for i, section in enumerate(sections):
+            section_dict = _section_to_dict(section)
+            section_id = section_dict["id"]
+            stripped = _strip_section(input_data, section_id)
+            if _check_feasible(stripped):
+                feasible_if_remove_section.append(section_id)
 
     return {
         "feasible_if_relax": feasible_if_relax,
@@ -1054,6 +1050,82 @@ def _build_run_diagnostics(
     return diagnostics
 
 
+PLACEHOLDER_INSTRUCTORS = {"staff", "tbd", "tba"}
+
+
+def _split_placeholder_instructors(input_data: SchedulingInput, quiet: bool = False) -> SchedulingInput:
+    """Split placeholder instructors (e.g. 'Staff') into unique per-section instructors.
+
+    If multiple sections share a placeholder instructor ID, they'd be subject to
+    the instructor overlap constraint, making the problem infeasible. This creates
+    distinct instructor IDs (Staff__1, Staff__2, ...) so each section is independent.
+    """
+    instructor_map = {}
+    for inst in input_data.instructors:
+        inst_dict = _instructor_to_dict(inst)
+        instructor_map[inst_dict["id"]] = inst_dict
+
+    placeholder_ids = {
+        iid for iid in instructor_map
+        if iid.lower().strip() in PLACEHOLDER_INSTRUCTORS
+    }
+    if not placeholder_ids:
+        return input_data
+
+    new_sections = []
+    new_instructors_by_id: Dict[str, dict] = {}
+    counters: Dict[str, int] = {}
+
+    for section in input_data.sections:
+        section_dict = _section_to_dict(section)
+        orig_id = section_dict.get("instructor_id")
+        if orig_id not in placeholder_ids:
+            new_sections.append(section_dict)
+            continue
+
+        counters[orig_id] = counters.get(orig_id, 0) + 1
+        synthetic_id = f"{orig_id}__{counters[orig_id]}"
+        section_dict = dict(section_dict)
+        section_dict["instructor_id"] = synthetic_id
+        new_sections.append(section_dict)
+
+        if synthetic_id not in new_instructors_by_id:
+            base = dict(instructor_map[orig_id])
+            base["id"] = synthetic_id
+            new_instructors_by_id[synthetic_id] = base
+
+    new_instructors = [
+        inst_dict for iid, inst_dict in instructor_map.items()
+        if iid not in placeholder_ids
+    ] + list(new_instructors_by_id.values())
+
+    if not quiet:
+        print(
+            f"[preprocess] Split {len(placeholder_ids)} placeholder instructor(s) "
+            f"into {len(new_instructors_by_id)} unique instructors",
+            flush=True,
+        )
+
+    raw = {
+        "courses": input_data.courses,
+        "majors": input_data.majors,
+        "major_preferences": input_data.major_preferences,
+        "department_preferences": input_data.department_preferences,
+        "section_preferences": input_data.section_preferences,
+        "sections": new_sections,
+        "instructors": new_instructors,
+        "rooms": input_data.rooms,
+        "timeslots": input_data.timeslots,
+        "meeting_patterns": input_data.meeting_patterns,
+        "crosslist_groups": input_data.crosslist_groups,
+        "no_overlap_groups": input_data.no_overlap_groups,
+        "blocked_times": input_data.blocked_times,
+        "locked_assignments": input_data.locked_assignments,
+        "soft_locks": input_data.soft_locks,
+    }
+    return SchedulingInput(raw)
+
+
 def _solve_schedule(input_data: SchedulingInput):
     """Solve the schedule using CP-SAT.
 
@@ -1063,6 +1135,7 @@ def _solve_schedule(input_data: SchedulingInput):
     Returns:
         Dict payload with status, solution or errors/diagnostics.
     """
+    input_data = _split_placeholder_instructors(input_data)
     errors: List[dict] = []
     errors.extend(
         _validate_crosslist_capacity(
@@ -1111,7 +1184,6 @@ def _solve_schedule(input_data: SchedulingInput):
     option_vars: Dict[Tuple[str, int], cp_model.IntVar] = {}
     option_data: Dict[Tuple[str, int], Tuple[str, Tuple[str, ...], str, int]] = {}
 
-    # One option must be selected per section.
     for section_id, options in options_by_section.items():
         section_vars = []
         for idx, option in enumerate(options):
@@ -1121,20 +1193,48 @@ def _solve_schedule(input_data: SchedulingInput):
             section_vars.append(var)
         model.Add(sum(section_vars) == 1)
 
+    # ------------------------------------------------------------------
+    # Pre-index option_vars for O(1) lookups in constraint loops.
+    # ------------------------------------------------------------------
+    # (room_id, timeslot_id) -> [(section_id, idx, var)]
+    vars_by_room_timeslot: Dict[Tuple[str, str], List[Tuple[str, int, cp_model.IntVar]]] = {}
+    # (instructor_id, timeslot_id) -> [var]
+    vars_by_instructor_timeslot: Dict[Tuple[str, str], List[cp_model.IntVar]] = {}
+    # (section_id, timeslot_id) -> [var]
+    vars_by_section_timeslot: Dict[Tuple[str, str], List[cp_model.IntVar]] = {}
+
+    for (section_id, idx), var in option_vars.items():
+        _, timeslot_set, room_id, _ = option_data[(section_id, idx)]
+        section_dict = _section_to_dict(sections_by_id[section_id])
+        instructor_id = section_dict["instructor_id"]
+        for ts_id in timeslot_set:
+            vars_by_room_timeslot.setdefault((room_id, ts_id), []).append(
+                (section_id, idx, var)
+            )
+            vars_by_instructor_timeslot.setdefault((instructor_id, ts_id), []).append(var)
+            vars_by_section_timeslot.setdefault((section_id, ts_id), []).append(var)
+
+    print(f"[solve] Indexed {len(option_vars)} option vars, building constraints...", flush=True)
+
     # Room usage: prevent overlaps across different roomshare groups.
+    all_timeslot_ids = []
+    for timeslot in input_data.timeslots:
+        timeslot_dict = timeslot.to_dict() if hasattr(timeslot, "to_dict") else timeslot
+        all_timeslot_ids.append(
+            timeslot_dict.get("id") if isinstance(timeslot_dict, dict) else timeslot.id
+        )
+
     for room in input_data.rooms:
-        room_dict = _room_to_dict(room)
-        room_id = room_dict["id"]
-        for timeslot in input_data.timeslots:
-            timeslot_dict = timeslot.to_dict() if hasattr(timeslot, "to_dict") else timeslot
-            timeslot_id = timeslot_dict.get("id") if isinstance(timeslot_dict, dict) else timeslot.id
+        room_id = (_room_to_dict(room))["id"]
+        for timeslot_id in all_timeslot_ids:
+            entries = vars_by_room_timeslot.get((room_id, timeslot_id))
+            if not entries:
+                continue
             vars_by_group: Dict[str, List[cp_model.IntVar]] = {}
-            for (section_id, idx), var in option_vars.items():
-                _, timeslot_set, opt_room_id, _ = option_data[(section_id, idx)]
-                if opt_room_id == room_id and timeslot_id in timeslot_set:
-                    group_key = section_to_roomshare_group[section_id]
-                    vars_by_group.setdefault(group_key, []).append(var)
-            if vars_by_group:
+            for section_id, idx, var in entries:
+                group_key = section_to_roomshare_group[section_id]
+                vars_by_group.setdefault(group_key, []).append(var)
+            if len(vars_by_group) > 1:
                 group_used_vars = []
                 for group_key, vars_for_group in vars_by_group.items():
                     group_used = model.NewBoolVar(f"room_use_{room_id}_{timeslot_id}_{group_key}")
@@ -1143,40 +1243,29 @@ def _solve_schedule(input_data: SchedulingInput):
                     group_used_vars.append(group_used)
                 model.Add(sum(group_used_vars) <= 1)
 
+    print("[solve] Room constraints done.", flush=True)
+
     # Instructor cannot teach overlapping times.
     for instructor in input_data.instructors:
-        instructor_dict = _instructor_to_dict(instructor)
-        instructor_id = instructor_dict["id"]
-        for timeslot in input_data.timeslots:
-            timeslot_dict = timeslot.to_dict() if hasattr(timeslot, "to_dict") else timeslot
-            timeslot_id = timeslot_dict.get("id") if isinstance(timeslot_dict, dict) else timeslot.id
-            vars_for_slot = []
-            for (section_id, idx), var in option_vars.items():
-                section = sections_by_id[section_id]
-                section_dict = _section_to_dict(section)
-                if section_dict["instructor_id"] != instructor_id:
-                    continue
-                _, timeslot_set, _, _ = option_data[(section_id, idx)]
-                if timeslot_id in timeslot_set:
-                    vars_for_slot.append(var)
-            if vars_for_slot:
+        instructor_id = (_instructor_to_dict(instructor))["id"]
+        for timeslot_id in all_timeslot_ids:
+            vars_for_slot = vars_by_instructor_timeslot.get((instructor_id, timeslot_id))
+            if vars_for_slot and len(vars_for_slot) > 1:
                 model.Add(sum(vars_for_slot) <= 1)
+
+    print("[solve] Instructor constraints done.", flush=True)
 
     # No-overlap groups cannot overlap in time.
     for group in input_data.no_overlap_groups:
         group_dict = group.to_dict() if hasattr(group, "to_dict") else group
         member_ids = group_dict.get("member_section_ids", []) if isinstance(group_dict, dict) else group.member_section_ids
-        for timeslot in input_data.timeslots:
-            timeslot_dict = timeslot.to_dict() if hasattr(timeslot, "to_dict") else timeslot
-            timeslot_id = timeslot_dict.get("id") if isinstance(timeslot_dict, dict) else timeslot.id
+        for timeslot_id in all_timeslot_ids:
             vars_for_slot = []
             for section_id in member_ids:
-                for idx, _ in enumerate(options_by_section.get(section_id, [])):
-                    var = option_vars[(section_id, idx)]
-                    _, timeslot_set, _, _ = option_data[(section_id, idx)]
-                    if timeslot_id in timeslot_set:
-                        vars_for_slot.append(var)
-            if vars_for_slot:
+                slot_vars = vars_by_section_timeslot.get((section_id, timeslot_id))
+                if slot_vars:
+                    vars_for_slot.extend(slot_vars)
+            if len(vars_for_slot) > 1:
                 model.Add(sum(vars_for_slot) <= 1)
 
     # Section-specific cannot_collide_with preferences:
@@ -1261,17 +1350,13 @@ def _solve_schedule(input_data: SchedulingInput):
         if len(core_section_ids) < 2:
             continue
 
-        for timeslot in input_data.timeslots:
-            timeslot_dict = timeslot.to_dict() if hasattr(timeslot, "to_dict") else timeslot
-            timeslot_id = timeslot_dict.get("id") if isinstance(timeslot_dict, dict) else timeslot.id
+        for timeslot_id in all_timeslot_ids:
             vars_for_slot: List[cp_model.IntVar] = []
             for section_id in core_section_ids:
-                for idx, _ in enumerate(options_by_section.get(section_id, [])):
-                    var = option_vars[(section_id, idx)]
-                    _, timeslot_set, _, _ = option_data[(section_id, idx)]
-                    if timeslot_id in timeslot_set:
-                        vars_for_slot.append(var)
-            if vars_for_slot:
+                slot_vars = vars_by_section_timeslot.get((section_id, timeslot_id))
+                if slot_vars:
+                    vars_for_slot.extend(slot_vars)
+            if len(vars_for_slot) > 1:
                 model.Add(sum(vars_for_slot) <= 1)
 
     # Department preferences Implementation: if collide_within_department is False for a department,
@@ -1307,20 +1392,17 @@ def _solve_schedule(input_data: SchedulingInput):
             continue
 
         # For each timeslot, enforce: at most one section from this department.
-        for timeslot in input_data.timeslots:
-            timeslot_dict = timeslot.to_dict() if hasattr(timeslot, "to_dict") else timeslot
-            timeslot_id = timeslot_dict.get("id") if isinstance(timeslot_dict, dict) else timeslot.id
-
+        for timeslot_id in all_timeslot_ids:
             vars_for_slot: List[cp_model.IntVar] = []
             for section_id in dept_section_ids:
-                for idx, _ in enumerate(options_by_section.get(section_id, [])):
-                    var = option_vars[(section_id, idx)]
-                    _, timeslot_set, _, _ = option_data[(section_id, idx)]
-                    if timeslot_id in timeslot_set:
-                        vars_for_slot.append(var)
+                slot_vars = vars_by_section_timeslot.get((section_id, timeslot_id))
+                if slot_vars:
+                    vars_for_slot.extend(slot_vars)
 
-            if vars_for_slot:
+            if len(vars_for_slot) > 1:
                 model.Add(sum(vars_for_slot) <= 1)
+
+    print("[solve] Major/department/no-overlap constraints done.", flush=True)
 
     # Cross-listed sections share times and (optionally) room.
     for group in input_data.crosslist_groups:
@@ -1462,10 +1544,12 @@ def _solve_schedule(input_data: SchedulingInput):
     # Minimize total penalty.
     model.Minimize(sum(penalty_terms))
 
-    # Solve model.
+    print("[solve] Model built, starting CP-SAT solver...", flush=True)
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 5.0
+    solver.parameters.max_time_in_seconds = 30.0
+    solver.parameters.num_workers = 1
     status = solver.Solve(model)
+    print(f"[solve] Solver finished, status={solver.StatusName(status)}", flush=True)
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         diagnostics = {
             **_diagnose_infeasibility(input_data),
@@ -1809,8 +1893,10 @@ def solve():
             }
         ), 400
 
+    print("[solve] Starting solve request...", flush=True)
     input_data = SchedulingInput(data["input"])
     result = _solve_schedule(input_data)
+    print(f"[solve] Solve completed with status: {result.get('status', 'unknown')}", flush=True)
     return jsonify(result)
 # ---------------------------------------------------------------------------
 # Future work / design notes
