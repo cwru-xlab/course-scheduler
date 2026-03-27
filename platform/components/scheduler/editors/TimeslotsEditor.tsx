@@ -46,8 +46,8 @@ const splitDays = (raw: string | string[] | undefined): string[] => {
     .filter(Boolean);
 };
 
-const HHMM_FALLBACK = "08:00";
-const MIN_TIME = "08:00";
+const HHMM_FALLBACK = "07:00";
+const MIN_TIME = "07:00";
 const MAX_TIME = "22:00";
 
 const toTimeOnly = (value: string | undefined): string => {
@@ -85,7 +85,7 @@ const clampTimeToBounds = (hhmm: string): string => {
 
 const TIME_OPTIONS = (() => {
   const options: { key: string; label: string }[] = [];
-  for (let minutes = 8 * 60; minutes <= 22 * 60; minutes += 5) {
+  for (let minutes = 7 * 60; minutes <= 22 * 60; minutes += 5) {
     const h24 = Math.floor(minutes / 60);
     const mins = minutes % 60;
     const hh = h24.toString().padStart(2, "0");

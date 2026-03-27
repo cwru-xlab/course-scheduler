@@ -329,6 +329,46 @@ def _has_required_features(room, required: List[str]) -> bool:
     return all(feature in room_features for feature in required)
 
 
+def _build_overlapping_timeslot_pairs(timeslots: List) -> set:
+    """Build a set of (ts_id_a, ts_id_b) pairs where the two timeslots overlap in time on the same day.
+
+    Two timeslots overlap if they share at least one day and their time ranges intersect.
+    Only pairs where ts_id_a < ts_id_b are included to avoid duplicates.
+    """
+    slot_info: List[Tuple[str, str, str, str]] = []  # (id, day, start, end)
+    for ts in timeslots:
+        d = ts.to_dict() if hasattr(ts, "to_dict") else ts
+        if not isinstance(d, dict):
+            continue
+        ts_id = str(d.get("id", ""))
+        day = d.get("day") or d.get("days") or ""
+        start = d.get("start_time", "")
+        end = d.get("end_time", "")
+        # Normalize to string for comparison
+        if hasattr(start, "strftime"):
+            start = start.strftime("%H:%M")
+        if hasattr(end, "strftime"):
+            end = end.strftime("%H:%M")
+        slot_info.append((ts_id, str(day), str(start), str(end)))
+
+    # Group by day for efficient pairwise comparison
+    from collections import defaultdict
+    by_day: Dict[str, List[Tuple[str, str, str]]] = defaultdict(list)
+    for ts_id, day, start, end in slot_info:
+        by_day[day].append((ts_id, start, end))
+
+    overlaps: set = set()
+    for day, slots in by_day.items():
+        for i in range(len(slots)):
+            for j in range(i + 1, len(slots)):
+                id_a, start_a, end_a = slots[i]
+                id_b, start_b, end_b = slots[j]
+                if start_a < end_b and start_b < end_a:
+                    pair = (min(id_a, id_b), max(id_a, id_b))
+                    overlaps.add(pair)
+    return overlaps
+
+
 def _normalize_day_tokens(value: Any) -> set:
     """Normalize day strings/lists into a canonical token set."""
     if value is None:
@@ -594,6 +634,66 @@ def _build_options(
         options_by_section[section_id] = section_options
 
     return options_by_section, errors
+
+
+def _strip_instructor(input_data: SchedulingInput, instructor_id: str) -> SchedulingInput:
+    """Return input data with all sections for an instructor removed."""
+    section_ids_to_remove = set()
+    for s in input_data.sections:
+        s_dict = _section_to_dict(s)
+        if s_dict.get("instructor_id") == instructor_id:
+            section_ids_to_remove.add(s_dict["id"])
+
+    remaining_sections = [
+        s for s in input_data.sections
+        if _section_to_dict(s)["id"] not in section_ids_to_remove
+    ]
+    remaining_crosslists = []
+    for group in input_data.crosslist_groups:
+        group_dict = group.to_dict() if hasattr(group, "to_dict") else group
+        members = [sid for sid in group_dict.get("member_section_ids", []) if sid not in section_ids_to_remove]
+        if len(members) >= 2:
+            remaining_crosslists.append({
+                "id": group_dict.get("id") if isinstance(group_dict, dict) else group.id,
+                "member_section_ids": members,
+                "require_same_room": group_dict.get("require_same_room") if isinstance(group_dict, dict) else group.require_same_room,
+            })
+    remaining_no_overlap = []
+    for group in input_data.no_overlap_groups:
+        group_dict = group.to_dict() if hasattr(group, "to_dict") else group
+        members = [sid for sid in group_dict.get("member_section_ids", []) if sid not in section_ids_to_remove]
+        if len(members) >= 2:
+            remaining_no_overlap.append({
+                "id": group_dict.get("id") if isinstance(group_dict, dict) else group.id,
+                "member_section_ids": members,
+                "reason": group_dict.get("reason") if isinstance(group_dict, dict) else group.reason,
+            })
+    remaining_locks = [
+        lock for lock in input_data.locked_assignments
+        if (lock.to_dict() if hasattr(lock, "to_dict") else lock).get("section_id") not in section_ids_to_remove
+    ]
+    remaining_soft_locks = [
+        lock for lock in input_data.soft_locks
+        if (lock.to_dict() if hasattr(lock, "to_dict") else lock).get("section_id") not in section_ids_to_remove
+    ]
+
+    return SchedulingInput({
+        "courses": input_data.courses,
+        "majors": input_data.majors,
+        "major_preferences": input_data.major_preferences,
+        "department_preferences": input_data.department_preferences,
+        "section_preferences": input_data.section_preferences,
+        "sections": remaining_sections,
+        "instructors": input_data.instructors,
+        "rooms": input_data.rooms,
+        "timeslots": input_data.timeslots,
+        "meeting_patterns": input_data.meeting_patterns,
+        "crosslist_groups": remaining_crosslists,
+        "no_overlap_groups": remaining_no_overlap,
+        "blocked_times": input_data.blocked_times,
+        "locked_assignments": remaining_locks,
+        "soft_locks": remaining_soft_locks,
+    })
 
 
 def _strip_section(input_data: SchedulingInput, section_id: str) -> SchedulingInput:
@@ -918,7 +1018,7 @@ def _diagnose_infeasibility(input_data: SchedulingInput) -> Dict[str, List[str]]
     Returns:
         Diagnostics with two lists:
             - feasible_if_relax: constraint families to relax.
-            - feasible_if_remove_section: section IDs to remove.
+            - feasible_if_remove_instructor: instructors whose sections can be removed.
     """
     relax_candidates = [
         ("blocked_times", "Blocked time constraints"),
@@ -940,26 +1040,44 @@ def _diagnose_infeasibility(input_data: SchedulingInput) -> Dict[str, List[str]]
         if _check_feasible(input_data, {relax_key}):
             feasible_if_relax.append(label)
 
-    feasible_if_remove_section: List[str] = []
-    sections = input_data.sections
-    MAX_SECTION_TESTS = 20
-    if len(sections) > MAX_SECTION_TESTS:
+    feasible_if_remove_instructor: List[dict] = []
+    instructor_load: Dict[str, int] = {}
+    for section in input_data.sections:
+        inst_id = _section_to_dict(section).get("instructor_id")
+        if inst_id:
+            instructor_load[inst_id] = instructor_load.get(inst_id, 0) + 1
+
+    sorted_instructors = sorted(instructor_load.items(), key=lambda x: x[1], reverse=True)
+    total_sections = len(input_data.sections)
+    print(f"[diagnose] Testing cumulative instructor removal (busiest first, {len(sorted_instructors)} instructors, {total_sections} sections)...", flush=True)
+    current_data = input_data
+    removed_sections = 0
+    for instructor_id, count in sorted_instructors:
+        current_data = _strip_instructor(current_data, instructor_id)
+        removed_sections += count
+        feasible_if_remove_instructor.append({
+            "instructor_id": instructor_id,
+            "section_count": count,
+        })
+        remaining = total_sections - removed_sections
         print(
-            f"[diagnose] Skipping per-section removal test ({len(sections)} sections, limit {MAX_SECTION_TESTS})",
+            f"[diagnose]   #{len(feasible_if_remove_instructor)}: Removed {instructor_id} ({count} sections) "
+            f"| total removed: {removed_sections}/{total_sections} | remaining: {remaining} | testing...",
             flush=True,
         )
-    else:
-        print(f"[diagnose] Testing {len(sections)} section removals...", flush=True)
-        for i, section in enumerate(sections):
-            section_dict = _section_to_dict(section)
-            section_id = section_dict["id"]
-            stripped = _strip_section(input_data, section_id)
-            if _check_feasible(stripped):
-                feasible_if_remove_section.append(section_id)
+        if _check_feasible(current_data):
+            print(
+                f"[diagnose]   FEASIBLE after removing {len(feasible_if_remove_instructor)} instructor(s), "
+                f"{removed_sections} sections",
+                flush=True,
+            )
+            break
+        else:
+            print(f"[diagnose]   still infeasible", flush=True)
 
     return {
         "feasible_if_relax": feasible_if_relax,
-        "feasible_if_remove_section": feasible_if_remove_section,
+        "feasible_if_remove_instructor": feasible_if_remove_instructor,
     }
 
 
@@ -1224,8 +1342,14 @@ def _solve_schedule(input_data: SchedulingInput):
             timeslot_dict.get("id") if isinstance(timeslot_dict, dict) else timeslot.id
         )
 
+    # Build set of overlapping timeslot pairs for room and instructor constraints.
+    overlapping_pairs = _build_overlapping_timeslot_pairs(input_data.timeslots)
+
+    # Collect all (room, ts_a, ts_b) conflict sets — both same-timeslot and
+    # cross-timeslot overlaps — then apply a single constraint per set.
     for room in input_data.rooms:
         room_id = (_room_to_dict(room))["id"]
+        # Same-timeslot conflicts
         for timeslot_id in all_timeslot_ids:
             entries = vars_by_room_timeslot.get((room_id, timeslot_id))
             if not entries:
@@ -1243,15 +1367,47 @@ def _solve_schedule(input_data: SchedulingInput):
                     group_used_vars.append(group_used)
                 model.Add(sum(group_used_vars) <= 1)
 
+        # Cross-timeslot overlap conflicts: for pairs of timeslots that overlap
+        # in time, no two different roomshare groups can use the same room.
+        for ts_a, ts_b in overlapping_pairs:
+            entries_a = vars_by_room_timeslot.get((room_id, ts_a))
+            entries_b = vars_by_room_timeslot.get((room_id, ts_b))
+            if not entries_a or not entries_b:
+                continue
+            # Merge entries from both timeslots, grouped by roomshare group
+            vars_by_group_cross: Dict[str, List[cp_model.IntVar]] = {}
+            for section_id, idx, var in entries_a:
+                group_key = section_to_roomshare_group[section_id]
+                vars_by_group_cross.setdefault(group_key, []).append(var)
+            for section_id, idx, var in entries_b:
+                group_key = section_to_roomshare_group[section_id]
+                vars_by_group_cross.setdefault(group_key, []).append(var)
+            if len(vars_by_group_cross) > 1:
+                group_used_vars = []
+                for group_key, vars_for_group in vars_by_group_cross.items():
+                    group_used = model.NewBoolVar(
+                        f"room_overlap_{room_id}_{ts_a}_{ts_b}_{group_key}"
+                    )
+                    for var in vars_for_group:
+                        model.Add(group_used >= var)
+                    group_used_vars.append(group_used)
+                model.Add(sum(group_used_vars) <= 1)
+
     print("[solve] Room constraints done.", flush=True)
 
-    # Instructor cannot teach overlapping times.
+    # Instructor cannot teach overlapping times (same timeslot OR overlapping timeslots).
     for instructor in input_data.instructors:
         instructor_id = (_instructor_to_dict(instructor))["id"]
         for timeslot_id in all_timeslot_ids:
             vars_for_slot = vars_by_instructor_timeslot.get((instructor_id, timeslot_id))
             if vars_for_slot and len(vars_for_slot) > 1:
                 model.Add(sum(vars_for_slot) <= 1)
+        # Cross-timeslot overlaps for instructors too
+        for ts_a, ts_b in overlapping_pairs:
+            vars_a = vars_by_instructor_timeslot.get((instructor_id, ts_a), [])
+            vars_b = vars_by_instructor_timeslot.get((instructor_id, ts_b), [])
+            if vars_a and vars_b:
+                model.Add(sum(vars_a) + sum(vars_b) <= 1)
 
     print("[solve] Instructor constraints done.", flush=True)
 
@@ -1895,6 +2051,13 @@ def solve():
 
     print("[solve] Starting solve request...", flush=True)
     input_data = SchedulingInput(data["input"])
+
+    remove_instructors = data.get("remove_instructors")
+    if remove_instructors:
+        print(f"[solve] Removing {len(remove_instructors)} instructor(s): {remove_instructors}", flush=True)
+        for inst_id in remove_instructors:
+            input_data = _strip_instructor(input_data, inst_id)
+
     result = _solve_schedule(input_data)
     print(f"[solve] Solve completed with status: {result.get('status', 'unknown')}", flush=True)
     return jsonify(result)

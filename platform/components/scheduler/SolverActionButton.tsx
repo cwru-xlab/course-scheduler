@@ -19,6 +19,7 @@ type ApiError = {
   diagnostics?: {
     feasible_if_relax?: string[];
     feasible_if_remove_section?: string[];
+    feasible_if_remove_instructor?: { instructor_id: string; section_count: number }[];
   };
 };
 

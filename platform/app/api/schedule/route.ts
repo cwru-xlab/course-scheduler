@@ -19,9 +19,11 @@ export async function POST(request: NextRequest) {
   try {
     // Use request body if provided, otherwise fall back to mock data
     let input: SchedulingInput;
+    let removeInstructors: string[] | undefined;
     try {
       const body = await request.json();
       input = body as SchedulingInput;
+      removeInstructors = (body as Record<string, unknown>).remove_instructors as string[] | undefined;
       // Basic validation - check if it has the required fields
       if (!input.sections || !input.rooms || !input.timeslots) {
         input = mockSchedulingInput;
@@ -43,7 +45,7 @@ export async function POST(request: NextRequest) {
         response = await fetch(`${baseUrl}/solve`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ input }),
+          body: JSON.stringify({ input, ...(removeInstructors?.length ? { remove_instructors: removeInstructors } : {}) }),
         });
         data = await parseResponseBody(response);
         break;

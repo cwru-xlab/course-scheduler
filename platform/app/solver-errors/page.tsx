@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 
@@ -9,6 +10,7 @@ import type { SchedulingInput, ValidationError } from "@/lib/scheduling/types";
 type SolverDiagnostics = {
   feasible_if_relax?: string[];
   feasible_if_remove_section?: string[];
+  feasible_if_remove_instructor?: { instructor_id: string; section_count: number }[];
   error_codes?: string[];
   referenced_sections?: string[];
   busiest_instructors?: { instructor_id: string; section_count: number }[];
@@ -48,13 +50,52 @@ function readStoredError(): StoredSolverError | null {
 }
 
 export default function SolverErrorsPage() {
+  const router = useRouter();
   const [stored, setStored] = useState<StoredSolverError | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [retryStatus, setRetryStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [retryError, setRetryError] = useState("");
 
   useEffect(() => {
     setStored(readStoredError());
     setIsHydrated(true);
   }, []);
+
+  const retryWithRemovedInstructors = async (instructorIds: string[]) => {
+    if (!stored?.input) return;
+    setRetryStatus("loading");
+    setRetryError("");
+    try {
+      const response = await fetch("/api/schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...stored.input,
+          remove_instructors: instructorIds,
+        }),
+      });
+      const result = await response.json();
+      if (result.status === "ok") {
+        localStorage.setItem(
+          "wsom-last-solver-run",
+          JSON.stringify({
+            input: stored.input,
+            solution: result,
+            createdAt: new Date().toISOString(),
+          }),
+        );
+        router.push("/calendar");
+      } else {
+        setRetryError(
+          result.errors?.[0]?.message ?? "Solver still returned an error after removal."
+        );
+        setRetryStatus("error");
+      }
+    } catch (err) {
+      setRetryError(err instanceof Error ? err.message : "Network error");
+      setRetryStatus("error");
+    }
+  };
 
   const referencedSectionIds = useMemo(() => {
     if (!stored) return [];
@@ -130,6 +171,33 @@ export default function SolverErrorsPage() {
               <span className="font-semibold">Feasible if remove section:</span>{" "}
               {(stored.diagnostics.feasible_if_remove_section ?? []).join(", ") || "None"}
             </div>
+            <div>
+              <span className="font-semibold">Feasible if remove instructor:</span>{" "}
+              {(stored.diagnostics.feasible_if_remove_instructor ?? []).length
+                ? stored.diagnostics.feasible_if_remove_instructor!.map((i) => `${i.instructor_id} (${i.section_count} sections)`).join(", ")
+                : "None"}
+            </div>
+            {(stored.diagnostics.feasible_if_remove_instructor ?? []).length > 0 && (
+              <div className="mt-3 flex items-center gap-3">
+                <button
+                  className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-white hover:bg-amber-600 disabled:opacity-50 transition-colors"
+                  disabled={retryStatus === "loading"}
+                  onClick={() => {
+                    const ids = stored.diagnostics!.feasible_if_remove_instructor!.map((i) => i.instructor_id);
+                    retryWithRemovedInstructors(ids);
+                  }}
+                >
+                  {retryStatus === "loading" ? "Solving..." : `Retry without ${stored.diagnostics.feasible_if_remove_instructor!.length} instructor(s)`}
+                </button>
+                <span className="text-xs text-slate-400">
+                  Removes {stored.diagnostics.feasible_if_remove_instructor!.reduce((s, i) => s + i.section_count, 0)} sections
+                  ({stored.diagnostics.feasible_if_remove_instructor!.map((i) => i.instructor_id).join(", ")})
+                </span>
+                {retryStatus === "error" && retryError && (
+                  <span className="text-xs text-red-600 font-medium">{retryError}</span>
+                )}
+              </div>
+            )}
             <div>
               <span className="font-semibold">Error codes:</span>{" "}
               {(stored.diagnostics.error_codes ?? []).join(", ") || "None"}

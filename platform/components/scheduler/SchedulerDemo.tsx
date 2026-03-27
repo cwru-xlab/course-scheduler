@@ -30,6 +30,7 @@ type ApiError = {
   diagnostics?: {
     feasible_if_relax?: string[];
     feasible_if_remove_section?: string[];
+    feasible_if_remove_instructor?: { instructor_id: string; section_count: number }[];
   };
 };
 
@@ -161,7 +162,7 @@ export const SchedulerDemo = () => {
     }
   };
 
-  const runSolver = async () => {
+  const runSolver = async (removeInstructors?: string[]) => {
     if (!data) return;
     setSolverStatus("loading");
     setErrors([]);
@@ -172,7 +173,10 @@ export const SchedulerDemo = () => {
       const response = await fetch("/api/schedule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          ...(removeInstructors?.length ? { remove_instructors: removeInstructors } : {}),
+        }),
       });
       const result = (await response.json()) as ApiSuccess | ApiError;
 
@@ -401,12 +405,33 @@ export const SchedulerDemo = () => {
                     <td className="px-4 py-4 text-sm text-slate-700 dark:text-default-700 font-medium">{err.message}</td>
                     <td className="px-4 py-4 text-right text-xs text-slate-500 dark:text-default-500">
                       {diagnostics?.feasible_if_relax?.length ? `Try relaxing: ${diagnostics.feasible_if_relax.join(", ")}. ` : ""}
+                      {diagnostics?.feasible_if_remove_instructor?.length ? `Feasible if removing instructor(s): ${diagnostics.feasible_if_remove_instructor.map((i) => `${i.instructor_id} (${i.section_count} sections)`).join(", ")}.` : ""}
                       {diagnostics?.feasible_if_remove_section?.length ? `Or remove section(s): ${diagnostics.feasible_if_remove_section.join(", ")}.` : ""}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            {diagnostics?.feasible_if_remove_instructor?.length ? (
+              <div className="mt-4 px-4 pb-4 flex items-center gap-3">
+                <Button
+                  size="sm"
+                  color="warning"
+                  variant="flat"
+                  isLoading={solverStatus === "loading"}
+                  onPress={() => {
+                    const ids = diagnostics.feasible_if_remove_instructor!.map((i) => i.instructor_id);
+                    runSolver(ids);
+                  }}
+                >
+                  Retry without {diagnostics.feasible_if_remove_instructor.length} instructor(s)
+                </Button>
+                <span className="text-xs text-slate-400 dark:text-default-400">
+                  Removes {diagnostics.feasible_if_remove_instructor.reduce((s, i) => s + i.section_count, 0)} sections
+                  ({diagnostics.feasible_if_remove_instructor.map((i) => i.instructor_id).join(", ")})
+                </span>
+              </div>
+            ) : null}
           </div>
         </div>
       )}
@@ -526,7 +551,7 @@ export const SchedulerDemo = () => {
       <div className="flex items-center gap-3 flex-wrap">
         <Button
           className="flex items-center gap-2 bg-weatherhead-primary text-white font-bold shadow-lg shadow-weatherhead-primary/20 hover:opacity-90 transition-all"
-          onPress={runSolver}
+          onPress={() => runSolver()}
           isLoading={solverStatus === "loading"}
           startContent={solverStatus === "idle" ? <Rocket className="size-4" /> : undefined}
         >

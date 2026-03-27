@@ -505,11 +505,13 @@ export default function CalendarPage() {
     return map;
   }, [data]);
 
-  const axisStart = 9 * 60; // 9:00 AM
-  const axisEnd = 21 * 60; // 9:00 PM
+  const axisStart = 7 * 60; // 7:00 AM
+  const axisEnd = 22 * 60; // 10:00 PM
   const axisRange = axisEnd - axisStart;
 
   const timeAxisLabels = [
+    "7AM",
+    "8AM",
     "9AM",
     "10AM",
     "11AM",
@@ -522,6 +524,7 @@ export default function CalendarPage() {
     "6PM",
     "7PM",
     "8PM",
+    "9PM",
   ];
   const hourSegments = timeAxisLabels.length;
 
