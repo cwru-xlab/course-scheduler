@@ -50,24 +50,10 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
     for row in timeslots_rows:
         for col in ["start_time", "end_time"]:
             val = row.get(col)
-            
-            # Handle actual Excel time objects
             if isinstance(val, datetime.time):
-                # Only flip hours 1-7 (afternoon classes)
-                if 1 <= val.hour <= 7:
-                    row[col] = val.replace(hour=val.hour + 12)
-                # Keep 8:25 AM exactly as is
-                continue 
-                    
-            # Handle potential string fallbacks
+                row[col] = val.strftime("%H:%M")
             elif isinstance(val, str) and ":" in val:
-                parts = val.strip().split(":")
-                if parts[0].isdigit():
-                    hour = int(parts[0])
-                    if 1 <= hour <= 7:
-                        hour += 12
-                        parts[0] = str(hour).zfill(2)
-                        row[col] = ":".join(parts)
+                row[col] = val.strip()
 
     sections: List[Dict[str, Any]] = []
     seen_section_ids = set()
