@@ -1,7 +1,9 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
+import { Input } from "@heroui/input";
 
 import { EditableCell } from "../EditableCell";
 import { EditableArrayCell } from "../EditableArrayCell";
@@ -41,6 +43,8 @@ export const SectionsEditor = ({
   crosslistGroupOptions,
   onUpdate,
 }: SectionsEditorProps) => {
+  const [searchQuery, setSearchQuery] = useState("");
+
   const updateSection = (index: number, field: keyof Section, value: unknown) => {
     const newSections = [...sections];
     newSections[index] = { ...newSections[index], [field]: value };
@@ -60,6 +64,31 @@ export const SectionsEditor = ({
     ...crosslistGroupOptions,
   ];
 
+  const filteredSections = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return sections
+      .map((section, index) => ({ section, index }))
+      .filter(({ section }) => {
+        if (!query) return true;
+        const searchable = [
+          section.id,
+          section.department ?? "",
+          section.course_id,
+          section.section_code,
+          section.instructor_id,
+          section.expected_enrollment,
+          section.enrollment_cap,
+          section.crosslist_group_id ?? "",
+          ...section.allowed_meeting_patterns,
+          ...section.room_requirements,
+          ...section.tags,
+        ]
+          .join(" ")
+          .toLowerCase();
+        return searchable.includes(query);
+      });
+  }, [searchQuery, sections]);
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -69,6 +98,14 @@ export const SectionsEditor = ({
         </Button>
       </CardHeader>
       <CardBody className="overflow-x-auto text-sm">
+        <Input
+          value={searchQuery}
+          onValueChange={setSearchQuery}
+          placeholder="Search sections..."
+          size="sm"
+          className="mb-3 max-w-md"
+          isClearable
+        />
         <table className="min-w-full">
           <thead className="text-left text-default-500">
             <tr>
@@ -88,7 +125,7 @@ export const SectionsEditor = ({
             </tr>
           </thead>
           <tbody>
-            {sections.map((section, idx) => (
+            {filteredSections.map(({ section, index: idx }) => (
               <tr
                 key={`${section.id}-${idx}`}
                 id={`note-sections-${encodeURIComponent(String(section.id))}`}
@@ -164,6 +201,9 @@ export const SectionsEditor = ({
         </table>
         {sections.length === 0 && (
           <div className="py-4 text-center text-default-400">No sections. Click "Add Section" to create one.</div>
+        )}
+        {sections.length > 0 && filteredSections.length === 0 && (
+          <div className="py-4 text-center text-default-400">No sections match your search.</div>
         )}
       </CardBody>
     </Card>

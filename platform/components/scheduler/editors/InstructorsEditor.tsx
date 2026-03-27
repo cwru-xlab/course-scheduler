@@ -1,7 +1,9 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
+import { Input } from "@heroui/input";
 
 import { EditableCell } from "../EditableCell";
 import { EditableSelectCell } from "../EditableSelectCell";
@@ -50,6 +52,8 @@ export const InstructorsEditor = ({
   timeslotOptions,
   onUpdate,
 }: InstructorsEditorProps) => {
+  const [searchQuery, setSearchQuery] = useState("");
+
   const updateInstructor = (index: number, field: string, value: unknown) => {
     const newInstructors = [...instructors];
     if (field.startsWith("preferences.")) {
@@ -72,6 +76,27 @@ export const InstructorsEditor = ({
     onUpdate(instructors.filter((_, i) => i !== index));
   };
 
+  const filteredInstructors = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return instructors
+      .map((inst, index) => ({ inst, index }))
+      .filter(({ inst }) => {
+        if (!query) return true;
+        const searchable = [
+          inst.id,
+          inst.name,
+          inst.rank_type,
+          ...inst.unavailable_times,
+          ...inst.preferences.preferred_days,
+          ...inst.preferences.preferred_patterns,
+          inst.preferences.max_teaching_days ?? "",
+        ]
+          .join(" ")
+          .toLowerCase();
+        return searchable.includes(query);
+      });
+  }, [instructors, searchQuery]);
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -81,6 +106,14 @@ export const InstructorsEditor = ({
         </Button>
       </CardHeader>
       <CardBody className="overflow-x-auto text-sm">
+        <Input
+          value={searchQuery}
+          onValueChange={setSearchQuery}
+          placeholder="Search instructors..."
+          size="sm"
+          className="mb-3 max-w-md"
+          isClearable
+        />
         <table className="w-full table-fixed">
           <thead className="text-left text-default-500">
             <tr>
@@ -96,7 +129,7 @@ export const InstructorsEditor = ({
             </tr>
           </thead>
           <tbody>
-            {instructors.map((inst, idx) => (
+            {filteredInstructors.map(({ inst, index: idx }) => (
               <tr
                 key={`${inst.id}-${idx}`}
                 id={`note-instructors-${encodeURIComponent(String(inst.id))}`}
@@ -165,6 +198,9 @@ export const InstructorsEditor = ({
         </table>
         {instructors.length === 0 && (
           <div className="py-4 text-center text-default-400">No instructors. Click "Add Instructor" to create one.</div>
+        )}
+        {instructors.length > 0 && filteredInstructors.length === 0 && (
+          <div className="py-4 text-center text-default-400">No instructors match your search.</div>
         )}
       </CardBody>
     </Card>

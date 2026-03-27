@@ -1,7 +1,9 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
+import { Input } from "@heroui/input";
 
 import { EditableCell } from "../EditableCell";
 import { EditableCheckbox } from "../EditableCheckbox";
@@ -26,6 +28,8 @@ const createEmptyCrossListGroup = (existing: CrossListGroup[]): CrossListGroup =
 });
 
 export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: CrossListGroupsEditorProps) => {
+  const [searchQuery, setSearchQuery] = useState("");
+
   const updateGroup = (index: number, field: keyof CrossListGroup, value: unknown) => {
     const newGroups = [...groups];
     newGroups[index] = { ...newGroups[index], [field]: value };
@@ -35,6 +39,19 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
   const addGroup = () => onUpdate([...groups, createEmptyCrossListGroup(groups)]);
   const deleteGroup = (index: number) => onUpdate(groups.filter((_, i) => i !== index));
 
+  const filteredGroups = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return groups
+      .map((group, index) => ({ group, index }))
+      .filter(({ group }) => {
+        if (!query) return true;
+        const searchable = [group.id, ...group.member_section_ids, group.require_same_room]
+          .join(" ")
+          .toLowerCase();
+        return searchable.includes(query);
+      });
+  }, [groups, searchQuery]);
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -42,6 +59,14 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
         <Button size="sm" color="primary" variant="flat" onPress={addGroup}>+ Add</Button>
       </CardHeader>
       <CardBody className="overflow-x-auto text-sm">
+        <Input
+          value={searchQuery}
+          onValueChange={setSearchQuery}
+          placeholder="Search cross-list groups..."
+          size="sm"
+          className="mb-3 max-w-md"
+          isClearable
+        />
         <table className="min-w-full">
           <thead className="text-left text-default-500">
             <tr>
@@ -53,7 +78,7 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
             </tr>
           </thead>
           <tbody>
-            {groups.map((group, idx) => (
+            {filteredGroups.map(({ group, index: idx }) => (
               <tr
                 key={`${group.id}-${idx}`}
                 id={`note-constraints-crosslist-groups-${encodeURIComponent(String(group.id))}`}
@@ -88,6 +113,9 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
           </tbody>
         </table>
         {groups.length === 0 && <div className="py-4 text-center text-default-400">No cross-list groups.</div>}
+        {groups.length > 0 && filteredGroups.length === 0 && (
+          <div className="py-4 text-center text-default-400">No cross-list groups match your search.</div>
+        )}
       </CardBody>
     </Card>
   );
@@ -107,6 +135,8 @@ const createEmptyNoOverlapGroup = (existing: NoOverlapGroup[]): NoOverlapGroup =
 });
 
 export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOverlapGroupsEditorProps) => {
+  const [searchQuery, setSearchQuery] = useState("");
+
   const updateGroup = (index: number, field: keyof NoOverlapGroup, value: unknown) => {
     const newGroups = [...groups];
     newGroups[index] = { ...newGroups[index], [field]: value };
@@ -116,6 +146,19 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
   const addGroup = () => onUpdate([...groups, createEmptyNoOverlapGroup(groups)]);
   const deleteGroup = (index: number) => onUpdate(groups.filter((_, i) => i !== index));
 
+  const filteredGroups = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return groups
+      .map((group, index) => ({ group, index }))
+      .filter(({ group }) => {
+        if (!query) return true;
+        const searchable = [group.id, ...group.member_section_ids, group.reason]
+          .join(" ")
+          .toLowerCase();
+        return searchable.includes(query);
+      });
+  }, [groups, searchQuery]);
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -123,6 +166,14 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
         <Button size="sm" color="primary" variant="flat" onPress={addGroup}>+ Add</Button>
       </CardHeader>
       <CardBody className="overflow-x-auto text-sm">
+        <Input
+          value={searchQuery}
+          onValueChange={setSearchQuery}
+          placeholder="Search no-overlap groups..."
+          size="sm"
+          className="mb-3 max-w-md"
+          isClearable
+        />
         <table className="min-w-full">
           <thead className="text-left text-default-500">
             <tr>
@@ -134,7 +185,7 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
             </tr>
           </thead>
           <tbody>
-            {groups.map((group, idx) => (
+            {filteredGroups.map(({ group, index: idx }) => (
               <tr
                 key={`${group.id}-${idx}`}
                 id={`note-constraints-no-overlap-groups-${encodeURIComponent(String(group.id))}`}
@@ -169,6 +220,9 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
           </tbody>
         </table>
         {groups.length === 0 && <div className="py-4 text-center text-default-400">No no-overlap groups.</div>}
+        {groups.length > 0 && filteredGroups.length === 0 && (
+          <div className="py-4 text-center text-default-400">No no-overlap groups match your search.</div>
+        )}
       </CardBody>
     </Card>
   );
@@ -195,6 +249,8 @@ const createEmptyBlockedTime = (): BlockedTime => ({
 });
 
 export const BlockedTimesEditor = ({ blockedTimes, timeslotOptions, onUpdate }: BlockedTimesEditorProps) => {
+  const [searchQuery, setSearchQuery] = useState("");
+
   const updateBlockedTime = (index: number, field: keyof BlockedTime, value: unknown) => {
     const newBlockedTimes = [...blockedTimes];
     newBlockedTimes[index] = { ...newBlockedTimes[index], [field]: value };
@@ -204,6 +260,19 @@ export const BlockedTimesEditor = ({ blockedTimes, timeslotOptions, onUpdate }: 
   const addBlockedTime = () => onUpdate([...blockedTimes, createEmptyBlockedTime()]);
   const deleteBlockedTime = (index: number) => onUpdate(blockedTimes.filter((_, i) => i !== index));
 
+  const filteredBlockedTimes = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return blockedTimes
+      .map((blocked, index) => ({ blocked, index }))
+      .filter(({ blocked }) => {
+        if (!query) return true;
+        const searchable = [blocked.scope, ...blocked.timeslot_ids, blocked.reason]
+          .join(" ")
+          .toLowerCase();
+        return searchable.includes(query);
+      });
+  }, [blockedTimes, searchQuery]);
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -211,6 +280,14 @@ export const BlockedTimesEditor = ({ blockedTimes, timeslotOptions, onUpdate }: 
         <Button size="sm" color="primary" variant="flat" onPress={addBlockedTime}>+ Add</Button>
       </CardHeader>
       <CardBody className="overflow-x-auto text-sm">
+        <Input
+          value={searchQuery}
+          onValueChange={setSearchQuery}
+          placeholder="Search blocked times..."
+          size="sm"
+          className="mb-3 max-w-md"
+          isClearable
+        />
         <table className="min-w-full">
           <thead className="text-left text-default-500">
             <tr>
@@ -222,7 +299,7 @@ export const BlockedTimesEditor = ({ blockedTimes, timeslotOptions, onUpdate }: 
             </tr>
           </thead>
           <tbody>
-            {blockedTimes.map((blocked, idx) => (
+            {filteredBlockedTimes.map(({ blocked, index: idx }) => (
               <tr
                 key={idx}
                 id={`note-constraints-blocked-times-${encodeURIComponent(`${blocked.scope}-${blocked.reason || "row"}-${idx}`)}`}
@@ -261,6 +338,9 @@ export const BlockedTimesEditor = ({ blockedTimes, timeslotOptions, onUpdate }: 
           </tbody>
         </table>
         {blockedTimes.length === 0 && <div className="py-4 text-center text-default-400">No blocked times.</div>}
+        {blockedTimes.length > 0 && filteredBlockedTimes.length === 0 && (
+          <div className="py-4 text-center text-default-400">No blocked times match your search.</div>
+        )}
       </CardBody>
     </Card>
   );
@@ -288,6 +368,8 @@ export const LockedAssignmentsEditor = ({
   roomOptions, 
   onUpdate 
 }: LockedAssignmentsEditorProps) => {
+  const [searchQuery, setSearchQuery] = useState("");
+
   const updateLock = (index: number, field: keyof LockedAssignment, value: unknown) => {
     const newLocks = [...lockedAssignments];
     newLocks[index] = { ...newLocks[index], [field]: value };
@@ -302,6 +384,19 @@ export const LockedAssignmentsEditor = ({
     ...roomOptions,
   ];
 
+  const filteredLocks = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return lockedAssignments
+      .map((lock, index) => ({ lock, index }))
+      .filter(({ lock }) => {
+        if (!query) return true;
+        const searchable = [lock.section_id, ...(lock.fixed_timeslot_set ?? []), lock.fixed_room ?? ""]
+          .join(" ")
+          .toLowerCase();
+        return searchable.includes(query);
+      });
+  }, [lockedAssignments, searchQuery]);
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -309,6 +404,14 @@ export const LockedAssignmentsEditor = ({
         <Button size="sm" color="primary" variant="flat" onPress={addLock}>+ Add</Button>
       </CardHeader>
       <CardBody className="overflow-x-auto text-sm">
+        <Input
+          value={searchQuery}
+          onValueChange={setSearchQuery}
+          placeholder="Search locked assignments..."
+          size="sm"
+          className="mb-3 max-w-md"
+          isClearable
+        />
         <table className="min-w-full">
           <thead className="text-left text-default-500">
             <tr>
@@ -320,7 +423,7 @@ export const LockedAssignmentsEditor = ({
             </tr>
           </thead>
           <tbody>
-            {lockedAssignments.map((lock, idx) => (
+            {filteredLocks.map(({ lock, index: idx }) => (
               <tr
                 key={idx}
                 id={`note-constraints-locked-assignments-${encodeURIComponent(`${lock.section_id || "row"}-${idx}`)}`}
@@ -365,6 +468,9 @@ export const LockedAssignmentsEditor = ({
           </tbody>
         </table>
         {lockedAssignments.length === 0 && <div className="py-4 text-center text-default-400">No locked assignments.</div>}
+        {lockedAssignments.length > 0 && filteredLocks.length === 0 && (
+          <div className="py-4 text-center text-default-400">No locked assignments match your search.</div>
+        )}
       </CardBody>
     </Card>
   );
@@ -393,6 +499,8 @@ export const SoftLocksEditor = ({
   roomOptions, 
   onUpdate 
 }: SoftLocksEditorProps) => {
+  const [searchQuery, setSearchQuery] = useState("");
+
   const updateLock = (index: number, field: keyof SoftLock, value: unknown) => {
     const newLocks = [...softLocks];
     newLocks[index] = { ...newLocks[index], [field]: value };
@@ -407,6 +515,24 @@ export const SoftLocksEditor = ({
     ...roomOptions,
   ];
 
+  const filteredLocks = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return softLocks
+      .map((lock, index) => ({ lock, index }))
+      .filter(({ lock }) => {
+        if (!query) return true;
+        const searchable = [
+          lock.section_id,
+          ...(lock.preferred_timeslot_set ?? []),
+          lock.preferred_room ?? "",
+          lock.weight,
+        ]
+          .join(" ")
+          .toLowerCase();
+        return searchable.includes(query);
+      });
+  }, [searchQuery, softLocks]);
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -414,6 +540,14 @@ export const SoftLocksEditor = ({
         <Button size="sm" color="primary" variant="flat" onPress={addLock}>+ Add</Button>
       </CardHeader>
       <CardBody className="overflow-x-auto text-sm">
+        <Input
+          value={searchQuery}
+          onValueChange={setSearchQuery}
+          placeholder="Search soft locks..."
+          size="sm"
+          className="mb-3 max-w-md"
+          isClearable
+        />
         <table className="min-w-full">
           <thead className="text-left text-default-500">
             <tr>
@@ -426,7 +560,7 @@ export const SoftLocksEditor = ({
             </tr>
           </thead>
           <tbody>
-            {softLocks.map((lock, idx) => (
+            {filteredLocks.map(({ lock, index: idx }) => (
               <tr
                 key={idx}
                 id={`note-constraints-soft-locks-${encodeURIComponent(`${lock.section_id || "row"}-${idx}`)}`}
@@ -474,6 +608,9 @@ export const SoftLocksEditor = ({
           </tbody>
         </table>
         {softLocks.length === 0 && <div className="py-4 text-center text-default-400">No soft locks.</div>}
+        {softLocks.length > 0 && filteredLocks.length === 0 && (
+          <div className="py-4 text-center text-default-400">No soft locks match your search.</div>
+        )}
       </CardBody>
     </Card>
   );

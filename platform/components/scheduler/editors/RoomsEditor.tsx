@@ -1,7 +1,9 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
+import { Input } from "@heroui/input";
 
 import { EditableCell } from "../EditableCell";
 import { EditableArrayCell } from "../EditableArrayCell";
@@ -24,6 +26,8 @@ const createEmptyRoom = (existing: Room[]): Room => ({
 });
 
 export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
+  const [searchQuery, setSearchQuery] = useState("");
+
   const updateRoom = (index: number, field: keyof Room, value: unknown) => {
     const newRooms = [...rooms];
     newRooms[index] = { ...newRooms[index], [field]: value };
@@ -38,6 +42,25 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
     onUpdate(rooms.filter((_, i) => i !== index));
   };
 
+  const filteredRooms = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return rooms
+      .map((room, index) => ({ room, index }))
+      .filter(({ room }) => {
+        if (!query) return true;
+        const searchable = [
+          room.id,
+          room.building,
+          room.room_number,
+          room.capacity,
+          ...room.features,
+        ]
+          .join(" ")
+          .toLowerCase();
+        return searchable.includes(query);
+      });
+  }, [rooms, searchQuery]);
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -47,6 +70,14 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
         </Button>
       </CardHeader>
       <CardBody className="overflow-x-auto text-sm">
+        <Input
+          value={searchQuery}
+          onValueChange={setSearchQuery}
+          placeholder="Search rooms..."
+          size="sm"
+          className="mb-3 max-w-md"
+          isClearable
+        />
         <table className="min-w-full">
           <thead className="text-left text-default-500">
             <tr>
@@ -60,7 +91,7 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
             </tr>
           </thead>
           <tbody>
-            {rooms.map((room, idx) => (
+            {filteredRooms.map(({ room, index: idx }) => (
               <tr
                 key={`${room.id}-${idx}`}
                 id={`note-rooms-${encodeURIComponent(String(room.id))}`}
@@ -99,6 +130,9 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
         </table>
         {rooms.length === 0 && (
           <div className="py-4 text-center text-default-400">No rooms. Click "Add Room" to create one.</div>
+        )}
+        {rooms.length > 0 && filteredRooms.length === 0 && (
+          <div className="py-4 text-center text-default-400">No rooms match your search.</div>
         )}
       </CardBody>
     </Card>

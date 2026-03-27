@@ -1,7 +1,9 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
+import { Input } from "@heroui/input";
 
 import { EditableCell } from "../EditableCell";
 import { EditableSelectCell } from "../EditableSelectCell";
@@ -99,6 +101,8 @@ const TIME_OPTIONS = (() => {
 })();
 
 export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) => {
+  const [searchQuery, setSearchQuery] = useState("");
+
   const updateTimeslot = (index: number, field: keyof Timeslot, value: unknown) => {
     const newTimeslots = [...timeslots];
     newTimeslots[index] = { ...newTimeslots[index], [field]: value };
@@ -118,6 +122,25 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
     onUpdate(timeslots.filter((_, i) => i !== index));
   };
 
+  const filteredTimeslots = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return timeslots
+      .map((slot, index) => ({ slot, index }))
+      .filter(({ slot }) => {
+        if (!query) return true;
+        const searchable = [
+          slot.id,
+          slot.day,
+          slot.start_time,
+          slot.end_time,
+          slot.slot_type ?? "",
+        ]
+          .join(" ")
+          .toLowerCase();
+        return searchable.includes(query);
+      });
+  }, [searchQuery, timeslots]);
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -127,6 +150,14 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
         </Button>
       </CardHeader>
       <CardBody className="overflow-x-auto text-sm">
+        <Input
+          value={searchQuery}
+          onValueChange={setSearchQuery}
+          placeholder="Search timeslots..."
+          size="sm"
+          className="mb-3 max-w-md"
+          isClearable
+        />
         <table className="min-w-full">
           <thead className="text-left text-default-500">
             <tr>
@@ -140,7 +171,7 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
             </tr>
           </thead>
           <tbody>
-            {timeslots.map((slot, idx) => (
+            {filteredTimeslots.map(({ slot, index: idx }) => (
               <tr
                 key={`${slot.id}-${idx}`}
                 id={`note-timeslots-${encodeURIComponent(String(slot.id))}`}
@@ -201,6 +232,9 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
         </table>
         {timeslots.length === 0 && (
           <div className="py-4 text-center text-default-400">No timeslots. Click "Add Timeslot" to create one.</div>
+        )}
+        {timeslots.length > 0 && filteredTimeslots.length === 0 && (
+          <div className="py-4 text-center text-default-400">No timeslots match your search.</div>
         )}
       </CardBody>
     </Card>
