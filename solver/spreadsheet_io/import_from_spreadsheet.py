@@ -101,11 +101,19 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
     rooms: List[Dict[str, Any]] = []
     for row in rooms_rows:
         room_id = _required_str(row, "id", "Rooms")
+        
+        raw_room = row.get("room_number")
+        room_val = ""
+        if raw_room is not None:
+            room_val = str(raw_room).strip()
+            if room_val.endswith(".0"):
+                room_val = room_val[:-2]
+
         rooms.append(
             {
                 "id": room_id,
                 "building": _str_with_default(row, "building", "Rooms", default=""),
-                "room_number": maybe_str(row.get("room_number")) or "",
+                "room_number": room_val,
                 "capacity": _int_with_default(row, "capacity", "Rooms", default=0),
                 "features": parse_list_cell(row.get("features")),
             }
