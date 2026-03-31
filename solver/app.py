@@ -32,15 +32,19 @@ from spreadsheet_io.spreadsheet_utils import build_template_bytes, parse_nested_
 
 from model import (
     BlockedTime,
+    Course,
     CrossListGroup,
     Instructor,
+    InstructorPreferences,
     LockedAssignment,
     MeetingPattern,
     NoOverlapGroup,
     Room,
+    RoomPreferences,
     ScheduleAssignment,
     ScheduleSolution,
     Section,
+    SectionPreferences,
     SoftLock,
     Timeslot,
     ValidationError,
@@ -2253,8 +2257,38 @@ def update_sections():
         )
 
     try:
-        # Clear existing sections
+        # Clear dependent rows first (FK order matters on Postgres)
+        ScheduleAssignment.query.filter(ScheduleAssignment.section_id.isnot(None)).delete()
+        SoftLock.query.delete()
+        LockedAssignment.query.delete()
+        SectionPreferences.query.delete()
         Section.query.delete()
+
+        # Auto-create referenced Course / Instructor rows that don't exist yet.
+        existing_course_ids = {c.id for c in db.session.query(Course.id).all()}  # type: ignore[attr-defined]
+        existing_instructor_ids = {i.id for i in db.session.query(Instructor.id).all()}  # type: ignore[attr-defined]
+
+        for item in sections_payload:
+            cid = item.get("course_id")
+            if cid and cid not in existing_course_ids:
+                dept = (str(item.get("department") or "").strip()) or ""
+                db.session.add(Course(
+                    id=cid,
+                    title=cid,
+                    department=dept,
+                ))
+                existing_course_ids.add(cid)
+
+            iid = item.get("instructor_id")
+            if iid and iid not in existing_instructor_ids:
+                db.session.add(Instructor(
+                    id=iid,
+                    name=iid,
+                    rank_type="Unknown",
+                ))
+                existing_instructor_ids.add(iid)
+
+        db.session.flush()
 
         skipped_sections: List[Dict[str, Any]] = []
         seen_section_ids = set()
@@ -2379,6 +2413,7 @@ def update_instructors():
         )
 
     try:
+        InstructorPreferences.query.delete()
         Instructor.query.delete()
         for item in instructors_payload:
             prefs = item.get("preferences", {}) or {}
@@ -2392,8 +2427,6 @@ def update_instructors():
             if prefs:
                 pref_model = instructor.preferences
                 if pref_model is None:
-                    from model import InstructorPreferences
-
                     pref_model = InstructorPreferences(instructor_id=instructor.id)
                     instructor.preferences = pref_model
                     db.session.add(pref_model)
@@ -2443,6 +2476,7 @@ def update_rooms():
         )
 
     try:
+        RoomPreferences.query.delete()
         Room.query.delete()
         for item in rooms_payload:
             room = Room(

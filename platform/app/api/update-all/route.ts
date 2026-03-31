@@ -117,36 +117,21 @@ export async function POST(request: NextRequest) {
       };
     };
 
-    // 1) Sections
-    {
-      const result = await callSolver("/update-sections", { sections });
-      if (!result.ok) {
-        return NextResponse.json(
-          { status: "error", errors: result.errors },
-          { status: result.status },
-        );
-      }
-      const skippedSections = Array.isArray(result.data?.skipped_sections)
-        ? (result.data.skipped_sections as Array<Record<string, unknown>>)
-        : [];
-      const duplicateIds = skippedSections
-        .filter((row) => row.duplicate === true && typeof row.id === "string")
-        .map((row) => row.id as string);
-      if (duplicateIds.length > 0) {
-        warnings.push(
-          `Duplicate section IDs were skipped: ${duplicateIds.join(", ")}.`,
-        );
-      }
-    }
+    // Update order: FK-safe (parents before children).
+    // Instructors, rooms, timeslots, and meeting patterns have no FK deps,
+    // so they go first. Sections reference courses + instructors (the backend
+    // auto-creates missing Course/Instructor rows, but sending instructors
+    // first keeps their full metadata). Constraints reference sections, so
+    // they go last.
 
-    // 2) Instructors
+    // 1) Instructors
     {
       const payload = instructors.map((inst) => ({
         id: inst.id,
         name: inst.name || inst.id,
         rank_type: inst.rank_type,
         preferences: {
-          preferred_times: [], // Not modeled on the frontend; keep empty.
+          preferred_times: [],
           preferred_days: inst.preferences?.preferred_days ?? [],
           preferred_patterns: inst.preferences?.preferred_patterns ?? [],
           unavailable_times: inst.unavailable_times ?? [],
@@ -165,12 +150,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 3) Rooms
+    // 2) Rooms
     {
       const payload = rooms.map((room) => ({
         id: room.id,
         building: room.building,
-        // Backend requires room_number and room_type; derive sensible defaults.
         room_number: room.room_number || room.id,
         capacity: room.capacity,
         room_type: "lecture",
@@ -194,7 +178,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 4) Timeslots
+    // 3) Timeslots
     {
       const payload = timeslots.map((slot) => ({
         id: slot.id,
@@ -215,7 +199,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 5) Meeting patterns
+    // 4) Meeting patterns
     {
       const payload = meeting_patterns.map((p) => ({
         id: p.id,
@@ -231,6 +215,28 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { status: "error", errors: result.errors },
           { status: result.status },
+        );
+      }
+    }
+
+    // 5) Sections (references courses + instructors; backend auto-creates missing parent rows)
+    {
+      const result = await callSolver("/update-sections", { sections });
+      if (!result.ok) {
+        return NextResponse.json(
+          { status: "error", errors: result.errors },
+          { status: result.status },
+        );
+      }
+      const skippedSections = Array.isArray(result.data?.skipped_sections)
+        ? (result.data.skipped_sections as Array<Record<string, unknown>>)
+        : [];
+      const duplicateIds = skippedSections
+        .filter((row) => row.duplicate === true && typeof row.id === "string")
+        .map((row) => row.id as string);
+      if (duplicateIds.length > 0) {
+        warnings.push(
+          `Duplicate section IDs were skipped: ${duplicateIds.join(", ")}.`,
         );
       }
     }
