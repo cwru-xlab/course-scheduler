@@ -1,4 +1,5 @@
 from datetime import datetime
+import os
 from importlib import import_module
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -69,7 +70,24 @@ Expected outputs:
 """
 
 app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///course_scheduler.db"
+
+_db_backend = os.environ.get("DB_BACKEND", "sqlite").lower()
+if _db_backend == "postgres":
+    _database_url = os.environ.get("DATABASE_URL")
+    if not _database_url:
+        raise RuntimeError(
+            "DB_BACKEND=postgres but DATABASE_URL is not set. "
+            "Provide a PostgreSQL connection string, e.g. "
+            "postgresql://user:pass@host:5432/dbname"
+        )
+    if _database_url.startswith("postgres://"):
+        _database_url = _database_url.replace("postgres://", "postgresql+psycopg://", 1)
+    elif _database_url.startswith("postgresql://"):
+        _database_url = _database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+    app.config["SQLALCHEMY_DATABASE_URI"] = _database_url
+else:
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///course_scheduler.db"
+
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # Enable CORS for all routes
@@ -168,27 +186,23 @@ def _seed_if_empty() -> None:
     db.session.commit()
 
 
-def _ensure_sqlite_schema() -> None:
-    """Apply lightweight migrations for SQLite (e.g. new columns on existing DBs)."""
+def _ensure_schema_migrations() -> None:
+    """Apply lightweight column migrations for existing DBs (SQLite and Postgres)."""
     try:
         engine = db.engine
-        if engine.dialect.name != "sqlite":
-            return
         inspector = inspect(engine)
         tables = inspector.get_table_names()
         if "sections" not in tables:
             return
         col_names = {c["name"] for c in inspector.get_columns("sections")}
-        if "department" in col_names:
-            return
-        with engine.begin() as conn:
-            conn.execute(
-                text(
-                    "ALTER TABLE sections ADD COLUMN department VARCHAR(128) NOT NULL DEFAULT ''"
+        if "department" not in col_names:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE sections ADD COLUMN department VARCHAR(128) NOT NULL DEFAULT ''"
+                    )
                 )
-            )
     except Exception:  # pylint: disable=broad-except
-        # Best-effort; create_all / manual migration can fix schema issues.
         pass
 
 
@@ -2642,7 +2656,7 @@ def update_constraints():
 # Ensure schema on import (covers `flask run` / gunicorn, not only `python app.py`).
 with app.app_context():
     db.create_all()
-    _ensure_sqlite_schema()
+    _ensure_schema_migrations()
     _seed_if_empty()
 
 
