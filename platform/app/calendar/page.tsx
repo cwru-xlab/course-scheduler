@@ -161,6 +161,13 @@ function formatTimeAmPm(hhmm: string): string {
   return `${h12}:${mins.toString().padStart(2, "0")} ${suffix}`;
 }
 
+function formatRoomNumberForDisplay(roomNumber?: string): string {
+  const value = (roomNumber ?? "").toString().trim();
+  if (!value) return "";
+  // Spreadsheet imports may coerce whole-number room values to strings like "201.0".
+  return value.replace(/\.0+$/, "");
+}
+
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
@@ -1185,7 +1192,7 @@ export default function CalendarPage() {
           <div className="flex border-b border-slate-200/80 min-h-[240px]">
             <div className="w-40 flex-shrink-0 border-r border-slate-200 bg-slate-50/30">
               {roomRows.map(({ room, rowHeight }) => {
-                const roomLabel = [room.building, room.room_number]
+                const roomLabel = [room.building, formatRoomNumberForDisplay(room.room_number)]
                   .filter(Boolean)
                   .join(" ");
                 return (
@@ -1645,7 +1652,12 @@ export default function CalendarPage() {
                   <div><span className="font-semibold">Room:</span> {selectedEvent.room.id}</div>
                   <div>
                     <span className="font-semibold">Building/Number:</span>{" "}
-                    {[selectedEvent.room.building, selectedEvent.room.room_number].filter(Boolean).join(" ") || "N/A"}
+                    {[
+                      selectedEvent.room.building,
+                      formatRoomNumberForDisplay(selectedEvent.room.room_number),
+                    ]
+                      .filter(Boolean)
+                      .join(" ") || "N/A"}
                   </div>
                   <div><span className="font-semibold">Timeslot ID:</span> {selectedEvent.timeslot.id}</div>
                   <div>
@@ -1689,7 +1701,9 @@ export default function CalendarPage() {
                   >
                     <div className="w-40 flex-shrink-0 border-r border-slate-300 p-2 text-xs">
                       <div className="font-bold">
-                        {[room.building, room.room_number].filter(Boolean).join(" ") || room.id}
+                        {[room.building, formatRoomNumberForDisplay(room.room_number)]
+                          .filter(Boolean)
+                          .join(" ") || room.id}
                       </div>
                       <div className="text-[10px] text-slate-600">
                         Capacity: {room.capacity ?? "N/A"}
