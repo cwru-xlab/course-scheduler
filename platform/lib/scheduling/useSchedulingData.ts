@@ -12,6 +12,7 @@ import React, {
 import type { SchedulingInput } from "./types";
 
 const STORAGE_KEY = "wsom-scheduling-data";
+export const SCHEDULING_DATA_REFRESH_EVENT = "wsom-scheduling-data-refresh";
 
 type UseSchedulingDataReturn = {
   data: SchedulingInput | null;
@@ -84,6 +85,17 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
 
   useEffect(() => {
     loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleRefresh = () => {
+      void loadData();
+    };
+    window.addEventListener(SCHEDULING_DATA_REFRESH_EVENT, handleRefresh);
+    return () => {
+      window.removeEventListener(SCHEDULING_DATA_REFRESH_EVENT, handleRefresh);
+    };
   }, [loadData]);
 
   const saveToLocalStorage = useCallback(() => {

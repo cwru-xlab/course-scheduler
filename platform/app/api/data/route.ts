@@ -4,7 +4,10 @@ const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:5001";
 
 export async function GET() {
   try {
-    const response = await fetch(`${SOLVER_URL}/data`, { method: "GET" });
+    const response = await fetch(`${SOLVER_URL}/data`, {
+      method: "GET",
+      cache: "no-store",
+    });
     const data = await response.json();
 
     if (!response.ok || data.status === "error") {
@@ -19,7 +22,10 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json(data, { status: 200 });
+    return NextResponse.json(data, {
+      status: 200,
+      headers: { "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate" },
+    });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to reach solver service.";

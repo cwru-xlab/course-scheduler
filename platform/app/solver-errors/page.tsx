@@ -114,6 +114,31 @@ export default function SolverErrorsPage() {
     return stored.input.sections.filter((s) => referencedSectionIds.includes(s.id));
   }, [stored, referencedSectionIds]);
 
+  const sectionById = useMemo(() => {
+    if (!stored) return new Map<string, SchedulingInput["sections"][number]>();
+    return new Map(stored.input.sections.map((section) => [section.id, section]));
+  }, [stored]);
+
+  const instructorById = useMemo(() => {
+    if (!stored) return new Map<string, SchedulingInput["instructors"][number]>();
+    return new Map(stored.input.instructors.map((instructor) => [instructor.id, instructor]));
+  }, [stored]);
+
+  const formatSectionLabel = (sectionId: string) => {
+    const section = sectionById.get(sectionId);
+    if (!section) return sectionId;
+    const dept = (section.department ?? "").trim();
+    const course = String(section.course_id ?? "").trim();
+    const code = (section.section_code ?? "").trim();
+    return [dept, course, code].filter(Boolean).join(" ");
+  };
+
+  const formatInstructorLabel = (instructorId: string) => {
+    const instructor = instructorById.get(instructorId);
+    if (!instructor) return instructorId;
+    return `${instructor.name || instructorId} (${instructorId})`;
+  };
+
   if (!isHydrated || !stored) {
     return (
       <div className="space-y-6">
@@ -169,12 +194,18 @@ export default function SolverErrorsPage() {
             </div>
             <div>
               <span className="font-semibold">Feasible if remove section:</span>{" "}
-              {(stored.diagnostics.feasible_if_remove_section ?? []).join(", ") || "None"}
+              {(stored.diagnostics.feasible_if_remove_section ?? []).length
+                ? stored.diagnostics.feasible_if_remove_section!
+                    .map((sectionId) => formatSectionLabel(sectionId))
+                    .join(", ")
+                : "None"}
             </div>
             <div>
               <span className="font-semibold">Feasible if remove instructor:</span>{" "}
               {(stored.diagnostics.feasible_if_remove_instructor ?? []).length
-                ? stored.diagnostics.feasible_if_remove_instructor!.map((i) => `${i.instructor_id} (${i.section_count} sections)`).join(", ")
+                ? stored.diagnostics.feasible_if_remove_instructor!
+                    .map((i) => `${formatInstructorLabel(i.instructor_id)} (${i.section_count} sections)`)
+                    .join(", ")
                 : "None"}
             </div>
             {(stored.diagnostics.feasible_if_remove_instructor ?? []).length > 0 && (
@@ -191,7 +222,7 @@ export default function SolverErrorsPage() {
                 </button>
                 <span className="text-xs text-slate-400">
                   Removes {stored.diagnostics.feasible_if_remove_instructor!.reduce((s, i) => s + i.section_count, 0)} sections
-                  ({stored.diagnostics.feasible_if_remove_instructor!.map((i) => i.instructor_id).join(", ")})
+                  ({stored.diagnostics.feasible_if_remove_instructor!.map((i) => formatInstructorLabel(i.instructor_id)).join(", ")})
                 </span>
                 {retryStatus === "error" && retryError && (
                   <span className="text-xs text-red-600 font-medium">{retryError}</span>
@@ -204,7 +235,11 @@ export default function SolverErrorsPage() {
             </div>
             <div>
               <span className="font-semibold">Referenced sections:</span>{" "}
-              {(stored.diagnostics.referenced_sections ?? []).join(", ") || "None"}
+              {(stored.diagnostics.referenced_sections ?? []).length
+                ? stored.diagnostics.referenced_sections!
+                    .map((sectionId) => formatSectionLabel(sectionId))
+                    .join(", ")
+                : "None"}
             </div>
           </div>
           {(stored.diagnostics.sections_exceeding_room_capacity ?? []).length > 0 && (
@@ -213,7 +248,7 @@ export default function SolverErrorsPage() {
               <ul className="mt-2 space-y-1 text-sm text-slate-700">
                 {stored.diagnostics.sections_exceeding_room_capacity?.map((x) => (
                   <li key={`capacity-${x.section_id}`}>
-                    {x.section_id}: required capacity{" "}
+                    {formatSectionLabel(x.section_id)}: required capacity{" "}
                     {x.required_capacity ?? x.expected_enrollment ?? "unknown"} &gt; max room capacity{" "}
                     {x.max_room_capacity}
                   </li>
@@ -227,8 +262,8 @@ export default function SolverErrorsPage() {
               <ul className="mt-2 space-y-1 text-sm text-slate-700">
                 {stored.diagnostics.most_constrained_sections?.slice(0, 8).map((x) => (
                   <li key={`constrained-${x.section_id}`}>
-                    {x.section_id} ({x.course_id ?? "unknown course"}) - options: {x.option_count}
-                    {x.instructor_id ? `, instructor: ${x.instructor_id}` : ""}
+                    {formatSectionLabel(x.section_id)} - options: {x.option_count}
+                    {x.instructor_id ? `, instructor: ${formatInstructorLabel(x.instructor_id)}` : ""}
                   </li>
                 ))}
               </ul>
@@ -240,7 +275,7 @@ export default function SolverErrorsPage() {
               <ul className="mt-2 space-y-1 text-sm text-slate-700">
                 {stored.diagnostics.busiest_instructors?.slice(0, 8).map((x) => (
                   <li key={`busy-${x.instructor_id}`}>
-                    {x.instructor_id}: {x.section_count}
+                    {formatInstructorLabel(x.instructor_id)}: {x.section_count}
                   </li>
                 ))}
               </ul>
@@ -273,8 +308,8 @@ export default function SolverErrorsPage() {
               <tbody>
                 {problematicSections.map((section) => (
                   <tr key={section.id} className="border-t border-slate-100">
-                    <td className="px-3 py-2 font-semibold text-slate-900">{section.id}</td>
-                    <td className="px-3 py-2">{section.instructor_id}</td>
+                    <td className="px-3 py-2 font-semibold text-slate-900">{formatSectionLabel(section.id)}</td>
+                    <td className="px-3 py-2">{formatInstructorLabel(section.instructor_id)}</td>
                     <td className="px-3 py-2">{section.expected_enrollment}</td>
                     <td className="px-3 py-2">{section.allowed_meeting_patterns.join(", ") || "None"}</td>
                     <td className="px-3 py-2">{section.room_requirements.join(", ") || "None"}</td>

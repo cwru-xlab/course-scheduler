@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import type { ScheduleSolution, SchedulingInput } from "@/lib/scheduling/types";
 import { MultiSelect } from "@/components/scheduler/MultiSelect";
+import { SCHEDULING_DATA_REFRESH_EVENT } from "@/lib/scheduling/useSchedulingData";
 
 type TimeslotDto = {
   id: string;
@@ -73,6 +74,20 @@ type SolverDataDto = {
   instructors: InstructorDto[];
   timeslots: TimeslotDto[];
   rooms: RoomDto[];
+};
+
+type SectionFormDraft = {
+  id: string;
+  department: string;
+  course_id: string;
+  section_code: string;
+  instructor_id: string;
+  expected_enrollment: number;
+  enrollment_cap: number;
+  allowed_meeting_patterns: string;
+  room_requirements: string;
+  crosslist_group_id: string;
+  tags: string;
 };
 
 type LastSolverRun = {
@@ -169,6 +184,29 @@ function formatRoomNumberForDisplay(roomNumber?: string): string {
   return value.replace(/\.0+$/, "");
 }
 
+function splitCsv(value: string): string[] {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function toSectionFormDraft(section: SectionDto): SectionFormDraft {
+  return {
+    id: String(section.id ?? "").trim(),
+    department: String(section.department ?? "").trim(),
+    course_id: String(section.course_id ?? "").trim(),
+    section_code: String(section.section_code ?? "").trim(),
+    instructor_id: String(section.instructor_id ?? "").trim(),
+    expected_enrollment: Number(section.expected_enrollment ?? 0),
+    enrollment_cap: Number(section.enrollment_cap ?? 0),
+    allowed_meeting_patterns: (section.allowed_meeting_patterns ?? []).join(", "),
+    room_requirements: (section.room_requirements ?? []).join(", "),
+    crosslist_group_id: String(section.crosslist_group_id ?? "").trim(),
+    tags: (section.tags ?? []).join(", "),
+  };
+}
+
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
@@ -187,6 +225,24 @@ function selectSlotNearMinutes(
       end: parseMinutes(slot.end_time),
     }))
     .filter((slot) => Math.abs(slot.end - slot.start - durationMinutes) <= 5);
+  if (daySlots.length === 0) return null;
+  return daySlots.sort(
+    (a, b) => Math.abs(a.start - dropMinutes) - Math.abs(b.start - dropMinutes),
+  )[0];
+}
+
+function selectAnySlotNearMinutes(
+  timeslots: TimeslotDto[],
+  selectedDay: Day,
+  dropMinutes: number,
+): TimeslotWithMinutes | null {
+  const daySlots = timeslots
+    .filter((slot) => timeslotMatchesDay(slot, selectedDay))
+    .map((slot) => ({
+      ...slot,
+      start: parseMinutes(slot.start_time),
+      end: parseMinutes(slot.end_time),
+    }));
   if (daySlots.length === 0) return null;
   return daySlots.sort(
     (a, b) => Math.abs(a.start - dropMinutes) - Math.abs(b.start - dropMinutes),
@@ -366,7 +422,17 @@ export default function CalendarPage() {
     originLane: number;
     preview: CalendarDragPreview;
   };
+  type PlacementPreview = {
+    targetRoomId: string;
+    slotId: string;
+    startMin: number;
+    endMin: number;
+    isValid: boolean;
+    message: string | null;
+  };
   const [calendarDrag, setCalendarDrag] = useState<CalendarDragState | null>(null);
+  const [pendingPlacementSectionId, setPendingPlacementSectionId] = useState<string | null>(null);
+  const [placementPreview, setPlacementPreview] = useState<PlacementPreview | null>(null);
   const roomTrackRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const suppressCardClickRef = useRef(false);
   const setRoomTrackRef = useCallback((roomId: string, el: HTMLDivElement | null) => {
@@ -380,12 +446,20 @@ export default function CalendarPage() {
   const [selectedDepartmentKeys, setSelectedDepartmentKeys] = useState<string[]>([]);
   const [selectedInstructorIds, setSelectedInstructorIds] = useState<string[]>([]);
   const [hoveredDepartmentKey, setHoveredDepartmentKey] = useState<string | null>(null);
-  const [selectedEvent, setSelectedEvent] = useState<{
-    section: SectionDto;
-    timeslot: TimeslotDto;
-    room: RoomDto;
-    professor: InstructorDto | null;
+  const [selectedLegendDepartmentKeys, setSelectedLegendDepartmentKeys] = useState<string[]>([]);
+  const [sectionModal, setSectionModal] = useState<{
+    mode: "create" | "edit";
+    initialSectionId?: string;
+    draft: SectionFormDraft;
   } | null>(null);
+  const [sectionModalError, setSectionModalError] = useState<string | null>(null);
+  const [isSavingSection, setIsSavingSection] = useState(false);
+  // Keep multiple pinned highlights; hovering adds a temporary highlight.
+  const activeLegendDepartmentKeys = useMemo(() => {
+    const keys = new Set(selectedLegendDepartmentKeys);
+    if (hoveredDepartmentKey) keys.add(hoveredDepartmentKey);
+    return keys;
+  }, [hoveredDepartmentKey, selectedLegendDepartmentKeys]);
 
   useEffect(() => {
     let mounted = true;
@@ -610,6 +684,85 @@ export default function CalendarPage() {
       .map((id) => ({ key: id, label: instructorById.get(id)?.name?.trim() || id }))
       .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
   }, [data, instructorById]);
+
+  const updateSectionModalDraft = useCallback(
+    <K extends keyof SectionFormDraft>(field: K, value: SectionFormDraft[K]) => {
+      setSectionModal((prev) => (prev ? { ...prev, draft: { ...prev.draft, [field]: value } } : prev));
+    },
+    [],
+  );
+
+  const openCreateSectionModal = useCallback(() => {
+    setSectionModalError(null);
+    setSectionModal({
+      mode: "create",
+      draft: {
+        id: "",
+        department: "",
+        course_id: "",
+        section_code: "A",
+        instructor_id: "",
+        expected_enrollment: 20,
+        enrollment_cap: 30,
+        allowed_meeting_patterns: "",
+        room_requirements: "",
+        crosslist_group_id: "",
+        tags: "",
+      },
+    });
+  }, []);
+
+  const validateSectionDraft = useCallback(
+    (
+      draft: SectionFormDraft,
+      mode: "create" | "edit",
+      currentSectionId?: string,
+    ): string | null => {
+      const id = draft.id.trim();
+      const courseId = draft.course_id.trim();
+      const sectionCode = draft.section_code.trim();
+      if (!id) return "Section ID is required.";
+      if (!courseId) return "Course ID is required.";
+      if (!sectionCode) return "Section code is required.";
+      if (!draft.instructor_id.trim()) return "Instructor is required.";
+      if (!instructorById.has(draft.instructor_id.trim())) {
+        return "Instructor must be selected from existing instructors.";
+      }
+      if (!Number.isFinite(draft.expected_enrollment) || draft.expected_enrollment < 0) {
+        return "Expected enrollment must be a non-negative number.";
+      }
+      if (!Number.isFinite(draft.enrollment_cap) || draft.enrollment_cap < 0) {
+        return "Enrollment cap must be a non-negative number.";
+      }
+      if (draft.enrollment_cap < draft.expected_enrollment) {
+        return "Enrollment cap must be greater than or equal to expected enrollment.";
+      }
+      const duplicate = data?.sections.find(
+        (section) => section.id === id && (mode === "create" || section.id !== currentSectionId),
+      );
+      if (duplicate) return `Section ID '${id}' already exists.`;
+      return null;
+    },
+    [data?.rooms, data?.sections, data?.timeslots, instructorById],
+  );
+
+  const persistSections = useCallback(async (sections: SectionDto[]) => {
+    const response = await fetch("/api/update-sections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sections }),
+    });
+    const payload = (await response.json()) as
+      | { status: "ok" }
+      | { status: "error"; errors?: { message?: string }[] };
+    if (!response.ok || payload.status === "error") {
+      const message =
+        payload.status === "error" && payload.errors?.length
+          ? payload.errors.map((e) => e.message).filter(Boolean).join(" | ")
+          : "Backend failed to update sections.";
+      throw new Error(message);
+    }
+  }, []);
 
   useEffect(() => {
     const validDepartmentKeys = new Set(departmentFilterOptions.map((option) => option.key));
@@ -1055,16 +1208,90 @@ export default function CalendarPage() {
     [axisRange, axisStart],
   );
 
+  const evaluatePlacement = useCallback(
+    (sectionId: string, targetRoomId: string, slot: TimeslotWithMinutes) => {
+      if (!data) return { isValid: false, message: "Calendar data is unavailable." };
+      const section = data.sections.find((s) => s.id === sectionId);
+      if (!section) return { isValid: false, message: "Section not found." };
+      const targetRoom = data.rooms.find((room) => room.id === targetRoomId);
+      const requiredSeats = section.enrollment_cap ?? section.expected_enrollment ?? 0;
+      if (
+        Number.isFinite(targetRoom?.capacity) &&
+        requiredSeats > (targetRoom?.capacity ?? 0)
+      ) {
+        return {
+          isValid: false,
+          message: `Invalid: ${section.department ?? ""} ${section.course_id} requires ${requiredSeats} seats, but room ${targetRoomId} capacity is ${targetRoom?.capacity}.`,
+        };
+      }
+      const conflicts = allDayEvents.filter((eventItem) => {
+        if (eventItem.section.id === sectionId) return false;
+        const itemRoomId =
+          assignmentsBySection[eventItem.section.id]?.room_id ?? eventItem.section.room_id ?? "";
+        if (itemRoomId !== targetRoomId) return false;
+        return slot.start < eventItem.end && slot.end > eventItem.start;
+      });
+      if (conflicts.length > 0) {
+        const conflictNames = conflicts
+          .map((c) => `${c.section.department ?? ""} ${c.section.course_id}`.trim())
+          .filter(Boolean)
+          .slice(0, 3)
+          .join(", ");
+        return {
+          isValid: false,
+          message: `Invalid: conflicts with ${conflictNames || "another class"} in room ${targetRoomId} at ${formatTimeAmPm(slot.start_time)}-${formatTimeAmPm(slot.end_time)}.`,
+        };
+      }
+      return {
+        isValid: true,
+        message: `Valid placement: room ${targetRoomId}, ${selectedDay} ${formatTimeAmPm(slot.start_time)}-${formatTimeAmPm(slot.end_time)}.`,
+      };
+    },
+    [allDayEvents, assignmentsBySection, data, selectedDay],
+  );
+
+  const commitPlacementByClick = useCallback(
+    (sectionId: string, targetRoomId: string, slot: TimeslotWithMinutes) => {
+      const check = evaluatePlacement(sectionId, targetRoomId, slot);
+      if (!check.isValid) {
+        setDragFeedback({ status: "invalid", message: check.message });
+        return;
+      }
+      const currentAssignment = assignmentsBySection[sectionId];
+      const nextAssignments: AssignmentMap = {
+        ...assignmentsBySection,
+        [sectionId]: {
+          timeslot_ids: [slot.id],
+          room_id: targetRoomId,
+          meeting_pattern_id: currentAssignment?.meeting_pattern_id ?? "",
+        },
+      };
+      setAssignmentsBySection(nextAssignments);
+      setSolverTimeslotIdsBySection((prev) => ({ ...prev, [sectionId]: [slot.id] }));
+      setPendingPlacementSectionId(null);
+      setPlacementPreview(null);
+      setDragFeedback({ status: "valid", message: check.message });
+      setBackendSaveMessage({
+        type: "success",
+        text: "Section placed on the calendar. Click Update Backend to persist this placement.",
+      });
+    },
+    [assignmentsBySection, evaluatePlacement],
+  );
+
   const handleUpdateBackend = async () => {
-    if (!solverInput || !hasValidUnsavedEdit) return;
+    if (!data || !hasValidUnsavedEdit) return;
     setIsSavingBackend(true);
     setBackendSaveMessage(null);
     try {
-      const mergedSections = solverInput.sections.map((section) => {
+      const mergedSections = data.sections.map((section) => {
         const assignment = assignmentsBySection[section.id];
         return {
           ...section,
-          room_id: assignment?.room_id ?? (section as unknown as { room_id?: string | null }).room_id ?? null,
+          room_id:
+            assignment?.room_id ??
+            (section as unknown as { room_id?: string | null }).room_id ??
+            null,
           timeslot_id:
             assignment?.timeslot_ids?.[0] ??
             (section as unknown as { timeslot_id?: string | null }).timeslot_id ??
@@ -1086,12 +1313,35 @@ export default function CalendarPage() {
             : "Backend failed to update sections.";
         throw new Error(message);
       }
+      setData((prev) => (prev ? { ...prev, sections: mergedSections } : prev));
       setBaselineAssignments(assignmentsBySection);
-      updateLastRunStorage(solverInput, assignmentsBySection);
+      if (solverInput) {
+        const nextInput: SchedulingInput = {
+          ...solverInput,
+          sections: mergedSections.map((section) => ({
+            id: section.id,
+            course_id: String(section.course_id),
+            department: (section.department ?? "").trim(),
+            section_code: section.section_code,
+            instructor_id: section.instructor_id,
+            expected_enrollment: section.expected_enrollment ?? 0,
+            enrollment_cap: section.enrollment_cap ?? section.expected_enrollment ?? 0,
+            allowed_meeting_patterns: section.allowed_meeting_patterns ?? [],
+            room_requirements: section.room_requirements ?? [],
+            crosslist_group_id: section.crosslist_group_id ?? null,
+            tags: section.tags ?? [],
+          })),
+        };
+        setSolverInput(nextInput);
+        updateLastRunStorage(nextInput, assignmentsBySection);
+      }
       setBackendSaveMessage({
         type: "success",
-        text: "Backend updated with the current valid calendar edits.",
+        text: "Backend updated. Sections will appear in the Sections editor and be used by Run Solver.",
       });
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event(SCHEDULING_DATA_REFRESH_EVENT));
+      }
     } catch (err) {
       setBackendSaveMessage({
         type: "error",
@@ -1101,6 +1351,153 @@ export default function CalendarPage() {
       setIsSavingBackend(false);
     }
   };
+
+  const handleSaveSectionModal = useCallback(async () => {
+    if (!data || !sectionModal) return;
+    setSectionModalError(null);
+
+    const validationError = validateSectionDraft(
+      sectionModal.draft,
+      sectionModal.mode,
+      sectionModal.initialSectionId,
+    );
+    if (validationError) {
+      setSectionModalError(validationError);
+      return;
+    }
+
+    const draft = sectionModal.draft;
+    const existingSection =
+      sectionModal.mode === "edit"
+        ? data.sections.find((section) => section.id === sectionModal.initialSectionId) ?? null
+        : null;
+    const existingAssignment =
+      sectionModal.mode === "edit" && existingSection
+        ? assignmentsBySection[existingSection.id]
+        : undefined;
+    const existingSolverTimeslotIds =
+      sectionModal.mode === "edit" && existingSection
+        ? solverTimeslotIdsBySection[existingSection.id]
+        : undefined;
+    const preservedTimeslotIds =
+      sectionModal.mode === "edit"
+        ? existingAssignment?.timeslot_ids?.length
+          ? existingAssignment.timeslot_ids
+          : existingSolverTimeslotIds?.length
+            ? existingSolverTimeslotIds
+            : existingSection?.timeslot_id
+              ? [existingSection.timeslot_id]
+              : []
+        : [];
+    const preservedRoomId =
+      sectionModal.mode === "edit"
+        ? existingAssignment?.room_id ?? existingSection?.room_id ?? ""
+        : "";
+
+    const normalizedSection: SectionDto = {
+      id: draft.id.trim(),
+      course_id: draft.course_id.trim(),
+      department: draft.department.trim(),
+      section_code: draft.section_code.trim(),
+      instructor_id: draft.instructor_id.trim(),
+      expected_enrollment: Number(draft.expected_enrollment),
+      enrollment_cap: Number(draft.enrollment_cap),
+      allowed_meeting_patterns: splitCsv(draft.allowed_meeting_patterns),
+      room_requirements: splitCsv(draft.room_requirements),
+      crosslist_group_id: draft.crosslist_group_id.trim() || null,
+      tags: splitCsv(draft.tags),
+      room_id: preservedRoomId || null,
+      timeslot_id: preservedTimeslotIds[0] ?? null,
+    };
+
+    let nextSections: SectionDto[];
+    if (sectionModal.mode === "create") {
+      nextSections = [...data.sections, normalizedSection];
+    } else {
+      nextSections = data.sections.map((section) =>
+        section.id === sectionModal.initialSectionId ? normalizedSection : section,
+      );
+    }
+
+    setIsSavingSection(true);
+    try {
+      await persistSections(nextSections);
+
+      const nextAssignments: AssignmentMap = {
+        ...assignmentsBySection,
+        [normalizedSection.id]: {
+          timeslot_ids:
+            sectionModal.mode === "edit" ? [...preservedTimeslotIds] : [],
+          room_id: sectionModal.mode === "edit" ? preservedRoomId : "",
+          meeting_pattern_id: assignmentsBySection[normalizedSection.id]?.meeting_pattern_id ?? "",
+        },
+      };
+      const nextSolverTimeslots = {
+        ...solverTimeslotIdsBySection,
+        [normalizedSection.id]:
+          sectionModal.mode === "edit" ? [...preservedTimeslotIds] : [],
+      };
+
+      setData((prev) => (prev ? { ...prev, sections: nextSections } : prev));
+
+      setAssignmentsBySection(nextAssignments);
+      setSolverTimeslotIdsBySection(nextSolverTimeslots);
+      setBaselineAssignments(nextAssignments);
+
+      if (solverInput) {
+        const nextInput: SchedulingInput = {
+          ...solverInput,
+          sections: nextSections.map((section) => ({
+            id: section.id,
+            course_id: String(section.course_id),
+            department: (section.department ?? "").trim(),
+            section_code: section.section_code,
+            instructor_id: section.instructor_id,
+            expected_enrollment: section.expected_enrollment ?? 0,
+            enrollment_cap: section.enrollment_cap ?? section.expected_enrollment ?? 0,
+            allowed_meeting_patterns: section.allowed_meeting_patterns ?? [],
+            room_requirements: section.room_requirements ?? [],
+            crosslist_group_id: section.crosslist_group_id ?? null,
+            tags: section.tags ?? [],
+          })),
+        };
+        setSolverInput(nextInput);
+        updateLastRunStorage(nextInput, nextAssignments);
+      }
+
+      setBackendSaveMessage({
+        type: "success",
+        text:
+          sectionModal.mode === "create"
+            ? "Section created. Click an available room/timeslot space to place it."
+            : "Section updates saved to backend.",
+      });
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event(SCHEDULING_DATA_REFRESH_EVENT));
+      }
+      if (sectionModal.mode === "create") {
+        setPendingPlacementSectionId(normalizedSection.id);
+        setDragFeedback({
+          status: "neutral",
+          message:
+            "New section created. Hover over available room/timeslot space, then click to place it.",
+        });
+      }
+      setSectionModal(null);
+    } catch (err) {
+      setSectionModalError(err instanceof Error ? err.message : "Failed to save section.");
+    } finally {
+      setIsSavingSection(false);
+    }
+  }, [
+    assignmentsBySection,
+    data,
+    persistSections,
+    sectionModal,
+    solverInput,
+    solverTimeslotIdsBySection,
+    validateSectionDraft,
+  ]);
 
   if (error) {
     return (
@@ -1251,11 +1648,18 @@ export default function CalendarPage() {
                 key={item.colorKey}
                 onMouseEnter={() => setHoveredDepartmentKey(item.colorKey)}
                 onMouseLeave={() => setHoveredDepartmentKey((prev) => (prev === item.colorKey ? null : prev))}
+                onClick={() => {
+                  setSelectedLegendDepartmentKeys((prev) =>
+                    prev.includes(item.colorKey)
+                      ? prev.filter((key) => key !== item.colorKey)
+                      : [...prev, item.colorKey],
+                  );
+                }}
                 className={clsx(
-                  "flex items-center gap-2 rounded-lg border px-2.5 py-1.5 mr-1 mb-1 transition-all",
-                  hoveredDepartmentKey === item.colorKey
+                  "flex items-center gap-2 rounded-lg border px-2.5 py-1.5 mr-1 mb-1 transition-all cursor-pointer",
+                  activeLegendDepartmentKeys.has(item.colorKey)
                     ? "border-slate-300 bg-slate-100 shadow-sm ring-2 ring-slate-200"
-                    : hoveredDepartmentKey
+                    : activeLegendDepartmentKeys.size > 0
                       ? "border-slate-100 bg-slate-50/60 opacity-70"
                       : "border-slate-100 bg-slate-50/80",
                 )}
@@ -1285,41 +1689,36 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {/* Day selector (Mon-Fri) */}
-      <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-          <span className="text-[10px] font-bold text-slate-400 uppercase px-2 tracking-widest">
-            Day:
-          </span>
-          {DAYS.map((d) => (
-            <button
-              key={d}
-              onClick={() => setSelectedDay(d)}
-              className={clsx(
-                "px-3 py-1.5 rounded-lg border text-xs font-bold whitespace-nowrap transition-colors",
-                selectedDay === d
-                  ? "bg-[#137fec]/10 border-[#137fec]/20 text-[#137fec]"
-                  : "bg-slate-50 border-slate-200 text-slate-600 hover:text-[#137fec] hover:bg-slate-100",
-              )}
-            >
-              {d}
-            </button>
-          ))}
+      {/* Day selector + quick add section */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="inline-flex items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+            <span className="text-[10px] font-bold text-slate-400 uppercase px-2 tracking-widest">
+              Day:
+            </span>
+            {DAYS.map((d) => (
+              <button
+                key={d}
+                onClick={() => setSelectedDay(d)}
+                className={clsx(
+                  "px-3 py-1.5 rounded-lg border text-xs font-bold whitespace-nowrap transition-colors",
+                  selectedDay === d
+                    ? "bg-[#137fec]/10 border-[#137fec]/20 text-[#137fec]"
+                    : "bg-slate-50 border-slate-200 text-slate-600 hover:text-[#137fec] hover:bg-slate-100",
+                )}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex items-center gap-1 ml-4 pl-4 border-l border-slate-200">
-          <button className="p-2 text-slate-500 hover:text-[#137fec] transition-colors">
-            <Maximize2 className="size-4" />
-          </button>
-          <button className="p-2 text-slate-500 hover:text-[#137fec] transition-colors">
-            <Minimize2 className="size-4" />
-          </button>
-          <button className="p-2 text-slate-500 hover:text-[#137fec] transition-colors">
-            <Filter className="size-4" />
-          </button>
-          <button className="p-2 text-slate-500 hover:text-[#137fec] transition-colors">
-            <Printer className="size-4" />
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={openCreateSectionModal}
+          className="flex items-center justify-center rounded-lg h-10 px-4 bg-indigo-50 text-indigo-800 font-bold border border-indigo-200 hover:bg-indigo-100 transition-colors shrink-0"
+        >
+          + Add Section
+        </button>
       </div>
 
       {/* Main calendar grid */}
@@ -1391,6 +1790,46 @@ export default function CalendarPage() {
                   ref={(el) => setRoomTrackRef(room.id, el)}
                   className="relative border-b border-slate-200/80 last:border-b-0"
                   style={{ minHeight: rowHeight }}
+                  onPointerMove={(e) => {
+                    if (!pendingPlacementSectionId || calendarDrag) return;
+                    const mins = minutesFromPointerInRoom(e.clientX, room.id);
+                    if (mins === null || !data) return;
+                    const slot = selectAnySlotNearMinutes(data.timeslots, selectedDay, mins);
+                    if (!slot) return;
+                    const check = evaluatePlacement(pendingPlacementSectionId, room.id, slot);
+                    setPlacementPreview({
+                      targetRoomId: room.id,
+                      slotId: slot.id,
+                      startMin: slot.start,
+                      endMin: slot.end,
+                      isValid: check.isValid,
+                      message: check.message,
+                    });
+                    setDragFeedback({
+                      status: check.isValid ? "valid" : "invalid",
+                      message: check.message,
+                    });
+                  }}
+                  onPointerLeave={() => {
+                    if (!pendingPlacementSectionId || calendarDrag) return;
+                    setPlacementPreview(null);
+                    setDragFeedback({
+                      status: "neutral",
+                      message:
+                        "New section created. Hover over available room/timeslot space, then click to place it.",
+                    });
+                  }}
+                  onClick={() => {
+                    if (!pendingPlacementSectionId || !placementPreview || calendarDrag) return;
+                    if (placementPreview.targetRoomId !== room.id) return;
+                    const slot = timeslotById.get(placementPreview.slotId);
+                    if (!slot) return;
+                    commitPlacementByClick(pendingPlacementSectionId, room.id, {
+                      ...slot,
+                      start: placementPreview.startMin,
+                      end: placementPreview.endMin,
+                    });
+                  }}
                 >
                   <div
                     className="absolute inset-0 grid pointer-events-none"
@@ -1448,8 +1887,8 @@ export default function CalendarPage() {
                       axisRange;
                     const top = EVENT_TOP_PADDING_PX + lane * (EVENT_HEIGHT_PX + EVENT_GAP_PX);
                     const matchesHoveredDepartment =
-                      !hoveredDepartmentKey ||
-                      departmentColorKey(section) === hoveredDepartmentKey;
+                      activeLegendDepartmentKeys.size === 0 ||
+                      activeLegendDepartmentKeys.has(departmentColorKey(section));
                     return (
                       <div
                         key={`${room.id}-${section.id}-occupied`}
@@ -1458,7 +1897,7 @@ export default function CalendarPage() {
                           matchesHoveredDepartment
                             ? "border-slate-300 bg-slate-100/70"
                             : "border-slate-200 bg-slate-100/35 opacity-45",
-                          hoveredDepartmentKey &&
+                          activeLegendDepartmentKeys.size > 0 &&
                             matchesHoveredDepartment &&
                             "ring-2 ring-slate-300/80",
                         )}
@@ -1517,6 +1956,52 @@ export default function CalendarPage() {
                         />
                       );
                     })()}
+                  {pendingPlacementSectionId &&
+                    placementPreview &&
+                    room.id === placementPreview.targetRoomId &&
+                    (() => {
+                      const slot = timeslotById.get(placementPreview.slotId);
+                      const section = data.sections.find((s) => s.id === pendingPlacementSectionId);
+                      if (!slot || !section) return null;
+                      const leftPct =
+                        (clamp(placementPreview.startMin, axisStart, axisEnd) - axisStart) /
+                        axisRange;
+                      const widthPct =
+                        (clamp(placementPreview.endMin, axisStart, axisEnd) -
+                          clamp(placementPreview.startMin, axisStart, axisEnd)) /
+                        axisRange;
+                      const bg = placementPreview.isValid
+                        ? "rgba(16, 185, 129, 0.16)"
+                        : "rgba(239, 68, 68, 0.16)";
+                      const border = placementPreview.isValid
+                        ? "rgba(5, 150, 105, 0.75)"
+                        : "rgba(220, 38, 38, 0.75)";
+                      const color =
+                        departmentPaletteByKey.get(departmentColorKey(section)) ?? solidPaletteAt(0);
+                      return (
+                        <div
+                          key={`placement-preview-${room.id}-${pendingPlacementSectionId}`}
+                          className="absolute z-[24] pointer-events-none border-l-4 rounded-lg p-2.5 flex flex-col justify-between shadow-sm"
+                          style={{
+                            left: `${leftPct * 100}%`,
+                            width: `${Math.max(widthPct * 100, 0.5)}%`,
+                            top: EVENT_TOP_PADDING_PX,
+                            height: EVENT_HEIGHT_PX,
+                            backgroundColor: bg,
+                            backgroundImage: color.cardPattern,
+                            borderLeftColor: color.cardBorder,
+                            outline: `2px solid ${border}`,
+                          }}
+                        >
+                          <div className="font-black text-[10px] truncate text-slate-900">
+                            {(section.department ? `${section.department} ` : "") + section.course_id}
+                          </div>
+                          <div className="text-[8px] font-bold text-slate-700 uppercase">
+                            {placementPreview.isValid ? "Click to place" : "Cannot place here"}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                   {visibleEvents.map(({ section, timeslot, start, end, lane }) => {
                 const leftPct =
@@ -1534,8 +2019,8 @@ export default function CalendarPage() {
                     const color =
                       departmentPaletteByKey.get(departmentColorKey(section)) ?? solidPaletteAt(0);
                     const matchesHoveredDepartment =
-                      !hoveredDepartmentKey ||
-                      departmentColorKey(section) === hoveredDepartmentKey;
+                      activeLegendDepartmentKeys.size === 0 ||
+                      activeLegendDepartmentKeys.has(departmentColorKey(section));
 
                 const isDragSource = calendarDrag?.sectionId === section.id;
                 return (
@@ -1549,7 +2034,7 @@ export default function CalendarPage() {
                         calendarDrag?.hasMoved &&
                         "opacity-[0.12] pointer-events-none",
                       !matchesHoveredDepartment && "opacity-35",
-                      hoveredDepartmentKey &&
+                      activeLegendDepartmentKeys.size > 0 &&
                         matchesHoveredDepartment &&
                         "ring-2 ring-slate-300/80 shadow-md",
                     )}
@@ -1661,16 +2146,17 @@ export default function CalendarPage() {
                         return null;
                       });
                     }}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       if (suppressCardClickRef.current) {
                         suppressCardClickRef.current = false;
                         return;
                       }
-                      setSelectedEvent({
-                        section,
-                        timeslot: timeslot!,
-                        room,
-                        professor: inst ?? null,
+                      setSectionModalError(null);
+                      setSectionModal({
+                        mode: "edit",
+                        initialSectionId: section.id,
+                        draft: toSectionFormDraft(section),
                       });
                     }}
                   >
@@ -1711,8 +2197,8 @@ export default function CalendarPage() {
                   const colorPv =
                     departmentPaletteByKey.get(departmentColorKey(section)) ?? solidPaletteAt(0);
                   const previewMatchesHoveredDepartment =
-                    !hoveredDepartmentKey ||
-                    departmentColorKey(section) === hoveredDepartmentKey;
+                    activeLegendDepartmentKeys.size === 0 ||
+                    activeLegendDepartmentKeys.has(departmentColorKey(section));
                   return (
                     <div
                       key="calendar-drag-preview"
@@ -1780,115 +2266,184 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {selectedEvent && (
+      {sectionModal && (
         <div
           className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px] flex items-center justify-center p-4"
-          onClick={() => setSelectedEvent(null)}
+          onClick={() => {
+            if (isSavingSection) return;
+            setSectionModal(null);
+            setSectionModalError(null);
+          }}
         >
           <div
             className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-              <h3 className="text-lg font-black text-slate-900">Section Details</h3>
+              <h3 className="text-lg font-black text-slate-900">
+                {sectionModal.mode === "create" ? "Add Section" : "Edit Section"}
+              </h3>
               <button
+                type="button"
+                disabled={isSavingSection}
                 className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
-                onClick={() => setSelectedEvent(null)}
+                onClick={() => {
+                  setSectionModal(null);
+                  setSectionModalError(null);
+                }}
               >
                 Close
               </button>
             </div>
-
-            <div className="space-y-6 px-6 py-5 text-sm">
-              <div>
-                <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">
-                  Section
-                </h4>
-                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <div><span className="font-semibold">Section ID:</span> {selectedEvent.section.id}</div>
-                  <div>
-                    <span className="font-semibold">Department:</span>{" "}
-                    {(selectedEvent.section.department ?? "").trim() || "—"}
-                  </div>
-                  <div><span className="font-semibold">Course ID:</span> {selectedEvent.section.course_id}</div>
-                  <div><span className="font-semibold">Section Code:</span> {selectedEvent.section.section_code}</div>
-                  <div><span className="font-semibold">Instructor ID:</span> {selectedEvent.section.instructor_id}</div>
-                  <div>
-                    <span className="font-semibold">Expected Enrollment:</span>{" "}
-                    {selectedEvent.section.expected_enrollment ?? "N/A"}
-                  </div>
-                  <div>
-                    <span className="font-semibold">Enrollment Cap:</span>{" "}
-                    {selectedEvent.section.enrollment_cap ?? "N/A"}
-                  </div>
-                  <div className="sm:col-span-2">
-                    <span className="font-semibold">Allowed Patterns:</span>{" "}
-                    {selectedEvent.section.allowed_meeting_patterns?.join(", ") || "N/A"}
-                  </div>
-                  <div className="sm:col-span-2">
-                    <span className="font-semibold">Room Requirements:</span>{" "}
-                    {selectedEvent.section.room_requirements?.join(", ") || "None"}
-                  </div>
+            <div className="space-y-4 px-6 py-5 text-sm">
+              {sectionModal.mode === "create" && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Rooms and timeslots are assigned directly on the calendar. After creating this
+                  section, hover over an available room/time space and click to place it.
                 </div>
+              )}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-slate-600">Section ID *</span>
+                  <input
+                    className="rounded-lg border border-slate-200 px-3 py-2"
+                    value={sectionModal.draft.id}
+                    onChange={(e) => updateSectionModalDraft("id", e.target.value)}
+                    disabled={sectionModal.mode === "edit" || isSavingSection}
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-slate-600">Department</span>
+                  <input
+                    className="rounded-lg border border-slate-200 px-3 py-2"
+                    value={sectionModal.draft.department}
+                    onChange={(e) => updateSectionModalDraft("department", e.target.value)}
+                    disabled={isSavingSection}
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-slate-600">Course ID *</span>
+                  <input
+                    className="rounded-lg border border-slate-200 px-3 py-2"
+                    value={sectionModal.draft.course_id}
+                    onChange={(e) => updateSectionModalDraft("course_id", e.target.value)}
+                    disabled={isSavingSection}
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-slate-600">Section Code *</span>
+                  <input
+                    className="rounded-lg border border-slate-200 px-3 py-2"
+                    value={sectionModal.draft.section_code}
+                    onChange={(e) => updateSectionModalDraft("section_code", e.target.value)}
+                    disabled={isSavingSection}
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-slate-600">Instructor *</span>
+                  <select
+                    className="rounded-lg border border-slate-200 px-3 py-2 bg-white"
+                    value={sectionModal.draft.instructor_id}
+                    onChange={(e) => updateSectionModalDraft("instructor_id", e.target.value)}
+                    disabled={isSavingSection}
+                  >
+                    <option value="">Select instructor</option>
+                    {data.instructors.map((inst) => (
+                      <option key={inst.id} value={inst.id}>
+                        {inst.name?.trim() || inst.id}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-slate-600">Expected Enrollment *</span>
+                  <input
+                    type="number"
+                    min={0}
+                    className="rounded-lg border border-slate-200 px-3 py-2"
+                    value={sectionModal.draft.expected_enrollment}
+                    onChange={(e) =>
+                      updateSectionModalDraft("expected_enrollment", Number(e.target.value))
+                    }
+                    disabled={isSavingSection}
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-slate-600">Enrollment Cap *</span>
+                  <input
+                    type="number"
+                    min={0}
+                    className="rounded-lg border border-slate-200 px-3 py-2"
+                    value={sectionModal.draft.enrollment_cap}
+                    onChange={(e) => updateSectionModalDraft("enrollment_cap", Number(e.target.value))}
+                    disabled={isSavingSection}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 sm:col-span-2">
+                  <span className="text-xs font-semibold text-slate-600">Allowed Meeting Patterns (comma-separated)</span>
+                  <input
+                    className="rounded-lg border border-slate-200 px-3 py-2"
+                    value={sectionModal.draft.allowed_meeting_patterns}
+                    onChange={(e) => updateSectionModalDraft("allowed_meeting_patterns", e.target.value)}
+                    disabled={isSavingSection}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 sm:col-span-2">
+                  <span className="text-xs font-semibold text-slate-600">Room Requirements (comma-separated)</span>
+                  <input
+                    className="rounded-lg border border-slate-200 px-3 py-2"
+                    value={sectionModal.draft.room_requirements}
+                    onChange={(e) => updateSectionModalDraft("room_requirements", e.target.value)}
+                    disabled={isSavingSection}
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-slate-600">Crosslist Group ID</span>
+                  <input
+                    className="rounded-lg border border-slate-200 px-3 py-2"
+                    value={sectionModal.draft.crosslist_group_id}
+                    onChange={(e) => updateSectionModalDraft("crosslist_group_id", e.target.value)}
+                    disabled={isSavingSection}
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-slate-600">Tags (comma-separated)</span>
+                  <input
+                    className="rounded-lg border border-slate-200 px-3 py-2"
+                    value={sectionModal.draft.tags}
+                    onChange={(e) => updateSectionModalDraft("tags", e.target.value)}
+                    disabled={isSavingSection}
+                  />
+                </label>
               </div>
-
-              <div>
-                <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">
-                  Professor
-                </h4>
-                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <div><span className="font-semibold">Name:</span> {selectedEvent.professor?.name || "N/A"}</div>
-                  <div><span className="font-semibold">ID:</span> {selectedEvent.professor?.id || selectedEvent.section.instructor_id}</div>
-                  <div><span className="font-semibold">Rank:</span> {selectedEvent.professor?.rank_type || "N/A"}</div>
-                  <div>
-                    <span className="font-semibold">Max Teaching Days:</span>{" "}
-                    {selectedEvent.professor?.preferences?.max_teaching_days ??
-                      selectedEvent.professor?.max_teaching_days ??
-                      "N/A"}
-                  </div>
-                  <div className="sm:col-span-2">
-                    <span className="font-semibold">Unavailable Times:</span>{" "}
-                    {selectedEvent.professor?.unavailable_times?.join(", ") ||
-                      selectedEvent.professor?.preferences?.unavailable_times?.join(", ") ||
-                      "N/A"}
-                  </div>
-                  <div className="sm:col-span-2">
-                    <span className="font-semibold">Preferred Times:</span>{" "}
-                    {selectedEvent.professor?.preferences?.preferred_times?.join(", ") || "N/A"}
-                  </div>
-                  <div className="sm:col-span-2">
-                    <span className="font-semibold">Preferred Days:</span>{" "}
-                    {selectedEvent.professor?.preferences?.preferred_days?.join(", ") || "N/A"}
-                  </div>
-                  <div className="sm:col-span-2">
-                    <span className="font-semibold">Preferred Patterns:</span>{" "}
-                    {selectedEvent.professor?.preferences?.preferred_patterns?.join(", ") || "N/A"}
-                  </div>
+              {sectionModalError && (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                  {sectionModalError}
                 </div>
-              </div>
-
-              <div>
-                <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">
-                  Meeting
-                </h4>
-                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <div><span className="font-semibold">Room:</span> {selectedEvent.room.id}</div>
-                  <div>
-                    <span className="font-semibold">Building/Number:</span>{" "}
-                    {[
-                      selectedEvent.room.building,
-                      formatRoomNumberForDisplay(selectedEvent.room.room_number),
-                    ]
-                      .filter(Boolean)
-                      .join(" ") || "N/A"}
-                  </div>
-                  <div><span className="font-semibold">Timeslot ID:</span> {selectedEvent.timeslot.id}</div>
-                  <div>
-                    <span className="font-semibold">Day/Time:</span>{" "}
-                    {(selectedEvent.timeslot.day || selectedEvent.timeslot.days || "").toString()}{" "}
-                    {formatTimeAmPm(selectedEvent.timeslot.start_time)} - {formatTimeAmPm(selectedEvent.timeslot.end_time)}
-                  </div>
-                </div>
+              )}
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={isSavingSection}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                  onClick={() => {
+                    setSectionModal(null);
+                    setSectionModalError(null);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isSavingSection}
+                  className={clsx(
+                    "rounded-lg px-3 py-2 text-sm font-bold text-white",
+                    isSavingSection ? "bg-slate-400" : "bg-[#137fec] hover:bg-[#0f6dca]",
+                  )}
+                  onClick={handleSaveSectionModal}
+                >
+                  {isSavingSection ? "Saving..." : "Confirm & Save"}
+                </button>
               </div>
             </div>
           </div>
