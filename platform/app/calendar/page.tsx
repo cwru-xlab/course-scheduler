@@ -16,6 +16,7 @@ import {
   Undo2,
 } from "lucide-react";
 import type { ScheduleSolution, SchedulingInput } from "@/lib/scheduling/types";
+import { MultiSelect } from "@/components/scheduler/MultiSelect";
 
 type TimeslotDto = {
   id: string;
@@ -376,6 +377,9 @@ export default function CalendarPage() {
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [selectedDepartmentKeys, setSelectedDepartmentKeys] = useState<string[]>([]);
+  const [selectedInstructorIds, setSelectedInstructorIds] = useState<string[]>([]);
+  const [hoveredDepartmentKey, setHoveredDepartmentKey] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<{
     section: SectionDto;
     timeslot: TimeslotDto;
@@ -585,6 +589,51 @@ export default function CalendarPage() {
     return map;
   }, [data]);
 
+  const departmentFilterOptions = useMemo(() => {
+    if (!data?.sections.length) return [] as { key: string; label: string }[];
+    const byKey = new Map<string, string>();
+    for (const section of data.sections) {
+      const key = departmentColorKey(section);
+      if (!byKey.has(key)) byKey.set(key, departmentLegendLabel(section));
+    }
+    return Array.from(byKey.entries())
+      .map(([key, label]) => ({ key, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+  }, [data]);
+
+  const professorFilterOptions = useMemo(() => {
+    if (!data?.sections.length) return [] as { key: string; label: string }[];
+    const usedInstructorIds = new Set(
+      data.sections.map((section) => section.instructor_id).filter(Boolean),
+    );
+    return Array.from(usedInstructorIds)
+      .map((id) => ({ key: id, label: instructorById.get(id)?.name?.trim() || id }))
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+  }, [data, instructorById]);
+
+  useEffect(() => {
+    const validDepartmentKeys = new Set(departmentFilterOptions.map((option) => option.key));
+    setSelectedDepartmentKeys((prev) => prev.filter((key) => validDepartmentKeys.has(key)));
+  }, [departmentFilterOptions]);
+
+  useEffect(() => {
+    const validInstructorIds = new Set(professorFilterOptions.map((option) => option.key));
+    setSelectedInstructorIds((prev) => prev.filter((id) => validInstructorIds.has(id)));
+  }, [professorFilterOptions]);
+
+  const sectionMatchesFilters = useCallback(
+    (section: SectionDto) => {
+      const departmentMatch =
+        selectedDepartmentKeys.length === 0 ||
+        selectedDepartmentKeys.includes(departmentColorKey(section));
+      const instructorMatch =
+        selectedInstructorIds.length === 0 ||
+        selectedInstructorIds.includes(section.instructor_id);
+      return departmentMatch && instructorMatch;
+    },
+    [selectedDepartmentKeys, selectedInstructorIds],
+  );
+
   const departmentPaletteByKey = useMemo(() => {
     const map = new Map<string, DepartmentPalette>();
     if (!data?.sections.length) return map;
@@ -623,7 +672,7 @@ export default function CalendarPage() {
     );
   }, [data, departmentPaletteByKey]);
 
-  const dayEvents = useMemo(() => {
+  const allDayEvents = useMemo(() => {
     if (!data) return [];
     const baseEvents = data.sections
       .map((s) => {
@@ -658,9 +707,15 @@ export default function CalendarPage() {
     });
   }, [assignmentsBySection, data, selectedDay, solverTimeslotIdsBySection, timeslotById]);
 
+  const dayEvents = useMemo(
+    () => allDayEvents.filter((event) => sectionMatchesFilters(event.section)),
+    [allDayEvents, sectionMatchesFilters],
+  );
+
   const getDayEvents = (day: Day) => {
     if (!data) return [];
     const baseEvents = data.sections
+      .filter((section) => sectionMatchesFilters(section))
       .map((s) => {
         const candidateTimeslotIds =
           assignmentsBySection[s.id]?.timeslot_ids ??
@@ -690,25 +745,25 @@ export default function CalendarPage() {
     });
   };
 
-  const eventsByRoom = useMemo(() => {
-    const byRoom = new Map<string, typeof dayEvents>();
-    dayEvents.forEach((event) => {
+  const allEventsByRoom = useMemo(() => {
+    const byRoom = new Map<string, typeof allDayEvents>();
+    allDayEvents.forEach((event) => {
       const roomId = event.section.room_id;
       if (!roomId) return;
       if (!byRoom.has(roomId)) byRoom.set(roomId, []);
       byRoom.get(roomId)?.push(event);
     });
     return byRoom;
-  }, [dayEvents]);
+  }, [allDayEvents]);
 
   const roomRows = useMemo(() => {
     if (!data) return [];
     return data.rooms.map((room) => {
-      const roomEvents = [...(eventsByRoom.get(room.id) ?? [])].sort(
+      const roomEvents = [...(allEventsByRoom.get(room.id) ?? [])].sort(
         (a, b) => a.start - b.start,
       );
       const laneEndTimes: number[] = [];
-      const events = roomEvents.map((event) => {
+      const eventsWithLane = roomEvents.map((event) => {
         let lane = laneEndTimes.findIndex((laneEnd) => laneEnd <= event.start);
         if (lane === -1) {
           lane = laneEndTimes.length;
@@ -718,14 +773,16 @@ export default function CalendarPage() {
         }
         return { ...event, lane };
       });
-      const laneCount = events.reduce((max, event) => Math.max(max, event.lane + 1), 0);
+      const laneCount = eventsWithLane.reduce((max, event) => Math.max(max, event.lane + 1), 0);
       const needed =
         EVENT_TOP_PADDING_PX * 2 +
         laneCount * EVENT_HEIGHT_PX +
         Math.max(0, laneCount - 1) * EVENT_GAP_PX;
-      return { room, events, rowHeight: Math.max(100, needed) };
+      const visibleEvents = eventsWithLane.filter((event) => sectionMatchesFilters(event.section));
+      const hiddenEvents = eventsWithLane.filter((event) => !sectionMatchesFilters(event.section));
+      return { room, visibleEvents, hiddenEvents, rowHeight: Math.max(100, needed) };
     });
-  }, [data, eventsByRoom]);
+  }, [allEventsByRoom, data, sectionMatchesFilters]);
 
   const getRoomRowsForDay = (day: Day) => {
     if (!data) return [];
@@ -845,7 +902,7 @@ export default function CalendarPage() {
         start: parseMinutes(slot.start_time),
         end: parseMinutes(slot.end_time),
       }));
-  }, [calendarDrag?.sectionId, data, dayEvents, selectedDay, axisStart, axisEnd]);
+  }, [calendarDrag?.sectionId, data, selectedDay]);
 
   const dragPossibleTimeslotBoundaries = useMemo(() => {
     if (!dragPossibleTimeslots.length) return [];
@@ -862,7 +919,7 @@ export default function CalendarPage() {
   const commitCalendarPlacement = useCallback(
     (sectionId: string, targetRoomId: string, selectedSlot: TimeslotWithMinutes) => {
       if (!data) return;
-      const dragged = dayEvents.find((x) => x.section.id === sectionId && x.timeslot);
+      const dragged = allDayEvents.find((x) => x.section.id === sectionId && x.timeslot);
       if (!dragged || !dragged.timeslot) return;
 
       const currentAssignment = assignmentsBySection[sectionId];
@@ -935,7 +992,7 @@ export default function CalendarPage() {
 
       const selectedStart = selectedSlot.start;
       const selectedEnd = selectedSlot.end;
-      const conflicts = dayEvents.filter((eventItem) => {
+      const conflicts = allDayEvents.filter((eventItem) => {
         if (eventItem.section.id === sectionId) return false;
         const itemRoomId =
           nextAssignments[eventItem.section.id]?.room_id ?? eventItem.section.room_id ?? "";
@@ -963,9 +1020,9 @@ export default function CalendarPage() {
     },
     [
       assignmentsBySection,
+      allDayEvents,
       backendSaveMessage,
       data,
-      dayEvents,
       dragError,
       dragFeedback,
       selectedDay,
@@ -1136,6 +1193,98 @@ export default function CalendarPage() {
         </div>
       )}
 
+      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+          <div className="flex items-center gap-2 min-w-[9rem]">
+            <Filter className="size-4 text-slate-400" aria-hidden />
+            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest">
+              Filters
+            </span>
+          </div>
+          <div className="flex flex-1 flex-col sm:flex-row gap-3">
+            <MultiSelect
+              label="Filter by departments"
+              placeholder="Departments"
+              options={departmentFilterOptions}
+              value={selectedDepartmentKeys}
+              onChange={setSelectedDepartmentKeys}
+            />
+            <MultiSelect
+              label="Filter by professors"
+              placeholder="Professors"
+              options={professorFilterOptions}
+              value={selectedInstructorIds}
+              onChange={setSelectedInstructorIds}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedDepartmentKeys([]);
+              setSelectedInstructorIds([]);
+            }}
+            disabled={!selectedDepartmentKeys.length && !selectedInstructorIds.length}
+            className={clsx(
+              "rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors self-start lg:self-auto",
+              selectedDepartmentKeys.length || selectedInstructorIds.length
+                ? "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed",
+            )}
+          >
+            Clear filters
+          </button>
+        </div>
+      </div>
+
+      {/* Department / course color legend */}
+      {departmentColorLegend.length > 0 && (
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex flex-wrap items-center gap-x-1 gap-y-2">
+            <div className="flex items-center gap-2 mb-1 w-full sm:w-auto sm:mb-0 sm:mr-2">
+              <Palette className="size-4 text-slate-400 shrink-0" aria-hidden />
+              <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest">
+                Department colors
+              </span>
+            </div>
+            {departmentColorLegend.map((item) => (
+              <div
+                key={item.colorKey}
+                onMouseEnter={() => setHoveredDepartmentKey(item.colorKey)}
+                onMouseLeave={() => setHoveredDepartmentKey((prev) => (prev === item.colorKey ? null : prev))}
+                className={clsx(
+                  "flex items-center gap-2 rounded-lg border px-2.5 py-1.5 mr-1 mb-1 transition-all",
+                  hoveredDepartmentKey === item.colorKey
+                    ? "border-slate-300 bg-slate-100 shadow-sm ring-2 ring-slate-200"
+                    : hoveredDepartmentKey
+                      ? "border-slate-100 bg-slate-50/60 opacity-70"
+                      : "border-slate-100 bg-slate-50/80",
+                )}
+              >
+                <span
+                  className="h-3.5 w-6 shrink-0 rounded border-l-[3px] shadow-sm border border-slate-300/70"
+                  style={{
+                    backgroundColor: item.swatch.cardBg,
+                    backgroundImage: item.swatch.cardPattern,
+                    borderLeftColor: item.swatch.cardBorder,
+                  }}
+                  aria-hidden
+                />
+                <span
+                  className="text-xs font-semibold text-slate-800 max-w-[12rem] truncate"
+                  title={item.label}
+                >
+                  {item.label}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[10px] text-slate-500 leading-relaxed">
+            Colors are per <span className="font-semibold">department</span> only. Populate the
+            department field (e.g. ECON, OPRE, FAFE) to control color grouping.
+          </p>
+        </div>
+      )}
+
       {/* Day selector (Mon-Fri) */}
       <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
@@ -1172,46 +1321,6 @@ export default function CalendarPage() {
           </button>
         </div>
       </div>
-
-      {/* Department / course color legend */}
-      {departmentColorLegend.length > 0 && (
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex flex-wrap items-center gap-x-1 gap-y-2">
-            <div className="flex items-center gap-2 mb-1 w-full sm:w-auto sm:mb-0 sm:mr-2">
-              <Palette className="size-4 text-slate-400 shrink-0" aria-hidden />
-              <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest">
-                Department colors
-              </span>
-            </div>
-            {departmentColorLegend.map((item) => (
-              <div
-                key={item.colorKey}
-                className="flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50/80 px-2.5 py-1.5 mr-1 mb-1"
-              >
-                <span
-                  className="h-3.5 w-6 shrink-0 rounded border-l-[3px] shadow-sm border border-slate-300/70"
-                  style={{
-                    backgroundColor: item.swatch.cardBg,
-                    backgroundImage: item.swatch.cardPattern,
-                    borderLeftColor: item.swatch.cardBorder,
-                  }}
-                  aria-hidden
-                />
-                <span
-                  className="text-xs font-semibold text-slate-800 max-w-[12rem] truncate"
-                  title={item.label}
-                >
-                  {item.label}
-                </span>
-              </div>
-            ))}
-          </div>
-          <p className="mt-2 text-[10px] text-slate-500 leading-relaxed">
-            Colors are per <span className="font-semibold">department</span> only. Populate the
-            department field (e.g. ECON, OPRE, FAFE) to control color grouping.
-          </p>
-        </div>
-      )}
 
       {/* Main calendar grid */}
       <div
@@ -1276,7 +1385,7 @@ export default function CalendarPage() {
               })}
             </div>
             <div className="flex-1 relative">
-              {roomRows.map(({ room, events, rowHeight }) => (
+              {roomRows.map(({ room, visibleEvents, hiddenEvents, rowHeight }) => (
                 <div
                   key={room.id}
                   ref={(el) => setRoomTrackRef(room.id, el)}
@@ -1332,6 +1441,41 @@ export default function CalendarPage() {
                         />
                       );
                     })}
+                  {hiddenEvents.map(({ section, start, end, lane }) => {
+                    const leftPct = (clamp(start, axisStart, axisEnd) - axisStart) / axisRange;
+                    const widthPct =
+                      (clamp(end, axisStart, axisEnd) - clamp(start, axisStart, axisEnd)) /
+                      axisRange;
+                    const top = EVENT_TOP_PADDING_PX + lane * (EVENT_HEIGHT_PX + EVENT_GAP_PX);
+                    const matchesHoveredDepartment =
+                      !hoveredDepartmentKey ||
+                      departmentColorKey(section) === hoveredDepartmentKey;
+                    return (
+                      <div
+                        key={`${room.id}-${section.id}-occupied`}
+                        className={clsx(
+                          "absolute z-[6] rounded-lg border border-dashed pointer-events-none transition-all",
+                          matchesHoveredDepartment
+                            ? "border-slate-300 bg-slate-100/70"
+                            : "border-slate-200 bg-slate-100/35 opacity-45",
+                          hoveredDepartmentKey &&
+                            matchesHoveredDepartment &&
+                            "ring-2 ring-slate-300/80",
+                        )}
+                        style={{
+                          left: `${leftPct * 100}%`,
+                          width: `${Math.max(widthPct * 100, 0.5)}%`,
+                          top,
+                          height: EVENT_HEIGHT_PX,
+                        }}
+                        title="Occupied by filtered course"
+                      >
+                        <div className="h-full w-full flex items-center justify-center text-[9px] font-semibold uppercase tracking-wide text-slate-500">
+                          Occupied
+                        </div>
+                      </div>
+                    );
+                  })}
                   {calendarDrag?.hasMoved &&
                     calendarDrag.preview &&
                     room.id === calendarDrag.preview.targetRoomId &&
@@ -1374,7 +1518,7 @@ export default function CalendarPage() {
                       );
                     })()}
 
-                  {events.map(({ section, timeslot, start, end, lane }) => {
+                  {visibleEvents.map(({ section, timeslot, start, end, lane }) => {
                 const leftPct =
                   (clamp(start, axisStart, axisEnd) - axisStart) / axisRange;
                 const widthPct =
@@ -1389,6 +1533,9 @@ export default function CalendarPage() {
                     const timeLabel = `${formatTimeAmPm(timeslot?.start_time ?? "00:00")} - ${formatTimeAmPm(timeslot?.end_time ?? "00:00")}`;
                     const color =
                       departmentPaletteByKey.get(departmentColorKey(section)) ?? solidPaletteAt(0);
+                    const matchesHoveredDepartment =
+                      !hoveredDepartmentKey ||
+                      departmentColorKey(section) === hoveredDepartmentKey;
 
                 const isDragSource = calendarDrag?.sectionId === section.id;
                 return (
@@ -1401,6 +1548,10 @@ export default function CalendarPage() {
                       isDragSource &&
                         calendarDrag?.hasMoved &&
                         "opacity-[0.12] pointer-events-none",
+                      !matchesHoveredDepartment && "opacity-35",
+                      hoveredDepartmentKey &&
+                        matchesHoveredDepartment &&
+                        "ring-2 ring-slate-300/80 shadow-md",
                     )}
                     style={{
                       left: `${leftPct * 100}%`,
@@ -1441,7 +1592,7 @@ export default function CalendarPage() {
                         const dist = Math.hypot(e.clientX - prev.startX, e.clientY - prev.startY);
                         const hasMoved = prev.hasMoved || dist > 8;
                         if (!data) return { ...prev, hasMoved };
-                        const draggedE = dayEvents.find(
+                        const draggedE = allDayEvents.find(
                           (x) => x.section.id === prev.sectionId && x.timeslot,
                         );
                         if (!draggedE) return { ...prev, hasMoved };
@@ -1559,11 +1710,15 @@ export default function CalendarPage() {
                   const timeLabelPv = `${formatTimeAmPm(st.start_time)} - ${formatTimeAmPm(st.end_time)}`;
                   const colorPv =
                     departmentPaletteByKey.get(departmentColorKey(section)) ?? solidPaletteAt(0);
+                  const previewMatchesHoveredDepartment =
+                    !hoveredDepartmentKey ||
+                    departmentColorKey(section) === hoveredDepartmentKey;
                   return (
                     <div
                       key="calendar-drag-preview"
                       className={clsx(
                         "absolute pointer-events-none z-[25] border-l-4 rounded-lg p-2.5 flex flex-col justify-between shadow-sm ring-2 ring-[#137fec]/40 ring-inset",
+                        !previewMatchesHoveredDepartment && "opacity-35",
                       )}
                       style={{
                         left: `${leftPct}%`,
