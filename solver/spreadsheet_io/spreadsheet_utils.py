@@ -146,28 +146,86 @@ def serialize_list_cell(values: List[str] | None) -> str:
     return LIST_SEPARATOR.join(str(v).strip() for v in values if str(v).strip())
 
 
-def parse_nested_list_cell(value: Any) -> List[List[str]]:
+def _is_missing_cell(value: Any) -> bool:
     if value is None:
+        return True
+    if isinstance(value, float) and value != value:  # NaN
+        return True
+    try:
+        import pandas as pd
+
+        if pd.isna(value):
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def parse_nested_list_cell(value: Any) -> List[List[str]]:
+    """
+    Parse MeetingPatterns.compatible_timeslot_sets from a spreadsheet cell.
+
+    Canonical text form: alternatives separated by ';', timeslot IDs within one
+    alternative separated by '|', e.g. "B1-M|B1-W;B2-M|B2-F".
+
+    Also accepts list-of-lists (JSON / DB shape) and a flat list of IDs (one set).
+    """
+    if _is_missing_cell(value):
         return []
+    if isinstance(value, (list, tuple)):
+        if not value:
+            return []
+        if all(isinstance(x, (list, tuple)) for x in value):
+            sets: List[List[str]] = []
+            for inner in value:
+                entries = [
+                    str(x).strip()
+                    for x in inner
+                    if str(x).strip() and not _is_missing_cell(x)
+                ]
+                if entries:
+                    sets.append(entries)
+            return sets
+        entries = [
+            str(x).strip()
+            for x in value
+            if str(x).strip() and not _is_missing_cell(x)
+        ]
+        return [entries] if entries else []
+
     text = str(value).strip()
-    if not text:
+    if not text or text.lower() in {"nan", "none"}:
         return []
-    sets: List[List[str]] = []
+    sets = []
     for set_part in text.split(LIST_SEPARATOR):
         set_part = set_part.strip()
         if not set_part:
             continue
-        entries = [part.strip() for part in set_part.split(SET_SEPARATOR) if part.strip()]
+        inner_sep = SET_SEPARATOR if SET_SEPARATOR in set_part else ","
+        entries = [part.strip() for part in set_part.split(inner_sep) if part.strip()]
         if entries:
             sets.append(entries)
     return sets
 
 
-def serialize_nested_list_cell(values: List[List[str]] | None) -> str:
-    if not values:
+def serialize_nested_list_cell(values: Any) -> str:
+    """Write compatible_timeslot_sets as ';'-separated alternatives, '|' within a set."""
+    if _is_missing_cell(values):
         return ""
-    set_strings = []
-    for row in values:
+    if isinstance(values, str):
+        parsed = parse_nested_list_cell(values)
+        return serialize_nested_list_cell(parsed)
+    if not isinstance(values, list) or not values:
+        return ""
+    rows: List[List[str]]
+    if isinstance(values[0], list):
+        rows = values  # type: ignore[assignment]
+    else:
+        rows = [values]  # type: ignore[list-item]
+    set_strings: List[str] = []
+    for row in rows:
+        if not isinstance(row, (list, tuple)):
+            continue
         entries = [str(v).strip() for v in row if str(v).strip()]
         if entries:
             set_strings.append(SET_SEPARATOR.join(entries))

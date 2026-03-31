@@ -388,34 +388,17 @@ def _maybe_int(value: Any) -> int | None:
 
 def _parse_timeslot_sets(value: Any) -> List[List[str]]:
     """
-    Parse a cell into a list of timeslot-id lists.
+    Parse a cell into a list of timeslot-id lists (same rules as spreadsheet_io).
 
-    Accepts forms like:
-    - "slot1|slot2; slot3|slot4"
-    - "slot1,slot2"
-    where ';' separates alternative sets, and ',' or '|' separate IDs within a set.
+    Accepts list-of-lists, a flat list (one set), or text:
+    "slot1|slot2; slot3|slot4" — ';' separates alternatives, '|' or ',' IDs within a set.
     """
-    if value is None or (isinstance(value, float) and pd.isna(value)):
-        return []
-    if isinstance(value, list):
-        # Assume already a list of lists or flat list.
-        if value and isinstance(value[0], list):
-            return value  # type: ignore[return-value]
-        return [list(map(str, value))]
-    s = str(value).strip()
-    if not s:
-        return []
-    sets: List[List[str]] = []
-    for part in s.split(";"):
-        part = part.strip()
-        if not part:
-            continue
-        if "|" in part:
-            ids = [p.strip() for p in part.split("|") if p.strip()]
-        else:
-            ids = [p.strip() for p in part.split(",") if p.strip()]
-        sets.append(ids)
-    return sets
+    try:
+        from spreadsheet_io.spreadsheet_utils import parse_nested_list_cell
+    except ModuleNotFoundError:
+        from spreadsheet_utils import parse_nested_list_cell  # type: ignore[no-redef]
+
+    return parse_nested_list_cell(value)
 
 
 def persist_parsed_data(parsed: ParsedData) -> None:

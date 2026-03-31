@@ -27,7 +27,7 @@ except ModuleNotFoundError:
 
 from spreadsheet_io.export_to_spreadsheet import scheduling_input_to_excel_bytes
 from spreadsheet_io.import_from_spreadsheet import parse_scheduling_input_from_excel_bytes
-from spreadsheet_io.spreadsheet_utils import build_template_bytes
+from spreadsheet_io.spreadsheet_utils import build_template_bytes, parse_nested_list_cell
 
 from model import (
     BlockedTime,
@@ -392,6 +392,8 @@ def _normalize_compatible_timeslot_sets(
     [[6],[7],[8]] so each item is treated as an alternative, not one combined meeting.
     """
     raw_sets = pattern_dict.get("compatible_timeslot_sets", [])
+    if isinstance(raw_sets, str):
+        raw_sets = parse_nested_list_cell(raw_sets)
     cleaned: List[List[str]] = []
     for item in raw_sets if isinstance(raw_sets, list) else []:
         if isinstance(item, list):
