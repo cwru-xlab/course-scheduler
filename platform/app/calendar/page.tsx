@@ -196,26 +196,32 @@ const EVENT_HEIGHT_PX = 70;
 const EVENT_GAP_PX = 8;
 const EVENT_TOP_PADDING_PX = 12;
 const MIN_TRACK_HEIGHT_PX = 240;
-const COURSE_COLOR_CLASSES = [
-  { bg: "bg-[#137fec]/20", border: "border-[#137fec]" },
-  { bg: "bg-emerald-500/20", border: "border-emerald-500" },
-  { bg: "bg-amber-500/20", border: "border-amber-500" },
-  { bg: "bg-rose-500/20", border: "border-rose-500" },
-  { bg: "bg-indigo-500/20", border: "border-indigo-500" },
-  { bg: "bg-cyan-500/20", border: "border-cyan-500" },
-  { bg: "bg-violet-500/20", border: "border-violet-500" },
-  { bg: "bg-orange-500/20", border: "border-orange-500" },
-];
+type DepartmentPalette = {
+  cardBg: string;
+  cardBorder: string;
+  printBg: string;
+  printBorder: string;
+  cardPattern: string;
+};
 
-const COURSE_PRINT_COLORS = [
-  { bg: "#dbeafe", border: "#137fec" },
-  { bg: "#dcfce7", border: "#22c55e" },
-  { bg: "#fef3c7", border: "#f59e0b" },
-  { bg: "#ffe4e6", border: "#f43f5e" },
-  { bg: "#e0e7ff", border: "#6366f1" },
-  { bg: "#cffafe", border: "#06b6d4" },
-  { bg: "#ede9fe", border: "#8b5cf6" },
-  { bg: "#ffedd5", border: "#f97316" },
+const DISTINCT_SOLID_DEPARTMENT_PALETTE: Array<{
+  cardBg: string;
+  cardBorder: string;
+  printBg: string;
+  printBorder: string;
+}> = [
+  { cardBg: "#dbeafe", cardBorder: "#1d4ed8", printBg: "#dbeafe", printBorder: "#1d4ed8" },
+  { cardBg: "#dcfce7", cardBorder: "#16a34a", printBg: "#dcfce7", printBorder: "#16a34a" },
+  { cardBg: "#fef3c7", cardBorder: "#d97706", printBg: "#fef3c7", printBorder: "#d97706" },
+  { cardBg: "#ffe4e6", cardBorder: "#e11d48", printBg: "#ffe4e6", printBorder: "#e11d48" },
+  { cardBg: "#e0e7ff", cardBorder: "#4338ca", printBg: "#e0e7ff", printBorder: "#4338ca" },
+  { cardBg: "#cffafe", cardBorder: "#0891b2", printBg: "#cffafe", printBorder: "#0891b2" },
+  { cardBg: "#ede9fe", cardBorder: "#7c3aed", printBg: "#ede9fe", printBorder: "#7c3aed" },
+  { cardBg: "#ffedd5", cardBorder: "#ea580c", printBg: "#ffedd5", printBorder: "#ea580c" },
+  { cardBg: "#ecfccb", cardBorder: "#4d7c0f", printBg: "#ecfccb", printBorder: "#4d7c0f" },
+  { cardBg: "#fae8ff", cardBorder: "#a21caf", printBg: "#fae8ff", printBorder: "#a21caf" },
+  { cardBg: "#fce7f3", cardBorder: "#be185d", printBg: "#fce7f3", printBorder: "#be185d" },
+  { cardBg: "#fef9c3", cardBorder: "#a16207", printBg: "#fef9c3", printBorder: "#a16207" },
 ];
 
 /** Single normalized key per academic department (not per course). */
@@ -232,22 +238,60 @@ function departmentLegendLabel(section: { department?: string | null; course_id:
   return "Unspecified";
 }
 
-function colorClassForScheduleSection(section: { department?: string | null; course_id: string | number }) {
-  const key = departmentColorKey(section);
+function hashString(value: string): number {
   let hash = 0;
-  for (let i = 0; i < key.length; i += 1) {
-    hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
   }
-  return COURSE_COLOR_CLASSES[hash % COURSE_COLOR_CLASSES.length];
+  return hash;
 }
 
-function printColorForScheduleSection(section: { department?: string | null; course_id: string | number }) {
-  const key = departmentColorKey(section);
-  let hash = 0;
-  for (let i = 0; i < key.length; i += 1) {
-    hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+function paletteForDepartmentKey(key: string, includePattern: boolean): DepartmentPalette {
+  const hash = hashString(key);
+  // Deterministic hue with offsets from hash bits to spread close keys.
+  const hue = (hash * 137.508 + ((hash >>> 8) % 29)) % 360;
+  const sat = 66 + (hash % 10); // 66..75
+  const cardLight = 92 - (hash % 4); // 89..92
+  const borderLight = 42 + (hash % 9); // 42..50
+  const printLight = 90 - (hash % 4); // 87..90
+  const printBorderLight = 38 + (hash % 9); // 38..46
+  const patternFamily = hash % 4;
+
+  let cardPattern = "none";
+  if (includePattern && patternFamily === 1) {
+    // subtle diagonal hatch
+    cardPattern =
+      "repeating-linear-gradient(45deg, rgba(15, 23, 42, 0.05) 0, rgba(15, 23, 42, 0.05) 2px, transparent 2px, transparent 7px)";
+  } else if (includePattern && patternFamily === 2) {
+    // subtle reverse diagonal hatch
+    cardPattern =
+      "repeating-linear-gradient(-45deg, rgba(15, 23, 42, 0.045) 0, rgba(15, 23, 42, 0.045) 2px, transparent 2px, transparent 8px)";
+  } else if (includePattern && patternFamily === 3) {
+    // subtle vertical stripes
+    cardPattern =
+      "repeating-linear-gradient(90deg, rgba(15, 23, 42, 0.045) 0, rgba(15, 23, 42, 0.045) 1px, transparent 1px, transparent 6px)";
   }
-  return COURSE_PRINT_COLORS[hash % COURSE_PRINT_COLORS.length];
+
+  return {
+    cardBg: `hsl(${hue.toFixed(1)} ${sat}% ${cardLight}%)`,
+    cardBorder: `hsl(${hue.toFixed(1)} ${Math.min(sat + 2, 82)}% ${borderLight}%)`,
+    printBg: `hsl(${hue.toFixed(1)} ${Math.max(sat - 8, 45)}% ${printLight}%)`,
+    printBorder: `hsl(${hue.toFixed(1)} ${Math.min(sat + 4, 84)}% ${printBorderLight}%)`,
+    cardPattern,
+  };
+}
+
+function solidPaletteAt(index: number): DepartmentPalette {
+  const swatch = DISTINCT_SOLID_DEPARTMENT_PALETTE[
+    index % DISTINCT_SOLID_DEPARTMENT_PALETTE.length
+  ];
+  return {
+    cardBg: swatch.cardBg,
+    cardBorder: swatch.cardBorder,
+    printBg: swatch.printBg,
+    printBorder: swatch.printBorder,
+    cardPattern: "none",
+  };
 }
 
 export default function CalendarPage() {
@@ -541,24 +585,43 @@ export default function CalendarPage() {
     return map;
   }, [data]);
 
+  const departmentPaletteByKey = useMemo(() => {
+    const map = new Map<string, DepartmentPalette>();
+    if (!data?.sections.length) return map;
+
+    const keys = Array.from(
+      new Set(data.sections.map((section) => departmentColorKey(section))),
+    ).sort((a, b) => a.localeCompare(b));
+
+    const useExpandedPalette = keys.length > DISTINCT_SOLID_DEPARTMENT_PALETTE.length;
+    keys.forEach((key, index) => {
+      map.set(
+        key,
+        useExpandedPalette ? paletteForDepartmentKey(key, true) : solidPaletteAt(index),
+      );
+    });
+
+    return map;
+  }, [data]);
+
   /** One swatch per department code (shared across all courses in that dept). */
   const departmentColorLegend = useMemo(() => {
     if (!data?.sections.length) return [];
     const byKey = new Map<
       string,
-      { colorKey: string; label: string; swatch: { bg: string; border: string } }
+      { colorKey: string; label: string; swatch: DepartmentPalette }
     >();
     for (const s of data.sections) {
       const colorKey = departmentColorKey(s);
       if (byKey.has(colorKey)) continue;
-      const swatch = colorClassForScheduleSection(s);
+      const swatch = departmentPaletteByKey.get(colorKey) ?? solidPaletteAt(0);
       const label = departmentLegendLabel(s);
       byKey.set(colorKey, { colorKey, label, swatch });
     }
     return Array.from(byKey.values()).sort((a, b) =>
       a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
     );
-  }, [data]);
+  }, [data, departmentPaletteByKey]);
 
   const dayEvents = useMemo(() => {
     if (!data) return [];
@@ -1126,11 +1189,12 @@ export default function CalendarPage() {
                 className="flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50/80 px-2.5 py-1.5 mr-1 mb-1"
               >
                 <span
-                  className={clsx(
-                    "h-3.5 w-6 shrink-0 rounded border-l-[3px] shadow-sm",
-                    item.swatch.bg,
-                    item.swatch.border,
-                  )}
+                  className="h-3.5 w-6 shrink-0 rounded border-l-[3px] shadow-sm border border-slate-300/70"
+                  style={{
+                    backgroundColor: item.swatch.cardBg,
+                    backgroundImage: item.swatch.cardPattern,
+                    borderLeftColor: item.swatch.cardBorder,
+                  }}
                   aria-hidden
                 />
                 <span
@@ -1323,7 +1387,8 @@ export default function CalendarPage() {
                 const professor = inst?.name ?? section.instructor_id ?? "—";
                 const title = section.department + " " + section.course_id;
                     const timeLabel = `${formatTimeAmPm(timeslot?.start_time ?? "00:00")} - ${formatTimeAmPm(timeslot?.end_time ?? "00:00")}`;
-                    const color = colorClassForScheduleSection(section);
+                    const color =
+                      departmentPaletteByKey.get(departmentColorKey(section)) ?? solidPaletteAt(0);
 
                 const isDragSource = calendarDrag?.sectionId === section.id;
                 return (
@@ -1336,14 +1401,15 @@ export default function CalendarPage() {
                       isDragSource &&
                         calendarDrag?.hasMoved &&
                         "opacity-[0.12] pointer-events-none",
-                      color.bg,
-                      color.border,
                     )}
                     style={{
                       left: `${leftPct * 100}%`,
                       width: `${Math.max(widthPct * 100, 0.5)}%`,
                       top,
                       height: EVENT_HEIGHT_PX,
+                      backgroundColor: color.cardBg,
+                      backgroundImage: color.cardPattern,
+                      borderLeftColor: color.cardBorder,
                     }}
                     title={`${title} • ${professor} • ${timeLabel} • Room ${room.id}`}
                     onPointerDown={(e) => {
@@ -1491,20 +1557,22 @@ export default function CalendarPage() {
                   const professorPv = instPv?.name ?? section.instructor_id ?? "—";
                   const ttlPv = `${section.department} ${section.course_id}`;
                   const timeLabelPv = `${formatTimeAmPm(st.start_time)} - ${formatTimeAmPm(st.end_time)}`;
-                  const colorPv = colorClassForScheduleSection(section);
+                  const colorPv =
+                    departmentPaletteByKey.get(departmentColorKey(section)) ?? solidPaletteAt(0);
                   return (
                     <div
                       key="calendar-drag-preview"
                       className={clsx(
                         "absolute pointer-events-none z-[25] border-l-4 rounded-lg p-2.5 flex flex-col justify-between shadow-sm ring-2 ring-[#137fec]/40 ring-inset",
-                        colorPv.bg,
-                        colorPv.border,
                       )}
                       style={{
                         left: `${leftPct}%`,
                         width: `${Math.max(widthPct, 0.5)}%`,
                         top: topPx,
                         height: EVENT_HEIGHT_PX,
+                        backgroundColor: colorPv.cardBg,
+                        backgroundImage: colorPv.cardPattern,
+                        borderLeftColor: colorPv.cardBorder,
                       }}
                     >
                       <div className="font-black text-[10px] truncate text-slate-900">{ttlPv}</div>
@@ -1730,7 +1798,8 @@ export default function CalendarPage() {
                             axisRange) *
                           100;
                         const top = EVENT_TOP_PADDING_PX + lane * (EVENT_HEIGHT_PX + EVENT_GAP_PX);
-                        const color = printColorForScheduleSection(section);
+                        const color =
+                          departmentPaletteByKey.get(departmentColorKey(section)) ?? solidPaletteAt(0);
                         const professorName =
                           instructorById.get(section.instructor_id)?.name ??
                           section.instructor_id;
@@ -1745,10 +1814,10 @@ export default function CalendarPage() {
                               width: `${Math.max(widthPct, 0.5)}%`,
                               top,
                               height: EVENT_HEIGHT_PX,
-                              backgroundColor: color.bg,
+                              backgroundColor: color.printBg,
                               borderColor: "#94a3b8",
                               borderLeftWidth: 4,
-                              borderLeftColor: color.border,
+                              borderLeftColor: color.printBorder,
                             }}
                           >
                             {(() => {
