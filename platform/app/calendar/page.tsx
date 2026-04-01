@@ -1605,6 +1605,7 @@ export default function CalendarPage() {
               options={departmentFilterOptions}
               value={selectedDepartmentKeys}
               onChange={setSelectedDepartmentKeys}
+              showSearch
             />
             <MultiSelect
               label="Filter by professors"
@@ -1612,6 +1613,7 @@ export default function CalendarPage() {
               options={professorFilterOptions}
               value={selectedInstructorIds}
               onChange={setSelectedInstructorIds}
+              showSearch
             />
           </div>
           <button
