@@ -278,9 +278,9 @@ def maybe_str(value: Any) -> str | None:
 
 def format_room_number_for_export(value: Any) -> str:
     """
-    Write room_number as text without a trailing decimal (e.g. 101 not 101.0).
+    Canonical string form for room_number (spreadsheet import/export, DB/TS).
 
-    Matches DB/TS string semantics; avoids Excel numeric cells for whole-number room IDs.
+    Numeric Excel cells become floats (101.0); normalize to "101", not "101.0".
     """
     if value is None or _is_missing_cell(value):
         return ""

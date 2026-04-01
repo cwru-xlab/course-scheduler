@@ -8,6 +8,11 @@ import pandas as pd
 
 from model import Course, Instructor, Room, Timeslot, MeetingPattern, Section, db
 
+try:
+    from spreadsheet_io.spreadsheet_utils import format_room_number_for_export
+except ModuleNotFoundError:
+    from spreadsheet_utils import format_room_number_for_export  # type: ignore[no-redef]
+
 
 def _parse_time(value: Any) -> time:
     """
@@ -262,7 +267,7 @@ def parse_excel_to_dicts(excel_bytes: bytes) -> ParsedData:
                 {
                     "id": str(row["id"]),
                     "building": str(row["building"]),
-                    "room_number": str(row.get("room_number", "")),
+                    "room_number": format_room_number_for_export(row.get("room_number", "")),
                     "capacity": int(row["capacity"]),
                     "room_type": str(row.get("room_type", "lecture")),
                     "has_av": bool(row.get("has_av", False)),
