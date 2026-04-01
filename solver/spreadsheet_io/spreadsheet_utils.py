@@ -269,18 +269,11 @@ def maybe_float(value: Any) -> float | None:
         return None
 
 
-def maybe_str(value: Any) -> str | None:
-    if value is None:
-        return None
-    text = str(value).strip()
-    return text or None
-
-
-def format_room_number_for_export(value: Any) -> str:
+def normalize_spreadsheet_string_cell(value: Any) -> str:
     """
-    Canonical string form for room_number (spreadsheet import/export, DB/TS).
+    Canonical string form for IDs, codes, room numbers, and other text cells.
 
-    Numeric Excel cells become floats (101.0); normalize to "101", not "101.0".
+    Excel `data_only` and pandas often yield floats (e.g. 101.0); DB/TS use strings.
     """
     if value is None or _is_missing_cell(value):
         return ""
@@ -301,6 +294,19 @@ def format_room_number_for_export(value: Any) -> str:
     if len(text) >= 3 and text[-2:] == ".0" and text[:-2].lstrip("-").isdigit():
         return text[:-2]
     return text
+
+
+def maybe_str(value: Any) -> str | None:
+    """Optional string from a cell; normalizes Excel/JSON float artifacts."""
+    if value is None:
+        return None
+    text = normalize_spreadsheet_string_cell(value)
+    return text or None
+
+
+def format_room_number_for_export(value: Any) -> str:
+    """Alias for :func:`normalize_spreadsheet_string_cell` (room_number)."""
+    return normalize_spreadsheet_string_cell(value)
 
 
 def build_template_workbook() -> Workbook:

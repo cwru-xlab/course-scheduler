@@ -9,9 +9,9 @@ import pandas as pd
 from model import Course, Instructor, Room, Timeslot, MeetingPattern, Section, db
 
 try:
-    from spreadsheet_io.spreadsheet_utils import format_room_number_for_export
+    from spreadsheet_io.spreadsheet_utils import normalize_spreadsheet_string_cell
 except ModuleNotFoundError:
-    from spreadsheet_utils import format_room_number_for_export  # type: ignore[no-redef]
+    from spreadsheet_utils import normalize_spreadsheet_string_cell  # type: ignore[no-redef]
 
 
 def _parse_time(value: Any) -> time:
@@ -234,7 +234,7 @@ def parse_excel_to_dicts(excel_bytes: bytes) -> ParsedData:
         for _, row in courses_df.iterrows():
             courses.append(
                 {
-                    "id": str(row["id"]),
+                    "id": normalize_spreadsheet_string_cell(row["id"]),
                     "title": str(row["title"]),
                     "department": str(row["department"]),
                     "is_core": bool(row.get("is_core", False)),
@@ -252,9 +252,11 @@ def parse_excel_to_dicts(excel_bytes: bytes) -> ParsedData:
             }
             instructors.append(
                 {
-                    "id": str(row["id"]),
-                    "name": str(row.get("name", "")),
-                    "rank_type": str(row.get("rank_type", "")),
+                    "id": normalize_spreadsheet_string_cell(row["id"]),
+                    "name": normalize_spreadsheet_string_cell(row.get("name", "")),
+                    "rank_type": normalize_spreadsheet_string_cell(
+                        row.get("rank_type", "")
+                    ),
                     "unavailable_times": _split_cell(row.get("unavailable_times")),
                     "preferences": preferences,
                 }
@@ -265,9 +267,11 @@ def parse_excel_to_dicts(excel_bytes: bytes) -> ParsedData:
         for _, row in rooms_df.iterrows():
             rooms.append(
                 {
-                    "id": str(row["id"]),
-                    "building": str(row["building"]),
-                    "room_number": format_room_number_for_export(row.get("room_number", "")),
+                    "id": normalize_spreadsheet_string_cell(row["id"]),
+                    "building": normalize_spreadsheet_string_cell(row["building"]),
+                    "room_number": normalize_spreadsheet_string_cell(
+                        row.get("room_number", "")
+                    ),
                     "capacity": int(row["capacity"]),
                     "room_type": str(row.get("room_type", "lecture")),
                     "has_av": bool(row.get("has_av", False)),
@@ -284,8 +288,10 @@ def parse_excel_to_dicts(excel_bytes: bytes) -> ParsedData:
             slot_type = str(row.get("slot_type", "standard")).strip()
             start = _parse_time(row["start_time"])
             end = _parse_time(row["end_time"])
-            slot_id = str(row.get("id")) if not pd.isna(row.get("id")) else _make_timeslot_id(
-                days, start, end, slot_type
+            slot_id = (
+                normalize_spreadsheet_string_cell(row.get("id"))
+                if not pd.isna(row.get("id"))
+                else _make_timeslot_id(days, start, end, slot_type)
             )
             timeslots.append(
                 {
@@ -304,7 +310,7 @@ def parse_excel_to_dicts(excel_bytes: bytes) -> ParsedData:
         for _, row in meeting_patterns_df.iterrows():
             meeting_patterns.append(
                 {
-                    "id": str(row["id"]),
+                    "id": normalize_spreadsheet_string_cell(row["id"]),
                     "slots_required": int(row["slots_required"]),
                     "allowed_days": _split_cell(row.get("allowed_days")),
                     "compatible_timeslot_sets": _parse_timeslot_sets(
@@ -318,10 +324,12 @@ def parse_excel_to_dicts(excel_bytes: bytes) -> ParsedData:
         for _, row in sections_df.iterrows():
             sections.append(
                 {
-                    "id": str(row["id"]),
-                    "course_id": str(row["course_id"]),
-                    "section_code": str(row["section_code"]),
-                    "instructor_id": str(row["instructor_id"]),
+                    "id": normalize_spreadsheet_string_cell(row["id"]),
+                    "course_id": normalize_spreadsheet_string_cell(row["course_id"]),
+                    "section_code": normalize_spreadsheet_string_cell(row["section_code"]),
+                    "instructor_id": normalize_spreadsheet_string_cell(
+                        row["instructor_id"]
+                    ),
                     "room_id": row.get("room_id") if not pd.isna(row.get("room_id")) else None,
                     "timeslot_id": row.get("timeslot_id")
                     if not pd.isna(row.get("timeslot_id"))
