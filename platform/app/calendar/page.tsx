@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import clsx from "clsx";
 import {
@@ -363,6 +364,45 @@ function solidPaletteAt(index: number): DepartmentPalette {
     printBorder: swatch.printBorder,
     cardPattern: "none",
   };
+}
+
+const CALENDAR_NAVBAR_SLOT_ID = "calendar-navbar-slot";
+
+/** Renders Undo into the sticky navbar (see `Navbar`); only mounted on the calendar page. */
+function CalendarUndoNavbarPortal({
+  canUndo,
+  onUndo,
+}: {
+  canUndo: boolean;
+  onUndo: () => void;
+}) {
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+
+  useLayoutEffect(() => {
+    setSlot(document.getElementById(CALENDAR_NAVBAR_SLOT_ID));
+  }, []);
+
+  if (!slot) return null;
+
+  return createPortal(
+    <button
+      type="button"
+      disabled={!canUndo}
+      onClick={onUndo}
+      className={clsx(
+        "flex items-center justify-center rounded-lg h-9 px-3 text-sm font-bold gap-2 border transition-colors shrink-0",
+        canUndo
+          ? "bg-slate-100 text-slate-900 border-slate-200 hover:bg-slate-200 dark:bg-default-100 dark:text-foreground dark:border-default-200 dark:hover:bg-default-200"
+          : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed dark:bg-default-50 dark:text-default-400",
+      )}
+      title={canUndo ? "Undo last manual calendar change" : "Nothing to undo"}
+      aria-label={canUndo ? "Undo last manual calendar change" : "Nothing to undo"}
+    >
+      <Undo2 className="size-4 shrink-0" aria-hidden />
+      <span className="hidden sm:inline">Undo Last Calendar Edit</span>
+    </button>,
+    slot,
+  );
 }
 
 export default function CalendarPage() {
@@ -1548,6 +1588,7 @@ export default function CalendarPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
+      <CalendarUndoNavbarPortal canUndo={undoStack.length > 0} onUndo={handleUndo} />
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex flex-col">
           <h1 className="text-3xl font-black tracking-tight text-slate-900">
@@ -1558,21 +1599,6 @@ export default function CalendarPage() {
           </p>
         </div>
         <div className="flex gap-3 flex-wrap">
-          <button
-            type="button"
-            disabled={!undoStack.length}
-            onClick={handleUndo}
-            className={clsx(
-              "flex items-center justify-center rounded-lg h-10 px-4 font-bold gap-2 border transition-colors",
-              undoStack.length
-                ? "bg-slate-100 text-slate-900 border-slate-200 hover:bg-slate-200"
-                : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
-            )}
-            title={undoStack.length ? "Undo last manual calendar change" : "Nothing to undo"}
-          >
-            <Undo2 className="size-4" />
-            Undo
-          </button>
           <button
             className="flex items-center justify-center rounded-lg h-10 px-4 bg-slate-100 text-slate-900 font-bold gap-2 border border-slate-200"
             onClick={handleExportPdf}

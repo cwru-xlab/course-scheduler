@@ -85,7 +85,11 @@ export const Navbar = () => {
             </NextLink>
           </nav>
 
-          <div className="flex items-center gap-2" />
+          {/* Calendar page portals the Undo control here so it stays in the sticky header */}
+          <div
+            id="calendar-navbar-slot"
+            className="flex flex-1 items-center justify-end gap-2 md:flex-none md:justify-end"
+          />
         </div>
       </div>
     </header>
