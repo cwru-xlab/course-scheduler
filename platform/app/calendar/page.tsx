@@ -177,6 +177,20 @@ function formatTimeAmPm(hhmm: string): string {
   return `${h12}:${mins.toString().padStart(2, "0")} ${suffix}`;
 }
 
+function formatMinutesAsAmPm(totalMinutes: number): string {
+  const minutes = Math.max(0, Math.round(totalMinutes));
+  const h24 = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  const suffix = h24 >= 12 ? "PM" : "AM";
+  const h12 = ((h24 + 11) % 12) + 1;
+  return `${h12}:${mins.toString().padStart(2, "0")} ${suffix}`;
+}
+
+/** Explicit start–end line for PDF/print (not inferred from the grid). */
+function formatScheduleTimeRange(startMin: number, endMin: number): string {
+  return `${formatMinutesAsAmPm(startMin)} – ${formatMinutesAsAmPm(endMin)}`;
+}
+
 function formatRoomNumberForDisplay(roomNumber?: string): string {
   const value = (roomNumber ?? "").toString().trim();
   if (!value) return "";
@@ -785,6 +799,24 @@ export default function CalendarPage() {
     },
     [selectedDepartmentKeys, selectedInstructorIds],
   );
+
+  /** Shown under the PDF title when department and/or professor filters are active. */
+  const printPdfFilterLines = useMemo(() => {
+    const lines: { key: string; label: string; value: string }[] = [];
+    if (selectedDepartmentKeys.length > 0) {
+      const labels = selectedDepartmentKeys
+        .map((k) => departmentFilterOptions.find((o) => o.key === k)?.label ?? k)
+        .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+      lines.push({ key: "departments", label: "Departments", value: labels.join(", ") });
+    }
+    if (selectedInstructorIds.length > 0) {
+      const labels = selectedInstructorIds
+        .map((id) => professorFilterOptions.find((o) => o.key === id)?.label ?? id)
+        .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+      lines.push({ key: "professors", label: "Professors", value: labels.join(", ") });
+    }
+    return lines;
+  }, [selectedDepartmentKeys, selectedInstructorIds, departmentFilterOptions, professorFilterOptions]);
 
   const departmentPaletteByKey = useMemo(() => {
     const map = new Map<string, DepartmentPalette>();
@@ -2454,99 +2486,106 @@ export default function CalendarPage() {
       <div className="hidden print:block print-calendar">
         {DAYS.map((day) => {
           const printRows = getRoomRowsForDay(day);
+          const printRowsWithEvents = printRows.filter((row) => row.events.length > 0);
           return (
             <div key={`print-${day}`} className="print-page">
-              <h2 className="text-xl font-bold mb-3">Schedule Output Calendar - {day}</h2>
-              <div className="border border-slate-300">
-                <div className="flex bg-slate-50 border-b border-slate-300">
-                  <div className="w-40 flex-shrink-0 border-r border-slate-300 p-2 text-[10px] font-bold uppercase">
-                    Rooms \ Time
-                  </div>
-                  <div className="flex flex-1">
-                    {timeAxisLabels.map((t) => (
-                      <div
-                        key={`${day}-${t}`}
-                        className="flex-1 text-center p-2 border-r border-slate-300 text-[10px] font-bold"
-                      >
-                        {t}
-                      </div>
-                    ))}
-                  </div>
+              <h2 className="text-xl font-bold mb-1">Schedule Output Calendar - {day}</h2>
+              {printPdfFilterLines.length > 0 && (
+                <div className="text-sm text-slate-700 mb-3 space-y-0.5">
+                  {printPdfFilterLines.map((line) => (
+                    <div key={`${day}-${line.key}`}>
+                      <span className="font-semibold">{line.label}: </span>
+                      {line.value}
+                    </div>
+                  ))}
                 </div>
-                {printRows.map(({ room, events, rowHeight }) => (
-                  <div
-                    key={`print-row-${day}-${room.id}`}
-                    className="flex border-b border-slate-200 last:border-b-0"
-                  >
-                    <div className="w-40 flex-shrink-0 border-r border-slate-300 p-2 text-xs">
-                      <div className="font-bold">
-                        {[room.building, formatRoomNumberForDisplay(room.room_number)]
-                          .filter(Boolean)
-                          .join(" ") || room.id}
-                      </div>
-                      <div className="text-[10px] text-slate-600">
-                        Capacity: {room.capacity ?? "N/A"}
-                      </div>
-                    </div>
-                    <div className="flex-1 relative" style={{ minHeight: rowHeight }}>
-                      <div
-                        className="absolute inset-0 grid pointer-events-none"
-                        style={{ gridTemplateColumns: `repeat(${hourSegments}, minmax(0, 1fr))` }}
-                      >
-                        {Array.from({ length: hourSegments }).map((_, j) => (
-                          <div
-                            key={j}
-                            className="border-r border-slate-300/50 last:border-r-0"
-                          />
-                        ))}
-                      </div>
-                      {events.map(({ section, start, end, lane }) => {
-                        const leftPct =
-                          ((clamp(start, axisStart, axisEnd) - axisStart) / axisRange) * 100;
-                        const widthPct =
-                          ((clamp(end, axisStart, axisEnd) -
-                            clamp(start, axisStart, axisEnd)) /
-                            axisRange) *
-                          100;
-                        const top = EVENT_TOP_PADDING_PX + lane * (EVENT_HEIGHT_PX + EVENT_GAP_PX);
-                        const color =
-                          departmentPaletteByKey.get(departmentColorKey(section)) ?? solidPaletteAt(0);
-                        const professorName =
-                          instructorById.get(section.instructor_id)?.name ??
-                          section.instructor_id;
-                        const professorLastName = professorName.trim().split(/\s+/).pop() ?? professorName;
-
-                        return (
-                          <div
-                            key={`print-event-${day}-${section.id}`}
-                            className="absolute border rounded px-2 py-1 text-[10px] leading-tight overflow-hidden"
-                            style={{
-                              left: `${leftPct}%`,
-                              width: `${Math.max(widthPct, 0.5)}%`,
-                              top,
-                              height: EVENT_HEIGHT_PX,
-                              backgroundColor: color.printBg,
-                              borderColor: "#94a3b8",
-                              borderLeftWidth: 4,
-                              borderLeftColor: color.printBorder,
-                            }}
-                          >
-                            {(() => {
-                              const dept = (section.department ?? "").toString().trim();
-                              return (
-                                <div className="font-bold truncate">
-                                  {(dept ? `${dept} ` : "") + section.course_id}
-                                </div>
-                              );
-                            })()}
-                            <div className="truncate">{professorLastName}</div>
+              )}
+              <p className="text-xs text-slate-600 mb-3">
+                Sections are listed by room with full course titles and instructor names. Times are the
+                scheduled start and end for {day}.
+              </p>
+              {printRowsWithEvents.length === 0 ? (
+                <div className="rounded border border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-600">
+                  No sections scheduled for this day (with the current filters).
+                </div>
+              ) : (
+                <div className="border border-slate-300 rounded-sm overflow-hidden">
+                  {printRowsWithEvents.map(({ room, events }) => {
+                    const sorted = [...events].sort(
+                      (a, b) => a.start - b.start || a.lane - b.lane,
+                    );
+                    const roomTitle =
+                      [room.building, formatRoomNumberForDisplay(room.room_number)]
+                        .filter(Boolean)
+                        .join(" ") || room.id;
+                    const renderEventRow = (
+                      event: (typeof sorted)[0],
+                      eventKey: string,
+                    ) => {
+                      const { section, start, end } = event;
+                      const color =
+                        departmentPaletteByKey.get(departmentColorKey(section)) ?? solidPaletteAt(0);
+                      const professorName =
+                        instructorById.get(section.instructor_id)?.name?.trim() ||
+                        section.instructor_id;
+                      const dept = (section.department ?? "").toString().trim();
+                      const courseLine = [dept, String(section.course_id)].filter(Boolean).join(" ");
+                      const sectionBit = section.section_code
+                        ? ` · Section ${section.section_code}`
+                        : "";
+                      return (
+                        <div
+                          key={eventKey}
+                          className="print-event-item flex gap-3 border-b border-slate-200 px-3 py-2.5 text-sm last:border-b-0"
+                          style={{
+                            borderLeftWidth: 4,
+                            borderLeftStyle: "solid",
+                            borderLeftColor: color.printBorder,
+                            backgroundColor: color.printBg,
+                          }}
+                        >
+                          <div className="w-40 shrink-0 text-xs font-semibold leading-snug text-slate-900">
+                            {formatScheduleTimeRange(start, end)}
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                          <div className="min-w-0 flex-1 leading-snug">
+                            <div className="font-bold text-slate-900 break-words">
+                              {courseLine}
+                              {sectionBit}
+                            </div>
+                            <div className="mt-0.5 text-slate-800 break-words">{professorName}</div>
+                          </div>
+                        </div>
+                      );
+                    };
+
+                    return (
+                      <div
+                        key={`print-room-${day}-${room.id}`}
+                        className="print-room-block border-b border-slate-300 last:border-b-0"
+                      >
+                        <div className="print-room-intro">
+                          <div className="print-room-header bg-slate-100 px-3 py-2 text-sm font-bold text-slate-900">
+                            {roomTitle}
+                            <span className="ml-2 font-normal text-slate-600">
+                              · Capacity {room.capacity ?? "N/A"}
+                            </span>
+                          </div>
+                          {renderEventRow(
+                            sorted[0],
+                            `print-event-${day}-${room.id}-${sorted[0].section.id}-0`,
+                          )}
+                        </div>
+                        {sorted.slice(1).map((event, idx) =>
+                          renderEventRow(
+                            event,
+                            `print-event-${day}-${room.id}-${event.section.id}-${idx + 1}`,
+                          ),
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })}
@@ -2584,6 +2623,13 @@ export default function CalendarPage() {
           .print-page:last-child {
             page-break-after: auto;
             break-after: auto;
+          }
+          /* Keep room title + first section together; avoid slicing a section across pages */
+          .print-calendar .print-event-item,
+          .print-calendar .print-room-intro,
+          .print-calendar .print-room-header {
+            break-inside: avoid;
+            page-break-inside: avoid;
           }
         }
       `}</style>
