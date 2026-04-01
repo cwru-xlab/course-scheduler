@@ -6,6 +6,7 @@ import clsx from "clsx";
 import {
   AlertTriangle,
   BarChart3,
+  ExternalLink,
   Filter,
   Maximize2,
   Minimize2,
@@ -18,6 +19,10 @@ import {
 import type { ScheduleSolution, SchedulingInput } from "@/lib/scheduling/types";
 import { MultiSelect } from "@/components/scheduler/MultiSelect";
 import { SCHEDULING_DATA_REFRESH_EVENT } from "@/lib/scheduling/useSchedulingData";
+import {
+  LAST_SOLVER_RUN_STORAGE_KEY,
+  getLatestSolverSnapshot,
+} from "@/lib/scheduling/solverLastSnapshot";
 
 type TimeslotDto = {
   id: string;
@@ -95,8 +100,6 @@ type LastSolverRun = {
   solution: ScheduleSolution;
   createdAt: string;
 };
-
-const LAST_SOLVER_RUN_STORAGE_KEY = "wsom-last-solver-run";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"] as const;
 type Day = (typeof DAYS)[number];
@@ -474,6 +477,39 @@ export default function CalendarPage() {
     if (hoveredDepartmentKey) keys.add(hoveredDepartmentKey);
     return keys;
   }, [hoveredDepartmentKey, selectedLegendDepartmentKeys]);
+
+  const [solverSnapshotHint, setSolverSnapshotHint] = useState<string | null>(null);
+
+  const refreshSolverSnapshotHint = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const snap = getLatestSolverSnapshot();
+    if (!snap) {
+      setSolverSnapshotHint(null);
+      return;
+    }
+    const date = new Date(snap.createdAt).toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+    setSolverSnapshotHint(
+      snap.kind === "success"
+        ? `Latest snapshot: successful run · ${date}`
+        : `Latest snapshot: solver error · ${date}`,
+    );
+  }, []);
+
+  useEffect(() => {
+    refreshSolverSnapshotHint();
+    const onVis = () => {
+      if (document.visibilityState === "visible") refreshSolverSnapshotHint();
+    };
+    window.addEventListener("focus", refreshSolverSnapshotHint);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("focus", refreshSolverSnapshotHint);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [refreshSolverSnapshotHint]);
 
   useEffect(() => {
     let mounted = true;
@@ -2285,17 +2321,27 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        <div className="bg-rose-50 p-6 rounded-xl border border-rose-100 shadow-sm col-span-1 md:col-span-2">
-          <div className="flex items-center gap-2 mb-4">
-            <AlertTriangle className="size-5 text-rose-500" />
-            <h3 className="font-bold text-sm text-rose-900">
-              Conflict Detection (prototype)
+        <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 shadow-sm col-span-1 md:col-span-2">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle className="size-5 text-amber-600" />
+            <h3 className="font-bold text-sm text-slate-900">
+              Solver diagnostics
             </h3>
           </div>
-          <div className="text-[11px] leading-relaxed text-slate-700">
-            This view is a visual schedule representation. Conflict detection can
-            be computed from constraints and solver output in a later step.
-          </div>
+          <p className="text-sm text-slate-600 leading-relaxed mb-4">
+            Open the diagnostics page to review the latest solver run: score, penalties, explanations,
+            and any diagnostic fields returned by the engine (for both successful solves and failures).
+          </p>
+          {solverSnapshotHint && (
+            <p className="text-xs text-slate-500 mb-3">{solverSnapshotHint}</p>
+          )}
+          <Link
+            href="/solver-errors"
+            className="inline-flex items-center gap-2 rounded-lg bg-[#137fec] px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-[#0f6dca] transition-colors"
+          >
+            Open solver diagnostics
+            <ExternalLink className="size-4 opacity-90" aria-hidden />
+          </Link>
         </div>
       </div>
 

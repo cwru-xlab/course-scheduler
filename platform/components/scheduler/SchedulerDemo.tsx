@@ -21,9 +21,22 @@ import {
 } from "./editors/ConstraintsEditors";
 
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
+import {
+  PENALTY_COLOR_LEGEND,
+  formatPenaltyValue,
+  maxNumericPenaltyInBreakdown,
+  orderedPenaltyEntries,
+  penaltyDescriptionForKey,
+  penaltyTitleForKey,
+  penaltyValueColor,
+} from "@/lib/scheduling/penaltyLabels";
 import type { ScheduleSolution, SchedulingInput, ValidationError } from "@/lib/scheduling/types";
+import {
+  LAST_SOLVER_RUN_STORAGE_KEY,
+  type SolverDiagnostics,
+} from "@/lib/scheduling/solverLastSnapshot";
 
-type ApiSuccess = ScheduleSolution & { status: "ok" };
+type ApiSuccess = ScheduleSolution & { status: "ok"; diagnostics?: SolverDiagnostics };
 type ApiError = {
   status: "error";
   errors: ValidationError[];
@@ -40,8 +53,6 @@ type UpdateSectionsApiResponse = UpdateSectionsApiSuccess | UpdateSectionsApiErr
 type ImportSpreadsheetResponse =
   | { status: "ok"; scheduling_input: SchedulingInput }
   | { status: "error"; errors: ValidationError[] };
-
-const LAST_SOLVER_RUN_STORAGE_KEY = "wsom-last-solver-run";
 
 export const SchedulerDemo = () => {
   const router = useRouter();
@@ -197,6 +208,7 @@ export const SchedulerDemo = () => {
             JSON.stringify({
               input: data,
               solution: result,
+              ...(result.diagnostics ? { diagnostics: result.diagnostics } : {}),
               createdAt: new Date().toISOString(),
             }),
           );
@@ -609,13 +621,39 @@ export const SchedulerDemo = () => {
                 <div className="text-4xl font-black text-weatherhead-primary">{solution.total_score.toFixed(0)}</div>
                 <p className="text-slate-400 dark:text-default-400 text-sm font-medium mt-1">Total penalty (lower is better)</p>
               </div>
-              <div className="space-y-4 mt-4">
-                {Object.entries(solution.penalty_breakdown).map(([key, value]) => (
-                  <div key={key} className="flex justify-between text-sm">
-                    <span className="text-slate-600 dark:text-default-500 capitalize">{key.replace(/_/g, " ")}</span>
-                    <span className="font-bold text-slate-900 dark:text-foreground">{value.toFixed(2)}</span>
-                  </div>
-                ))}
+              <p className="text-[10px] leading-snug text-slate-500 dark:text-default-400 mt-2 px-0.5">
+                {PENALTY_COLOR_LEGEND}
+              </p>
+              <div className="space-y-3 mt-2">
+                {(() => {
+                  const pb = solution.penalty_breakdown as Record<string, unknown>;
+                  const maxP = maxNumericPenaltyInBreakdown(pb);
+                  return orderedPenaltyEntries(pb).map(([key, value]) => (
+                    <div
+                      key={key}
+                      className="rounded-lg border border-slate-100 dark:border-default-200 bg-slate-50/80 dark:bg-default-50/50 px-3 py-2"
+                    >
+                      <div className="flex justify-between gap-3 text-sm">
+                        <div className="min-w-0">
+                          <div className="font-semibold text-slate-800 dark:text-foreground">
+                            {penaltyTitleForKey(key)}
+                          </div>
+                          {penaltyDescriptionForKey(key) ? (
+                            <p className="mt-0.5 text-[11px] leading-snug text-slate-500 dark:text-default-400">
+                              {penaltyDescriptionForKey(key)}
+                            </p>
+                          ) : null}
+                        </div>
+                        <span
+                          className="shrink-0 font-mono font-bold tabular-nums"
+                          style={{ color: penaltyValueColor(value, maxP) }}
+                        >
+                          {formatPenaltyValue(value)}
+                        </span>
+                      </div>
+                    </div>
+                  ));
+                })()}
               </div>
             </div>
           </div>

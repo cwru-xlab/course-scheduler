@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { MessageSquare, Reply } from "lucide-react";
 import type { SchedulingInput } from "@/lib/scheduling/types";
+import * as SolverLastSnapshot from "@/lib/scheduling/solverLastSnapshot";
 
 type StoredReply = {
   id: string;
@@ -40,8 +41,6 @@ type RowPreview = {
 
 const STORAGE_PREFIX = "wsom-row-notes::";
 const SCHEDULING_DATA_STORAGE_KEY = "wsom-scheduling-data";
-const LAST_SOLVER_RUN_STORAGE_KEY = "wsom-last-solver-run";
-
 const scopeToRoute: Record<string, string> = {
   sections: "/editor/sections",
   instructors: "/editor/instructors",
@@ -158,7 +157,7 @@ export default function NotesFeedPage() {
     }
 
     try {
-      const rawRun = localStorage.getItem(LAST_SOLVER_RUN_STORAGE_KEY);
+      const rawRun = localStorage.getItem(SolverLastSnapshot.LAST_SOLVER_RUN_STORAGE_KEY);
       if (rawRun) {
         const parsedRun = JSON.parse(rawRun) as { input?: SchedulingInput };
         if (parsedRun?.input) {

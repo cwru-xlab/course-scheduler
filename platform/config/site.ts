@@ -17,6 +17,7 @@ export const siteConfig = {
   navMenuItems: [
     { label: "Editor", href: "/editor/sections" },
     { label: "Calendar", href: "/calendar" },
+    { label: "Solver diagnostics", href: "/solver-errors" },
   ],
   links: {
     github: "https://github.com/",

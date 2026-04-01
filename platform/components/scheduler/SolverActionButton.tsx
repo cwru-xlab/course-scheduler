@@ -11,8 +11,13 @@ import type {
   SchedulingInput,
   ValidationError,
 } from "@/lib/scheduling/types";
+import {
+  LAST_SOLVER_ERROR_STORAGE_KEY,
+  LAST_SOLVER_RUN_STORAGE_KEY,
+  type SolverDiagnostics,
+} from "@/lib/scheduling/solverLastSnapshot";
 
-type ApiSuccess = ScheduleSolution & { status: "ok" };
+type ApiSuccess = ScheduleSolution & { status: "ok"; diagnostics?: SolverDiagnostics };
 type ApiError = {
   status: "error";
   errors: ValidationError[];
@@ -22,9 +27,6 @@ type ApiError = {
     feasible_if_remove_instructor?: { instructor_id: string; section_count: number }[];
   };
 };
-
-const LAST_SOLVER_RUN_STORAGE_KEY = "wsom-last-solver-run";
-const LAST_SOLVER_ERROR_STORAGE_KEY = "wsom-last-solver-error";
 
 export const SolverActionButton = ({ data }: { data: SchedulingInput | null }) => {
   const router = useRouter();
@@ -89,6 +91,7 @@ export const SolverActionButton = ({ data }: { data: SchedulingInput | null }) =
           JSON.stringify({
             input: data,
             solution: result,
+            ...(result.diagnostics ? { diagnostics: result.diagnostics } : {}),
             createdAt: new Date().toISOString(),
           }),
         );
