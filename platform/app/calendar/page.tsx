@@ -634,12 +634,11 @@ export default function CalendarPage() {
     return map;
   }, [data]);
 
-  const axisStart = 7 * 60; // 7:00 AM
+  const axisStart = 8 * 60; // 8:00 AM
   const axisEnd = 22 * 60; // 10:00 PM
   const axisRange = axisEnd - axisStart;
 
   const timeAxisLabels = [
-    "7AM",
     "8AM",
     "9AM",
     "10AM",
