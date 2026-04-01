@@ -276,6 +276,33 @@ def maybe_str(value: Any) -> str | None:
     return text or None
 
 
+def format_room_number_for_export(value: Any) -> str:
+    """
+    Write room_number as text without a trailing decimal (e.g. 101 not 101.0).
+
+    Matches DB/TS string semantics; avoids Excel numeric cells for whole-number room IDs.
+    """
+    if value is None or _is_missing_cell(value):
+        return ""
+    if isinstance(value, bool):
+        return ""
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        if value != value:  # NaN
+            return ""
+        if value == int(value):
+            return str(int(value))
+        return str(value)
+    text = str(value).strip()
+    if text.lower() in {"nan", "none"}:
+        return ""
+    # String that looks like a whole float, e.g. from JSON "101.0"
+    if len(text) >= 3 and text[-2:] == ".0" and text[:-2].lstrip("-").isdigit():
+        return text[:-2]
+    return text
+
+
 def build_template_workbook() -> Workbook:
     wb = Workbook()
     default_ws = wb.active

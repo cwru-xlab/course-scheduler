@@ -8,12 +8,14 @@ from openpyxl import Workbook
 try:
     from spreadsheet_io.spreadsheet_utils import (
         SPREADSHEET_SPECS,
+        format_room_number_for_export,
         serialize_list_cell,
         serialize_nested_list_cell,
     )
 except ModuleNotFoundError:
     from spreadsheet_utils import (  # type: ignore[no-redef]
         SPREADSHEET_SPECS,
+        format_room_number_for_export,
         serialize_list_cell,
         serialize_nested_list_cell,
     )
@@ -80,7 +82,7 @@ def _rows_for_sheet(sheet_name: str, payload: Dict[str, Any]) -> list[Dict[str, 
             {
                 "id": item.get("id", ""),
                 "building": item.get("building", ""),
-                "room_number": item.get("room_number", ""),
+                "room_number": format_room_number_for_export(item.get("room_number", "")),
                 "capacity": item.get("capacity", ""),
                 "features": serialize_list_cell(item.get("features")),
             }
