@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { MessageSquare, Reply } from "lucide-react";
 import type { SchedulingInput } from "@/lib/scheduling/types";
+import { SCHEDULING_DATA_REFRESH_EVENT } from "@/lib/scheduling/useSchedulingData";
 import * as SolverLastSnapshot from "@/lib/scheduling/solverLastSnapshot";
 
 type StoredReply = {
@@ -67,6 +68,50 @@ const scopeToLabel: Record<string, string> = {
   "constraints-soft-locks": "Constraints: Soft Locks",
 };
 
+function getIndexFromRowId(rowId: string): number | null {
+  const lastDash = rowId.lastIndexOf("-");
+  if (lastDash === -1) return null;
+  const maybeIndex = parseInt(rowId.slice(lastDash + 1), 10);
+  return Number.isFinite(maybeIndex) ? maybeIndex : null;
+}
+
+/** True if the feed item's scope/rowId matches a row in the current editor snapshot. */
+function rowExistsInEditorData(item: FeedItem, data: SchedulingInput): boolean {
+  switch (item.scope) {
+    case "sections":
+      return data.sections.some((s) => String(s.id) === item.rowId);
+    case "instructors":
+      return data.instructors.some((s) => String(s.id) === item.rowId);
+    case "rooms":
+      return data.rooms.some((s) => String(s.id) === item.rowId);
+    case "timeslots":
+      return data.timeslots.some((s) => String(s.id) === item.rowId);
+    case "meeting-patterns":
+      return data.meeting_patterns.some((s) => String(s.id) === item.rowId);
+    case "constraints-crosslist-groups":
+      return data.crosslist_groups.some((s) => String(s.id) === item.rowId);
+    case "constraints-no-overlap-groups":
+      return data.no_overlap_groups.some((s) => String(s.id) === item.rowId);
+    case "constraints-blocked-times": {
+      const idx = getIndexFromRowId(item.rowId);
+      if (idx === null) return false;
+      return idx >= 0 && idx < data.blocked_times.length;
+    }
+    case "constraints-locked-assignments": {
+      const idx = getIndexFromRowId(item.rowId);
+      if (idx === null) return false;
+      return idx >= 0 && idx < data.locked_assignments.length;
+    }
+    case "constraints-soft-locks": {
+      const idx = getIndexFromRowId(item.rowId);
+      if (idx === null) return false;
+      return idx >= 0 && idx < data.soft_locks.length;
+    }
+    default:
+      return false;
+  }
+}
+
 /** Opens the row's notes modal on the editor page and focuses the feed item's note/reply. */
 function editorHrefWithNotesModal(item: FeedItem): string {
   const route = scopeToRoute[item.scope] ?? "/editor/sections";
@@ -93,6 +138,8 @@ export default function NotesFeedPage() {
   const [filterScope, setFilterScope] = useState<string>("all");
   const [filterAuthor, setFilterAuthor] = useState<string>("all");
   const [filterKind, setFilterKind] = useState<"all" | "note" | "reply">("all");
+  /** When false, hide feed items whose linked row is no longer in the editor (stale). */
+  const [includeStale, setIncludeStale] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -127,6 +174,7 @@ export default function NotesFeedPage() {
               text: r.note,
               author: r.author,
               createdAt: r.createdAt,
+              completed: n.completed,
               parentNoteId: n.id,
               scope,
               rowId,
@@ -144,29 +192,43 @@ export default function NotesFeedPage() {
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const rawDraft = localStorage.getItem(SCHEDULING_DATA_STORAGE_KEY);
-      if (rawDraft) {
-        const parsedDraft = JSON.parse(rawDraft) as SchedulingInput;
-        setScheduleData(parsedDraft);
-        return;
-      }
-    } catch {
-      // Fall through to other local source.
-    }
-
-    try {
-      const rawRun = localStorage.getItem(SolverLastSnapshot.LAST_SOLVER_RUN_STORAGE_KEY);
-      if (rawRun) {
-        const parsedRun = JSON.parse(rawRun) as { input?: SchedulingInput };
-        if (parsedRun?.input) {
-          setScheduleData(parsedRun.input);
+    const loadScheduleFromStorage = () => {
+      if (typeof window === "undefined") return;
+      try {
+        const rawDraft = localStorage.getItem(SCHEDULING_DATA_STORAGE_KEY);
+        if (rawDraft) {
+          setScheduleData(JSON.parse(rawDraft) as SchedulingInput);
+          return;
         }
+      } catch {
+        // Fall through.
       }
-    } catch {
-      // Feed still works without row preview details.
-    }
+      try {
+        const rawRun = localStorage.getItem(SolverLastSnapshot.LAST_SOLVER_RUN_STORAGE_KEY);
+        if (rawRun) {
+          const parsedRun = JSON.parse(rawRun) as { input?: SchedulingInput };
+          if (parsedRun?.input) {
+            setScheduleData(parsedRun.input);
+            return;
+          }
+        }
+      } catch {
+        // ignore
+      }
+      setScheduleData(null);
+    };
+
+    loadScheduleFromStorage();
+
+    const onRefresh = () => loadScheduleFromStorage();
+    window.addEventListener("focus", onRefresh);
+    window.addEventListener("storage", onRefresh);
+    window.addEventListener(SCHEDULING_DATA_REFRESH_EVENT, onRefresh);
+    return () => {
+      window.removeEventListener("focus", onRefresh);
+      window.removeEventListener("storage", onRefresh);
+      window.removeEventListener(SCHEDULING_DATA_REFRESH_EVENT, onRefresh);
+    };
   }, []);
 
   const groupedCount = useMemo(() => {
@@ -182,9 +244,13 @@ export default function NotesFeedPage() {
       if (filterScope !== "all" && item.scope !== filterScope) return false;
       if (filterAuthor !== "all" && item.author !== filterAuthor) return false;
       if (filterKind !== "all" && item.kind !== filterKind) return false;
+      if (!includeStale && scheduleData !== null) {
+        const isStale = !rowExistsInEditorData(item, scheduleData);
+        if (isStale) return false;
+      }
       return true;
     });
-  }, [feedItems, filterScope, filterAuthor, filterKind]);
+  }, [feedItems, filterScope, filterAuthor, filterKind, includeStale, scheduleData]);
 
   const filteredGroupedCount = useMemo(() => {
     const map = new Map<string, number>();
@@ -199,13 +265,6 @@ export default function NotesFeedPage() {
     for (const item of feedItems) set.add(item.author);
     return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
   }, [feedItems]);
-
-  const getIndexFromRowId = (rowId: string): number | null => {
-    const lastDash = rowId.lastIndexOf("-");
-    if (lastDash === -1) return null;
-    const maybeIndex = parseInt(rowId.slice(lastDash + 1), 10);
-    return Number.isFinite(maybeIndex) ? maybeIndex : null;
-  };
 
   useEffect(() => {
     if (!selectedItem) return;
@@ -364,13 +423,15 @@ export default function NotesFeedPage() {
           <h1 className="text-3xl font-black tracking-tight text-slate-900">Recent Notes & Replies</h1>
           <p className="text-slate-500 mt-1">
             Activity feed ordered by recency. Open a note to view row details; use the link to jump to the editor
-            with that row&apos;s notes modal open.
+            with that row&apos;s notes modal open. Notes tagged{" "}
+            <span className="font-semibold text-slate-700">Stale</span> reference a row that is no longer in the
+            editor (removed or overwritten by import).
           </p>
         </div>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
             <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
               Table
@@ -421,6 +482,26 @@ export default function NotesFeedPage() {
               <option value="reply">Replies</option>
             </select>
           </div>
+
+          <div>
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
+              Stale rows
+            </div>
+            <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm hover:bg-slate-50/80">
+              <input
+                type="checkbox"
+                className="size-4 shrink-0 rounded border-slate-300 text-weatherhead-primary focus:ring-weatherhead-primary/25"
+                checked={includeStale}
+                onChange={(e) => setIncludeStale(e.target.checked)}
+              />
+              <span className="leading-tight">
+                Include stale
+                <span className="mt-0.5 block text-[11px] font-normal text-slate-500">
+                  Toggle to show/hide notes whose row is removed or overwritten from the editor
+                </span>
+              </span>
+            </label>
+          </div>
         </div>
 
         <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -445,9 +526,15 @@ export default function NotesFeedPage() {
               setFilterScope("all");
               setFilterAuthor("all");
               setFilterKind("all");
+              setIncludeStale(false);
             }}
             className="text-xs font-semibold text-slate-600 hover:text-weatherhead-primary transition-colors"
-            disabled={filterScope === "all" && filterAuthor === "all" && filterKind === "all"}
+            disabled={
+              filterScope === "all" &&
+              filterAuthor === "all" &&
+              filterKind === "all" &&
+              !includeStale
+            }
           >
             Clear filters
           </button>
@@ -462,24 +549,39 @@ export default function NotesFeedPage() {
         ) : (
           filteredFeedItems.map((item) => {
             const href = editorHrefWithNotesModal(item);
+            const rowMissingFromEditor =
+              scheduleData !== null && !rowExistsInEditorData(item, scheduleData);
+            const showStatusBadge = typeof item.completed === "boolean";
+            const statusTitle = rowMissingFromEditor
+              ? "The linked row is no longer in the editor (deleted or replaced by import). Status reflects how the note was saved."
+              : undefined;
             return (
               <div
                 key={item.id}
                 className="relative rounded-xl border border-slate-200 bg-white p-4 hover:border-[#137fec]/40 hover:bg-[#137fec]/[0.03] transition-colors"
                 onClick={() => setSelectedItem(item)}
               >
-                {item.kind === "note" && typeof item.completed === "boolean" && (
+                {showStatusBadge && (
                   <div className="absolute top-3 right-3 z-0 pointer-events-none">
-                    <span
-                      className={[
-                        "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold",
-                        item.completed
-                          ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-                          : "bg-amber-50 border-amber-200 text-amber-700",
-                      ].join(" ")}
-                    >
-                      {item.completed ? "Completed" : "Open"}
-                    </span>
+                    {rowMissingFromEditor ? (
+                      <span
+                        className="pointer-events-auto inline-flex items-center rounded-full border border-slate-300 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700"
+                        title={statusTitle}
+                      >
+                        {item.completed ? "Stale - Completed" : "Stale - Open"}
+                      </span>
+                    ) : (
+                      <span
+                        className={[
+                          "pointer-events-auto inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold",
+                          item.completed
+                            ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                            : "bg-amber-50 border-amber-200 text-amber-700",
+                        ].join(" ")}
+                      >
+                        {item.completed ? "Completed" : "Open"}
+                      </span>
+                    )}
                   </div>
                 )}
                 <div className="flex items-start gap-3">
@@ -507,13 +609,22 @@ export default function NotesFeedPage() {
                       {item.text}
                     </div>
                     <div className="mt-2">
-                      <Link
-                        href={href}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-[11px] text-[#137fec] font-semibold hover:underline"
-                      >
-                        Open notes for this row
-                      </Link>
+                      {rowMissingFromEditor ? (
+                        <span
+                          className="text-[11px] font-semibold text-slate-400 line-through decoration-dashed cursor-not-allowed select-none"
+                          aria-disabled="true"
+                        >
+                          Open notes for this row
+                        </span>
+                      ) : (
+                        <Link
+                          href={href}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[11px] text-[#137fec] font-semibold hover:underline"
+                        >
+                          Open notes for this row
+                        </Link>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -559,9 +670,22 @@ export default function NotesFeedPage() {
                 {(() => {
                   const preview = buildRowPreview(selectedItem, scheduleData);
                   if (!preview) {
+                    if (
+                      scheduleData &&
+                      !rowExistsInEditorData(selectedItem, scheduleData)
+                    ) {
+                      return (
+                        <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                          This row is no longer in the current editor data (it may have been deleted
+                          or replaced by an import). The note is kept for your records; use{" "}
+                          <span className="font-semibold">Stale</span> in the feed to spot these.
+                        </div>
+                      );
+                    }
                     return (
                       <div className="mt-2 text-slate-500">
-                        Row details unavailable. You can still open the linked row directly.
+                        Row details unavailable. Load editor data or open the linked row from the
+                        editor.
                       </div>
                     );
                   }
@@ -580,12 +704,22 @@ export default function NotesFeedPage() {
                 })()}
               </div>
               <div className="flex justify-end">
-                <Link
-                  href={editorHrefWithNotesModal(selectedItem)}
-                  className="rounded-lg bg-[#137fec] px-4 py-2 text-white text-sm font-bold hover:opacity-90"
-                >
-                  Open notes for this row
-                </Link>
+                {scheduleData !== null &&
+                !rowExistsInEditorData(selectedItem, scheduleData) ? (
+                  <span
+                    className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-400 line-through decoration-dashed cursor-not-allowed select-none"
+                    aria-disabled="true"
+                  >
+                    Open notes for this row
+                  </span>
+                ) : (
+                  <Link
+                    href={editorHrefWithNotesModal(selectedItem)}
+                    className="rounded-lg bg-[#137fec] px-4 py-2 text-white text-sm font-bold hover:opacity-90"
+                  >
+                    Open notes for this row
+                  </Link>
+                )}
               </div>
             </div>
           </div>
