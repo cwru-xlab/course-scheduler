@@ -226,6 +226,45 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
+function timeslotDurationMinutes(slot: Pick<TimeslotDto, "start_time" | "end_time">): number {
+  return Math.max(0, parseMinutes(slot.end_time) - parseMinutes(slot.start_time));
+}
+
+/**
+ * Calendar background bands: hue encodes meeting length so 50-min, 75-min, and 2h blocks read at a glance.
+ * `emphasis` raises alpha while dragging.
+ */
+function rgbaFillForTimeslotDuration(durationMin: number, emphasis: "normal" | "strong"): string {
+  const d = Math.max(0, durationMin);
+  const a = emphasis === "strong" ? 0.22 : 0.13;
+  if (d <= 60) return `rgba(37, 99, 235, ${a})`;
+  if (d <= 75) return `rgba(8, 145, 178, ${a})`;
+  if (d <= 90) return `rgba(5, 150, 105, ${a})`;
+  if (d <= 105) return `rgba(202, 138, 4, ${a})`;
+  if (d <= 120) return `rgba(234, 88, 12, ${a})`;
+  if (d <= 150) return `rgba(220, 38, 38, ${a})`;
+  return `rgba(124, 58, 237, ${a})`;
+}
+
+function rgbaBorderForTimeslotDuration(durationMin: number): string {
+  const d = Math.max(0, durationMin);
+  if (d <= 60) return "rgba(29, 78, 216, 0.5)";
+  if (d <= 75) return "rgba(14, 116, 144, 0.5)";
+  if (d <= 90) return "rgba(4, 120, 87, 0.5)";
+  if (d <= 105) return "rgba(161, 98, 7, 0.5)";
+  if (d <= 120) return "rgba(194, 65, 12, 0.5)";
+  if (d <= 150) return "rgba(185, 28, 28, 0.5)";
+  return "rgba(109, 40, 217, 0.5)";
+}
+
+const TIMESLOT_DURATION_LEGEND: { label: string; sampleMin: number }[] = [
+  { label: "≤ 60 min", sampleMin: 50 },
+  { label: "61–90 min", sampleMin: 75 },
+  { label: "91–120 min", sampleMin: 105 },
+  { label: "121–150 min", sampleMin: 135 },
+  { label: "> 150 min", sampleMin: 170 },
+];
+
 function selectSlotNearMinutes(
   timeslots: TimeslotDto[],
   selectedDay: Day,
@@ -1748,6 +1787,30 @@ export default function CalendarPage() {
         </div>
       )}
 
+      {calendarDrag?.sectionId && dragPossibleTimeslots.length > 0 && (
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest w-full sm:w-auto">
+              Timeslot length (while dragging)
+            </span>
+            {TIMESLOT_DURATION_LEGEND.map((item) => (
+              <div key={item.label} className="flex items-center gap-2">
+                <span
+                  className="h-3.5 w-6 shrink-0 rounded border border-slate-200/80"
+                  style={{ backgroundColor: rgbaFillForTimeslotDuration(item.sampleMin, "strong") }}
+                  aria-hidden
+                />
+                <span className="text-xs font-semibold text-slate-700">{item.label}</span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[10px] text-slate-500 leading-relaxed">
+            Shaded columns appear only while you drag; colors match slot duration on{" "}
+            <span className="font-semibold">{selectedDay}</span>.
+          </p>
+        </div>
+      )}
+
       {/* Day selector + quick add section */}
       <div className="flex items-center justify-between gap-3">
         <div className="inline-flex items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
@@ -1890,8 +1953,33 @@ export default function CalendarPage() {
                     });
                   }}
                 >
+                  {calendarDrag?.sectionId &&
+                    dragPossibleTimeslots
+                      .filter((slot) => slot.end > axisStart && slot.start < axisEnd)
+                      .map((slot) => {
+                        const durationMin = Math.max(0, slot.end - slot.start);
+                        const leftPct =
+                          (clamp(slot.start, axisStart, axisEnd) - axisStart) / axisRange;
+                        const widthPct =
+                          (clamp(slot.end, axisStart, axisEnd) -
+                            clamp(slot.start, axisStart, axisEnd)) /
+                          axisRange;
+                        return (
+                          <div
+                            key={`${room.id}-ts-band-${slot.id}`}
+                            className="absolute top-0 bottom-0 pointer-events-none"
+                            style={{
+                              left: `${leftPct * 100}%`,
+                              width: `${Math.max(widthPct * 100, 0.5)}%`,
+                              backgroundColor: rgbaFillForTimeslotDuration(durationMin, "strong"),
+                              zIndex: 0,
+                            }}
+                            title={`${formatTimeAmPm(slot.start_time)}–${formatTimeAmPm(slot.end_time)} (${durationMin} min)`}
+                          />
+                        );
+                      })}
                   <div
-                    className="absolute inset-0 grid pointer-events-none"
+                    className="absolute inset-0 grid pointer-events-none z-[1]"
                     style={{ gridTemplateColumns: `repeat(${hourSegments}, minmax(0, 1fr))` }}
                   >
                     {Array.from({ length: hourSegments }).map((_, j) => (
@@ -1901,33 +1989,6 @@ export default function CalendarPage() {
                   />
                 ))}
               </div>
-                  {calendarDrag?.sectionId &&
-                    dragPossibleTimeslots.map((slot) => {
-                      const slotType = (slot.slot_type ?? "").toString().trim().toLowerCase();
-                      const isLong =
-                        slotType === "evening" || slotType === "long" || slotType === "long_block";
-                      const bg = isLong
-                        ? "rgba(250, 204, 21, 0.18)" // light yellow fill
-                        : "rgba(19, 127, 236, 0.14)"; // light blue fill
-                      const leftPct =
-                        (clamp(slot.start, axisStart, axisEnd) - axisStart) / axisRange;
-                      const widthPct =
-                        (clamp(slot.end, axisStart, axisEnd) -
-                          clamp(slot.start, axisStart, axisEnd)) /
-                        axisRange;
-                      return (
-                        <div
-                          key={`${room.id}-slot-fill-${slot.id}`}
-                          className="absolute top-0 bottom-0 pointer-events-none"
-                          style={{
-                            left: `${leftPct * 100}%`,
-                            width: `${Math.max(widthPct * 100, 0.5)}%`,
-                            backgroundColor: bg,
-                            zIndex: 1,
-                          }}
-                        />
-                      );
-                    })}
                   {calendarDrag?.sectionId &&
                     dragPossibleTimeslotBoundaries.map((minute) => {
                       const leftPct = ((minute - axisStart) / axisRange) * 100;
@@ -1980,15 +2041,9 @@ export default function CalendarPage() {
                     (() => {
                       const slot = timeslotById.get(calendarDrag.preview.slotId);
                       if (!slot) return null;
-                      const slotType = (slot.slot_type ?? "").toString().trim().toLowerCase();
-                      const isLong =
-                        slotType === "evening" || slotType === "long" || slotType === "long_block";
-                      const bg = isLong
-                        ? "rgba(250, 204, 21, 0.22)" // light yellow
-                        : "rgba(19, 127, 236, 0.18)"; // light blue
-                      const border = isLong
-                        ? "rgba(234, 179, 8, 0.55)"
-                        : "rgba(19, 127, 236, 0.45)";
+                      const durationMin = timeslotDurationMinutes(slot);
+                      const bg = rgbaFillForTimeslotDuration(durationMin, "strong");
+                      const border = rgbaBorderForTimeslotDuration(durationMin);
                       const slotStartM = parseMinutes(slot.start_time);
                       const slotEndM = parseMinutes(slot.end_time);
                       const leftPct =
