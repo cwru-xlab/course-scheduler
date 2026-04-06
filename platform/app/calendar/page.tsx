@@ -13,6 +13,7 @@ import {
   Minimize2,
   Palette,
   Printer,
+  Redo2,
   Rocket,
   Share2,
   Undo2,
@@ -408,13 +409,17 @@ function solidPaletteAt(index: number): DepartmentPalette {
 
 const CALENDAR_NAVBAR_SLOT_ID = "calendar-navbar-slot";
 
-/** Renders Undo into the sticky navbar (see `Navbar`); only mounted on the calendar page. */
-function CalendarUndoNavbarPortal({
+/** Renders Undo/Redo into the sticky navbar (see `Navbar`); only mounted on the calendar page. */
+function CalendarHistoryNavbarPortal({
   canUndo,
+  canRedo,
   onUndo,
+  onRedo,
 }: {
   canUndo: boolean;
+  canRedo: boolean;
   onUndo: () => void;
+  onRedo: () => void;
 }) {
   const [slot, setSlot] = useState<HTMLElement | null>(null);
 
@@ -425,22 +430,40 @@ function CalendarUndoNavbarPortal({
   if (!slot) return null;
 
   return createPortal(
-    <button
-      type="button"
-      disabled={!canUndo}
-      onClick={onUndo}
-      className={clsx(
-        "flex items-center justify-center rounded-lg h-9 px-3 text-sm font-bold gap-2 border transition-colors shrink-0",
-        canUndo
-          ? "bg-slate-100 text-slate-900 border-slate-200 hover:bg-slate-200 dark:bg-default-100 dark:text-foreground dark:border-default-200 dark:hover:bg-default-200"
-          : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed dark:bg-default-50 dark:text-default-400",
-      )}
-      title={canUndo ? "Undo last manual calendar change" : "Nothing to undo"}
-      aria-label={canUndo ? "Undo last manual calendar change" : "Nothing to undo"}
-    >
-      <Undo2 className="size-4 shrink-0" aria-hidden />
-      <span className="hidden sm:inline">Undo Last Calendar Edit</span>
-    </button>,
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        disabled={!canUndo}
+        onClick={onUndo}
+        className={clsx(
+          "flex items-center justify-center rounded-lg h-9 px-3 text-sm font-bold gap-2 border transition-colors shrink-0",
+          canUndo
+            ? "bg-slate-100 text-slate-900 border-slate-200 hover:bg-slate-200 dark:bg-default-100 dark:text-foreground dark:border-default-200 dark:hover:bg-default-200"
+            : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed dark:bg-default-50 dark:text-default-400",
+        )}
+        title={canUndo ? "Undo last manual calendar change" : "Nothing to undo"}
+        aria-label={canUndo ? "Undo last manual calendar change" : "Nothing to undo"}
+      >
+        <Undo2 className="size-4 shrink-0" aria-hidden />
+        <span className="hidden sm:inline">Undo</span>
+      </button>
+      <button
+        type="button"
+        disabled={!canRedo}
+        onClick={onRedo}
+        className={clsx(
+          "flex items-center justify-center rounded-lg h-9 px-3 text-sm font-bold gap-2 border transition-colors shrink-0",
+          canRedo
+            ? "bg-slate-100 text-slate-900 border-slate-200 hover:bg-slate-200 dark:bg-default-100 dark:text-foreground dark:border-default-200 dark:hover:bg-default-200"
+            : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed dark:bg-default-50 dark:text-default-400",
+        )}
+        title={canRedo ? "Redo last undone calendar change" : "Nothing to redo"}
+        aria-label={canRedo ? "Redo last undone calendar change" : "Nothing to redo"}
+      >
+        <Redo2 className="size-4 shrink-0" aria-hidden />
+        <span className="hidden sm:inline">Redo</span>
+      </button>
+    </div>,
     slot,
   );
 }
@@ -534,8 +557,6 @@ export default function CalendarPage() {
     key: string;
     assignmentsBySection: AssignmentMap;
     solverTimeslotIdsBySection: Record<string, string[]>;
-    dragFeedback: { status: "neutral" | "valid" | "invalid"; message: string | null };
-    dragError: string | null;
     backendSaveMessage: { type: "success" | "error"; text: string } | null;
   };
 
@@ -550,6 +571,8 @@ export default function CalendarPage() {
   >({});
   const [undoStack, setUndoStack] = useState<UndoSnapshot[]>([]);
   const undoStackRef = useRef<UndoSnapshot[]>([]);
+  const [redoStack, setRedoStack] = useState<UndoSnapshot[]>([]);
+  const redoStackRef = useRef<UndoSnapshot[]>([]);
   const [dragError, setDragError] = useState<string | null>(null);
   const [dragFeedback, setDragFeedback] = useState<{
     status: "neutral" | "valid" | "invalid";
@@ -735,6 +758,8 @@ export default function CalendarPage() {
                 setSolverTimeslotIdsBySection(allTimeslotIdsBySection);
                 setUndoStack([]);
                 undoStackRef.current = [];
+                setRedoStack([]);
+                redoStackRef.current = [];
                 setData({
                   sections: sectionsFromSolver,
                   timeslots: timeslotsFromSolver,
@@ -775,6 +800,8 @@ export default function CalendarPage() {
           setBaselineAssignments(fallbackAssignments);
           setUndoStack([]);
           undoStackRef.current = [];
+          setRedoStack([]);
+          redoStackRef.current = [];
           setData(json.data);
         }
       } catch (e) {
@@ -1156,16 +1183,53 @@ export default function CalendarPage() {
     const stack = undoStackRef.current;
     const snapshot = stack[stack.length - 1];
     if (!snapshot) return;
+    const currentSnapshot: UndoSnapshot = {
+      key: stateKeyForUndo(assignmentsBySection, solverTimeslotIdsBySection),
+      assignmentsBySection,
+      solverTimeslotIdsBySection,
+      backendSaveMessage,
+    };
+    const nextRedo = [...redoStackRef.current, currentSnapshot];
+    const trimmedRedo = nextRedo.length > 25 ? nextRedo.slice(nextRedo.length - 25) : nextRedo;
+    redoStackRef.current = trimmedRedo;
+    setRedoStack(trimmedRedo);
     const nextStack = stack.slice(0, -1);
     // Update ref first so a second click can't read a stale stack.
     undoStackRef.current = nextStack;
     setUndoStack(nextStack);
     setAssignmentsBySection(snapshot.assignmentsBySection);
     setSolverTimeslotIdsBySection(snapshot.solverTimeslotIdsBySection);
-    setDragFeedback(snapshot.dragFeedback);
-    setDragError(snapshot.dragError);
+  // Per-move validation feedback is transient; recomputing it on undo avoids stale/confusing messages.
+  setDragFeedback({ status: "neutral", message: null });
+  setDragError(null);
     setBackendSaveMessage(snapshot.backendSaveMessage);
-  }, []);
+  }, [assignmentsBySection, backendSaveMessage, solverTimeslotIdsBySection, stateKeyForUndo]);
+
+  const handleRedo = useCallback(() => {
+    const stack = redoStackRef.current;
+    const snapshot = stack[stack.length - 1];
+    if (!snapshot) return;
+    const currentSnapshot: UndoSnapshot = {
+      key: stateKeyForUndo(assignmentsBySection, solverTimeslotIdsBySection),
+      assignmentsBySection,
+      solverTimeslotIdsBySection,
+      backendSaveMessage,
+    };
+    const nextUndo = [...undoStackRef.current, currentSnapshot];
+    const trimmedUndo = nextUndo.length > 25 ? nextUndo.slice(nextUndo.length - 25) : nextUndo;
+    undoStackRef.current = trimmedUndo;
+    setUndoStack(trimmedUndo);
+
+    const nextRedo = stack.slice(0, -1);
+    redoStackRef.current = nextRedo;
+    setRedoStack(nextRedo);
+
+    setAssignmentsBySection(snapshot.assignmentsBySection);
+    setSolverTimeslotIdsBySection(snapshot.solverTimeslotIdsBySection);
+    setDragFeedback({ status: "neutral", message: null });
+    setDragError(null);
+    setBackendSaveMessage(snapshot.backendSaveMessage);
+  }, [assignmentsBySection, backendSaveMessage, solverTimeslotIdsBySection, stateKeyForUndo]);
 
   const updateLastRunStorage = (
     nextInput: SchedulingInput,
@@ -1287,6 +1351,8 @@ export default function CalendarPage() {
         JSON.stringify([...uniqueNextTimeslotIds].sort()) ===
           JSON.stringify([...(currentAssignment?.timeslot_ids ?? currentTimeslotIds)].sort());
       if (!alreadyPlaced) {
+        setRedoStack([]);
+        redoStackRef.current = [];
         setUndoStack((prev) => {
           const key = stateKeyForUndo(assignmentsBySection, solverTimeslotIdsBySection);
           const lastKey = prev.length ? prev[prev.length - 1]?.key : null;
@@ -1297,8 +1363,6 @@ export default function CalendarPage() {
               key,
               assignmentsBySection,
               solverTimeslotIdsBySection,
-              dragFeedback,
-              dragError,
               backendSaveMessage,
             },
           ];
@@ -1792,7 +1856,12 @@ export default function CalendarPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
-      <CalendarUndoNavbarPortal canUndo={undoStack.length > 0} onUndo={handleUndo} />
+      <CalendarHistoryNavbarPortal
+        canUndo={undoStack.length > 0}
+        canRedo={redoStack.length > 0}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+      />
       <CalendarDragFeedbackToastPortal
         mountedOn={dragFeedbackToastMount}
         dragFeedback={dragFeedback}
