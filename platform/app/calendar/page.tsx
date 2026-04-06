@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import clsx from "clsx";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
   BarChart3,
@@ -226,6 +227,45 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
+function timeslotDurationMinutes(slot: Pick<TimeslotDto, "start_time" | "end_time">): number {
+  return Math.max(0, parseMinutes(slot.end_time) - parseMinutes(slot.start_time));
+}
+
+/**
+ * Calendar background bands: hue encodes meeting length so 50-min, 75-min, and 2h blocks read at a glance.
+ * `emphasis` raises alpha while dragging.
+ */
+function rgbaFillForTimeslotDuration(durationMin: number, emphasis: "normal" | "strong"): string {
+  const d = Math.max(0, durationMin);
+  const a = emphasis === "strong" ? 0.22 : 0.13;
+  if (d <= 60) return `rgba(37, 99, 235, ${a})`;
+  if (d <= 75) return `rgba(8, 145, 178, ${a})`;
+  if (d <= 90) return `rgba(5, 150, 105, ${a})`;
+  if (d <= 105) return `rgba(202, 138, 4, ${a})`;
+  if (d <= 120) return `rgba(234, 88, 12, ${a})`;
+  if (d <= 150) return `rgba(220, 38, 38, ${a})`;
+  return `rgba(124, 58, 237, ${a})`;
+}
+
+function rgbaBorderForTimeslotDuration(durationMin: number): string {
+  const d = Math.max(0, durationMin);
+  if (d <= 60) return "rgba(29, 78, 216, 0.5)";
+  if (d <= 75) return "rgba(14, 116, 144, 0.5)";
+  if (d <= 90) return "rgba(4, 120, 87, 0.5)";
+  if (d <= 105) return "rgba(161, 98, 7, 0.5)";
+  if (d <= 120) return "rgba(194, 65, 12, 0.5)";
+  if (d <= 150) return "rgba(185, 28, 28, 0.5)";
+  return "rgba(109, 40, 217, 0.5)";
+}
+
+const TIMESLOT_DURATION_LEGEND: { label: string; sampleMin: number }[] = [
+  { label: "≤ 60 min", sampleMin: 50 },
+  { label: "61–90 min", sampleMin: 75 },
+  { label: "91–120 min", sampleMin: 105 },
+  { label: "121–150 min", sampleMin: 135 },
+  { label: "> 150 min", sampleMin: 170 },
+];
+
 function selectSlotNearMinutes(
   timeslots: TimeslotDto[],
   selectedDay: Day,
@@ -405,6 +445,61 @@ function CalendarUndoNavbarPortal({
   );
 }
 
+type CalendarDragFeedbackState = {
+  status: "neutral" | "valid" | "invalid";
+  message: string | null;
+};
+
+/** Fixed below the navbar so valid/invalid drag messages stay visible while the calendar scrolls. */
+function CalendarDragFeedbackToastPortal({
+  mountedOn,
+  dragFeedback,
+  dragError,
+}: {
+  mountedOn: HTMLElement | null;
+  dragFeedback: CalendarDragFeedbackState;
+  dragError: string | null;
+}) {
+  if (!mountedOn) return null;
+  const line = dragFeedback.message ?? dragError;
+  const isError = !!dragError || dragFeedback.status === "invalid";
+  const isValid = !dragError && dragFeedback.status === "valid";
+  const toastKey = `${dragFeedback.status}\u001f${dragError ?? ""}\u001f${dragFeedback.message ?? ""}`;
+
+  return createPortal(
+    <AnimatePresence>
+      {line ? (
+        <motion.div
+          key={toastKey}
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none fixed inset-x-0 top-16 z-[45] flex justify-center px-4 sm:px-6 pt-2"
+          initial={{ opacity: 0, y: -12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -12 }}
+          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <div
+            className={clsx(
+              "pointer-events-auto w-full max-w-3xl rounded-xl border px-4 py-3 text-sm font-medium shadow-lg backdrop-blur-md",
+              isError &&
+                "border-red-200 bg-red-50/95 text-red-800 dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-200",
+              isValid &&
+                "border-emerald-200 bg-emerald-50/95 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-100",
+              !isError &&
+                !isValid &&
+                "border-slate-200 bg-white/95 text-slate-800 dark:border-default-200 dark:bg-default-100/95 dark:text-foreground",
+            )}
+          >
+            {line}
+          </div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>,
+    mountedOn,
+  );
+}
+
 export default function CalendarPage() {
   type AssignmentMap = Record<
     string,
@@ -488,6 +583,10 @@ export default function CalendarPage() {
   const [pendingPlacementSectionId, setPendingPlacementSectionId] = useState<string | null>(null);
   const [placementPreview, setPlacementPreview] = useState<PlacementPreview | null>(null);
   const roomTrackRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  /** Vertical scroll container for the room grid (`overflow-y-auto`). */
+  const calendarScrollContainerRef = useRef<HTMLDivElement | null>(null);
+  /** Latest pointer Y during calendar drag (document listener; works when source card is `pointer-events-none`). */
+  const calendarDragPointerYRef = useRef<number | null>(null);
   const suppressCardClickRef = useRef(false);
   const setRoomTrackRef = useCallback((roomId: string, el: HTMLDivElement | null) => {
     roomTrackRefs.current[roomId] = el;
@@ -514,6 +613,11 @@ export default function CalendarPage() {
     if (hoveredDepartmentKey) keys.add(hoveredDepartmentKey);
     return keys;
   }, [hoveredDepartmentKey, selectedLegendDepartmentKeys]);
+
+  const [dragFeedbackToastMount, setDragFeedbackToastMount] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    setDragFeedbackToastMount(document.body);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -1008,6 +1112,9 @@ export default function CalendarPage() {
     });
   }, [allEventsByRoom, data, sectionMatchesFilters]);
 
+  const calendarRoomRowsRef = useRef(roomRows);
+  calendarRoomRowsRef.current = roomRows;
+
   const getRoomRowsForDay = (day: Day) => {
     if (!data) return [];
     const events = getDayEvents(day);
@@ -1278,6 +1385,103 @@ export default function CalendarPage() {
     },
     [axisRange, axisStart],
   );
+
+  const activeCalendarDragPointerId = calendarDrag?.pointerId;
+
+  useEffect(() => {
+    if (activeCalendarDragPointerId == null) {
+      calendarDragPointerYRef.current = null;
+      return;
+    }
+    const pointerId = activeCalendarDragPointerId;
+    const onPointerMoveDoc = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      calendarDragPointerYRef.current = ev.clientY;
+    };
+    document.addEventListener("pointermove", onPointerMoveDoc, { capture: true });
+
+    const edgePx = 120;
+    const maxStep = 48;
+    let rafId = 0;
+    let stopped = false;
+
+    const tick = () => {
+      if (stopped) return;
+      const y = calendarDragPointerYRef.current;
+      if (y != null) {
+        const rows = calendarRoomRowsRef.current;
+        const firstRoomId = rows[0]?.room.id;
+        const lastRoomId = rows[rows.length - 1]?.room.id;
+        const inner = calendarScrollContainerRef.current;
+        const headerEl = typeof document !== "undefined" ? document.querySelector("header") : null;
+        const navbarBottom = headerEl ? headerEl.getBoundingClientRect().bottom : 64;
+        const vh = typeof window !== "undefined" ? window.innerHeight : 0;
+        const innerRect = inner?.getBoundingClientRect();
+
+        let upIntensity = 0;
+        if (y < navbarBottom + edgePx) {
+          upIntensity = Math.max(upIntensity, clamp((navbarBottom + edgePx - y) / edgePx, 0, 1));
+        }
+        if (innerRect && y < innerRect.top + edgePx) {
+          upIntensity = Math.max(
+            upIntensity,
+            clamp((innerRect.top + edgePx - y) / edgePx, 0, 1),
+          );
+        }
+
+        let downIntensity = 0;
+        if (y > vh - edgePx) {
+          downIntensity = Math.max(downIntensity, clamp((y - (vh - edgePx)) / edgePx, 0, 1));
+        }
+        if (innerRect && y > innerRect.bottom - edgePx) {
+          downIntensity = Math.max(
+            downIntensity,
+            clamp((y - (innerRect.bottom - edgePx)) / edgePx, 0, 1),
+          );
+        }
+
+        if (upIntensity > 0) {
+          const step = maxStep * upIntensity * upIntensity;
+          if (inner && inner.scrollTop > 0) {
+            inner.scrollTop = Math.max(0, inner.scrollTop - step);
+          }
+          const firstTrack = firstRoomId ? roomTrackRefs.current[firstRoomId] : null;
+          if (firstTrack) {
+            const firstTop = firstTrack.getBoundingClientRect().top;
+            if (firstTop < navbarBottom - 0.5) {
+              window.scrollBy(0, -step);
+            }
+          }
+        }
+
+        if (downIntensity > 0) {
+          const step = maxStep * downIntensity * downIntensity;
+          if (inner) {
+            const maxInner = inner.scrollHeight - inner.clientHeight;
+            if (inner.scrollTop < maxInner - 0.5) {
+              inner.scrollTop = Math.min(maxInner, inner.scrollTop + step);
+            }
+          }
+          const lastTrack = lastRoomId ? roomTrackRefs.current[lastRoomId] : null;
+          if (lastTrack) {
+            const lastBottom = lastTrack.getBoundingClientRect().bottom;
+            if (lastBottom > vh - 0.5) {
+              window.scrollBy(0, step);
+            }
+          }
+        }
+      }
+      rafId = window.requestAnimationFrame(tick);
+    };
+    rafId = window.requestAnimationFrame(tick);
+
+    return () => {
+      stopped = true;
+      window.cancelAnimationFrame(rafId);
+      document.removeEventListener("pointermove", onPointerMoveDoc, { capture: true });
+      calendarDragPointerYRef.current = null;
+    };
+  }, [activeCalendarDragPointerId]);
 
   const evaluatePlacement = useCallback(
     (sectionId: string, targetRoomId: string, slot: TimeslotWithMinutes) => {
@@ -1589,6 +1793,11 @@ export default function CalendarPage() {
   return (
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
       <CalendarUndoNavbarPortal canUndo={undoStack.length > 0} onUndo={handleUndo} />
+      <CalendarDragFeedbackToastPortal
+        mountedOn={dragFeedbackToastMount}
+        dragFeedback={dragFeedback}
+        dragError={dragError}
+      />
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex flex-col">
           <h1 className="text-3xl font-black tracking-tight text-slate-900">
@@ -1748,6 +1957,30 @@ export default function CalendarPage() {
         </div>
       )}
 
+      {calendarDrag?.sectionId && dragPossibleTimeslots.length > 0 && (
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest w-full sm:w-auto">
+              Timeslot length (while dragging)
+            </span>
+            {TIMESLOT_DURATION_LEGEND.map((item) => (
+              <div key={item.label} className="flex items-center gap-2">
+                <span
+                  className="h-3.5 w-6 shrink-0 rounded border border-slate-200/80"
+                  style={{ backgroundColor: rgbaFillForTimeslotDuration(item.sampleMin, "strong") }}
+                  aria-hidden
+                />
+                <span className="text-xs font-semibold text-slate-700">{item.label}</span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[10px] text-slate-500 leading-relaxed">
+            Shaded columns appear only while you drag; colors match slot duration on{" "}
+            <span className="font-semibold">{selectedDay}</span>.
+          </p>
+        </div>
+      )}
+
       {/* Day selector + quick add section */}
       <div className="flex items-center justify-between gap-3">
         <div className="inline-flex items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
@@ -1791,18 +2024,6 @@ export default function CalendarPage() {
             : "bg-white border-slate-200",
         )}
       >
-        {(dragFeedback.message || dragError) && (
-          <div
-            className={clsx(
-              "border-b px-4 py-3 text-sm font-medium",
-              dragFeedback.status === "valid"
-                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                : "border-red-200 bg-red-50 text-red-700",
-            )}
-          >
-            {dragFeedback.message ?? dragError}
-          </div>
-        )}
         <div className="flex bg-slate-50 border-b border-slate-200">
           <div className="w-40 flex-shrink-0 border-r border-slate-200 p-4 font-bold text-[10px] uppercase text-slate-500 tracking-widest">
             Rooms \ Time
@@ -1819,7 +2040,7 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto relative">
+        <div ref={calendarScrollContainerRef} className="flex-1 overflow-y-auto relative">
           <div className="flex border-b border-slate-200/80 min-h-[240px]">
             <div className="w-40 flex-shrink-0 border-r border-slate-200 bg-slate-50/30">
               {roomRows.map(({ room, rowHeight }) => {
@@ -1890,8 +2111,33 @@ export default function CalendarPage() {
                     });
                   }}
                 >
+                  {calendarDrag?.sectionId &&
+                    dragPossibleTimeslots
+                      .filter((slot) => slot.end > axisStart && slot.start < axisEnd)
+                      .map((slot) => {
+                        const durationMin = Math.max(0, slot.end - slot.start);
+                        const leftPct =
+                          (clamp(slot.start, axisStart, axisEnd) - axisStart) / axisRange;
+                        const widthPct =
+                          (clamp(slot.end, axisStart, axisEnd) -
+                            clamp(slot.start, axisStart, axisEnd)) /
+                          axisRange;
+                        return (
+                          <div
+                            key={`${room.id}-ts-band-${slot.id}`}
+                            className="absolute top-0 bottom-0 pointer-events-none"
+                            style={{
+                              left: `${leftPct * 100}%`,
+                              width: `${Math.max(widthPct * 100, 0.5)}%`,
+                              backgroundColor: rgbaFillForTimeslotDuration(durationMin, "strong"),
+                              zIndex: 0,
+                            }}
+                            title={`${formatTimeAmPm(slot.start_time)}–${formatTimeAmPm(slot.end_time)} (${durationMin} min)`}
+                          />
+                        );
+                      })}
                   <div
-                    className="absolute inset-0 grid pointer-events-none"
+                    className="absolute inset-0 grid pointer-events-none z-[1]"
                     style={{ gridTemplateColumns: `repeat(${hourSegments}, minmax(0, 1fr))` }}
                   >
                     {Array.from({ length: hourSegments }).map((_, j) => (
@@ -1901,33 +2147,6 @@ export default function CalendarPage() {
                   />
                 ))}
               </div>
-                  {calendarDrag?.sectionId &&
-                    dragPossibleTimeslots.map((slot) => {
-                      const slotType = (slot.slot_type ?? "").toString().trim().toLowerCase();
-                      const isLong =
-                        slotType === "evening" || slotType === "long" || slotType === "long_block";
-                      const bg = isLong
-                        ? "rgba(250, 204, 21, 0.18)" // light yellow fill
-                        : "rgba(19, 127, 236, 0.14)"; // light blue fill
-                      const leftPct =
-                        (clamp(slot.start, axisStart, axisEnd) - axisStart) / axisRange;
-                      const widthPct =
-                        (clamp(slot.end, axisStart, axisEnd) -
-                          clamp(slot.start, axisStart, axisEnd)) /
-                        axisRange;
-                      return (
-                        <div
-                          key={`${room.id}-slot-fill-${slot.id}`}
-                          className="absolute top-0 bottom-0 pointer-events-none"
-                          style={{
-                            left: `${leftPct * 100}%`,
-                            width: `${Math.max(widthPct * 100, 0.5)}%`,
-                            backgroundColor: bg,
-                            zIndex: 1,
-                          }}
-                        />
-                      );
-                    })}
                   {calendarDrag?.sectionId &&
                     dragPossibleTimeslotBoundaries.map((minute) => {
                       const leftPct = ((minute - axisStart) / axisRange) * 100;
@@ -1980,15 +2199,9 @@ export default function CalendarPage() {
                     (() => {
                       const slot = timeslotById.get(calendarDrag.preview.slotId);
                       if (!slot) return null;
-                      const slotType = (slot.slot_type ?? "").toString().trim().toLowerCase();
-                      const isLong =
-                        slotType === "evening" || slotType === "long" || slotType === "long_block";
-                      const bg = isLong
-                        ? "rgba(250, 204, 21, 0.22)" // light yellow
-                        : "rgba(19, 127, 236, 0.18)"; // light blue
-                      const border = isLong
-                        ? "rgba(234, 179, 8, 0.55)"
-                        : "rgba(19, 127, 236, 0.45)";
+                      const durationMin = timeslotDurationMinutes(slot);
+                      const bg = rgbaFillForTimeslotDuration(durationMin, "strong");
+                      const border = rgbaBorderForTimeslotDuration(durationMin);
                       const slotStartM = parseMinutes(slot.start_time);
                       const slotEndM = parseMinutes(slot.end_time);
                       const leftPct =
@@ -2111,6 +2324,7 @@ export default function CalendarPage() {
                       if (!solverInput || e.button !== 0) return;
                       e.stopPropagation();
                       e.preventDefault();
+                      calendarDragPointerYRef.current = e.clientY;
                       const targetEl = e.currentTarget;
                       targetEl.setPointerCapture(e.pointerId);
                       setDragError(null);

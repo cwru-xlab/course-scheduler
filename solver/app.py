@@ -1,5 +1,6 @@
 from datetime import datetime
 import os
+import re
 from importlib import import_module
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -257,7 +258,7 @@ def _timeslot_days(timeslots: List[Timeslot]) -> Dict[str, str]:
             # fallback to attribute access
             slot_dict = {"id": getattr(slot, "id", None), "day": getattr(slot, "day", None)}
         slot_id = slot_dict.get("id")
-        day = slot_dict.get("day")
+        day = slot_dict.get("day") or slot_dict.get("days")
         if slot_id is not None and day is not None:
             result[slot_id] = day
     return result
@@ -350,41 +351,72 @@ def _has_required_features(room, required: List[str]) -> bool:
 def _build_overlapping_timeslot_pairs(timeslots: List) -> set:
     """Build a set of (ts_id_a, ts_id_b) pairs where the two timeslots overlap in time on the same day.
 
-    Two timeslots overlap if they share at least one day and their time ranges intersect.
+    Two timeslots overlap if they share at least one day AND their time ranges intersect.
+    Multi-day strings (e.g. "MWF", "TR", "Monday,Wednesday") are expanded into
+    individual day tokens so that e.g. "MWF" and "MW" are correctly recognised as
+    sharing days Monday and Wednesday.
     Only pairs where ts_id_a < ts_id_b are included to avoid duplicates.
     """
-    slot_info: List[Tuple[str, str, str, str]] = []  # (id, day, start, end)
+    # (id, frozenset_of_day_tokens, start_str, end_str)
+    slot_info: List[Tuple[str, frozenset, str, str]] = []
     for ts in timeslots:
         d = ts.to_dict() if hasattr(ts, "to_dict") else ts
         if not isinstance(d, dict):
             continue
         ts_id = str(d.get("id", ""))
-        day = d.get("day") or d.get("days") or ""
+        raw_day = d.get("day") or d.get("days") or ""
         start = d.get("start_time", "")
         end = d.get("end_time", "")
-        # Normalize to string for comparison
+        # Normalize times to strings for comparison
         if hasattr(start, "strftime"):
             start = start.strftime("%H:%M")
         if hasattr(end, "strftime"):
             end = end.strftime("%H:%M")
-        slot_info.append((ts_id, str(day), str(start), str(end)))
-
-    # Group by day for efficient pairwise comparison
-    from collections import defaultdict
-    by_day: Dict[str, List[Tuple[str, str, str]]] = defaultdict(list)
-    for ts_id, day, start, end in slot_info:
-        by_day[day].append((ts_id, start, end))
+        # Expand multi-day strings into individual day tokens using the existing
+        # _normalize_day_tokens helper so all formats are handled uniformly.
+        day_tokens = _normalize_day_tokens(raw_day)
+        slot_info.append((ts_id, frozenset(day_tokens), str(start), str(end)))
 
     overlaps: set = set()
-    for day, slots in by_day.items():
-        for i in range(len(slots)):
-            for j in range(i + 1, len(slots)):
-                id_a, start_a, end_a = slots[i]
-                id_b, start_b, end_b = slots[j]
-                if start_a < end_b and start_b < end_a:
-                    pair = (min(id_a, id_b), max(id_a, id_b))
-                    overlaps.add(pair)
+    for i in range(len(slot_info)):
+        id_a, days_a, start_a, end_a = slot_info[i]
+        for j in range(i + 1, len(slot_info)):
+            id_b, days_b, start_b, end_b = slot_info[j]
+            # Only check time overlap if the two slots share at least one day.
+            if days_a & days_b and start_a < end_b and start_b < end_a:
+                pair = (min(id_a, id_b), max(id_a, id_b))
+                overlaps.add(pair)
     return overlaps
+
+
+_COMPACT_SCHEDULE_DAYS_RE = re.compile(r"^[MTWRFSU]+$", re.IGNORECASE)
+
+_FULL_DAY_NAME_TO_CODE = {
+    "monday": "M",
+    "tuesday": "T",
+    "wednesday": "W",
+    "thursday": "R",
+    "friday": "F",
+    "saturday": "S",
+    "sunday": "U",
+}
+
+
+def _expand_schedule_day_token(token: str) -> set:
+    """Turn one day field token into single-letter codes (M,T,W,R,F,S,U).
+
+    Handles compact academic strings like MWF, TR, MW next to comma-separated
+    or list forms like M, W, F.
+    """
+    t = token.strip()
+    if not t:
+        return set()
+    key = t.lower().replace(".", "")
+    if key in _FULL_DAY_NAME_TO_CODE:
+        return {_FULL_DAY_NAME_TO_CODE[key]}
+    if _COMPACT_SCHEDULE_DAYS_RE.fullmatch(t):
+        return {c.upper() for c in t}
+    return {t}
 
 
 def _normalize_day_tokens(value: Any) -> set:
@@ -396,7 +428,11 @@ def _normalize_day_tokens(value: Any) -> set:
     else:
         normalized = str(value).replace("/", ",")
         tokens = [part.strip() for part in normalized.split(",")]
-    return {token for token in tokens if token}
+    out: set = set()
+    for token in tokens:
+        if token:
+            out.update(_expand_schedule_day_token(token))
+    return out
 
 
 def _normalize_compatible_timeslot_sets(
@@ -846,6 +882,8 @@ def _check_feasible(
             timeslot_dict.get("id") if isinstance(timeslot_dict, dict) else timeslot.id
         )
 
+    overlapping_pairs_feas = _build_overlapping_timeslot_pairs(input_data.timeslots)
+
     if "room_conflicts" not in relax:
         for room in input_data.rooms:
             room_id = (_room_to_dict(room)).get("id")
@@ -855,6 +893,20 @@ def _check_feasible(
                     continue
                 vars_for_slot = [var for _, _, var in entries]
                 model.Add(sum(vars_for_slot) <= 1)
+            for ts_a, ts_b in overlapping_pairs_feas:
+                entries_a = vars_by_room_timeslot.get((room_id, ts_a))
+                entries_b = vars_by_room_timeslot.get((room_id, ts_b))
+                if not entries_a or not entries_b:
+                    continue
+                merged_vars: List[cp_model.IntVar] = []
+                seen_var: set[int] = set()
+                for _, _, v in entries_a + entries_b:
+                    vid = id(v)
+                    if vid not in seen_var:
+                        seen_var.add(vid)
+                        merged_vars.append(v)
+                if len(merged_vars) > 1:
+                    model.Add(sum(merged_vars) <= 1)
 
     if "instructor_conflicts" not in relax:
         for instructor in input_data.instructors:
@@ -863,6 +915,11 @@ def _check_feasible(
                 vars_for_slot = vars_by_instructor_timeslot.get((instructor_id, timeslot_id))
                 if vars_for_slot and len(vars_for_slot) > 1:
                     model.Add(sum(vars_for_slot) <= 1)
+            for ts_a, ts_b in overlapping_pairs_feas:
+                vars_a = vars_by_instructor_timeslot.get((instructor_id, ts_a), [])
+                vars_b = vars_by_instructor_timeslot.get((instructor_id, ts_b), [])
+                if vars_a and vars_b:
+                    model.Add(sum(vars_a) + sum(vars_b) <= 1)
 
     if "no_overlap_groups" not in relax:
         for group in input_data.no_overlap_groups:
@@ -1727,18 +1784,36 @@ def _solve_schedule(input_data: SchedulingInput):
     status = solver.Solve(model)
     print(f"[solve] Solver finished, status={solver.StatusName(status)}", flush=True)
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-        diagnostics = {
-            **_diagnose_infeasibility(input_data),
+        base_diag = {
             **_build_run_diagnostics(input_data, options_by_section),
+            "cp_sat_status": solver.StatusName(status),
         }
+        # UNKNOWN usually means the time limit was hit before a feasible solution
+        # was found — not a proof of infeasibility. Running _diagnose_infeasibility
+        # in that case suggests removing many instructors even when the instance
+        # is solvable with more search time or a looser model.
+        if status == cp_model.INFEASIBLE:
+            diagnostics = {**_diagnose_infeasibility(input_data), **base_diag}
+            err_code, err_msg = "infeasible", "No feasible schedule exists under the current constraints."
+        elif status == cp_model.UNKNOWN:
+            diagnostics = base_diag
+            err_code, err_msg = (
+                "solver_timeout",
+                (
+                    "The solver stopped before finding a schedule (often the time limit). "
+                    "Tighter room sets make this more likely; try increasing the solver time "
+                    "or relaxing constraints — the problem may still be feasible."
+                ),
+            )
+        else:
+            diagnostics = base_diag
+            err_code, err_msg = (
+                "solver_failed",
+                f"Solver finished with status {solver.StatusName(status)}.",
+            )
         return {
             "status": "error",
-            "errors": [
-                {
-                    "code": "infeasible",
-                    "message": "No feasible schedule found."
-                }
-            ],
+            "errors": [{"code": err_code, "message": err_msg}],
             "diagnostics": diagnostics,
         }
 
