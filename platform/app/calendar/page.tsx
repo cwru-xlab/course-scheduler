@@ -8,6 +8,7 @@ import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
+  Archive,
   BarChart3,
   Filter,
   Lock,
@@ -16,6 +17,7 @@ import {
   Palette,
   Printer,
   Rocket,
+  Save,
   Share2,
   Unlock,
   Undo2,
@@ -26,6 +28,12 @@ import type {
   SchedulingInput,
 } from "@/lib/scheduling/types";
 import { MultiSelect } from "@/components/scheduler/MultiSelect";
+import {
+  LAST_SOLVER_ERROR_STORAGE_KEY,
+  LAST_SOLVER_RUN_STORAGE_KEY,
+  saveScheduleToHistory,
+  type LastSolverRunSnapshot,
+} from "@/lib/scheduling/history";
 import { SCHEDULING_DATA_REFRESH_EVENT } from "@/lib/scheduling/useSchedulingData";
 
 type TimeslotDto = {
@@ -99,16 +107,22 @@ type SectionFormDraft = {
   tags: string;
 };
 
-type LastSolverRun = {
-  input: SchedulingInput;
-  solution: ScheduleSolution;
-  createdAt: string;
-  /** Section IDs marked locked in the calendar UI (includes cross-list peers). */
+type LastSolverRun = LastSolverRunSnapshot & {
+  // Backward compatibility for older snapshots without optional locks.
   lockedSectionIds?: string[];
 };
 
-const LAST_SOLVER_RUN_STORAGE_KEY = "wsom-last-solver-run";
-const LAST_SOLVER_ERROR_STORAGE_KEY = "wsom-last-solver-error";
+type SaveScheduleDraft = {
+  name: string;
+  scheduleDate: string;
+};
+
+type SaveScheduleModalState = {
+  isOpen: boolean;
+  isSaving: boolean;
+  error: string | null;
+  draft: SaveScheduleDraft;
+};
 
 type CalendarAssignmentMap = Record<
   string,
@@ -163,6 +177,14 @@ function normalizeAssignmentMapEntry(
     room_id: (fromMap?.room_id ?? section.room_id ?? "").trim(),
     meeting_pattern_id: fromMap?.meeting_pattern_id ?? "",
   };
+}
+
+function todayAsIsoDate(): string {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"] as const;
@@ -577,6 +599,15 @@ export default function CalendarPage() {
     clientY: number;
     sectionId: string;
   } | null>(null);
+  const [saveScheduleModal, setSaveScheduleModal] = useState<SaveScheduleModalState>({
+    isOpen: false,
+    isSaving: false,
+    error: null,
+    draft: {
+      name: "",
+      scheduleDate: todayAsIsoDate(),
+    },
+  });
 
   const stateKeyForUndo = useCallback(
     (
@@ -2093,6 +2124,129 @@ export default function CalendarPage() {
     validateSectionDraft,
   ]);
 
+  const openSaveScheduleModal = useCallback(() => {
+    const now = new Date();
+    const defaultName = `Schedule ${now.toLocaleDateString()} ${now.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`;
+    setSaveScheduleModal({
+      isOpen: true,
+      isSaving: false,
+      error: null,
+      draft: {
+        name: defaultName,
+        scheduleDate: todayAsIsoDate(),
+      },
+    });
+  }, []);
+
+  const closeSaveScheduleModal = useCallback(() => {
+    setSaveScheduleModal((prev) => ({ ...prev, isOpen: false, error: null }));
+  }, []);
+
+  const updateSaveScheduleDraft = useCallback(
+    (patch: Partial<SaveScheduleDraft>) => {
+      setSaveScheduleModal((prev) => ({
+        ...prev,
+        draft: { ...prev.draft, ...patch },
+      }));
+    },
+    [],
+  );
+
+  const buildSnapshotFromCurrentView = useCallback(
+    async (): Promise<LastSolverRunSnapshot> => {
+      let inputForSnapshot: SchedulingInput | null = solverInput;
+      if (!inputForSnapshot) {
+        const res = await fetch("/api/data", { method: "GET" });
+        const json = (await res.json()) as
+          | { status: "ok"; data: SchedulingInput }
+          | { status: "error"; errors?: { message?: string }[] };
+        if (!res.ok || json.status !== "ok") {
+          const msg =
+            json.status === "error"
+              ? (json.errors ?? []).map((e) => e.message).filter(Boolean).join(" | ")
+              : "Unable to load scheduling data to save history snapshot.";
+          throw new Error(msg || "Unable to load scheduling data.");
+        }
+        inputForSnapshot = json.data;
+      }
+
+      const assignments = Object.entries(assignmentsBySection).map(([section_id, value]) => ({
+        section_id,
+        timeslot_ids: value.timeslot_ids,
+        room_id: value.room_id,
+        meeting_pattern_id: value.meeting_pattern_id,
+      }));
+
+      return {
+        input: {
+          ...inputForSnapshot,
+          locked_assignments: mergePlacementLocks(
+            inputForSnapshot.locked_assignments ?? [],
+            lockedSectionIds,
+            assignmentsBySection,
+            data?.sections ?? [],
+          ),
+        },
+        solution: {
+          assignments,
+          total_score: 0,
+          penalty_breakdown: {},
+          explanations: [],
+        },
+        createdAt: new Date().toISOString(),
+        lockedSectionIds,
+      };
+    },
+    [assignmentsBySection, data?.sections, lockedSectionIds, solverInput],
+  );
+
+  const handleSaveScheduleToHistory = useCallback(async () => {
+    const trimmedName = saveScheduleModal.draft.name.trim();
+    if (!trimmedName) {
+      setSaveScheduleModal((prev) => ({
+        ...prev,
+        error: "Schedule name is required.",
+      }));
+      return;
+    }
+    if (!saveScheduleModal.draft.scheduleDate) {
+      setSaveScheduleModal((prev) => ({
+        ...prev,
+        error: "Schedule date is required.",
+      }));
+      return;
+    }
+    setSaveScheduleModal((prev) => ({ ...prev, isSaving: true, error: null }));
+    try {
+      const snapshot = await buildSnapshotFromCurrentView();
+      saveScheduleToHistory({
+        name: trimmedName,
+        scheduleDate: saveScheduleModal.draft.scheduleDate,
+        snapshot,
+      });
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          LAST_SOLVER_RUN_STORAGE_KEY,
+          JSON.stringify(snapshot),
+        );
+      }
+      setSaveScheduleModal((prev) => ({ ...prev, isOpen: false, isSaving: false, error: null }));
+      setBackendSaveMessage({
+        type: "success",
+        text: `Saved "${trimmedName}" to Schedule History.`,
+      });
+    } catch (e) {
+      setSaveScheduleModal((prev) => ({
+        ...prev,
+        isSaving: false,
+        error: e instanceof Error ? e.message : "Failed to save schedule history.",
+      }));
+    }
+  }, [buildSnapshotFromCurrentView, saveScheduleModal.draft.name, saveScheduleModal.draft.scheduleDate]);
+
   if (error) {
     return (
       <div className="bg-rose-50 p-6 rounded-xl border border-rose-100 shadow-sm text-rose-900">
@@ -2127,6 +2281,22 @@ export default function CalendarPage() {
           </p>
         </div>
         <div className="flex gap-3 flex-wrap">
+          <button
+            type="button"
+            onClick={openSaveScheduleModal}
+            className="flex items-center justify-center rounded-lg h-10 px-4 bg-indigo-50 text-indigo-800 font-bold gap-2 border border-indigo-200 hover:bg-indigo-100 transition-colors"
+            title="Save this generated/edited schedule to history"
+          >
+            <Save className="size-4" />
+            Save Schedule
+          </button>
+          <Link
+            href="/history"
+            className="flex items-center justify-center rounded-lg h-10 px-4 bg-slate-100 text-slate-800 font-bold gap-2 border border-slate-200 hover:bg-slate-200 transition-colors"
+          >
+            <Archive className="size-4" />
+            History
+          </Link>
           <button
             className="flex items-center justify-center rounded-lg h-10 px-4 bg-slate-100 text-slate-900 font-bold gap-2 border border-slate-200"
             onClick={handleExportPdf}
@@ -3056,6 +3226,83 @@ export default function CalendarPage() {
           </div>,
           dragFeedbackToastMount,
         )}
+
+      {saveScheduleModal.isOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px] flex items-center justify-center p-4"
+          onClick={() => {
+            if (saveScheduleModal.isSaving) return;
+            closeSaveScheduleModal();
+          }}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <h3 className="text-lg font-black text-slate-900">Save Schedule</h3>
+              <button
+                type="button"
+                disabled={saveScheduleModal.isSaving}
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                onClick={closeSaveScheduleModal}
+              >
+                Close
+              </button>
+            </div>
+            <div className="space-y-4 px-6 py-5 text-sm">
+              <p className="text-xs text-slate-500">
+                Save this generated/edited schedule so you can reload, export, or branch it later.
+              </p>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-600">Schedule name *</span>
+                <input
+                  className="rounded-lg border border-slate-200 px-3 py-2"
+                  value={saveScheduleModal.draft.name}
+                  onChange={(e) => updateSaveScheduleDraft({ name: e.target.value })}
+                  disabled={saveScheduleModal.isSaving}
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-600">Schedule date *</span>
+                <input
+                  type="date"
+                  className="rounded-lg border border-slate-200 px-3 py-2"
+                  value={saveScheduleModal.draft.scheduleDate}
+                  onChange={(e) => updateSaveScheduleDraft({ scheduleDate: e.target.value })}
+                  disabled={saveScheduleModal.isSaving}
+                />
+              </label>
+              {saveScheduleModal.error && (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                  {saveScheduleModal.error}
+                </div>
+              )}
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={saveScheduleModal.isSaving}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                  onClick={closeSaveScheduleModal}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={saveScheduleModal.isSaving}
+                  className={clsx(
+                    "rounded-lg px-3 py-2 text-sm font-bold text-white",
+                    saveScheduleModal.isSaving ? "bg-slate-400" : "bg-[#137fec] hover:bg-[#0f6dca]",
+                  )}
+                  onClick={() => void handleSaveScheduleToHistory()}
+                >
+                  {saveScheduleModal.isSaving ? "Saving..." : "Save to History"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {sectionModal && (
         <div
