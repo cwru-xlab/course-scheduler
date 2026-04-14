@@ -1080,8 +1080,9 @@ def _check_feasible(
                                 )
 
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 5.0
-    solver.parameters.num_workers = 1
+    solver.parameters.max_time_in_seconds = 120.0
+    solver.parameters.num_workers = 2
+    solver.parameters.random_seed = 0
     status = solver.Solve(model)
     return status in (cp_model.OPTIMAL, cp_model.FEASIBLE)
 
@@ -1781,6 +1782,7 @@ def _solve_schedule(input_data: SchedulingInput):
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = 120.0
     solver.parameters.num_workers = 1
+    solver.parameters.random_seed = 0
     status = solver.Solve(model)
     print(f"[solve] Solver finished, status={solver.StatusName(status)}", flush=True)
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
