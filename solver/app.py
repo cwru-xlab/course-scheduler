@@ -1779,7 +1779,7 @@ def _solve_schedule(input_data: SchedulingInput):
 
     print("[solve] Model built, starting CP-SAT solver...", flush=True)
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 300.0
+    solver.parameters.max_time_in_seconds = 120.0
     solver.parameters.num_workers = 1
     status = solver.Solve(model)
     print(f"[solve] Solver finished, status={solver.StatusName(status)}", flush=True)
