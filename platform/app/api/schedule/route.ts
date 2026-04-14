@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { mockSchedulingInput } from "@/lib/scheduling/mockData";
 import type { SchedulingInput } from "@/lib/scheduling/types";
 
+export const maxDuration = 800;
+
 const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:5001";
 const SOLVER_FALLBACK_URLS = ["http://localhost:5001", "http://localhost:8000"];
 
