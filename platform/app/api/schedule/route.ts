@@ -6,6 +6,9 @@ import type { SchedulingInput } from "@/lib/scheduling/types";
 const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:5001";
 const SOLVER_FALLBACK_URLS = ["http://localhost:5001", "http://localhost:8000"];
 
+// The CP-SAT solver may take up to 120s; give extra headroom.
+export const maxDuration = 180;
+
 const parseResponseBody = async (response: Response) => {
   const raw = await response.text();
   try {
@@ -42,11 +45,15 @@ export async function POST(request: NextRequest) {
 
     for (const baseUrl of candidateUrls) {
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 150_000);
         response = await fetch(`${baseUrl}/solve`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ input, ...(removeInstructors?.length ? { remove_instructors: removeInstructors } : {}) }),
+          signal: controller.signal,
         });
+        clearTimeout(timeoutId);
         data = await parseResponseBody(response);
         break;
       } catch (err) {

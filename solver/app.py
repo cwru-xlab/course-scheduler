@@ -1341,7 +1341,6 @@ def _solve_schedule(input_data: SchedulingInput):
     options_by_section, option_errors = _build_options(input_data)
     errors.extend(option_errors)
     if errors:
-        return {"status": "error", "errors": errors}
         error_codes = sorted({str(err.get("code", "unknown")) for err in errors})
         return {
             "status": "error",
@@ -1781,7 +1780,7 @@ def _solve_schedule(input_data: SchedulingInput):
     print("[solve] Model built, starting CP-SAT solver...", flush=True)
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = 120.0
-    solver.parameters.num_workers = 1
+    solver.parameters.num_workers = 2
     solver.parameters.random_seed = 0
     status = solver.Solve(model)
     print(f"[solve] Solver finished, status={solver.StatusName(status)}", flush=True)
@@ -2155,7 +2154,20 @@ def solve():
         for inst_id in remove_instructors:
             input_data = _strip_instructor(input_data, inst_id)
 
-    result = _solve_schedule(input_data)
+    try:
+        result = _solve_schedule(input_data)
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        result = {
+            "status": "error",
+            "errors": [
+                {
+                    "code": "internal_error",
+                    "message": f"Solver crashed: {type(exc).__name__}: {exc}",
+                }
+            ],
+        }
     print(f"[solve] Solve completed with status: {result.get('status', 'unknown')}", flush=True)
     return jsonify(result)
 # ---------------------------------------------------------------------------

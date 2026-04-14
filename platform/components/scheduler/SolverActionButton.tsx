@@ -43,11 +43,15 @@ export const SolverActionButton = ({ data }: { data: SchedulingInput | null }) =
     setSolverError(null);
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 180_000);
       const response = await fetch("/api/schedule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       const raw = await response.text();
       let result: ApiSuccess | ApiError | null = null;
       try {
@@ -96,7 +100,11 @@ export const SolverActionButton = ({ data }: { data: SchedulingInput | null }) =
       router.push("/calendar");
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Failed to reach solver API.";
+        error instanceof DOMException && error.name === "AbortError"
+          ? "Solver request timed out. The schedule may be too complex — try relaxing constraints."
+          : error instanceof Error
+            ? error.message
+            : "Failed to reach solver API.";
       setSolverError(message);
     } finally {
       setSolverStatus("idle");
