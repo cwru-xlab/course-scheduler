@@ -162,9 +162,15 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
 
     blocked_times: List[Dict[str, Any]] = []
     for row in blocked_rows:
+        days = maybe_str(row.get("days"))
+        start_time = maybe_str(row.get("start_time"))
+        end_time = maybe_str(row.get("end_time"))
         blocked_times.append(
             {
                 "scope": _str_with_default(row, "scope", "BlockedTimes", default="global"),
+                "days": days or "",
+                "start_time": start_time or "",
+                "end_time": end_time or "",
                 "timeslot_ids": parse_list_cell(row.get("timeslot_ids")),
                 "reason": _str_with_default(row, "reason", "BlockedTimes", default="blocked"),
             }

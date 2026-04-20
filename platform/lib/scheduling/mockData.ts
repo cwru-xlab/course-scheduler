@@ -189,7 +189,9 @@ export const mockSchedulingInput: SchedulingInput = {
   blocked_times: [
     {
       scope: "global",
-      timeslot_ids: ["TS-T-0900"],
+      days: "T",
+      start_time: "09:00",
+      end_time: "10:15",
       reason: "university_event",
     },
   ],

@@ -197,16 +197,23 @@ def _ensure_schema_migrations() -> None:
         engine = db.engine
         inspector = inspect(engine)
         tables = inspector.get_table_names()
-        if "sections" not in tables:
-            return
-        col_names = {c["name"] for c in inspector.get_columns("sections")}
-        if "department" not in col_names:
-            with engine.begin() as conn:
-                conn.execute(
-                    text(
-                        "ALTER TABLE sections ADD COLUMN department VARCHAR(128) NOT NULL DEFAULT ''"
+        with engine.begin() as conn:
+            if "sections" in tables:
+                section_cols = {c["name"] for c in inspector.get_columns("sections")}
+                if "department" not in section_cols:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE sections ADD COLUMN department VARCHAR(128) NOT NULL DEFAULT ''"
+                        )
                     )
-                )
+            if "blocked_times" in tables:
+                blocked_cols = {c["name"] for c in inspector.get_columns("blocked_times")}
+                if "days" not in blocked_cols:
+                    conn.execute(text("ALTER TABLE blocked_times ADD COLUMN days VARCHAR(32)"))
+                if "start_time" not in blocked_cols:
+                    conn.execute(text("ALTER TABLE blocked_times ADD COLUMN start_time VARCHAR(16)"))
+                if "end_time" not in blocked_cols:
+                    conn.execute(text("ALTER TABLE blocked_times ADD COLUMN end_time VARCHAR(16)"))
     except Exception:  # pylint: disable=broad-except
         pass
 
@@ -387,6 +394,27 @@ def _build_overlapping_timeslot_pairs(timeslots: List) -> set:
                 pair = (min(id_a, id_b), max(id_a, id_b))
                 overlaps.add(pair)
     return overlaps
+
+
+def _timeslot_overlaps_block_range(timeslot: dict, blocked: dict) -> bool:
+    """Return True when timeslot overlaps blocked day/time range."""
+    blocked_days = _normalize_day_tokens(blocked.get("days"))
+    if not blocked_days:
+        return False
+    slot_days = _normalize_day_tokens(timeslot.get("day") or timeslot.get("days"))
+    if not (blocked_days & slot_days):
+        return False
+
+    try:
+        blocked_start = _parse_time(blocked.get("start_time"))
+        blocked_end = _parse_time(blocked.get("end_time"))
+        slot_start = _parse_time(timeslot.get("start_time"))
+        slot_end = _parse_time(timeslot.get("end_time"))
+    except ValueError:
+        return False
+    if not blocked_start or not blocked_end or not slot_start or not slot_end:
+        return False
+    return slot_start < blocked_end and blocked_start < slot_end
 
 
 _COMPACT_SCHEDULE_DAYS_RE = re.compile(r"^[MTWRFSU]+$", re.IGNORECASE)
@@ -590,13 +618,32 @@ def _build_options(
             locked_by_section[section_id] = lock_dict if isinstance(lock_dict, dict) else lock
 
     blocked_times_global = set()
+    timeslots_by_id: Dict[str, dict] = {}
+    for timeslot in input_data.timeslots:
+        slot_dict = timeslot.to_dict() if hasattr(timeslot, "to_dict") else timeslot
+        if not isinstance(slot_dict, dict):
+            continue
+        ts_id = slot_dict.get("id")
+        if ts_id is not None:
+            timeslots_by_id[str(ts_id)] = slot_dict
+
     if not ignore_blocked_times:
         for blocked in input_data.blocked_times:
             blocked_dict = blocked.to_dict() if hasattr(blocked, "to_dict") else blocked
             scope = blocked_dict.get("scope") if isinstance(blocked_dict, dict) else blocked.scope
             if scope == "global":
-                timeslot_ids = blocked_dict.get("timeslot_ids", []) if isinstance(blocked_dict, dict) else blocked.timeslot_ids
-                blocked_times_global.update(timeslot_ids)
+                normalized_block = blocked_dict if isinstance(blocked_dict, dict) else {}
+                # Legacy explicit timeslot IDs still supported.
+                blocked_times_global.update(normalized_block.get("timeslot_ids", []) or [])
+                # New behavior: range + days drives overlap filtering.
+                if (
+                    normalized_block.get("days")
+                    and normalized_block.get("start_time")
+                    and normalized_block.get("end_time")
+                ):
+                    for ts_id, slot_dict in timeslots_by_id.items():
+                        if _timeslot_overlaps_block_range(slot_dict, normalized_block):
+                            blocked_times_global.add(ts_id)
 
     crosslist_totals = _build_crosslist_totals(input_data.sections)
     options_by_section: Dict[str, List[Tuple[str, Tuple[str, ...], str, int]]] = {}
@@ -2733,6 +2780,9 @@ def update_constraints():
                 BlockedTime(
                     scope=item.get("scope") or "global",
                     timeslot_ids=item.get("timeslot_ids", []) or [],
+                    days=item.get("days"),
+                    start_time=item.get("start_time"),
+                    end_time=item.get("end_time"),
                     reason=item.get("reason") or "blocked",
                 )
             )

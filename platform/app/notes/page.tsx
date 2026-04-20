@@ -316,7 +316,9 @@ export default function NotesFeedPage() {
           title: `Blocked Time Row ${idx + 1}`,
           fields: [
             { label: "Scope", value: String(row.scope ?? "N/A") },
-            { label: "Timeslots", value: row.timeslot_ids?.join(", ") || "N/A" },
+            { label: "Days", value: row.days || "N/A" },
+            { label: "Start", value: row.start_time || "N/A" },
+            { label: "End", value: row.end_time || "N/A" },
             { label: "Reason", value: row.reason || "N/A" },
           ],
         };
