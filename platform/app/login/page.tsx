@@ -1,5 +1,4 @@
 import { headers } from "next/headers";
-import Link from "next/link";
 import { Button } from "@heroui/button";
 
 import { generateCWRUSSOLoginURL } from "@/lib/auth";
@@ -87,7 +86,7 @@ export default async function LoginPage({
         <div className="flex flex-col gap-3">
           {cwruLoginUrl ? (
             <Button
-              as={Link}
+              as="a"
               href={cwruLoginUrl}
               color="primary"
               size="lg"
