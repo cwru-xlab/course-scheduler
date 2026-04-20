@@ -1014,7 +1014,29 @@ Frontend needs to know how to reach the solver:
   - defaults to `http://localhost:5001` in most routes
   - some routes include fallback to `http://localhost:8000`
 
+Auth variables (used for CWRU SSO login — see section 19.4):
+
+- `APP_BASE_URL` — base URL of this app, used to build the CWRU SSO callback.
+  - Dev: `http://localhost:3000`
+  - Prod: `https://course-scheduler.xlab-cwru.com` (or whatever your deploy hostname is — it must be pre-registered with CWRU UTech)
+- `JWT_SECRET` — 32+ random bytes used to sign session JWTs. Generate with `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`. Rotating this invalidates all sessions.
+
+Copy `platform/.env.example` to `platform/.env.local` and fill these in before running `npm run dev`.
+
 Optional environment variables exist for the LLM integration library, but the current UI you see here uses notes stored in `localStorage` (not an LLM-backed system).
+
+### 19.4 Auth (CWRU SSO)
+
+The entire site is gated behind CWRU SSO via `platform/middleware.ts`. Flow:
+
+1. Unauthenticated request → redirected to `/login`.
+2. `/login` shows a "Sign in with CWRU SSO" button that redirects to `https://login.case.edu/cas/login`.
+3. CWRU redirects back to `/api/auth/cwru-sso-callback?ticket=...`. The callback server-validates the ticket, signs a JWT, and sets an `auth-token` HTTP-only cookie.
+4. Middleware verifies the cookie on every request; the user menu in the top-right shows who is signed in.
+
+**Local development**: CWRU CAS cannot redirect to `http://localhost`, so when the browser hostname is `localhost`/`127.0.0.1` AND `NODE_ENV !== "production"`, `/login` also renders a "Dev one-click login" button that issues a placeholder JWT via `POST /api/auth/dev-login`. That endpoint returns 404 on any non-localhost Host header or in production — safe to ship.
+
+No database: identity from CAS is signed directly into the JWT. See `CWRU_SSO_INTEGRATION.md` for the protocol spec.
 
 ---
 

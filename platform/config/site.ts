@@ -21,4 +21,15 @@ export const siteConfig = {
   links: {
     github: "https://github.com/",
   },
+  auth: {
+    jwtExpiresIn: "45d",
+    cookieMaxAge: 60 * 60 * 24 * 45,
+    cookie: {
+      name: "auth-token",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax" as const,
+      path: "/",
+    },
+  },
 };

@@ -13,6 +13,8 @@ import { Calendar as CalendarIcon, ChevronDown, MessageSquare } from "lucide-rea
 import NextLink from "next/link";
 import { usePathname } from "next/navigation";
 
+import { UserMenu } from "@/components/user-menu";
+
 export const Navbar = () => {
   const pathname = usePathname();
   const isEditorActive = pathname.startsWith("/editor");
@@ -86,10 +88,10 @@ export const Navbar = () => {
           </nav>
 
           {/* Calendar page portals the Undo control here so it stays in the sticky header */}
-          <div
-            id="calendar-navbar-slot"
-            className="flex flex-1 items-center justify-end gap-2 md:flex-none md:justify-end"
-          />
+          <div className="flex flex-1 items-center justify-end gap-2 md:flex-none md:justify-end">
+            <div id="calendar-navbar-slot" className="flex items-center gap-2" />
+            <UserMenu />
+          </div>
         </div>
       </div>
     </header>
