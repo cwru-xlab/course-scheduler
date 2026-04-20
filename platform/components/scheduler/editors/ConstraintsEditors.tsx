@@ -231,7 +231,6 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
 // Blocked Times Editor
 type BlockedTimesEditorProps = {
   blockedTimes: BlockedTime[];
-  timeslotOptions: { key: string; label: string }[];
   onUpdate: (blockedTimes: BlockedTime[]) => void;
 };
 
@@ -242,13 +241,40 @@ const SCOPE_OPTIONS = [
   { key: "program", label: "Program" },
 ];
 
+const BLOCKED_DAY_OPTIONS = [
+  { key: "Monday", label: "Monday" },
+  { key: "Tuesday", label: "Tuesday" },
+  { key: "Wednesday", label: "Wednesday" },
+  { key: "Thursday", label: "Thursday" },
+  { key: "Friday", label: "Friday" },
+];
+
+const BLOCKED_TIME_OPTIONS = (() => {
+  const options: { key: string; label: string }[] = [];
+  for (let minutes = 0; minutes < 24 * 60; minutes += 5) {
+    const h24 = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    const hh = h24.toString().padStart(2, "0");
+    const mm = mins.toString().padStart(2, "0");
+    const suffix = h24 >= 12 ? "PM" : "AM";
+    const h12 = ((h24 + 11) % 12) + 1;
+    options.push({
+      key: `${hh}:${mm}`,
+      label: `${h12}:${mm} ${suffix}`,
+    });
+  }
+  return options;
+})();
+
 const createEmptyBlockedTime = (): BlockedTime => ({
   scope: "global",
-  timeslot_ids: [],
+  days: "",
+  start_time: "",
+  end_time: "",
   reason: "",
 });
 
-export const BlockedTimesEditor = ({ blockedTimes, timeslotOptions, onUpdate }: BlockedTimesEditorProps) => {
+export const BlockedTimesEditor = ({ blockedTimes, onUpdate }: BlockedTimesEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const updateBlockedTime = (index: number, field: keyof BlockedTime, value: unknown) => {
@@ -260,13 +286,39 @@ export const BlockedTimesEditor = ({ blockedTimes, timeslotOptions, onUpdate }: 
   const addBlockedTime = () => onUpdate([...blockedTimes, createEmptyBlockedTime()]);
   const deleteBlockedTime = (index: number) => onUpdate(blockedTimes.filter((_, i) => i !== index));
 
+  const blockedDaysToSelection = (days: string | null | undefined): string[] =>
+    (days ?? "")
+      .split(",")
+      .map((d) => d.trim())
+      .filter(Boolean);
+
+  const normalizeBlockedTimeValue = (value: string | null | undefined): string => {
+    const raw = (value ?? "").trim();
+    if (!raw) return "";
+    const match = raw.match(/^(\d{1,2}):(\d{2})/);
+    if (!match) return "";
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+      return "";
+    }
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  };
+
   const filteredBlockedTimes = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return blockedTimes
       .map((blocked, index) => ({ blocked, index }))
       .filter(({ blocked }) => {
         if (!query) return true;
-        const searchable = [blocked.scope, ...blocked.timeslot_ids, blocked.reason]
+        const searchable = [
+          blocked.scope,
+          blocked.days,
+          blocked.start_time,
+          blocked.end_time,
+          ...(blocked.timeslot_ids ?? []),
+          blocked.reason,
+        ]
           .join(" ")
           .toLowerCase();
         return searchable.includes(query);
@@ -292,7 +344,9 @@ export const BlockedTimesEditor = ({ blockedTimes, timeslotOptions, onUpdate }: 
           <thead className="text-left text-default-500">
             <tr>
               <th className="pb-2 pr-3">Scope</th>
-              <th className="pb-2 pr-3">Timeslots</th>
+              <th className="pb-2 pr-3">Days</th>
+              <th className="pb-2 pr-3">Start</th>
+              <th className="pb-2 pr-3">End</th>
               <th className="pb-2 pr-3">Reason</th>
               <th className="pb-2 pr-3">View Notes</th>
               <th className="pb-2 pr-3"></th>
@@ -314,10 +368,28 @@ export const BlockedTimesEditor = ({ blockedTimes, timeslotOptions, onUpdate }: 
                 </td>
                 <td className="py-2 pr-3">
                   <MultiSelect
-                    value={blocked.timeslot_ids}
-                    options={timeslotOptions}
-                    onChange={(v) => updateBlockedTime(idx, "timeslot_ids", v)}
-                    placeholder="Select timeslots"
+                    value={blockedDaysToSelection(blocked.days)}
+                    options={BLOCKED_DAY_OPTIONS}
+                    onChange={(v) => updateBlockedTime(idx, "days", v.join(","))}
+                    placeholder="Select days"
+                  />
+                </td>
+                <td className="py-2 pr-3">
+                  <EditableSelectCell
+                    value={normalizeBlockedTimeValue(blocked.start_time)}
+                    options={BLOCKED_TIME_OPTIONS}
+                    onChange={(v) => updateBlockedTime(idx, "start_time", v)}
+                    placeholder="Select start"
+                    isSearchable
+                  />
+                </td>
+                <td className="py-2 pr-3">
+                  <EditableSelectCell
+                    value={normalizeBlockedTimeValue(blocked.end_time)}
+                    options={BLOCKED_TIME_OPTIONS}
+                    onChange={(v) => updateBlockedTime(idx, "end_time", v)}
+                    placeholder="Select end"
+                    isSearchable
                   />
                 </td>
                 <td className="py-2 pr-3">

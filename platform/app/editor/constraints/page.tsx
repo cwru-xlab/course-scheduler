@@ -126,7 +126,6 @@ export default function ConstraintsPage() {
         />
         <BlockedTimesEditor
           blockedTimes={data.blocked_times}
-          timeslotOptions={timeslotOptions}
           onUpdate={(blockedTimes) => updateField("blocked_times", blockedTimes)}
         />
         <LockedAssignmentsEditor

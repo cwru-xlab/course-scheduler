@@ -69,7 +69,11 @@ export type NoOverlapGroup = {
 
 export type BlockedTime = {
   scope: "global" | "instructor" | "room" | "program";
-  timeslot_ids: Id[];
+  days: string;
+  start_time: string;
+  end_time: string;
+  // Legacy fallback support for imported data.
+  timeslot_ids?: Id[];
   reason: string;
 };
 

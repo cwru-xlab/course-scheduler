@@ -547,13 +547,21 @@ class BlockedTime(db.Model):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     scope = Column(String(32), nullable=False)  # e.g., "global", "department", "room"
+    # Legacy support: explicit timeslot IDs can still be supplied.
     timeslot_ids = Column(JSON, nullable=False)  # List[str] - blocked timeslot IDs
+    # Preferred shape: block a day/time range and resolve overlapping timeslots.
+    days = Column(String(32), nullable=True)  # e.g., "MWF" or "M,W,F"
+    start_time = Column(String(16), nullable=True)  # e.g., "10:00"
+    end_time = Column(String(16), nullable=True)  # e.g., "10:50"
     reason = Column(Text, nullable=False)  # Why these times are blocked
 
     def to_dict(self):
         return {
             "scope": self.scope,
             "timeslot_ids": self.timeslot_ids or [],
+            "days": self.days,
+            "start_time": self.start_time,
+            "end_time": self.end_time,
             "reason": self.reason,
         }
 
