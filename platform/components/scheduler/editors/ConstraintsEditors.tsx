@@ -13,6 +13,10 @@ import { RowNotesButton } from "../RowNotesButton";
 
 import type { CrossListGroup, NoOverlapGroup, BlockedTime, LockedAssignment, SoftLock } from "@/lib/scheduling/types";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
+import {
+  SCHEDULING_WINDOW_END_HOUR,
+  SCHEDULING_WINDOW_START_HOUR,
+} from "@/lib/scheduling/timeWindow";
 
 // CrossList Groups Editor
 type CrossListGroupsEditorProps = {
@@ -249,9 +253,16 @@ const BLOCKED_DAY_OPTIONS = [
   { key: "Friday", label: "Friday" },
 ];
 
+const BLOCKED_TIME_MIN_HOUR = SCHEDULING_WINDOW_START_HOUR;
+const BLOCKED_TIME_MAX_HOUR = SCHEDULING_WINDOW_END_HOUR;
+
 const BLOCKED_TIME_OPTIONS = (() => {
   const options: { key: string; label: string }[] = [];
-  for (let minutes = 0; minutes < 24 * 60; minutes += 5) {
+  for (
+    let minutes = BLOCKED_TIME_MIN_HOUR * 60;
+    minutes <= BLOCKED_TIME_MAX_HOUR * 60;
+    minutes += 5
+  ) {
     const h24 = Math.floor(minutes / 60);
     const mins = minutes % 60;
     const hh = h24.toString().padStart(2, "0");

@@ -21,6 +21,10 @@ import {
 import type { ScheduleSolution, SchedulingInput } from "@/lib/scheduling/types";
 import { MultiSelect } from "@/components/scheduler/MultiSelect";
 import { SCHEDULING_DATA_REFRESH_EVENT } from "@/lib/scheduling/useSchedulingData";
+import {
+  SCHEDULING_WINDOW_END_HOUR,
+  SCHEDULING_WINDOW_START_HOUR,
+} from "@/lib/scheduling/timeWindow";
 
 type TimeslotDto = {
   id: string;
@@ -819,26 +823,19 @@ export default function CalendarPage() {
     return map;
   }, [data]);
 
-  const axisStart = 8 * 60; // 8:00 AM
-  const axisEnd = 22 * 60; // 10:00 PM
+  const axisStart = SCHEDULING_WINDOW_START_HOUR * 60;
+  const axisEnd = SCHEDULING_WINDOW_END_HOUR * 60;
   const axisRange = axisEnd - axisStart;
 
-  const timeAxisLabels = [
-    "8AM",
-    "9AM",
-    "10AM",
-    "11AM",
-    "12PM",
-    "1PM",
-    "2PM",
-    "3PM",
-    "4PM",
-    "5PM",
-    "6PM",
-    "7PM",
-    "8PM",
-    "9PM",
-  ];
+  const timeAxisLabels = Array.from(
+    { length: Math.max(SCHEDULING_WINDOW_END_HOUR - SCHEDULING_WINDOW_START_HOUR, 0) },
+    (_, idx) => {
+      const h24 = SCHEDULING_WINDOW_START_HOUR + idx;
+      const suffix = h24 >= 12 ? "PM" : "AM";
+      const h12 = ((h24 + 11) % 12) + 1;
+      return `${h12}${suffix}`;
+    },
+  );
   const hourSegments = timeAxisLabels.length;
 
   const instructorById = useMemo(() => {

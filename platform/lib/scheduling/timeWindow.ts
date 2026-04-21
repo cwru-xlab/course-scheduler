@@ -1,0 +1,6 @@
+export const SCHEDULING_WINDOW_START_HOUR = 8;
+export const SCHEDULING_WINDOW_END_HOUR = 22;
+
+export const SCHEDULING_WINDOW_START_TIME = `${String(SCHEDULING_WINDOW_START_HOUR).padStart(2, "0")}:00`;
+export const SCHEDULING_WINDOW_END_TIME = `${String(SCHEDULING_WINDOW_END_HOUR).padStart(2, "0")}:00`;
+

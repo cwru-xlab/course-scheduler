@@ -12,6 +12,10 @@ import { RowNotesButton } from "../RowNotesButton";
 
 import type { Timeslot } from "@/lib/scheduling/types";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
+import {
+  SCHEDULING_WINDOW_END_TIME,
+  SCHEDULING_WINDOW_START_TIME,
+} from "@/lib/scheduling/timeWindow";
 
 type TimeslotsEditorProps = {
   timeslots: Timeslot[];
@@ -46,9 +50,9 @@ const splitDays = (raw: string | string[] | undefined): string[] => {
     .filter(Boolean);
 };
 
-const HHMM_FALLBACK = "07:00";
-const MIN_TIME = "07:00";
-const MAX_TIME = "22:00";
+const HHMM_FALLBACK = SCHEDULING_WINDOW_START_TIME;
+const MIN_TIME = SCHEDULING_WINDOW_START_TIME;
+const MAX_TIME = SCHEDULING_WINDOW_END_TIME;
 
 const toTimeOnly = (value: string | undefined): string => {
   if (!value) return HHMM_FALLBACK;
@@ -85,7 +89,9 @@ const clampTimeToBounds = (hhmm: string): string => {
 
 const TIME_OPTIONS = (() => {
   const options: { key: string; label: string }[] = [];
-  for (let minutes = 7 * 60; minutes <= 22 * 60; minutes += 5) {
+  const minHour = Number.parseInt(MIN_TIME.split(":")[0] ?? "8", 10);
+  const maxHour = Number.parseInt(MAX_TIME.split(":")[0] ?? "22", 10);
+  for (let minutes = minHour * 60; minutes <= maxHour * 60; minutes += 5) {
     const h24 = Math.floor(minutes / 60);
     const mins = minutes % 60;
     const hh = h24.toString().padStart(2, "0");
