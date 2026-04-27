@@ -145,8 +145,7 @@ MeetingPatterns define **how many slots** and **which combinations** are valid.
 ```json
 CrossListGroup {
   id,
-  member_section_ids[],
-  require_same_room: boolean
+  member_section_ids[]
 }
 ```
 
@@ -154,7 +153,7 @@ Rules:
 
 * all members share **identical timeslot set**
 * room capacity must satisfy **sum of enrollments**
-* room equality enforced only if `require_same_room = true`
+* all members share the **same room** (always)
 
 ---
 
@@ -564,7 +563,7 @@ Below is the meaning of fields as used by the scheduling system:
   - `compatible_timeslot_sets[]`: **a list of alternatives**, where each alternative is an array of timeslot ids that the meeting consumes
 - `crosslist_groups[]`
   - `member_section_ids[]`: which sections are cross-listed together
-  - `require_same_room`: when `true`, cross-listed sections must share the same room in addition to time
+  - cross-listed sections always share the same room and timeslot set
 - `no_overlap_groups[]`
   - `member_section_ids[]`: sections that must not overlap
   - `reason`: human label for why the group exists
@@ -631,7 +630,7 @@ The workbook must include these sheets and columns:
 - `MeetingPatterns`
   - `id`, `slots_required`, `allowed_days`, `compatible_timeslot_sets`
 - `CrosslistGroups`
-  - `id`, `member_section_ids`, `require_same_room`
+  - `id`, `member_section_ids`
 - `NoOverlapGroups`
   - `id`, `member_section_ids`, `reason`
 - `BlockedTimes`

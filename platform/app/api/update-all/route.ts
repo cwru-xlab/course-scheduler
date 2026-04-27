@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import type { SchedulingInput } from "@/lib/scheduling/types";
+import { normalizeCrosslistData } from "@/lib/scheduling/crosslist";
 
 const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:5001";
 const SOLVER_FALLBACK_URLS = ["http://localhost:5001", "http://localhost:8000"];
@@ -25,17 +26,43 @@ export async function POST(request: NextRequest) {
     }
 
     const {
-      sections = [],
-      instructors = [],
-      rooms = [],
-      timeslots = [],
-      meeting_patterns = [],
-      crosslist_groups = [],
-      no_overlap_groups = [],
-      blocked_times = [],
-      locked_assignments = [],
-      soft_locks = [],
+      sections: rawSections = [],
+      instructors: rawInstructors = [],
+      rooms: rawRooms = [],
+      timeslots: rawTimeslots = [],
+      meeting_patterns: rawMeetingPatterns = [],
+      crosslist_groups: rawCrosslistGroups = [],
+      no_overlap_groups: rawNoOverlapGroups = [],
+      blocked_times: rawBlockedTimes = [],
+      locked_assignments: rawLockedAssignments = [],
+      soft_locks: rawSoftLocks = [],
     } = body;
+
+    const normalized = normalizeCrosslistData({
+      sections: rawSections,
+      instructors: rawInstructors,
+      rooms: rawRooms,
+      timeslots: rawTimeslots,
+      meeting_patterns: rawMeetingPatterns,
+      crosslist_groups: rawCrosslistGroups,
+      no_overlap_groups: rawNoOverlapGroups,
+      blocked_times: rawBlockedTimes,
+      locked_assignments: rawLockedAssignments,
+      soft_locks: rawSoftLocks,
+    });
+
+    const {
+      sections,
+      instructors,
+      rooms,
+      timeslots,
+      meeting_patterns,
+      crosslist_groups,
+      no_overlap_groups,
+      blocked_times,
+      locked_assignments,
+      soft_locks,
+    } = normalized;
 
     const warnings: string[] = [];
 

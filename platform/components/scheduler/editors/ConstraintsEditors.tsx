@@ -6,7 +6,6 @@ import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Input } from "@heroui/input";
 
 import { EditableCell } from "../EditableCell";
-import { EditableCheckbox } from "../EditableCheckbox";
 import { EditableSelectCell } from "../EditableSelectCell";
 import { MultiSelect } from "../MultiSelect";
 import { RowNotesButton } from "../RowNotesButton";
@@ -28,7 +27,6 @@ type CrossListGroupsEditorProps = {
 const createEmptyCrossListGroup = (existing: CrossListGroup[]): CrossListGroup => ({
   id: nextIntegerId(existing.map((g) => g.id)),
   member_section_ids: [],
-  require_same_room: true,
 });
 
 export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: CrossListGroupsEditorProps) => {
@@ -49,7 +47,7 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
       .map((group, index) => ({ group, index }))
       .filter(({ group }) => {
         if (!query) return true;
-        const searchable = [group.id, ...group.member_section_ids, group.require_same_room]
+        const searchable = [group.id, ...group.member_section_ids]
           .join(" ")
           .toLowerCase();
         return searchable.includes(query);
@@ -76,7 +74,6 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
             <tr>
               <th className="pb-2 pr-3">ID</th>
               <th className="pb-2 pr-3">Member Sections</th>
-              <th className="pb-2 pr-3">Same Room</th>
               <th className="pb-2 pr-3">View Notes</th>
               <th className="pb-2 pr-3"></th>
             </tr>
@@ -98,9 +95,6 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
                     onChange={(v) => updateGroup(idx, "member_section_ids", v)}
                     placeholder="Select sections"
                   />
-                </td>
-                <td className="py-2 pr-3">
-                  <EditableCheckbox value={group.require_same_room} onChange={(v) => updateGroup(idx, "require_same_room", v)} />
                 </td>
                 <td className="py-2 pr-3">
                   <RowNotesButton

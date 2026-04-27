@@ -489,7 +489,6 @@ def load_sections_from_soc_editors(
             crosslist_groups.append({
                 "id": group_id,
                 "member_section_ids": sorted(ids),
-                "require_same_room": True,
             })
             for sid in ids:
                 section_by_id[sid]["crosslist_group_id"] = group_id
@@ -866,7 +865,6 @@ def build_model_input(max_rows: int | None = None) -> dict:
             crosslist_groups.append({
                 "id": gid,
                 "member_section_ids": sorted(member_ids),
-                "require_same_room": True,
             })
 
     return {

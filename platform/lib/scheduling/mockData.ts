@@ -176,7 +176,6 @@ export const mockSchedulingInput: SchedulingInput = {
     {
       id: "CLG-1",
       member_section_ids: ["SEC-101-A", "SEC-550-A"],
-      require_same_room: true,
     },
   ],
   no_overlap_groups: [

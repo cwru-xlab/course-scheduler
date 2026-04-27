@@ -31,7 +31,7 @@ This workbook format is the interchange schema for the scheduler UI's `Schedulin
 `id`, `slots_required`, `allowed_days`, `compatible_timeslot_sets`
 
 ### `CrosslistGroups`
-`id`, `member_section_ids`, `require_same_room`
+`id`, `member_section_ids`
 
 ### `NoOverlapGroups`
 `id`, `member_section_ids`, `reason`

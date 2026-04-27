@@ -61,7 +61,7 @@ SPREADSHEET_SPECS: List[SheetSpec] = [
     ),
     SheetSpec(
         name="CrosslistGroups",
-        columns=["id", "member_section_ids", "require_same_room"],
+        columns=["id", "member_section_ids"],
     ),
     SheetSpec(
         name="NoOverlapGroups",

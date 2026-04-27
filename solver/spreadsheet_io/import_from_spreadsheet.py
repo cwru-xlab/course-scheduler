@@ -16,7 +16,6 @@ try:
         maybe_int,
         maybe_str,
         normalize_sheet_headers,
-        parse_bool_cell,
         parse_list_cell,
         parse_nested_list_cell,
     )
@@ -27,7 +26,6 @@ except ModuleNotFoundError:
         maybe_int,
         maybe_str,
         normalize_sheet_headers,
-        parse_bool_cell,
         parse_list_cell,
         parse_nested_list_cell,
     )
@@ -146,7 +144,6 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
             {
                 "id": _required_str(row, "id", "CrosslistGroups"),
                 "member_section_ids": parse_list_cell(row.get("member_section_ids")),
-                "require_same_room": parse_bool_cell(row.get("require_same_room"), default=False),
             }
         )
 

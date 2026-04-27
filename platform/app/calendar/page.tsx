@@ -1243,6 +1243,25 @@ export default function CalendarPage() {
     });
   }, [allEventsByRoom, data, sectionMatchesFilters]);
 
+  const linkedSectionIdsBySection = useMemo(() => {
+    const map = new Map<string, string[]>();
+    if (!data) return map;
+    const membersByGroup = new Map<string, string[]>();
+    for (const section of data.sections) {
+      const groupId = String(section.crosslist_group_id ?? "").trim();
+      if (!groupId) continue;
+      const members = membersByGroup.get(groupId) ?? [];
+      members.push(section.id);
+      membersByGroup.set(groupId, members);
+    }
+    for (const section of data.sections) {
+      const groupId = String(section.crosslist_group_id ?? "").trim();
+      const linked = groupId ? membersByGroup.get(groupId) ?? [section.id] : [section.id];
+      map.set(section.id, linked);
+    }
+    return map;
+  }, [data]);
+
   const calendarRoomRowsRef = useRef(roomRows);
   calendarRoomRowsRef.current = roomRows;
 
@@ -1663,12 +1682,17 @@ export default function CalendarPage() {
       if (!data) return;
       const dragged = allDayEvents.find((x) => x.section.id === sectionId && x.timeslot);
       if (!dragged || !dragged.timeslot) return;
+      const linkedSectionIds = linkedSectionIdsBySection.get(sectionId) ?? [sectionId];
+      const linkedSectionIdSet = new Set(linkedSectionIds);
 
       const currentAssignment = assignmentsBySection[sectionId];
       const currentRoomId = currentAssignment?.room_id ?? dragged.section.room_id ?? "";
       const targetRoom = data.rooms.find((room) => room.id === targetRoomId);
-      const requiredSeats =
-        dragged.section.enrollment_cap ?? dragged.section.expected_enrollment ?? 0;
+      const requiredSeats = linkedSectionIds.reduce((sum, linkedSectionId) => {
+        const linkedSection = data.sections.find((section) => section.id === linkedSectionId);
+        const seats = linkedSection?.enrollment_cap ?? linkedSection?.expected_enrollment ?? 0;
+        return sum + seats;
+      }, 0);
       if (
         targetRoomId !== currentRoomId &&
         Number.isFinite(targetRoom?.capacity) &&
@@ -1693,10 +1717,19 @@ export default function CalendarPage() {
         return id;
       });
       const uniqueNextTimeslotIds = Array.from(new Set(nextTimeslotIds));
-      const alreadyPlaced =
-        targetRoomId === (currentRoomId ?? "") &&
-        JSON.stringify([...uniqueNextTimeslotIds].sort()) ===
-          JSON.stringify([...(currentAssignment?.timeslot_ids ?? currentTimeslotIds)].sort());
+      const alreadyPlaced = linkedSectionIds.every((linkedSectionId) => {
+        const linkedEvent = allDayEvents.find((eventItem) => eventItem.section.id === linkedSectionId);
+        const linkedAssignment = assignmentsBySection[linkedSectionId];
+        const linkedCurrentRoomId = linkedAssignment?.room_id ?? linkedEvent?.section.room_id ?? "";
+        const linkedCurrentTimeslotIds =
+          linkedAssignment?.timeslot_ids ??
+          (linkedEvent?.section.timeslot_id ? [linkedEvent.section.timeslot_id] : []);
+        return (
+          targetRoomId === linkedCurrentRoomId &&
+          JSON.stringify([...uniqueNextTimeslotIds].sort()) ===
+            JSON.stringify([...(linkedAssignment?.timeslot_ids ?? linkedCurrentTimeslotIds)].sort())
+        );
+      });
       if (!alreadyPlaced) {
         setRedoStack([]);
         redoStackRef.current = [];
@@ -1720,22 +1753,27 @@ export default function CalendarPage() {
       }
       const nextAssignments: AssignmentMap = {
         ...assignmentsBySection,
-        [sectionId]: {
+      };
+      for (const linkedSectionId of linkedSectionIds) {
+        const linkedAssignment = assignmentsBySection[linkedSectionId];
+        nextAssignments[linkedSectionId] = {
           timeslot_ids: uniqueNextTimeslotIds,
           room_id: targetRoomId,
-          meeting_pattern_id: currentAssignment?.meeting_pattern_id ?? "",
-        },
-      };
+          meeting_pattern_id: linkedAssignment?.meeting_pattern_id ?? "",
+        };
+      }
       setAssignmentsBySection(nextAssignments);
       setSolverTimeslotIdsBySection((prev) => ({
         ...prev,
-        [sectionId]: uniqueNextTimeslotIds,
+        ...Object.fromEntries(
+          linkedSectionIds.map((linkedSectionId) => [linkedSectionId, uniqueNextTimeslotIds]),
+        ),
       }));
 
       const selectedStart = selectedSlot.start;
       const selectedEnd = selectedSlot.end;
       const conflicts = allDayEvents.filter((eventItem) => {
-        if (eventItem.section.id === sectionId) return false;
+        if (linkedSectionIdSet.has(eventItem.section.id)) return false;
         const itemRoomId =
           nextAssignments[eventItem.section.id]?.room_id ?? eventItem.section.room_id ?? "";
         if (itemRoomId !== targetRoomId) return false;
@@ -1755,7 +1793,7 @@ export default function CalendarPage() {
       } else {
         setDragFeedback({
           status: "valid",
-          message: `Valid: moved to room ${targetRoomId}, ${selectedDay} ${formatTimeAmPm(selectedSlot.start_time)}-${formatTimeAmPm(selectedSlot.end_time)}. This change can be persisted.`,
+          message: `Valid: moved ${linkedSectionIds.length > 1 ? "cross-listed group" : "section"} to room ${targetRoomId}, ${selectedDay} ${formatTimeAmPm(selectedSlot.start_time)}-${formatTimeAmPm(selectedSlot.end_time)}. This change can be persisted.`,
         });
         setDragError(null);
       }
@@ -1767,6 +1805,7 @@ export default function CalendarPage() {
       data,
       dragError,
       dragFeedback,
+      linkedSectionIdsBySection,
       selectedDay,
       solverTimeslotIdsBySection,
       timeslotById,
@@ -1899,8 +1938,14 @@ export default function CalendarPage() {
       if (!data) return { isValid: false, message: "Calendar data is unavailable." };
       const section = data.sections.find((s) => s.id === sectionId);
       if (!section) return { isValid: false, message: "Section not found." };
+      const linkedSectionIds = linkedSectionIdsBySection.get(sectionId) ?? [sectionId];
+      const linkedSectionIdSet = new Set(linkedSectionIds);
       const targetRoom = data.rooms.find((room) => room.id === targetRoomId);
-      const requiredSeats = section.enrollment_cap ?? section.expected_enrollment ?? 0;
+      const requiredSeats = linkedSectionIds.reduce((sum, linkedSectionId) => {
+        const linkedSection = data.sections.find((s) => s.id === linkedSectionId);
+        const seats = linkedSection?.enrollment_cap ?? linkedSection?.expected_enrollment ?? 0;
+        return sum + seats;
+      }, 0);
       if (
         Number.isFinite(targetRoom?.capacity) &&
         requiredSeats > (targetRoom?.capacity ?? 0)
@@ -1911,7 +1956,7 @@ export default function CalendarPage() {
         };
       }
       const conflicts = allDayEvents.filter((eventItem) => {
-        if (eventItem.section.id === sectionId) return false;
+        if (linkedSectionIdSet.has(eventItem.section.id)) return false;
         const itemRoomId =
           assignmentsBySection[eventItem.section.id]?.room_id ?? eventItem.section.room_id ?? "";
         if (itemRoomId !== targetRoomId) return false;
@@ -1933,7 +1978,7 @@ export default function CalendarPage() {
         message: `Valid placement: room ${targetRoomId}, ${selectedDay} ${formatTimeAmPm(slot.start_time)}-${formatTimeAmPm(slot.end_time)}.`,
       };
     },
-    [allDayEvents, assignmentsBySection, data, selectedDay],
+    [allDayEvents, assignmentsBySection, data, linkedSectionIdsBySection, selectedDay],
   );
 
   const commitPlacementByClick = useCallback(
@@ -1943,26 +1988,37 @@ export default function CalendarPage() {
         setDragFeedback({ status: "invalid", message: check.message });
         return;
       }
-      const currentAssignment = assignmentsBySection[sectionId];
+      const linkedSectionIds = linkedSectionIdsBySection.get(sectionId) ?? [sectionId];
       const nextAssignments: AssignmentMap = {
         ...assignmentsBySection,
-        [sectionId]: {
+      };
+      for (const linkedSectionId of linkedSectionIds) {
+        const currentAssignment = assignmentsBySection[linkedSectionId];
+        nextAssignments[linkedSectionId] = {
           timeslot_ids: [slot.id],
           room_id: targetRoomId,
           meeting_pattern_id: currentAssignment?.meeting_pattern_id ?? "",
-        },
-      };
+        };
+      }
       setAssignmentsBySection(nextAssignments);
-      setSolverTimeslotIdsBySection((prev) => ({ ...prev, [sectionId]: [slot.id] }));
+      setSolverTimeslotIdsBySection((prev) => ({
+        ...prev,
+        ...Object.fromEntries(
+          linkedSectionIds.map((linkedSectionId) => [linkedSectionId, [slot.id]]),
+        ),
+      }));
       setPendingPlacementSectionId(null);
       setPlacementPreview(null);
       setDragFeedback({ status: "valid", message: check.message });
       setBackendSaveMessage({
         type: "success",
-        text: "Section placed on the calendar. Click Update Backend to persist this placement.",
+        text:
+          linkedSectionIds.length > 1
+            ? "Cross-listed group placed on the calendar. Click Update Backend to persist this placement."
+            : "Section placed on the calendar. Click Update Backend to persist this placement.",
       });
     },
-    [assignmentsBySection, evaluatePlacement],
+    [assignmentsBySection, evaluatePlacement, linkedSectionIdsBySection],
   );
 
   const handleUpdateBackend = async () => {

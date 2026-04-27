@@ -214,6 +214,31 @@ def _ensure_schema_migrations() -> None:
                     conn.execute(text("ALTER TABLE blocked_times ADD COLUMN start_time VARCHAR(16)"))
                 if "end_time" not in blocked_cols:
                     conn.execute(text("ALTER TABLE blocked_times ADD COLUMN end_time VARCHAR(16)"))
+            if "crosslist_groups" in tables:
+                crosslist_cols = [c["name"] for c in inspector.get_columns("crosslist_groups")]
+                if "require_same_room" in crosslist_cols:
+                    # Drop obsolete legacy column by table rebuild for SQLite compatibility.
+                    conn.execute(
+                        text(
+                            """
+                            CREATE TABLE IF NOT EXISTS crosslist_groups_new (
+                                id VARCHAR PRIMARY KEY,
+                                member_section_ids JSON NOT NULL
+                            )
+                            """
+                        )
+                    )
+                    conn.execute(
+                        text(
+                            """
+                            INSERT INTO crosslist_groups_new (id, member_section_ids)
+                            SELECT id, member_section_ids
+                            FROM crosslist_groups
+                            """
+                        )
+                    )
+                    conn.execute(text("DROP TABLE crosslist_groups"))
+                    conn.execute(text("ALTER TABLE crosslist_groups_new RENAME TO crosslist_groups"))
     except Exception:  # pylint: disable=broad-except
         pass
 
@@ -525,7 +550,41 @@ def _required_section_capacity(section: Any) -> int:
     return 0
 
 
-def _build_crosslist_totals(sections: List) -> Dict[str, int]:
+def _build_section_to_crosslist_group(crosslists: List, sections: List) -> Dict[str, str]:
+    """Build canonical section -> cross-list group mapping.
+
+    Membership declared in cross-list groups is authoritative; section.crosslist_group_id
+    is used as a fallback for sections not explicitly listed in a group.
+    """
+    section_ids = {
+        _section_to_dict(section).get("id")
+        for section in sections
+        if _section_to_dict(section).get("id")
+    }
+    section_to_group: Dict[str, str] = {}
+
+    for group in crosslists:
+        group_dict = group.to_dict() if hasattr(group, "to_dict") else group
+        group_id = group_dict.get("id") if isinstance(group_dict, dict) else group.id
+        if group_id is None:
+            continue
+        members = group_dict.get("member_section_ids", []) if isinstance(group_dict, dict) else group.member_section_ids
+        for member in members or []:
+            member_id = str(member)
+            if member_id in section_ids:
+                section_to_group[member_id] = str(group_id)
+
+    for section in sections:
+        section_dict = _section_to_dict(section)
+        section_id = section_dict.get("id")
+        crosslist_id = section_dict.get("crosslist_group_id")
+        if section_id and crosslist_id and section_id not in section_to_group:
+            section_to_group[str(section_id)] = str(crosslist_id)
+
+    return section_to_group
+
+
+def _build_crosslist_totals(crosslists: List, sections: List) -> Dict[str, int]:
     """Compute total required seats per cross-list group.
 
     Args:
@@ -535,9 +594,11 @@ def _build_crosslist_totals(sections: List) -> Dict[str, int]:
         Mapping of cross-list group ID to summed required section capacity.
     """
     totals: Dict[str, int] = {}
+    section_to_group = _build_section_to_crosslist_group(crosslists, sections)
     for section in sections:
         section_dict = _section_to_dict(section)
-        crosslist_id = section_dict.get("crosslist_group_id")
+        section_id = section_dict.get("id")
+        crosslist_id = section_to_group.get(str(section_id)) if section_id else None
         if crosslist_id:
             totals.setdefault(crosslist_id, 0)
             totals[crosslist_id] += _required_section_capacity(section_dict)
@@ -561,7 +622,7 @@ def _validate_crosslist_capacity(
     """
     errors: List[dict] = []
     max_room_capacity = max((_room_to_dict(room).get("capacity", 0) for room in rooms), default=0)
-    total_by_group = _build_crosslist_totals(sections)
+    total_by_group = _build_crosslist_totals(crosslists, sections)
     for group in crosslists:
         group_dict = group.to_dict() if hasattr(group, "to_dict") else group
         group_id = group_dict.get("id") if isinstance(group_dict, dict) else group.id
@@ -645,7 +706,10 @@ def _build_options(
                         if _timeslot_overlaps_block_range(slot_dict, normalized_block):
                             blocked_times_global.add(ts_id)
 
-    crosslist_totals = _build_crosslist_totals(input_data.sections)
+    section_to_crosslist_group = _build_section_to_crosslist_group(
+        input_data.crosslist_groups, input_data.sections
+    )
+    crosslist_totals = _build_crosslist_totals(input_data.crosslist_groups, input_data.sections)
     options_by_section: Dict[str, List[Tuple[str, Tuple[str, ...], str, int]]] = {}
     errors: List[dict] = []
 
@@ -678,7 +742,7 @@ def _build_options(
                 if room_dict["id"] not in allowed_rooms:
                     continue
             available_rooms.append(room_dict)
-        crosslist_id = section_dict.get("crosslist_group_id")
+        crosslist_id = section_to_crosslist_group.get(section_id)
         if crosslist_id:
             required_capacity = crosslist_totals.get(crosslist_id, 0)
             if not ignore_crosslist_capacity and not ignore_room_capacity:
@@ -759,7 +823,6 @@ def _strip_instructor(input_data: SchedulingInput, instructor_id: str) -> Schedu
             remaining_crosslists.append({
                 "id": group_dict.get("id") if isinstance(group_dict, dict) else group.id,
                 "member_section_ids": members,
-                "require_same_room": group_dict.get("require_same_room") if isinstance(group_dict, dict) else group.require_same_room,
             })
     remaining_no_overlap = []
     for group in input_data.no_overlap_groups:
@@ -818,7 +881,6 @@ def _strip_section(input_data: SchedulingInput, section_id: str) -> SchedulingIn
             remaining_crosslists.append({
                 "id": group_dict.get("id") if isinstance(group_dict, dict) else group.id,
                 "member_section_ids": members,
-                "require_same_room": group_dict.get("require_same_room") if isinstance(group_dict, dict) else group.require_same_room,
             })
     remaining_no_overlap = []
     for group in input_data.no_overlap_groups:
@@ -893,6 +955,9 @@ def _check_feasible(
 
     model = cp_model.CpModel()
     sections_by_id = {_section_to_dict(s)["id"]: s for s in input_data.sections}
+    section_to_crosslist_group = _build_section_to_crosslist_group(
+        input_data.crosslist_groups, input_data.sections
+    )
 
     option_vars: Dict[Tuple[str, int], cp_model.IntVar] = {}
     option_data: Dict[Tuple[str, int], Tuple[str, Tuple[str, ...], str, int]] = {}
@@ -908,7 +973,9 @@ def _check_feasible(
 
     # Pre-index for O(1) lookups (same approach as _solve_schedule).
     vars_by_room_timeslot: Dict[Tuple[str, str], List[Tuple[str, int, cp_model.IntVar]]] = {}
-    vars_by_instructor_timeslot: Dict[Tuple[str, str], List[cp_model.IntVar]] = {}
+    vars_by_instructor_timeslot: Dict[
+        Tuple[str, str], List[Tuple[str, cp_model.IntVar]]
+    ] = {}
     vars_by_section_timeslot: Dict[Tuple[str, str], List[cp_model.IntVar]] = {}
 
     for (section_id, idx), var in option_vars.items():
@@ -919,7 +986,9 @@ def _check_feasible(
             vars_by_room_timeslot.setdefault((room_id, ts_id), []).append(
                 (section_id, idx, var)
             )
-            vars_by_instructor_timeslot.setdefault((instructor_id, ts_id), []).append(var)
+            vars_by_instructor_timeslot.setdefault((instructor_id, ts_id), []).append(
+                (section_id, var)
+            )
             vars_by_section_timeslot.setdefault((section_id, ts_id), []).append(var)
 
     all_timeslot_ids = []
@@ -959,14 +1028,46 @@ def _check_feasible(
         for instructor in input_data.instructors:
             instructor_id = (_instructor_to_dict(instructor))["id"]
             for timeslot_id in all_timeslot_ids:
-                vars_for_slot = vars_by_instructor_timeslot.get((instructor_id, timeslot_id))
-                if vars_for_slot and len(vars_for_slot) > 1:
-                    model.Add(sum(vars_for_slot) <= 1)
+                entries_for_slot = vars_by_instructor_timeslot.get(
+                    (instructor_id, timeslot_id)
+                )
+                if entries_for_slot and len(entries_for_slot) > 1:
+                    vars_by_group: Dict[str, List[cp_model.IntVar]] = {}
+                    for section_id, var in entries_for_slot:
+                        group_key = section_to_crosslist_group.get(
+                            section_id, f"sec:{section_id}"
+                        )
+                        vars_by_group.setdefault(group_key, []).append(var)
+                    if len(vars_by_group) > 1:
+                        group_used_vars = []
+                        for group_key, vars_for_group in vars_by_group.items():
+                            group_used = model.NewBoolVar(
+                                f"feas_inst_use_{instructor_id}_{timeslot_id}_{group_key}"
+                            )
+                            for var in vars_for_group:
+                                model.Add(group_used >= var)
+                            group_used_vars.append(group_used)
+                        model.Add(sum(group_used_vars) <= 1)
             for ts_a, ts_b in overlapping_pairs_feas:
-                vars_a = vars_by_instructor_timeslot.get((instructor_id, ts_a), [])
-                vars_b = vars_by_instructor_timeslot.get((instructor_id, ts_b), [])
-                if vars_a and vars_b:
-                    model.Add(sum(vars_a) + sum(vars_b) <= 1)
+                entries_a = vars_by_instructor_timeslot.get((instructor_id, ts_a), [])
+                entries_b = vars_by_instructor_timeslot.get((instructor_id, ts_b), [])
+                if entries_a and entries_b:
+                    vars_by_group_cross: Dict[str, List[cp_model.IntVar]] = {}
+                    for section_id, var in entries_a + entries_b:
+                        group_key = section_to_crosslist_group.get(
+                            section_id, f"sec:{section_id}"
+                        )
+                        vars_by_group_cross.setdefault(group_key, []).append(var)
+                    if len(vars_by_group_cross) > 1:
+                        group_used_vars = []
+                        for group_key, vars_for_group in vars_by_group_cross.items():
+                            group_used = model.NewBoolVar(
+                                f"feas_inst_overlap_{instructor_id}_{ts_a}_{ts_b}_{group_key}"
+                            )
+                            for var in vars_for_group:
+                                model.Add(group_used >= var)
+                            group_used_vars.append(group_used)
+                        model.Add(sum(group_used_vars) <= 1)
 
     if "no_overlap_groups" not in relax:
         for group in input_data.no_overlap_groups:
@@ -1104,7 +1205,6 @@ def _check_feasible(
         for group in input_data.crosslist_groups:
             group_dict = group.to_dict() if hasattr(group, "to_dict") else group
             members = group_dict.get("member_section_ids", []) if isinstance(group_dict, dict) else group.member_section_ids
-            require_same_room = group_dict.get("require_same_room", False) if isinstance(group_dict, dict) else group.require_same_room
             for i, section_a in enumerate(members):
                 for section_b in members[i + 1 :]:
                     options_a = options_by_section.get(section_a, [])
@@ -1119,7 +1219,7 @@ def _check_feasible(
                                     + option_vars[(section_b, idx_b)]
                                     <= 1
                                 )
-                            elif require_same_room and room_a != room_b:
+                            elif room_a != room_b:
                                 model.Add(
                                     option_vars[(section_a, idx_a)]
                                     + option_vars[(section_b, idx_b)]
@@ -1406,18 +1506,19 @@ def _solve_schedule(input_data: SchedulingInput):
     timeslot_day = _timeslot_days(input_data.timeslots)
     instructors_by_id = _instructors_by_id(input_data)
     sections_by_id = {_section_to_dict(s)["id"]: s for s in input_data.sections}
+    section_to_crosslist_group = _build_section_to_crosslist_group(
+        input_data.crosslist_groups, input_data.sections
+    )
     crosslist_roomshare = set()
     for group in input_data.crosslist_groups:
         group_dict = group.to_dict() if hasattr(group, "to_dict") else group
         group_id = group_dict.get("id") if isinstance(group_dict, dict) else group.id
-        require_same_room = group_dict.get("require_same_room", False) if isinstance(group_dict, dict) else group.require_same_room
-        if require_same_room:
-            crosslist_roomshare.add(group_id)
+        crosslist_roomshare.add(group_id)
     section_to_roomshare_group: Dict[str, str] = {}
     for section in input_data.sections:
         section_dict = _section_to_dict(section)
         section_id = section_dict["id"]
-        crosslist_id = section_dict.get("crosslist_group_id")
+        crosslist_id = section_to_crosslist_group.get(section_id)
         if crosslist_id and crosslist_id in crosslist_roomshare:
             section_to_roomshare_group[section_id] = crosslist_id
         else:
@@ -1441,7 +1542,9 @@ def _solve_schedule(input_data: SchedulingInput):
     # (room_id, timeslot_id) -> [(section_id, idx, var)]
     vars_by_room_timeslot: Dict[Tuple[str, str], List[Tuple[str, int, cp_model.IntVar]]] = {}
     # (instructor_id, timeslot_id) -> [var]
-    vars_by_instructor_timeslot: Dict[Tuple[str, str], List[cp_model.IntVar]] = {}
+    vars_by_instructor_timeslot: Dict[
+        Tuple[str, str], List[Tuple[str, cp_model.IntVar]]
+    ] = {}
     # (section_id, timeslot_id) -> [var]
     vars_by_section_timeslot: Dict[Tuple[str, str], List[cp_model.IntVar]] = {}
 
@@ -1453,7 +1556,9 @@ def _solve_schedule(input_data: SchedulingInput):
             vars_by_room_timeslot.setdefault((room_id, ts_id), []).append(
                 (section_id, idx, var)
             )
-            vars_by_instructor_timeslot.setdefault((instructor_id, ts_id), []).append(var)
+            vars_by_instructor_timeslot.setdefault((instructor_id, ts_id), []).append(
+                (section_id, var)
+            )
             vars_by_section_timeslot.setdefault((section_id, ts_id), []).append(var)
 
     print(f"[solve] Indexed {len(option_vars)} option vars, building constraints...", flush=True)
@@ -1523,15 +1628,41 @@ def _solve_schedule(input_data: SchedulingInput):
     for instructor in input_data.instructors:
         instructor_id = (_instructor_to_dict(instructor))["id"]
         for timeslot_id in all_timeslot_ids:
-            vars_for_slot = vars_by_instructor_timeslot.get((instructor_id, timeslot_id))
-            if vars_for_slot and len(vars_for_slot) > 1:
-                model.Add(sum(vars_for_slot) <= 1)
+            entries_for_slot = vars_by_instructor_timeslot.get((instructor_id, timeslot_id))
+            if entries_for_slot and len(entries_for_slot) > 1:
+                vars_by_group: Dict[str, List[cp_model.IntVar]] = {}
+                for section_id, var in entries_for_slot:
+                    group_key = section_to_crosslist_group.get(section_id, f"sec:{section_id}")
+                    vars_by_group.setdefault(group_key, []).append(var)
+                if len(vars_by_group) > 1:
+                    group_used_vars = []
+                    for group_key, vars_for_group in vars_by_group.items():
+                        group_used = model.NewBoolVar(
+                            f"inst_use_{instructor_id}_{timeslot_id}_{group_key}"
+                        )
+                        for var in vars_for_group:
+                            model.Add(group_used >= var)
+                        group_used_vars.append(group_used)
+                    model.Add(sum(group_used_vars) <= 1)
         # Cross-timeslot overlaps for instructors too
         for ts_a, ts_b in overlapping_pairs:
-            vars_a = vars_by_instructor_timeslot.get((instructor_id, ts_a), [])
-            vars_b = vars_by_instructor_timeslot.get((instructor_id, ts_b), [])
-            if vars_a and vars_b:
-                model.Add(sum(vars_a) + sum(vars_b) <= 1)
+            entries_a = vars_by_instructor_timeslot.get((instructor_id, ts_a), [])
+            entries_b = vars_by_instructor_timeslot.get((instructor_id, ts_b), [])
+            if entries_a and entries_b:
+                vars_by_group_cross: Dict[str, List[cp_model.IntVar]] = {}
+                for section_id, var in entries_a + entries_b:
+                    group_key = section_to_crosslist_group.get(section_id, f"sec:{section_id}")
+                    vars_by_group_cross.setdefault(group_key, []).append(var)
+                if len(vars_by_group_cross) > 1:
+                    group_used_vars = []
+                    for group_key, vars_for_group in vars_by_group_cross.items():
+                        group_used = model.NewBoolVar(
+                            f"inst_overlap_{instructor_id}_{ts_a}_{ts_b}_{group_key}"
+                        )
+                        for var in vars_for_group:
+                            model.Add(group_used >= var)
+                        group_used_vars.append(group_used)
+                    model.Add(sum(group_used_vars) <= 1)
 
     print("[solve] Instructor constraints done.", flush=True)
 
@@ -1684,11 +1815,10 @@ def _solve_schedule(input_data: SchedulingInput):
 
     print("[solve] Major/department/no-overlap constraints done.", flush=True)
 
-    # Cross-listed sections share times and (optionally) room.
+    # Cross-listed sections share both times and room.
     for group in input_data.crosslist_groups:
         group_dict = group.to_dict() if hasattr(group, "to_dict") else group
         members = group_dict.get("member_section_ids", []) if isinstance(group_dict, dict) else group.member_section_ids
-        require_same_room = group_dict.get("require_same_room", False) if isinstance(group_dict, dict) else group.require_same_room
         for i, section_a in enumerate(members):
             for section_b in members[i + 1 :]:
                 options_a = options_by_section.get(section_a, [])
@@ -1703,7 +1833,7 @@ def _solve_schedule(input_data: SchedulingInput):
                                 + option_vars[(section_b, idx_b)]
                                 <= 1
                             )
-                        elif require_same_room and room_a != room_b:
+                        elif room_a != room_b:
                             model.Add(
                                 option_vars[(section_a, idx_a)]
                                 + option_vars[(section_b, idx_b)]
@@ -2751,6 +2881,10 @@ def update_meeting_patterns():
 def update_constraints():
     data = request.get_json() or {}
     try:
+        crosslist_cols = {
+            col["name"] for col in inspect(db.engine).get_columns("crosslist_groups")
+        }
+        has_legacy_room_col = "require_same_room" in crosslist_cols
         CrossListGroup.query.delete()
         NoOverlapGroup.query.delete()
         BlockedTime.query.delete()
@@ -2758,12 +2892,39 @@ def update_constraints():
         SoftLock.query.delete()
 
         for item in data.get("crosslist_groups", []) or []:
-            db.session.add(
-                CrossListGroup(
-                    id=item.get("id"),
-                    member_section_ids=item.get("member_section_ids", []) or [],
-                    require_same_room=bool(item.get("require_same_room", False)),
+            if has_legacy_room_col:
+                db.session.execute(
+                    text(
+                        """
+                        INSERT INTO crosslist_groups (id, member_section_ids, require_same_room)
+                        VALUES (:id, :member_section_ids, 1)
+                        """
+                    ),
+                    {
+                        "id": item.get("id"),
+                        "member_section_ids": json.dumps(
+                            item.get("member_section_ids", []) or []
+                        ),
+                    },
                 )
+            else:
+                db.session.add(
+                    CrossListGroup(
+                        id=item.get("id"),
+                        member_section_ids=item.get("member_section_ids", []) or [],
+                    )
+                )
+        # Canonicalize section-level cross-list IDs from group membership.
+        # Cross-list groups are the source of truth.
+        Section.query.update({Section.crosslist_group_id: None})
+        for item in data.get("crosslist_groups", []) or []:
+            group_id = item.get("id")
+            member_ids = item.get("member_section_ids", []) or []
+            if not group_id or not member_ids:
+                continue
+            (
+                Section.query.filter(Section.id.in_(member_ids))
+                .update({Section.crosslist_group_id: group_id}, synchronize_session=False)
             )
 
         for item in data.get("no_overlap_groups", []) or []:

@@ -502,7 +502,6 @@ class CrossListGroup(db.Model):
 
     id = Column(String, primary_key=True)
     member_section_ids = Column(JSON, nullable=False)  # List[str] - section IDs in this group
-    require_same_room = Column(Boolean, nullable=False, default=False)  # Must share same room?
 
     # One-to-many: One group contains many sections
     sections = relationship("Section", back_populates="crosslist_group")
@@ -511,7 +510,6 @@ class CrossListGroup(db.Model):
         return {
             "id": self.id,
             "member_section_ids": self.member_section_ids or [],
-            "require_same_room": self.require_same_room,
         }
 
 

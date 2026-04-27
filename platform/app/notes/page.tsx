@@ -292,7 +292,6 @@ export default function NotesFeedPage() {
           title: `Cross-List Group ${row.id}`,
           fields: [
             { label: "Members", value: row.member_section_ids?.join(", ") || "N/A" },
-            { label: "Require Same Room", value: row.require_same_room ? "Yes" : "No" },
           ],
         };
       }

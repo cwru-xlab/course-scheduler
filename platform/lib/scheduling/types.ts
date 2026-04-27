@@ -58,7 +58,6 @@ export type MeetingPattern = {
 export type CrossListGroup = {
   id: Id;
   member_section_ids: Id[];
-  require_same_room: boolean;
 };
 
 export type NoOverlapGroup = {

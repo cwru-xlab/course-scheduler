@@ -125,7 +125,6 @@ def _rows_for_sheet(sheet_name: str, payload: Dict[str, Any]) -> list[Dict[str, 
             {
                 "id": _export_str(item.get("id", "")),
                 "member_section_ids": serialize_list_cell(item.get("member_section_ids")),
-                "require_same_room": bool(item.get("require_same_room", False)),
             }
             for item in payload.get("crosslist_groups", [])
         ]

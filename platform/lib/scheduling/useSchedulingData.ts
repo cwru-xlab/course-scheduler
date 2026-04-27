@@ -10,6 +10,7 @@ import React, {
 } from "react";
 
 import type { SchedulingInput } from "./types";
+import { normalizeCrosslistData } from "./crosslist";
 
 const STORAGE_KEY = "wsom-scheduling-data";
 export const SCHEDULING_DATA_REFRESH_EVENT = "wsom-scheduling-data-refresh";
@@ -66,7 +67,7 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
       }
 
       if (isMounted) {
-        setData(result.data);
+        setData(normalizeCrosslistData(result.data));
         setIsFromLocalStorage(false);
         setHasUnsavedChanges(false);
       }
@@ -104,7 +105,7 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
 
   // Update entire data object
   const updateData = useCallback((newData: SchedulingInput) => {
-    setData(newData);
+    setData(normalizeCrosslistData(newData));
     setHasUnsavedChanges(true);
   }, []);
 
@@ -113,7 +114,7 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
     <K extends keyof SchedulingInput>(field: K, value: SchedulingInput[K]) => {
       setData((prev) => {
         if (!prev) return prev;
-        return { ...prev, [field]: value };
+        return normalizeCrosslistData({ ...prev, [field]: value });
       });
       setHasUnsavedChanges(true);
     },
