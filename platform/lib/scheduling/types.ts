@@ -71,6 +71,8 @@ export type BlockedTime = {
   days: string;
   start_time: string;
   end_time: string;
+  instructor_id?: Id;
+  room_id?: Id;
   // Legacy fallback support for imported data.
   timeslot_ids?: Id[];
   reason: string;

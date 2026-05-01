@@ -551,6 +551,8 @@ class BlockedTime(db.Model):
     days = Column(String(32), nullable=True)  # e.g., "MWF" or "M,W,F"
     start_time = Column(String(16), nullable=True)  # e.g., "10:00"
     end_time = Column(String(16), nullable=True)  # e.g., "10:50"
+    instructor_id = Column(String, nullable=True)
+    room_id = Column(String, nullable=True)
     reason = Column(Text, nullable=False)  # Why these times are blocked
 
     def to_dict(self):
@@ -560,6 +562,8 @@ class BlockedTime(db.Model):
             "days": self.days,
             "start_time": self.start_time,
             "end_time": self.end_time,
+            "instructor_id": self.instructor_id,
+            "room_id": self.room_id,
             "reason": self.reason,
         }
 

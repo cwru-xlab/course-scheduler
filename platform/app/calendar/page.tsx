@@ -24,6 +24,7 @@ import {
   Undo2,
 } from "lucide-react";
 import type {
+  BlockedTime,
   LockedAssignment,
   ScheduleSolution,
   SchedulingInput,
@@ -133,6 +134,19 @@ type CalendarAssignmentMap = Record<
   string,
   { timeslot_ids: string[]; room_id: string; meeting_pattern_id: string }
 >;
+
+type PlacementEvaluationCode = "blocked" | "capacity" | "conflict" | "other";
+
+type PlacementEvaluation = {
+  isValid: boolean;
+  message: string;
+  reasonCode?: PlacementEvaluationCode;
+};
+
+type BlockedRuleMatch = {
+  matches: boolean;
+  label: string;
+};
 
 function crosslistPeerSectionIds(sectionId: string, sections: SectionDto[]): string[] {
   const section = sections.find((s) => s.id === sectionId);
@@ -260,6 +274,140 @@ function parseMinutes(hhmm: string): number {
 
   const [h, m] = raw.split(":").map((x) => parseInt(x, 10));
   return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+}
+
+function normalizeScopeValue(raw: unknown): string {
+  return String(raw ?? "")
+    .trim()
+    .toLowerCase();
+}
+
+function blockedDaysMatch(dayExpression: unknown, selectedDay: Day): boolean {
+  const raw = String(dayExpression ?? "").trim();
+  if (!raw) return true;
+  const pseudoTimeslot: TimeslotDto = {
+    id: "__blocked-day__",
+    days: raw,
+    start_time: "00:00",
+    end_time: "23:59",
+  };
+  return timeslotMatchesDay(pseudoTimeslot, selectedDay);
+}
+
+function blockedRuleOverlapsSlot(rule: BlockedTime, slot: TimeslotWithMinutes, selectedDay: Day): boolean {
+  const explicitIds = Array.isArray(rule.timeslot_ids)
+    ? rule.timeslot_ids.map((id) => String(id)).filter(Boolean)
+    : [];
+  if (explicitIds.includes(slot.id)) return true;
+
+  if (!blockedDaysMatch(rule.days, selectedDay)) return false;
+  if (!rule.start_time || !rule.end_time) return false;
+  const blockStart = parseMinutes(rule.start_time);
+  const blockEnd = parseMinutes(rule.end_time);
+  if (!Number.isFinite(blockStart) || !Number.isFinite(blockEnd) || blockEnd <= blockStart) {
+    return false;
+  }
+  return slot.start < blockEnd && slot.end > blockStart;
+}
+
+function blockedRuleTarget(raw: unknown, aliases: string[]): string {
+  if (!raw || typeof raw !== "object") return "";
+  const record = raw as Record<string, unknown>;
+  for (const key of aliases) {
+    const candidate = String(record[key] ?? "").trim();
+    if (candidate) return candidate;
+  }
+  return "";
+}
+
+function blockedRuleMatchesSection(
+  rule: BlockedTime,
+  section: SectionDto,
+  targetRoomId?: string,
+): BlockedRuleMatch {
+  const scope = normalizeScopeValue(rule.scope);
+  if (scope === "global") return { matches: true, label: "global policy" };
+
+  if (scope === "program" || scope === "department") {
+    const departmentTarget = blockedRuleTarget(rule, [
+      "department",
+      "program",
+      "program_id",
+      "target",
+      "target_id",
+      "scope_value",
+      "value",
+    ]);
+    const sectionDepartment = String(section.department ?? "").trim();
+    if (!departmentTarget || !sectionDepartment) {
+      return { matches: false, label: "department policy" };
+    }
+    return {
+      matches: sectionDepartment.localeCompare(departmentTarget, undefined, { sensitivity: "accent" }) === 0,
+      label: `department ${departmentTarget}`,
+    };
+  }
+
+  if (scope === "instructor" || scope === "professor") {
+    const instructorTarget = blockedRuleTarget(rule, [
+      "instructor_id",
+      "instructor",
+      "professor_id",
+      "professor",
+      "target",
+      "target_id",
+      "scope_value",
+      "value",
+    ]);
+    if (!instructorTarget) return { matches: false, label: "instructor policy" };
+    return {
+      matches:
+        String(section.instructor_id ?? "").trim().localeCompare(instructorTarget, undefined, {
+          sensitivity: "accent",
+        }) === 0,
+      label: `professor ${instructorTarget}`,
+    };
+  }
+
+  if (scope === "room") {
+    const roomTarget = blockedRuleTarget(rule, [
+      "room_id",
+      "room",
+      "target",
+      "target_id",
+      "scope_value",
+      "value",
+    ]);
+    if (!roomTarget) return { matches: false, label: "room policy" };
+    const selectedRoom = String(targetRoomId ?? "").trim();
+    return {
+      matches:
+        selectedRoom.localeCompare(roomTarget, undefined, { sensitivity: "accent" }) === 0,
+      label: `room ${roomTarget}`,
+    };
+  }
+
+  if (scope === "course" || scope === "section") {
+    const courseTarget = blockedRuleTarget(rule, [
+      "course_id",
+      "section_id",
+      "course",
+      "section",
+      "target",
+      "target_id",
+      "scope_value",
+      "value",
+    ]);
+    if (!courseTarget) return { matches: false, label: "course policy" };
+    const sectionCourseId = String(section.course_id ?? "").trim();
+    const sectionId = String(section.id ?? "").trim();
+    const matched =
+      sectionCourseId.localeCompare(courseTarget, undefined, { sensitivity: "accent" }) === 0 ||
+      sectionId.localeCompare(courseTarget, undefined, { sensitivity: "accent" }) === 0;
+    return { matches: matched, label: `course ${courseTarget}` };
+  }
+
+  return { matches: false, label: `${scope || "unknown"} policy` };
 }
 
 function formatTimeAmPm(hhmm: string): string {
@@ -950,6 +1098,32 @@ export default function CalendarPage() {
     data?.instructors.forEach((i) => map.set(i.id, i));
     return map;
   }, [data]);
+
+  const sectionById = useMemo(() => {
+    const map = new Map<string, SectionDto>();
+    data?.sections.forEach((section) => map.set(section.id, section));
+    return map;
+  }, [data]);
+
+  const findBlockedPlacementMessage = useCallback(
+    (sectionId: string, targetRoomId: string, slot: TimeslotWithMinutes): string | null => {
+      if (!solverInput) return null;
+      const section = sectionById.get(sectionId);
+      if (!section) return null;
+      for (const blocked of solverInput.blocked_times ?? []) {
+        const sectionScopeMatch = blockedRuleMatchesSection(blocked, section, targetRoomId);
+        if (!sectionScopeMatch.matches) continue;
+        if (!blockedRuleOverlapsSlot(blocked, slot, selectedDay)) continue;
+        const reason = String(blocked.reason ?? "").trim();
+        const title = [section.department, String(section.course_id)].filter(Boolean).join(" ").trim();
+        const timeRange = `${formatTimeAmPm(slot.start_time)}-${formatTimeAmPm(slot.end_time)}`;
+        const reasonText = reason ? ` Reason: ${reason}.` : "";
+        return `Cannot place ${title || section.id} into ${selectedDay} ${timeRange}. This timeslot is blocked by ${sectionScopeMatch.label}.${reasonText}`;
+      }
+      return null;
+    },
+    [sectionById, selectedDay, solverInput],
+  );
 
   const departmentFilterOptions = useMemo(() => {
     if (!data?.sections.length) return [] as { key: string; label: string }[];
@@ -1677,12 +1851,57 @@ export default function CalendarPage() {
       .sort((a, b) => a - b);
   }, [dragPossibleTimeslots, axisStart, axisEnd]);
 
+  const dragBlockedTimeslotInfo = useMemo(() => {
+    const blockedSlotIds = new Set<string>();
+    const blockedReasonBySlotId = new Map<string, string>();
+    if (!calendarDrag?.sectionId || !dragPossibleTimeslots.length || !solverInput) {
+      return { blockedSlotIds, blockedReasonBySlotId };
+    }
+    const linkedSectionIds = linkedSectionIdsBySection.get(calendarDrag.sectionId) ?? [
+      calendarDrag.sectionId,
+    ];
+    for (const roomRow of roomRows) {
+      for (const slot of dragPossibleTimeslots) {
+        for (const linkedSectionId of linkedSectionIds) {
+          const blockedMessage = findBlockedPlacementMessage(linkedSectionId, roomRow.room.id, slot);
+          if (!blockedMessage) continue;
+          const key = `${roomRow.room.id}::${slot.id}`;
+          blockedSlotIds.add(key);
+          blockedReasonBySlotId.set(key, blockedMessage);
+          break;
+        }
+      }
+    }
+    return { blockedSlotIds, blockedReasonBySlotId };
+  }, [
+    calendarDrag?.sectionId,
+    dragPossibleTimeslots,
+    findBlockedPlacementMessage,
+    linkedSectionIdsBySection,
+    roomRows,
+    solverInput,
+  ]);
+
   const commitCalendarPlacement = useCallback(
     (sectionId: string, targetRoomId: string, selectedSlot: TimeslotWithMinutes) => {
       if (!data) return;
       const dragged = allDayEvents.find((x) => x.section.id === sectionId && x.timeslot);
       if (!dragged || !dragged.timeslot) return;
       const linkedSectionIds = linkedSectionIdsBySection.get(sectionId) ?? [sectionId];
+      for (const linkedSectionId of linkedSectionIds) {
+        const blockedMessage = findBlockedPlacementMessage(
+          linkedSectionId,
+          targetRoomId,
+          selectedSlot,
+        );
+        if (blockedMessage) {
+          setDragFeedback({
+            status: "invalid",
+            message: blockedMessage,
+          });
+          return;
+        }
+      }
       const linkedSectionIdSet = new Set(linkedSectionIds);
 
       const currentAssignment = assignmentsBySection[sectionId];
@@ -1806,6 +2025,7 @@ export default function CalendarPage() {
       dragError,
       dragFeedback,
       linkedSectionIdsBySection,
+      findBlockedPlacementMessage,
       selectedDay,
       solverTimeslotIdsBySection,
       timeslotById,
@@ -1935,10 +2155,20 @@ export default function CalendarPage() {
 
   const evaluatePlacement = useCallback(
     (sectionId: string, targetRoomId: string, slot: TimeslotWithMinutes) => {
-      if (!data) return { isValid: false, message: "Calendar data is unavailable." };
+      if (!data) {
+        return { isValid: false, message: "Calendar data is unavailable.", reasonCode: "other" } as PlacementEvaluation;
+      }
       const section = data.sections.find((s) => s.id === sectionId);
-      if (!section) return { isValid: false, message: "Section not found." };
+      if (!section) {
+        return { isValid: false, message: "Section not found.", reasonCode: "other" } as PlacementEvaluation;
+      }
       const linkedSectionIds = linkedSectionIdsBySection.get(sectionId) ?? [sectionId];
+      for (const linkedSectionId of linkedSectionIds) {
+        const blockedMessage = findBlockedPlacementMessage(linkedSectionId, targetRoomId, slot);
+        if (blockedMessage) {
+          return { isValid: false, message: blockedMessage, reasonCode: "blocked" } as PlacementEvaluation;
+        }
+      }
       const linkedSectionIdSet = new Set(linkedSectionIds);
       const targetRoom = data.rooms.find((room) => room.id === targetRoomId);
       const requiredSeats = linkedSectionIds.reduce((sum, linkedSectionId) => {
@@ -1953,7 +2183,8 @@ export default function CalendarPage() {
         return {
           isValid: false,
           message: `Invalid: ${section.department ?? ""} ${section.course_id} requires ${requiredSeats} seats, but room ${targetRoomId} capacity is ${targetRoom?.capacity}.`,
-        };
+          reasonCode: "capacity",
+        } as PlacementEvaluation;
       }
       const conflicts = allDayEvents.filter((eventItem) => {
         if (linkedSectionIdSet.has(eventItem.section.id)) return false;
@@ -1971,14 +2202,22 @@ export default function CalendarPage() {
         return {
           isValid: false,
           message: `Invalid: conflicts with ${conflictNames || "another class"} in room ${targetRoomId} at ${formatTimeAmPm(slot.start_time)}-${formatTimeAmPm(slot.end_time)}.`,
-        };
+          reasonCode: "conflict",
+        } as PlacementEvaluation;
       }
       return {
         isValid: true,
         message: `Valid placement: room ${targetRoomId}, ${selectedDay} ${formatTimeAmPm(slot.start_time)}-${formatTimeAmPm(slot.end_time)}.`,
-      };
+      } as PlacementEvaluation;
     },
-    [allDayEvents, assignmentsBySection, data, linkedSectionIdsBySection, selectedDay],
+    [
+      allDayEvents,
+      assignmentsBySection,
+      data,
+      findBlockedPlacementMessage,
+      linkedSectionIdsBySection,
+      selectedDay,
+    ],
   );
 
   const commitPlacementByClick = useCallback(
@@ -2632,7 +2871,8 @@ export default function CalendarPage() {
           </div>
           <p className="mt-2 text-[10px] text-slate-500 leading-relaxed">
             Shaded columns appear only while you drag; colors match slot duration on{" "}
-            <span className="font-semibold">{selectedDay}</span>.
+            <span className="font-semibold">{selectedDay}</span>. Red hatched columns are blocked for
+            the course currently being dragged.
           </p>
         </div>
       )}
@@ -2772,6 +3012,9 @@ export default function CalendarPage() {
                       .filter((slot) => slot.end > axisStart && slot.start < axisEnd)
                       .map((slot) => {
                         const durationMin = Math.max(0, slot.end - slot.start);
+                        const blockedKey = `${room.id}::${slot.id}`;
+                        const isBlockedForDraggedSection = dragBlockedTimeslotInfo.blockedSlotIds.has(blockedKey);
+                        const blockedReason = dragBlockedTimeslotInfo.blockedReasonBySlotId.get(blockedKey);
                         const leftPct =
                           (clamp(slot.start, axisStart, axisEnd) - axisStart) / axisRange;
                         const widthPct =
@@ -2785,10 +3028,21 @@ export default function CalendarPage() {
                             style={{
                               left: `${leftPct * 100}%`,
                               width: `${Math.max(widthPct * 100, 0.5)}%`,
-                              backgroundColor: rgbaFillForTimeslotDuration(durationMin, "strong"),
+                              backgroundColor: isBlockedForDraggedSection
+                                ? "rgba(220, 38, 38, 0.2)"
+                                : rgbaFillForTimeslotDuration(durationMin, "strong"),
+                              backgroundImage: isBlockedForDraggedSection
+                                ? "repeating-linear-gradient(135deg, rgba(220,38,38,0.38) 0px, rgba(220,38,38,0.38) 5px, rgba(255,255,255,0.0) 5px, rgba(255,255,255,0.0) 10px)"
+                                : undefined,
+                              outline: isBlockedForDraggedSection
+                                ? "1px solid rgba(220, 38, 38, 0.75)"
+                                : undefined,
                               zIndex: 0,
                             }}
-                            title={`${formatTimeAmPm(slot.start_time)}–${formatTimeAmPm(slot.end_time)} (${durationMin} min)`}
+                            title={
+                              blockedReason ??
+                              `${formatTimeAmPm(slot.start_time)}–${formatTimeAmPm(slot.end_time)} (${durationMin} min)`
+                            }
                           />
                         );
                       })}
@@ -2855,9 +3109,15 @@ export default function CalendarPage() {
                     (() => {
                       const slot = timeslotById.get(calendarDrag.preview.slotId);
                       if (!slot) return null;
+                      const blockedKey = `${room.id}::${slot.id}`;
+                      const isBlockedForDraggedSection = dragBlockedTimeslotInfo.blockedSlotIds.has(blockedKey);
                       const durationMin = timeslotDurationMinutes(slot);
-                      const bg = rgbaFillForTimeslotDuration(durationMin, "strong");
-                      const border = rgbaBorderForTimeslotDuration(durationMin);
+                      const bg = isBlockedForDraggedSection
+                        ? "rgba(239, 68, 68, 0.2)"
+                        : rgbaFillForTimeslotDuration(durationMin, "strong");
+                      const border = isBlockedForDraggedSection
+                        ? "rgba(220, 38, 38, 0.85)"
+                        : rgbaBorderForTimeslotDuration(durationMin);
                       const slotStartM = parseMinutes(slot.start_time);
                       const slotEndM = parseMinutes(slot.end_time);
                       const leftPct =
@@ -3141,6 +3401,9 @@ export default function CalendarPage() {
                   const timeLabelPv = `${formatTimeAmPm(st.start_time)} - ${formatTimeAmPm(st.end_time)}`;
                   const colorPv =
                     departmentPaletteByKey.get(departmentColorKey(section)) ?? solidPaletteAt(0);
+                  const previewBlocked = dragBlockedTimeslotInfo.blockedSlotIds.has(
+                    `${d.preview.targetRoomId}::${st.id}`,
+                  );
                   const previewMatchesHoveredDepartment =
                     activeLegendDepartmentKeys.size === 0 ||
                     activeLegendDepartmentKeys.has(departmentColorKey(section));
@@ -3148,7 +3411,8 @@ export default function CalendarPage() {
                     <div
                       key="calendar-drag-preview"
                       className={clsx(
-                        "absolute pointer-events-none z-[25] border-l-4 rounded-lg p-2.5 flex flex-col justify-between shadow-sm ring-2 ring-[#137fec]/40 ring-inset",
+                        "absolute pointer-events-none z-[25] border-l-4 rounded-lg p-2.5 flex flex-col justify-between shadow-sm ring-2 ring-inset",
+                        previewBlocked ? "ring-red-500/65" : "ring-[#137fec]/40",
                         !previewMatchesHoveredDepartment && "opacity-35",
                       )}
                       style={{

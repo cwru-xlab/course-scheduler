@@ -525,6 +525,8 @@ export const SchedulerDemo = () => {
             />
             <BlockedTimesEditor
               blockedTimes={data.blocked_times}
+              instructorOptions={instructorOptions}
+              roomOptions={roomOptions}
               onUpdate={(blockedTimes) => markDirtyAndUpdateField("blocked_times", blockedTimes)}
             />
             <LockedAssignmentsEditor

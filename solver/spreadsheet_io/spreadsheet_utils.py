@@ -69,7 +69,16 @@ SPREADSHEET_SPECS: List[SheetSpec] = [
     ),
     SheetSpec(
         name="BlockedTimes",
-        columns=["scope", "days", "start_time", "end_time", "reason"],
+        columns=[
+            "scope",
+            "days",
+            "start_time",
+            "end_time",
+            "instructor_id",
+            "room_id",
+            "timeslot_ids",
+            "reason",
+        ],
     ),
     SheetSpec(
         name="LockedAssignments",

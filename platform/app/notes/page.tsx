@@ -318,6 +318,8 @@ export default function NotesFeedPage() {
             { label: "Days", value: row.days || "N/A" },
             { label: "Start", value: row.start_time || "N/A" },
             { label: "End", value: row.end_time || "N/A" },
+            { label: "Professor", value: row.instructor_id || "N/A" },
+            { label: "Room", value: row.room_id || "N/A" },
             { label: "Reason", value: row.reason || "N/A" },
           ],
         };
