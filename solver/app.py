@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 import os
 import re
 from importlib import import_module
@@ -206,6 +207,10 @@ def _ensure_schema_migrations() -> None:
                             "ALTER TABLE sections ADD COLUMN department VARCHAR(128) NOT NULL DEFAULT ''"
                         )
                     )
+                if "previous_meeting_pattern" not in section_cols:
+                    conn.execute(
+                        text("ALTER TABLE sections ADD COLUMN previous_meeting_pattern VARCHAR")
+                    )
             if "blocked_times" in tables:
                 blocked_cols = {c["name"] for c in inspector.get_columns("blocked_times")}
                 if "days" not in blocked_cols:
@@ -214,6 +219,10 @@ def _ensure_schema_migrations() -> None:
                     conn.execute(text("ALTER TABLE blocked_times ADD COLUMN start_time VARCHAR(16)"))
                 if "end_time" not in blocked_cols:
                     conn.execute(text("ALTER TABLE blocked_times ADD COLUMN end_time VARCHAR(16)"))
+                if "instructor_id" not in blocked_cols:
+                    conn.execute(text("ALTER TABLE blocked_times ADD COLUMN instructor_id VARCHAR"))
+                if "room_id" not in blocked_cols:
+                    conn.execute(text("ALTER TABLE blocked_times ADD COLUMN room_id VARCHAR"))
             if "crosslist_groups" in tables:
                 crosslist_cols = [c["name"] for c in inspector.get_columns("crosslist_groups")]
                 if "require_same_room" in crosslist_cols:
@@ -2607,6 +2616,7 @@ def update_sections():
                 is_crosslisted=bool(item.get("is_crosslisted", False)),
                 last_year_time=item.get("last_year_time"),
                 last_year_room=item.get("last_year_room"),
+                previous_meeting_pattern=item.get("previous_meeting_pattern"),
                 allowed_meeting_patterns=item.get("allowed_meeting_patterns", []),
                 room_requirements=item.get("room_requirements", []),
                 crosslist_group_id=item.get("crosslist_group_id"),
@@ -2944,6 +2954,8 @@ def update_constraints():
                     days=item.get("days"),
                     start_time=item.get("start_time"),
                     end_time=item.get("end_time"),
+                    instructor_id=item.get("instructor_id"),
+                    room_id=item.get("room_id"),
                     reason=item.get("reason") or "blocked",
                 )
             )

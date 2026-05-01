@@ -168,6 +168,8 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
                 "days": days or "",
                 "start_time": start_time or "",
                 "end_time": end_time or "",
+                "instructor_id": maybe_str(row.get("instructor_id")) or "",
+                "room_id": maybe_str(row.get("room_id")) or "",
                 "timeslot_ids": parse_list_cell(row.get("timeslot_ids")),
                 "reason": _str_with_default(row, "reason", "BlockedTimes", default="blocked"),
             }

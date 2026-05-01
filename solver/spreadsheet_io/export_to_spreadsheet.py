@@ -144,6 +144,9 @@ def _rows_for_sheet(sheet_name: str, payload: Dict[str, Any]) -> list[Dict[str, 
                 "days": _export_str(item.get("days", "")),
                 "start_time": _export_str(item.get("start_time", "")),
                 "end_time": _export_str(item.get("end_time", "")),
+                "instructor_id": _export_str(item.get("instructor_id", "")),
+                "room_id": _export_str(item.get("room_id", "")),
+                "timeslot_ids": serialize_list_cell(item.get("timeslot_ids")),
                 "reason": _export_str(item.get("reason", "")),
             }
             for item in payload.get("blocked_times", [])

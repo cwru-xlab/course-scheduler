@@ -31,6 +31,7 @@ const createEmptySection = (existing: Section[]): Section => ({
   expected_enrollment: 20,
   enrollment_cap: 30,
   allowed_meeting_patterns: [],
+  previous_meeting_pattern: undefined,
   room_requirements: [],
   crosslist_group_id: null,
   tags: [],
@@ -79,6 +80,7 @@ export const SectionsEditor = ({
           section.expected_enrollment,
           section.enrollment_cap,
           section.crosslist_group_id ?? "",
+          section.previous_meeting_pattern ?? "",
           ...section.allowed_meeting_patterns,
           ...section.room_requirements,
           ...section.tags,
@@ -117,6 +119,7 @@ export const SectionsEditor = ({
               <th className="pb-2 pr-3">Enroll</th>
               <th className="pb-2 pr-3">Cap</th>
               <th className="pb-2 pr-3">Meeting Patterns</th>
+              <th className="pb-2 pr-3">Assigned Pattern</th>
               <th className="pb-2 pr-3">Room Req</th>
               <th className="pb-2 pr-3">Crosslist Group</th>
               <th className="pb-2 pr-3">Tags</th>
@@ -167,6 +170,16 @@ export const SectionsEditor = ({
                     options={meetingPatternOptions}
                     onChange={(v) => updateSection(idx, "allowed_meeting_patterns", v)}
                     placeholder="Select patterns"
+                  />
+                </td>
+                <td className="py-2 pr-3">
+                  <EditableSelectCell
+                    value={section.previous_meeting_pattern ?? "__none__"}
+                    options={[{ key: "__none__", label: "(None)" }, ...meetingPatternOptions]}
+                    onChange={(v) =>
+                      updateSection(idx, "previous_meeting_pattern", v === "__none__" ? undefined : v)
+                    }
+                    placeholder="Pattern"
                   />
                 </td>
                 <td className="py-2 pr-3">
