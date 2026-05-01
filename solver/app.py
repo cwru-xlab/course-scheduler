@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 import os
 import re
 from importlib import import_module
@@ -205,6 +206,10 @@ def _ensure_schema_migrations() -> None:
                         text(
                             "ALTER TABLE sections ADD COLUMN department VARCHAR(128) NOT NULL DEFAULT ''"
                         )
+                    )
+                if "previous_meeting_pattern" not in section_cols:
+                    conn.execute(
+                        text("ALTER TABLE sections ADD COLUMN previous_meeting_pattern VARCHAR")
                     )
             if "blocked_times" in tables:
                 blocked_cols = {c["name"] for c in inspector.get_columns("blocked_times")}
@@ -2611,6 +2616,7 @@ def update_sections():
                 is_crosslisted=bool(item.get("is_crosslisted", False)),
                 last_year_time=item.get("last_year_time"),
                 last_year_room=item.get("last_year_room"),
+                previous_meeting_pattern=item.get("previous_meeting_pattern"),
                 allowed_meeting_patterns=item.get("allowed_meeting_patterns", []),
                 room_requirements=item.get("room_requirements", []),
                 crosslist_group_id=item.get("crosslist_group_id"),
