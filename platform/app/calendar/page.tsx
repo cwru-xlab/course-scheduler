@@ -41,6 +41,7 @@ import {
   SCHEDULING_WINDOW_END_HOUR,
   SCHEDULING_WINDOW_START_HOUR,
 } from "@/lib/scheduling/timeWindow";
+import { isSectionArchived, normalizeSectionState } from "@/lib/scheduling/sectionState";
 
 type TimeslotDto = {
   id: string;
@@ -84,6 +85,7 @@ type SectionDto = {
   room_requirements?: string[];
   crosslist_group_id?: string | null;
   tags?: string[];
+  state?: string | null;
 };
 
 type RoomDto = {
@@ -997,6 +999,7 @@ type MeetingPatternPlacementOption = {
                   room_requirements: section.room_requirements ?? [],
                   crosslist_group_id: section.crosslist_group_id ?? null,
                   tags: section.tags ?? [],
+                  state: section.state ?? "active",
                   room_id: assignment?.room_id ?? null,
                   // Legacy field retained for compatibility with existing rendering.
                   timeslot_id: assignment?.timeslot_ids?.[0] ?? null,
@@ -1399,6 +1402,7 @@ type MeetingPatternPlacementOption = {
         room_requirements: section.room_requirements ?? [],
         crosslist_group_id: section.crosslist_group_id ?? null,
         tags: section.tags ?? [],
+        state: normalizeSectionState(section.state),
       })),
     [],
   );
@@ -1524,6 +1528,9 @@ type MeetingPatternPlacementOption = {
 
   const sectionMatchesFilters = useCallback(
     (section: SectionDto) => {
+      if (isSectionArchived(section)) {
+        return false;
+      }
       const departmentMatch =
         selectedDepartmentKeys.length === 0 ||
         selectedDepartmentKeys.includes(departmentColorKey(section));

@@ -63,6 +63,7 @@ def _rows_for_sheet(sheet_name: str, payload: Dict[str, Any]) -> list[Dict[str, 
                 "previous_meeting_pattern": _export_str(
                     item.get("previous_meeting_pattern") or ""
                 ),
+                "state": _export_str(item.get("state") or "active"),
             }
             for item in payload.get("sections", [])
         ]

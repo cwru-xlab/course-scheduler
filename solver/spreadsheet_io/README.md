@@ -15,7 +15,9 @@ This workbook format is the interchange schema for the scheduler UI's `Schedulin
 ### `Sections`
 `id`, `course_id`, `department`, `section_code`, `instructor_id`,
 `expected_enrollment`, `enrollment_cap`, `allowed_meeting_patterns`,
-`room_requirements`, `crosslist_group_id`, `tags`, `previous_meeting_pattern`
+`room_requirements`, `crosslist_group_id`, `tags`, `previous_meeting_pattern`, `state`
+
+`state` is `active` (default) or `archived`. Archived sections are excluded from the solver and hidden on the calendar.
 
 ### `Instructors`
 `id`, `name`, `rank_type`, `unavailable_times`, `preferred_days`,

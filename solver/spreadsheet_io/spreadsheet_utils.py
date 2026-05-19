@@ -33,6 +33,7 @@ SPREADSHEET_SPECS: List[SheetSpec] = [
             "crosslist_group_id",
             "tags",
             "previous_meeting_pattern",
+            "state",
         ],
     ),
     SheetSpec(
@@ -136,6 +137,14 @@ def normalize_sheet_headers(sheet_name: str, headers: List[str]) -> List[str]:
     raise ValueError(
         f"Sheet '{sheet_name}' has invalid headers. Expected: {expected}. Found: {headers[:len(expected)]}"
     )
+
+
+def normalize_section_state(raw: Any) -> str:
+    """Return 'active' or 'archived'. Blank/missing defaults to active."""
+    value = str(raw or "").strip().lower()
+    if value in ("archived", "archive"):
+        return "archived"
+    return "active"
 
 
 def parse_list_cell(value: Any) -> List[str]:
