@@ -13,10 +13,15 @@ import { RowNotesButton } from "../RowNotesButton";
 
 import type { Section, SectionState } from "@/lib/scheduling/types";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
-import { isSectionArchived, normalizeSectionState } from "@/lib/scheduling/sectionState";
+import {
+  isSectionArchived,
+  isSectionNew,
+  normalizeSectionState,
+} from "@/lib/scheduling/sectionState";
 
 const STATE_OPTIONS: { key: SectionState; label: string }[] = [
   { key: "active", label: "Active" },
+  { key: "new", label: "New" },
   { key: "archived", label: "Archived" },
 ];
 
@@ -41,7 +46,7 @@ const createEmptySection = (existing: Section[]): Section => ({
   room_requirements: [],
   crosslist_group_id: null,
   tags: [],
-  state: "active",
+  state: "new",
 });
 
 export const SectionsEditor = ({
@@ -140,7 +145,13 @@ export const SectionsEditor = ({
               <tr
                 key={`${section.id}-${idx}`}
                 id={`note-sections-${encodeURIComponent(String(section.id))}`}
-                className={`border-t border-default-200${isSectionArchived(section) ? " opacity-60" : ""}`}
+                className={`border-t border-default-200${
+                  isSectionArchived(section)
+                    ? " opacity-60"
+                    : isSectionNew(section)
+                      ? " bg-primary-50/40"
+                      : ""
+                }`}
               >
                 <td className="py-2 pr-3">
                   <EditableCell value={section.id} onChange={(v) => updateSection(idx, "id", v)} />

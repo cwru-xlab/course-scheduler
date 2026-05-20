@@ -140,10 +140,12 @@ def normalize_sheet_headers(sheet_name: str, headers: List[str]) -> List[str]:
 
 
 def normalize_section_state(raw: Any) -> str:
-    """Return 'active' or 'archived'. Blank/missing defaults to active."""
+    """Return 'active', 'new', or 'archived'. Blank/missing defaults to active."""
     value = str(raw or "").strip().lower()
     if value in ("archived", "archive"):
         return "archived"
+    if value == "new":
+        return "new"
     return "active"
 
 

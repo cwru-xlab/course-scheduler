@@ -1,6 +1,6 @@
 export type Id = string;
 
-export type SectionState = "active" | "archived";
+export type SectionState = "active" | "archived" | "new";
 
 export type Section = {
   id: Id;
@@ -16,7 +16,7 @@ export type Section = {
   crosslist_group_id?: Id | null;
   tags: string[];
   previous_meeting_pattern?: Id;
-  /** active (default) = schedule & show on calendar; archived = excluded from solver & calendar */
+  /** active/new = schedule & show on calendar; archived = excluded from solver & calendar */
   state?: SectionState;
 };
 
