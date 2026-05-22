@@ -22,6 +22,10 @@ import {
   Share2,
   Unlock,
   Undo2,
+  Play,
+  CloudBackup,
+  Pencil,
+  FolderClock
 } from "lucide-react";
 import type {
   BlockedTime,
@@ -920,6 +924,7 @@ type MeetingPatternPlacementOption = {
     selectedOptionKey: string;
   } | null>(null);
   const [meetingPatternSelectionError, setMeetingPatternSelectionError] = useState<string | null>(null);
+  const [toolbarActionHint, setToolbarActionHint] = useState<string | null>(null);
   // Keep multiple pinned highlights; hovering adds a temporary highlight.
   const activeLegendDepartmentKeys = useMemo(() => {
     const keys = new Set(selectedLegendDepartmentKeys);
@@ -2955,94 +2960,156 @@ type MeetingPatternPlacementOption = {
             Click through Monday–Friday to view scheduled sections.
           </p>
         </div>
-        <div className="flex gap-3 flex-wrap">
-          <button
-            type="button"
-            onClick={openSaveScheduleModal}
-            className="flex items-center justify-center rounded-lg h-10 px-4 bg-indigo-50 text-indigo-800 font-bold gap-2 border border-indigo-200 hover:bg-indigo-100 transition-colors"
-            title="Save this generated/edited schedule to history"
+        <div className="flex flex-col items-stretch gap-2 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2">
+            <div
+              onMouseEnter={() => setToolbarActionHint("Run solver using current backend data and placement locks.")}
+              onMouseLeave={() => setToolbarActionHint(null)}
+              onFocus={() => setToolbarActionHint("Run solver using current backend data and placement locks.")}
+              onBlur={() => setToolbarActionHint(null)}
+              className="contents"
+            >
+              <button
+                type="button"
+                disabled={solverRunStatus === "loading" || !data}
+                onClick={() => void handleRunSolverFromCalendar()}
+                className={clsx(
+                  "flex items-center justify-center rounded-lg size-10 font-bold border transition-colors",
+                  solverRunStatus !== "loading" && data
+                    ? "bg-[#137fec] text-white border-[#137fec] shadow-lg shadow-[#137fec]/20 hover:bg-[#0f6dca]"
+                    : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
+                )}
+                title="Run the solver using backend scheduling data and locks from this page"
+                aria-label="Run solver"
+              >
+                <Play className="size-4" />
+              </button>
+            </div>
+            <div
+              onMouseEnter={() => setToolbarActionHint("Persist valid calendar edits to backend tables.")}
+              onMouseLeave={() => setToolbarActionHint(null)}
+              onFocus={() => setToolbarActionHint("Persist valid calendar edits to backend tables.")}
+              onBlur={() => setToolbarActionHint(null)}
+              className="contents"
+            >
+              <button
+                type="button"
+                disabled={!hasValidUnsavedEdit || isSavingBackend}
+                onClick={handleUpdateBackend}
+                className={clsx(
+                  "flex items-center justify-center rounded-lg size-10 font-bold border transition-colors",
+                  hasValidUnsavedEdit && !isSavingBackend
+                    ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
+                    : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
+                )}
+                title={
+                  hasValidUnsavedEdit
+                    ? "Persist valid calendar edits to backend"
+                    : "Make a valid edit first to enable backend update"
+                }
+                aria-label="Update backend"
+              >
+                <CloudBackup className="size-4" />
+              </button>
+            </div>
+            <div className="hidden lg:block h-7 w-px bg-slate-200 mx-1" />
+            <Link
+              href="/editor/sections"
+              onMouseEnter={() => setToolbarActionHint("Open section editor tables to manage course data.")}
+              onMouseLeave={() => setToolbarActionHint(null)}
+              onFocus={() => setToolbarActionHint("Open section editor tables to manage course data.")}
+              onBlur={() => setToolbarActionHint(null)}
+              className="flex items-center justify-center rounded-lg size-10 bg-slate-100 text-slate-800 font-bold border border-slate-200 hover:bg-slate-200 transition-colors"
+              aria-label="Edit schedule data"
+            >
+              <Pencil className="size-4" />
+            </Link>
+            <button
+              type="button"
+              onClick={openSaveScheduleModal}
+              onMouseEnter={() => setToolbarActionHint("Save this schedule snapshot to history.")}
+              onMouseLeave={() => setToolbarActionHint(null)}
+              onFocus={() => setToolbarActionHint("Save this schedule snapshot to history.")}
+              onBlur={() => setToolbarActionHint(null)}
+              className="flex items-center justify-center rounded-lg size-10 bg-indigo-50 text-indigo-800 font-bold border border-indigo-200 hover:bg-indigo-100 transition-colors"
+              title="Save this generated/edited schedule to history"
+              aria-label="Save schedule"
+            >
+              <Save className="size-4" />
+            </button>
+            <Link
+              href="/history"
+              onMouseEnter={() => setToolbarActionHint("Open schedule history entries.")}
+              onMouseLeave={() => setToolbarActionHint(null)}
+              onFocus={() => setToolbarActionHint("Open schedule history entries.")}
+              onBlur={() => setToolbarActionHint(null)}
+              className="flex items-center justify-center rounded-lg size-10 bg-slate-100 text-slate-800 font-bold border border-slate-200 hover:bg-slate-200 transition-colors"
+              aria-label="History"
+            >
+              <FolderClock className="size-4" />
+            </Link>
+            <button
+              onMouseEnter={() => setToolbarActionHint("Export the visible calendar to PDF.")}
+              onMouseLeave={() => setToolbarActionHint(null)}
+              onFocus={() => setToolbarActionHint("Export the visible calendar to PDF.")}
+              onBlur={() => setToolbarActionHint(null)}
+              className="flex items-center justify-center rounded-lg size-10 bg-slate-100 text-slate-900 font-bold border border-slate-200 hover:bg-slate-200 transition-colors"
+              onClick={handleExportPdf}
+              aria-label="Export PDF"
+            >
+              <Share2 className="size-4" />
+            </button>
+            <div className="hidden lg:block h-7 w-px bg-slate-200 mx-1" />
+            <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden">
+              <button
+                type="button"
+                onClick={lockAllPlacementChanges}
+                onMouseEnter={() => setToolbarActionHint("Lock all changed placements for solver runs.")}
+                onMouseLeave={() => setToolbarActionHint(null)}
+                onFocus={() => setToolbarActionHint("Lock all changed placements for solver runs.")}
+                onBlur={() => setToolbarActionHint(null)}
+                className="flex items-center justify-center h-10 w-10 bg-amber-50 text-amber-900 font-bold hover:bg-amber-100 transition-colors"
+                title="Hard-lock every section whose placement differs from the saved baseline (needs room + times)"
+                aria-label="Lock all changes"
+              >
+                <Lock className="size-4" />
+              </button>
+              <div
+                onMouseEnter={() => setToolbarActionHint("Remove all placement locks from this calendar view.")}
+                onMouseLeave={() => setToolbarActionHint(null)}
+                onFocus={() => setToolbarActionHint("Remove all placement locks from this calendar view.")}
+                onBlur={() => setToolbarActionHint(null)}
+                className="contents"
+              >
+                <button
+                  type="button"
+                  disabled={!hasAnyPlacementLock}
+                  onClick={unlockAllPlacementLocks}
+                  className={clsx(
+                    "flex items-center justify-center h-10 w-10 font-bold border-l transition-colors",
+                    hasAnyPlacementLock
+                      ? "bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100"
+                      : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
+                  )}
+                  title="Remove all placement locks added from this calendar view"
+                  aria-label="Unlock all changes"
+                >
+                  <Unlock className="size-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+          <div
+            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 min-h-[34px] flex items-center"
+            aria-live="polite"
           >
-            <Save className="size-4" />
-            Save Schedule
-          </button>
-          <Link
-            href="/history"
-            className="flex items-center justify-center rounded-lg h-10 px-4 bg-slate-100 text-slate-800 font-bold gap-2 border border-slate-200 hover:bg-slate-200 transition-colors"
-          >
-            <Archive className="size-4" />
-            History
-          </Link>
-          <button
-            className="flex items-center justify-center rounded-lg h-10 px-4 bg-slate-100 text-slate-900 font-bold gap-2 border border-slate-200"
-            onClick={handleExportPdf}
-          >
-            <Share2 className="size-4" />
-            Export PDF
-          </button>
-          <button
-            type="button"
-            onClick={lockAllPlacementChanges}
-            className="flex items-center justify-center rounded-lg h-10 px-4 bg-amber-50 text-amber-900 font-bold gap-2 border border-amber-200 hover:bg-amber-100 transition-colors"
-            title="Hard-lock every section whose placement differs from the saved baseline (needs room + times)"
-          >
-            <Lock className="size-4" />
-            Lock all changes
-          </button>
-          <button
-            type="button"
-            disabled={!hasAnyPlacementLock}
-            onClick={unlockAllPlacementLocks}
-            className={clsx(
-              "flex items-center justify-center rounded-lg h-10 px-4 font-bold gap-2 border transition-colors",
-              hasAnyPlacementLock
-                ? "bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100"
-                : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
-            )}
-            title="Remove all placement locks added from this calendar view"
-          >
-            <Unlock className="size-4" />
-            Unlock all
-          </button>
-          <button
-            type="button"
-            disabled={solverRunStatus === "loading" || !data}
-            onClick={() => void handleRunSolverFromCalendar()}
-            className={clsx(
-              "flex items-center justify-center rounded-lg h-10 px-4 font-bold gap-2 border transition-colors",
-              solverRunStatus !== "loading" && data
-                ? "bg-[#137fec] text-white border-[#137fec] shadow-lg shadow-[#137fec]/20 hover:bg-[#0f6dca]"
-                : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
-            )}
-            title="Run the solver using backend scheduling data and locks from this page"
-          >
-            <Rocket className="size-4" />
-            {solverRunStatus === "loading" ? "Running…" : "Run Solver"}
-          </button>
-          <button
-            type="button"
-            disabled={!hasValidUnsavedEdit || isSavingBackend}
-            onClick={handleUpdateBackend}
-            className={clsx(
-              "flex items-center justify-center rounded-lg h-10 px-4 font-bold gap-2 border transition-colors",
-              hasValidUnsavedEdit && !isSavingBackend
-                ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
-                : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
-            )}
-            title={
-              hasValidUnsavedEdit
-                ? "Persist valid calendar edits to backend"
-                : "Make a valid edit first to enable backend update"
-            }
-          >
-            Update Backend
-          </button>
-          <Link
-            href="/editor/sections"
-            className="flex items-center justify-center rounded-lg h-10 px-4 bg-[#137fec] text-white font-bold gap-2 shadow-lg shadow-[#137fec]/20"
-          >
-            <Rocket className="size-4" />
-            Adjust Schedule Data
-          </Link>
+            {toolbarActionHint ?? "\u00A0"}
+          </div>
+          {hasValidUnsavedEdit && (
+            <p className="text-[11px] font-semibold text-emerald-700 px-1">
+              Unsaved valid edits are ready to sync.
+            </p>
+          )}
         </div>
       </div>
 
