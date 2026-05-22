@@ -20,6 +20,8 @@ import {
   SoftLocksEditor,
 } from "./editors/ConstraintsEditors";
 
+import { applyNotesImportToLocalStorage, collectAllRowNotes } from "@/lib/notes/storage";
+import type { NotesRowPatch } from "@/lib/notes/types";
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 import type { ScheduleSolution, SchedulingInput, ValidationError } from "@/lib/scheduling/types";
 
@@ -38,7 +40,17 @@ type UpdateSectionsApiSuccess = { status: "ok" };
 type UpdateSectionsApiError = { status: "error"; errors: ValidationError[] };
 type UpdateSectionsApiResponse = UpdateSectionsApiSuccess | UpdateSectionsApiError;
 type ImportSpreadsheetResponse =
-  | { status: "ok"; scheduling_input: SchedulingInput }
+  | {
+      status: "ok";
+      scheduling_input: SchedulingInput;
+      notes_patches?: NotesRowPatch[];
+      notes_import_summary?: {
+        rowsUpdated: number;
+        notesAdded: number;
+        notesFromSheet: number;
+        repliesFromSheet: number;
+      };
+    }
   | { status: "error"; errors: ValidationError[] };
 
 const LAST_SOLVER_RUN_STORAGE_KEY = "wsom-last-solver-run";
@@ -247,8 +259,24 @@ export const SchedulerDemo = () => {
       setSolution(null);
       setDiagnostics(undefined);
       setHasChangesSinceLastUpdate(true);
+
+      let notesMessage = "";
+      if (result.notes_patches && result.notes_patches.length > 0) {
+        const summary = applyNotesImportToLocalStorage(result.notes_patches);
+        const parts: string[] = [];
+        if (summary.notesAdded > 0) {
+          parts.push(`${summary.notesAdded} new note${summary.notesAdded === 1 ? "" : "s"}`);
+        }
+        if (summary.notesFromSheet > 0) {
+          parts.push(
+            `${summary.notesFromSheet} from Notes sheet (${summary.repliesFromSheet} repl${summary.repliesFromSheet === 1 ? "y" : "ies"})`,
+          );
+        }
+        if (parts.length > 0) notesMessage = ` Notes: ${parts.join("; ")}.`;
+      }
+
       setSpreadsheetStatus("import-success");
-      setSpreadsheetMessage("Spreadsheet imported and loaded into editor state.");
+      setSpreadsheetMessage(`Spreadsheet imported and loaded into editor state.${notesMessage}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to import spreadsheet.";
       setErrors([{ code: "network_error", message }]);
@@ -268,7 +296,7 @@ export const SchedulerDemo = () => {
       const response = await fetch("/api/export-scheduling-spreadsheet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input: data }),
+        body: JSON.stringify({ input: data, notes: collectAllRowNotes() }),
       });
       if (!response.ok) {
         let message = "Failed to export spreadsheet.";

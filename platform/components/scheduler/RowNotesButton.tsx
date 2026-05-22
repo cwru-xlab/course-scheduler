@@ -8,22 +8,8 @@ import { MessageSquare } from "lucide-react";
 
 import { useAuth } from "@/lib/auth-client";
 import { formatNoteAuthor } from "@/lib/note-author";
-
-type RowNote = {
-  id: string;
-  note: string;
-  author: string;
-  completed: boolean;
-  createdAt: string;
-  replies?: RowReply[];
-};
-
-type RowReply = {
-  id: string;
-  note: string;
-  author: string;
-  createdAt: string;
-};
+import type { RowNote, RowReply } from "@/lib/notes/types";
+import { notesStorageKey } from "@/lib/notes/types";
 
 type RowNotesButtonProps = {
   scope: string;
@@ -31,8 +17,7 @@ type RowNotesButtonProps = {
   title: string;
 };
 
-const storageKeyFor = (scope: string, rowId: string) =>
-  `wsom-row-notes::${scope}::${rowId}`;
+const storageKeyFor = (scope: string, rowId: string) => notesStorageKey(scope, rowId);
 
 /** Query params written by the Notes Feed so we can open this modal on arrival. */
 const OPEN_NOTES_QUERY = "openRowNotes";

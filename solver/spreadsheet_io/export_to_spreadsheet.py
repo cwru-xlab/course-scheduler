@@ -64,6 +64,8 @@ def _rows_for_sheet(sheet_name: str, payload: Dict[str, Any]) -> list[Dict[str, 
                     item.get("previous_meeting_pattern") or ""
                 ),
                 "state": _export_str(item.get("state") or "active"),
+                "prev_notes": "",
+                "new_notes": "",
             }
             for item in payload.get("sections", [])
         ]
@@ -84,6 +86,8 @@ def _rows_for_sheet(sheet_name: str, payload: Dict[str, Any]) -> list[Dict[str, 
                     "max_teaching_days": _export_str(
                         preferences.get("max_teaching_days") or ""
                     ),
+                    "prev_notes": "",
+                    "new_notes": "",
                 }
             )
         return rows
@@ -95,6 +99,8 @@ def _rows_for_sheet(sheet_name: str, payload: Dict[str, Any]) -> list[Dict[str, 
                 "room_number": _export_str(item.get("room_number", "")),
                 "capacity": item.get("capacity", ""),
                 "features": serialize_list_cell(item.get("features")),
+                "prev_notes": "",
+                "new_notes": "",
             }
             for item in payload.get("rooms", [])
         ]
@@ -106,6 +112,8 @@ def _rows_for_sheet(sheet_name: str, payload: Dict[str, Any]) -> list[Dict[str, 
                 "start_time": _export_str(item.get("start_time", "")),
                 "end_time": _export_str(item.get("end_time", "")),
                 "slot_type": _export_str(item.get("slot_type", "") or ""),
+                "prev_notes": "",
+                "new_notes": "",
             }
             for item in payload.get("timeslots", [])
         ]
@@ -118,6 +126,8 @@ def _rows_for_sheet(sheet_name: str, payload: Dict[str, Any]) -> list[Dict[str, 
                 "compatible_timeslot_sets": serialize_nested_list_cell(
                     item.get("compatible_timeslot_sets")
                 ),
+                "prev_notes": "",
+                "new_notes": "",
             }
             for item in payload.get("meeting_patterns", [])
         ]

@@ -34,6 +34,8 @@ SPREADSHEET_SPECS: List[SheetSpec] = [
             "tags",
             "previous_meeting_pattern",
             "state",
+            "prev_notes",
+            "new_notes",
         ],
     ),
     SheetSpec(
@@ -46,19 +48,59 @@ SPREADSHEET_SPECS: List[SheetSpec] = [
             "preferred_days",
             "preferred_patterns",
             "max_teaching_days",
+            "prev_notes",
+            "new_notes",
         ],
     ),
     SheetSpec(
         name="Rooms",
-        columns=["id", "building", "room_number", "capacity", "features"],
+        columns=[
+            "id",
+            "building",
+            "room_number",
+            "capacity",
+            "features",
+            "prev_notes",
+            "new_notes",
+        ],
     ),
     SheetSpec(
         name="Timeslots",
-        columns=["id", "day", "start_time", "end_time", "slot_type"],
+        columns=[
+            "id",
+            "day",
+            "start_time",
+            "end_time",
+            "slot_type",
+            "prev_notes",
+            "new_notes",
+        ],
     ),
     SheetSpec(
         name="MeetingPatterns",
-        columns=["id", "slots_required", "allowed_days", "compatible_timeslot_sets"],
+        columns=[
+            "id",
+            "slots_required",
+            "allowed_days",
+            "compatible_timeslot_sets",
+            "prev_notes",
+            "new_notes",
+        ],
+    ),
+    SheetSpec(
+        name="Notes",
+        columns=[
+            "scope",
+            "row_key",
+            "note_id",
+            "parent_note_id",
+            "seq",
+            "created_at",
+            "author",
+            "completed",
+            "body",
+            "source",
+        ],
     ),
     SheetSpec(
         name="CrosslistGroups",
@@ -119,6 +161,12 @@ LEGACY_SHEET_COLUMNS: Dict[str, List[str]] = {
 }
 
 
+_NOTE_SUFFIX = ("prev_notes", "new_notes")
+_ENTITY_SHEETS_WITH_NOTES = frozenset(
+    {"Sections", "Instructors", "Rooms", "Timeslots", "MeetingPatterns"}
+)
+
+
 def normalize_sheet_headers(sheet_name: str, headers: List[str]) -> List[str]:
     """
     Accept either the current schema or a legacy schema for certain sheets.
@@ -129,6 +177,14 @@ def normalize_sheet_headers(sheet_name: str, headers: List[str]) -> List[str]:
     expected = spec.columns
     if headers[: len(expected)] == expected:
         return expected
+
+    if sheet_name in _ENTITY_SHEETS_WITH_NOTES:
+        scheduling_only = [c for c in expected if c not in _NOTE_SUFFIX]
+        if headers[: len(scheduling_only)] == scheduling_only:
+            return scheduling_only
+        with_notes = scheduling_only + list(_NOTE_SUFFIX)
+        if headers[: len(with_notes)] == with_notes:
+            return scheduling_only
 
     legacy = LEGACY_SHEET_COLUMNS.get(sheet_name)
     if legacy and headers[: len(legacy)] == legacy:
