@@ -97,6 +97,7 @@ export function parseNotesFromWorkbook(
       notesAdded,
       notesFromSheet,
       repliesFromSheet,
+      notesRemoved: 0,
     },
   };
 }

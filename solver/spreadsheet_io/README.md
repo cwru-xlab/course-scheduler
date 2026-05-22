@@ -55,6 +55,18 @@ Structured note/reply rows for round-trip. Optional on import; populated on expo
 ### `SoftLocks`
 `section_id`, `preferred_timeslot_set`, `preferred_room`, `weight`
 
+## Presentation (export & template)
+
+Exported and template workbooks are formatted for readability:
+
+- **Frozen header row** on every sheet
+- **Bold header** row with light background
+- **Column widths** sized from header + cell content (wider for `prev_notes`, `new_notes`, `body`, long list fields)
+- **Wrap text** on note columns and other long-text fields; top-aligned cells
+- **`prev_notes`**: light gray fill; **`new_notes`**: light yellow fill (entity sheets)
+
+Notes are embedded during export in the solver (openpyxl) so formatting is preserved.
+
 ## Template
 - Generate a fresh template:
   - `cd solver`

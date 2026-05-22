@@ -20,8 +20,9 @@ import {
   SoftLocksEditor,
 } from "./editors/ConstraintsEditors";
 
-import { applyNotesImportToLocalStorage, collectAllRowNotes } from "@/lib/notes/storage";
-import type { NotesRowPatch } from "@/lib/notes/types";
+import { ImportSpreadsheetWarningModal } from "@/components/scheduler/ImportSpreadsheetWarningModal";
+import { collectRowNotesForExport } from "@/lib/notes/storage";
+import { importSpreadsheetFile } from "@/lib/spreadsheet-import-client";
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 import type { ScheduleSolution, SchedulingInput, ValidationError } from "@/lib/scheduling/types";
 
@@ -39,20 +40,6 @@ type ApiError = {
 type UpdateSectionsApiSuccess = { status: "ok" };
 type UpdateSectionsApiError = { status: "error"; errors: ValidationError[] };
 type UpdateSectionsApiResponse = UpdateSectionsApiSuccess | UpdateSectionsApiError;
-type ImportSpreadsheetResponse =
-  | {
-      status: "ok";
-      scheduling_input: SchedulingInput;
-      notes_patches?: NotesRowPatch[];
-      notes_import_summary?: {
-        rowsUpdated: number;
-        notesAdded: number;
-        notesFromSheet: number;
-        repliesFromSheet: number;
-      };
-    }
-  | { status: "error"; errors: ValidationError[] };
-
 const LAST_SOLVER_RUN_STORAGE_KEY = "wsom-last-solver-run";
 
 export const SchedulerDemo = () => {
@@ -78,6 +65,7 @@ export const SchedulerDemo = () => {
     "idle" | "importing" | "import-success" | "import-error" | "exporting" | "export-error"
   >("idle");
   const [spreadsheetMessage, setSpreadsheetMessage] = useState("");
+  const [importWarningOpen, setImportWarningOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const timeslotLabelMap = useMemo(() => {
@@ -224,6 +212,11 @@ export const SchedulerDemo = () => {
   };
 
   const handleImportButtonPress = () => {
+    setImportWarningOpen(true);
+  };
+
+  const handleImportWarningConfirm = () => {
+    setImportWarningOpen(false);
     fileInputRef.current?.click();
   };
 
@@ -231,27 +224,16 @@ export const SchedulerDemo = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const formData = new FormData();
-    formData.set("file", file, file.name);
-
     setSpreadsheetStatus("importing");
     setSpreadsheetMessage("");
     setErrors([]);
 
     try {
-      const response = await fetch("/api/import-scheduling-spreadsheet", {
-        method: "POST",
-        body: formData,
-      });
-      const result = (await response.json()) as ImportSpreadsheetResponse;
-
-      if (!response.ok || result.status === "error") {
-        const importErrors =
-          result.status === "error" && Array.isArray(result.errors) ? result.errors : [];
-        const message = importErrors[0]?.message ?? "Failed to import spreadsheet.";
-        setErrors(importErrors);
+      const result = await importSpreadsheetFile(file);
+      if (!result.ok) {
+        setErrors(result.errors);
         setSpreadsheetStatus("import-error");
-        setSpreadsheetMessage(message);
+        setSpreadsheetMessage(result.message);
         return;
       }
 
@@ -259,24 +241,8 @@ export const SchedulerDemo = () => {
       setSolution(null);
       setDiagnostics(undefined);
       setHasChangesSinceLastUpdate(true);
-
-      let notesMessage = "";
-      if (result.notes_patches && result.notes_patches.length > 0) {
-        const summary = applyNotesImportToLocalStorage(result.notes_patches);
-        const parts: string[] = [];
-        if (summary.notesAdded > 0) {
-          parts.push(`${summary.notesAdded} new note${summary.notesAdded === 1 ? "" : "s"}`);
-        }
-        if (summary.notesFromSheet > 0) {
-          parts.push(
-            `${summary.notesFromSheet} from Notes sheet (${summary.repliesFromSheet} repl${summary.repliesFromSheet === 1 ? "y" : "ies"})`,
-          );
-        }
-        if (parts.length > 0) notesMessage = ` Notes: ${parts.join("; ")}.`;
-      }
-
       setSpreadsheetStatus("import-success");
-      setSpreadsheetMessage(`Spreadsheet imported and loaded into editor state.${notesMessage}`);
+      setSpreadsheetMessage(result.message);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to import spreadsheet.";
       setErrors([{ code: "network_error", message }]);
@@ -296,7 +262,7 @@ export const SchedulerDemo = () => {
       const response = await fetch("/api/export-scheduling-spreadsheet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input: data, notes: collectAllRowNotes() }),
+        body: JSON.stringify({ input: data, notes: collectRowNotesForExport() }),
       });
       if (!response.ok) {
         let message = "Failed to export spreadsheet.";
@@ -591,6 +557,11 @@ export const SchedulerDemo = () => {
         </span>
       </div>
 
+      <ImportSpreadsheetWarningModal
+        isOpen={importWarningOpen}
+        onCancel={() => setImportWarningOpen(false)}
+        onConfirm={handleImportWarningConfirm}
+      />
       <div className="flex items-center gap-3 flex-wrap">
         <input
           ref={fileInputRef}

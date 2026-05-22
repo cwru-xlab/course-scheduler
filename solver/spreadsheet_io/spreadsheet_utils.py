@@ -172,19 +172,22 @@ def normalize_sheet_headers(sheet_name: str, headers: List[str]) -> List[str]:
     Accept either the current schema or a legacy schema for certain sheets.
 
     Returns the canonical header list for the sheet if the provided headers are compatible.
+    Note columns (prev_notes, new_notes) are never returned here — the solver ignores them;
+    the platform reads those cells separately for note import/export.
     """
     spec = SHEET_NAME_TO_SPEC[sheet_name]
     expected = spec.columns
-    if headers[: len(expected)] == expected:
-        return expected
 
     if sheet_name in _ENTITY_SHEETS_WITH_NOTES:
         scheduling_only = [c for c in expected if c not in _NOTE_SUFFIX]
-        if headers[: len(scheduling_only)] == scheduling_only:
-            return scheduling_only
         with_notes = scheduling_only + list(_NOTE_SUFFIX)
         if headers[: len(with_notes)] == with_notes:
             return scheduling_only
+        if headers[: len(scheduling_only)] == scheduling_only:
+            return scheduling_only
+
+    if headers[: len(expected)] == expected:
+        return expected
 
     legacy = LEGACY_SHEET_COLUMNS.get(sheet_name)
     if legacy and headers[: len(legacy)] == legacy:
@@ -386,6 +389,11 @@ def format_room_number_for_export(value: Any) -> str:
 
 
 def build_template_workbook() -> Workbook:
+    try:
+        from spreadsheet_io.beautify import beautify_workbook
+    except ModuleNotFoundError:
+        from beautify import beautify_workbook  # type: ignore[no-redef]
+
     wb = Workbook()
     default_ws = wb.active
     wb.remove(default_ws)
@@ -393,7 +401,8 @@ def build_template_workbook() -> Workbook:
     for spec in SPREADSHEET_SPECS:
         ws = wb.create_sheet(spec.name)
         ws.append(spec.columns)
-        _autosize_columns(ws, spec.columns)
+
+    beautify_workbook(wb)
     return wb
 
 
@@ -405,5 +414,8 @@ def build_template_bytes() -> bytes:
 
 
 def _autosize_columns(ws: Worksheet, headers: List[str]) -> None:
+    """Legacy helper; prefer :func:`beautify.beautify_workbook`."""
+    from openpyxl.utils import get_column_letter
+
     for idx, header in enumerate(headers, start=1):
-        ws.column_dimensions[chr(64 + idx)].width = max(len(header) + 2, 14)
+        ws.column_dimensions[get_column_letter(idx)].width = max(len(header) + 2, 14)

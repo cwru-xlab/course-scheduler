@@ -2573,8 +2573,15 @@ def export_scheduling_spreadsheet():
             400,
         )
 
+    note_entries = data.get("notes") if isinstance(data, dict) else None
+    if note_entries is not None and not isinstance(note_entries, list):
+        note_entries = None
+
     try:
-        workbook_bytes = scheduling_input_to_excel_bytes(input_payload)
+        workbook_bytes = scheduling_input_to_excel_bytes(
+            input_payload,
+            note_entries=note_entries,
+        )
     except Exception as exc:  # pylint: disable=broad-except
         return (
             jsonify(

@@ -31,6 +31,11 @@ export function collectAllRowNotes(): NotesRowEntry[] {
   return entries;
 }
 
+/** Notes with content only — used for export so empty storage keys do not wipe spreadsheet cells. */
+export function collectRowNotesForExport(): NotesRowEntry[] {
+  return collectAllRowNotes().filter((entry) => entry.notes.length > 0);
+}
+
 function noteTimestamp(note: RowNote): number {
   const t = Date.parse(note.createdAt);
   return Number.isNaN(t) ? 0 : t;
@@ -57,6 +62,18 @@ function mergeNotePreserveExisting(existing: RowNote, incoming: RowNote): RowNot
   };
 }
 
+/** Combine structured sheet notes and new_notes cell notes for one row (no prior state). */
+export function combineImportRowNotes(patch: NotesRowPatch): RowNote[] {
+  const byId = new Map<string, RowNote>();
+  for (const note of patch.fromSheet) {
+    byId.set(note.id, { ...note, replies: note.replies ?? [] });
+  }
+  for (const note of patch.newNotes) {
+    if (!byId.has(note.id)) byId.set(note.id, note);
+  }
+  return sortNotesNewestFirst(Array.from(byId.values()));
+}
+
 export function mergeRowNotes(
   existing: RowNote[],
   fromSheet: RowNote[],
@@ -74,10 +91,35 @@ export function mergeRowNotes(
   return sortNotesNewestFirst(Array.from(byId.values()));
 }
 
-export function applyNotesImportToLocalStorage(patches: NotesRowPatch[]): NotesImportSummary {
-  if (typeof window === "undefined") {
-    return { rowsUpdated: 0, notesAdded: 0, notesFromSheet: 0, repliesFromSheet: 0 };
+function clearAllStoredNotes(): number {
+  if (typeof window === "undefined") return 0;
+  const keys: string[] = [];
+  for (let i = 0; i < localStorage.length; i += 1) {
+    const key = localStorage.key(i);
+    if (key?.startsWith(NOTES_STORAGE_PREFIX)) keys.push(key);
   }
+  for (const key of keys) localStorage.removeItem(key);
+  return keys.length;
+}
+
+/**
+ * Replace all row notes in localStorage with the spreadsheet import.
+ * Notes not present in the import (including the Notes feed) are removed.
+ */
+export function applyNotesImportOverwriteToLocalStorage(
+  patches: NotesRowPatch[],
+): NotesImportSummary {
+  if (typeof window === "undefined") {
+    return {
+      rowsUpdated: 0,
+      notesAdded: 0,
+      notesFromSheet: 0,
+      repliesFromSheet: 0,
+      notesRemoved: 0,
+    };
+  }
+
+  const notesRemoved = clearAllStoredNotes();
 
   let rowsUpdated = 0;
   let notesAdded = 0;
@@ -85,26 +127,39 @@ export function applyNotesImportToLocalStorage(patches: NotesRowPatch[]): NotesI
   let repliesFromSheet = 0;
 
   for (const patch of patches) {
-    const key = notesStorageKey(patch.scope, patch.rowKey);
-    const existing = parseStoredNotes(localStorage.getItem(key));
     notesAdded += patch.newNotes.length;
     for (const n of patch.fromSheet) {
       notesFromSheet += 1;
       repliesFromSheet += n.replies?.length ?? 0;
     }
-    const merged = mergeRowNotes(existing, patch.fromSheet, patch.newNotes);
-    if (merged.length > 0) {
-      localStorage.setItem(key, JSON.stringify(merged));
-      rowsUpdated += 1;
-    } else if (existing.length > 0) {
-      localStorage.removeItem(key);
-      rowsUpdated += 1;
-    }
+    const notes = combineImportRowNotes(patch);
+    if (notes.length === 0) continue;
+    localStorage.setItem(
+      notesStorageKey(patch.scope, patch.rowKey),
+      JSON.stringify(notes),
+    );
+    rowsUpdated += 1;
   }
 
-  if (typeof window !== "undefined" && rowsUpdated > 0) {
-    window.dispatchEvent(new CustomEvent("wsom-notes-updated"));
-  }
+  window.dispatchEvent(new CustomEvent("wsom-notes-updated"));
 
-  return { rowsUpdated, notesAdded, notesFromSheet, repliesFromSheet };
+  return { rowsUpdated, notesAdded, notesFromSheet, repliesFromSheet, notesRemoved };
 }
+
+export function formatNotesImportSummaryMessage(summary: NotesImportSummary): string {
+  const parts: string[] = [];
+  if (summary.notesRemoved > 0) {
+    parts.push(`${summary.notesRemoved} previous note thread${summary.notesRemoved === 1 ? "" : "s"} cleared`);
+  }
+  const totalNotes = summary.notesFromSheet + summary.notesAdded;
+  if (totalNotes > 0) {
+    parts.push(`${totalNotes} note${totalNotes === 1 ? "" : "s"} loaded from spreadsheet`);
+  } else if (summary.notesRemoved > 0) {
+    parts.push("no notes in spreadsheet");
+  }
+  if (parts.length === 0) return "";
+  return ` Notes: ${parts.join("; ")}.`;
+}
+
+/** @deprecated Use applyNotesImportOverwriteToLocalStorage — import always replaces notes. */
+export const applyNotesImportToLocalStorage = applyNotesImportOverwriteToLocalStorage;

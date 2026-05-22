@@ -58,6 +58,7 @@ export type NotesImportSummary = {
   notesAdded: number;
   notesFromSheet: number;
   repliesFromSheet: number;
+  notesRemoved: number;
 };
 
 export const NOTES_STORAGE_PREFIX = "wsom-row-notes::";

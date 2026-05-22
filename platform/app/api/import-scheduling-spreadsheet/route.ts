@@ -17,6 +17,7 @@ type ImportSpreadsheetSuccess = {
     notesAdded: number;
     notesFromSheet: number;
     repliesFromSheet: number;
+    notesRemoved: number;
   };
 };
 

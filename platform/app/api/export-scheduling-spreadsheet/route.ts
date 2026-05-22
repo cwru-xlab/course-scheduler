@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { applyNotesToExportWorkbook } from "@/lib/spreadsheet-notes";
 import type { NotesRowEntry } from "@/lib/notes/types";
 
 const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:5001";
@@ -14,7 +13,10 @@ export async function POST(request: NextRequest) {
     const response = await fetch(`${SOLVER_URL}/export-scheduling-spreadsheet`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ input: body.input ?? body }),
+      body: JSON.stringify({
+        input: body.input ?? body,
+        notes: Array.isArray(body.notes) ? body.notes : [],
+      }),
     });
 
     if (!response.ok) {
@@ -37,10 +39,8 @@ export async function POST(request: NextRequest) {
     }
 
     const solverBytes = await response.arrayBuffer();
-    const noteEntries = Array.isArray(body.notes) ? body.notes : [];
-    const patched = applyNotesToExportWorkbook(solverBytes, noteEntries);
 
-    return new NextResponse(new Uint8Array(patched), {
+    return new NextResponse(solverBytes, {
       status: 200,
       headers: {
         "Content-Type":

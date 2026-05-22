@@ -3,24 +3,11 @@
 import { useRef, useState, type ChangeEvent } from "react";
 import { Button } from "@heroui/button";
 
-import { applyNotesImportToLocalStorage, collectAllRowNotes } from "@/lib/notes/storage";
-import type { NotesRowPatch } from "@/lib/notes/types";
+import { ImportSpreadsheetWarningModal } from "@/components/scheduler/ImportSpreadsheetWarningModal";
+import { collectRowNotesForExport } from "@/lib/notes/storage";
+import { importSpreadsheetFile } from "@/lib/spreadsheet-import-client";
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 import type { SchedulingInput, ValidationError } from "@/lib/scheduling/types";
-
-type ImportSpreadsheetResponse =
-  | {
-      status: "ok";
-      scheduling_input: SchedulingInput;
-      notes_patches?: NotesRowPatch[];
-      notes_import_summary?: {
-        rowsUpdated: number;
-        notesAdded: number;
-        notesFromSheet: number;
-        repliesFromSheet: number;
-      };
-    }
-  | { status: "error"; errors: ValidationError[] };
 
 const secondaryClassName =
   "bg-slate-100 dark:bg-default-100 text-slate-700 dark:text-foreground font-bold border border-slate-200 dark:border-default-200";
@@ -35,9 +22,15 @@ export function SpreadsheetImportExportButtons({ data }: Props) {
     "idle" | "importing" | "import-success" | "import-error" | "exporting" | "export-error"
   >("idle");
   const [spreadsheetMessage, setSpreadsheetMessage] = useState("");
+  const [importWarningOpen, setImportWarningOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImportButtonPress = () => {
+    setImportWarningOpen(true);
+  };
+
+  const handleImportWarningConfirm = () => {
+    setImportWarningOpen(false);
     fileInputRef.current?.click();
   };
 
@@ -45,49 +38,22 @@ export function SpreadsheetImportExportButtons({ data }: Props) {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const formData = new FormData();
-    formData.set("file", file, file.name);
-
     setSpreadsheetStatus("importing");
     setSpreadsheetMessage("");
 
     try {
-      const response = await fetch("/api/import-scheduling-spreadsheet", {
-        method: "POST",
-        body: formData,
+      const result = await importSpreadsheetFile(file, {
+        successPrefix: "Spreadsheet loaded into the editor.",
       });
-      const result = (await response.json()) as ImportSpreadsheetResponse;
-
-      if (!response.ok || result.status === "error") {
-        const importErrors =
-          result.status === "error" && Array.isArray(result.errors) ? result.errors : [];
-        const message = importErrors[0]?.message ?? "Failed to import spreadsheet.";
+      if (!result.ok) {
         setSpreadsheetStatus("import-error");
-        setSpreadsheetMessage(message);
+        setSpreadsheetMessage(result.message);
         return;
       }
 
       updateData(result.scheduling_input);
-
-      let notesMessage = "";
-      if (result.notes_patches && result.notes_patches.length > 0) {
-        const summary = applyNotesImportToLocalStorage(result.notes_patches);
-        const parts: string[] = [];
-        if (summary.notesAdded > 0) {
-          parts.push(`${summary.notesAdded} new note${summary.notesAdded === 1 ? "" : "s"}`);
-        }
-        if (summary.notesFromSheet > 0) {
-          parts.push(
-            `${summary.notesFromSheet} from Notes sheet (${summary.repliesFromSheet} repl${summary.repliesFromSheet === 1 ? "y" : "ies"})`,
-          );
-        }
-        if (parts.length > 0) {
-          notesMessage = ` Notes: ${parts.join("; ")}.`;
-        }
-      }
-
       setSpreadsheetStatus("import-success");
-      setSpreadsheetMessage(`Spreadsheet loaded into the editor.${notesMessage}`);
+      setSpreadsheetMessage(result.message);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to import spreadsheet.";
       setSpreadsheetStatus("import-error");
@@ -105,7 +71,7 @@ export function SpreadsheetImportExportButtons({ data }: Props) {
       const response = await fetch("/api/export-scheduling-spreadsheet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input: data, notes: collectAllRowNotes() }),
+        body: JSON.stringify({ input: data, notes: collectRowNotesForExport() }),
       });
       if (!response.ok) {
         let message = "Failed to export spreadsheet.";
@@ -143,6 +109,11 @@ export function SpreadsheetImportExportButtons({ data }: Props) {
 
   return (
     <>
+      <ImportSpreadsheetWarningModal
+        isOpen={importWarningOpen}
+        onCancel={() => setImportWarningOpen(false)}
+        onConfirm={handleImportWarningConfirm}
+      />
       <input
         ref={fileInputRef}
         type="file"

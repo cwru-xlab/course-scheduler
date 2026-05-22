@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from io import BytesIO
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from openpyxl import Workbook
 
 try:
+    from spreadsheet_io.beautify import beautify_workbook
+    from spreadsheet_io.notes_export import apply_notes_to_workbook
     from spreadsheet_io.spreadsheet_utils import (
         SPREADSHEET_SPECS,
         normalize_spreadsheet_string_cell,
@@ -13,6 +15,8 @@ try:
         serialize_nested_list_cell,
     )
 except ModuleNotFoundError:
+    from beautify import beautify_workbook  # type: ignore[no-redef]
+    from notes_export import apply_notes_to_workbook  # type: ignore[no-redef]
     from spreadsheet_utils import (  # type: ignore[no-redef]
         SPREADSHEET_SPECS,
         normalize_spreadsheet_string_cell,
@@ -26,7 +30,10 @@ def _export_str(value: Any) -> str:
     return normalize_spreadsheet_string_cell(value)
 
 
-def scheduling_input_to_excel_bytes(payload: Dict[str, Any]) -> bytes:
+def scheduling_input_to_excel_bytes(
+    payload: Dict[str, Any],
+    note_entries: List[Dict[str, Any]] | None = None,
+) -> bytes:
     workbook = Workbook()
     default_ws = workbook.active
     workbook.remove(default_ws)
@@ -37,6 +44,16 @@ def scheduling_input_to_excel_bytes(payload: Dict[str, Any]) -> bytes:
         rows = _rows_for_sheet(spec.name, payload)
         for row in rows:
             ws.append([row.get(column, "") for column in spec.columns])
+
+    populated_notes = [
+        entry
+        for entry in (note_entries or [])
+        if isinstance(entry, dict) and entry.get("notes")
+    ]
+    if populated_notes:
+        apply_notes_to_workbook(workbook, populated_notes)
+
+    beautify_workbook(workbook)
 
     output = BytesIO()
     workbook.save(output)
