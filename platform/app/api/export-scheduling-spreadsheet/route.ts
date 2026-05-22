@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:8000";
+import type { NotesRowEntry } from "@/lib/notes/types";
+
+const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:5001";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = (await request.json()) as {
+      input?: unknown;
+      notes?: NotesRowEntry[];
+    };
     const response = await fetch(`${SOLVER_URL}/export-scheduling-spreadsheet`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        input: body.input ?? body,
+        notes: Array.isArray(body.notes) ? body.notes : [],
+      }),
     });
 
     if (!response.ok) {
@@ -26,23 +34,20 @@ export async function POST(request: NextRequest) {
           status: "error",
           errors: [{ code: "export_failed", message: solverError }],
         },
-        { status: response.status || 500 }
+        { status: response.status || 500 },
       );
     }
 
-    const contentType =
-      response.headers.get("content-type") ??
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-    const contentDisposition =
-      response.headers.get("content-disposition") ??
-      "attachment; filename=scheduling_export.xlsx";
-    const bytes = await response.arrayBuffer();
+    const solverBytes = await response.arrayBuffer();
 
-    return new NextResponse(bytes, {
+    return new NextResponse(solverBytes, {
       status: 200,
       headers: {
-        "Content-Type": contentType,
-        "Content-Disposition": contentDisposition,
+        "Content-Type":
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition":
+          response.headers.get("content-disposition") ??
+          "attachment; filename=scheduling_export.xlsx",
       },
     });
   } catch (error) {
@@ -52,7 +57,7 @@ export async function POST(request: NextRequest) {
         status: "error",
         errors: [{ code: "network_error", message }],
       },
-      { status: 502 }
+      { status: 502 },
     );
   }
 }

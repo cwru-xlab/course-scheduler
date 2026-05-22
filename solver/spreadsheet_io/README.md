@@ -15,22 +15,30 @@ This workbook format is the interchange schema for the scheduler UI's `Schedulin
 ### `Sections`
 `id`, `course_id`, `department`, `section_code`, `instructor_id`,
 `expected_enrollment`, `enrollment_cap`, `allowed_meeting_patterns`,
-`room_requirements`, `crosslist_group_id`, `tags`, `previous_meeting_pattern`, `state`
+`room_requirements`, `crosslist_group_id`, `tags`, `previous_meeting_pattern`, `state`,
+`prev_notes`, `new_notes`
 
 `state` is `active` (default), `new`, or `archived`. `new` marks a section as newly added (scheduled like active). Archived sections are excluded from the solver and hidden on the calendar.
 
+`prev_notes` / `new_notes` are consumed by the platform UI (not the solver). Export fills `prev_notes`; planners add text in `new_notes` for import.
+
 ### `Instructors`
 `id`, `name`, `rank_type`, `unavailable_times`, `preferred_days`,
-`preferred_patterns`, `max_teaching_days`
+`preferred_patterns`, `max_teaching_days`, `prev_notes`, `new_notes`
 
 ### `Rooms`
-`id`, `building`, `room_number`, `capacity`, `features`
+`id`, `building`, `room_number`, `capacity`, `features`, `prev_notes`, `new_notes`
 
 ### `Timeslots`
-`id`, `day`, `start_time`, `end_time`, `slot_type`
+`id`, `day`, `start_time`, `end_time`, `slot_type`, `prev_notes`, `new_notes`
 
 ### `MeetingPatterns`
-`id`, `slots_required`, `allowed_days`, `compatible_timeslot_sets`
+`id`, `slots_required`, `allowed_days`, `compatible_timeslot_sets`, `prev_notes`, `new_notes`
+
+### `Notes` (platform)
+`scope`, `row_key`, `note_id`, `parent_note_id`, `seq`, `created_at`, `author`, `completed`, `body`, `source`
+
+Structured note/reply rows for round-trip. Optional on import; populated on export from the app.
 
 ### `CrosslistGroups`
 `id`, `member_section_ids`
@@ -46,6 +54,18 @@ This workbook format is the interchange schema for the scheduler UI's `Schedulin
 
 ### `SoftLocks`
 `section_id`, `preferred_timeslot_set`, `preferred_room`, `weight`
+
+## Presentation (export & template)
+
+Exported and template workbooks are formatted for readability:
+
+- **Frozen header row** on every sheet
+- **Bold header** row with light background
+- **Column widths** sized from header + cell content (wider for `prev_notes`, `new_notes`, `body`, long list fields)
+- **Wrap text** on note columns and other long-text fields; top-aligned cells
+- **`prev_notes`**: light gray fill; **`new_notes`**: light yellow fill (entity sheets)
+
+Notes are embedded during export in the solver (openpyxl) so formatting is preserved.
 
 ## Template
 - Generate a fresh template:

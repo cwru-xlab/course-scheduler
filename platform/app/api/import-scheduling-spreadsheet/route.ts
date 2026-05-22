@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { verifyToken } from "@/lib/auth";
+import { siteConfig } from "@/config/site";
+import { parseNotesFromWorkbook } from "@/lib/spreadsheet-notes";
+import type { NotesRowPatch } from "@/lib/notes/types";
 import type { SchedulingInput, ValidationError } from "@/lib/scheduling/types";
 
 const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:5001";
@@ -7,6 +11,14 @@ const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:5001";
 type ImportSpreadsheetSuccess = {
   status: "ok";
   scheduling_input: SchedulingInput;
+  notes_patches: NotesRowPatch[];
+  notes_import_summary: {
+    rowsUpdated: number;
+    notesAdded: number;
+    notesFromSheet: number;
+    repliesFromSheet: number;
+    notesRemoved: number;
+  };
 };
 
 type ImportSpreadsheetError = {
@@ -24,9 +36,11 @@ export async function POST(request: NextRequest) {
           status: "error",
           errors: [{ code: "missing_file", message: "Upload an Excel file in form field 'file'." }],
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
+
+    const fileBytes = await file.arrayBuffer();
 
     const formData = new FormData();
     formData.set("file", file, file.name);
@@ -48,16 +62,22 @@ export async function POST(request: NextRequest) {
               ? backendErrors
               : [{ code: "import_failed", message: "Backend failed to import spreadsheet." }],
         },
-        { status: response.status || 500 }
+        { status: response.status || 500 },
       );
     }
+
+    const token = request.cookies.get(siteConfig.auth.cookie.name)?.value;
+    const user = token ? await verifyToken(token) : null;
+    const notesResult = parseNotesFromWorkbook(fileBytes, user);
 
     return NextResponse.json(
       {
         status: "ok",
         scheduling_input: data.scheduling_input,
+        notes_patches: notesResult.patches,
+        notes_import_summary: notesResult.summary,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to reach solver service.";
@@ -66,7 +86,7 @@ export async function POST(request: NextRequest) {
         status: "error",
         errors: [{ code: "network_error", message }],
       },
-      { status: 502 }
+      { status: 502 },
     );
   }
 }
