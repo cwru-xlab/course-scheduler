@@ -11,8 +11,19 @@ import { EditableSelectCell } from "../EditableSelectCell";
 import { MultiSelect } from "../MultiSelect";
 import { RowNotesButton } from "../RowNotesButton";
 
-import type { Section } from "@/lib/scheduling/types";
+import type { Section, SectionState } from "@/lib/scheduling/types";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
+import {
+  isSectionArchived,
+  isSectionNew,
+  normalizeSectionState,
+} from "@/lib/scheduling/sectionState";
+
+const STATE_OPTIONS: { key: SectionState; label: string }[] = [
+  { key: "active", label: "Active" },
+  { key: "new", label: "New" },
+  { key: "archived", label: "Archived" },
+];
 
 type SectionsEditorProps = {
   sections: Section[];
@@ -35,6 +46,7 @@ const createEmptySection = (existing: Section[]): Section => ({
   room_requirements: [],
   crosslist_group_id: null,
   tags: [],
+  state: "new",
 });
 
 export const SectionsEditor = ({
@@ -115,6 +127,7 @@ export const SectionsEditor = ({
               <th className="pb-2 pr-3">Department</th>
               <th className="pb-2 pr-3">Course</th>
               <th className="pb-2 pr-3">Code</th>
+              <th className="pb-2 pr-3">State</th>
               <th className="pb-2 pr-3">Instructor</th>
               <th className="pb-2 pr-3">Enroll</th>
               <th className="pb-2 pr-3">Cap</th>
@@ -132,7 +145,13 @@ export const SectionsEditor = ({
               <tr
                 key={`${section.id}-${idx}`}
                 id={`note-sections-${encodeURIComponent(String(section.id))}`}
-                className="border-t border-default-200"
+                className={`border-t border-default-200${
+                  isSectionArchived(section)
+                    ? " opacity-60"
+                    : isSectionNew(section)
+                      ? " bg-primary-50/40"
+                      : ""
+                }`}
               >
                 <td className="py-2 pr-3">
                   <EditableCell value={section.id} onChange={(v) => updateSection(idx, "id", v)} />
@@ -149,6 +168,14 @@ export const SectionsEditor = ({
                 </td>
                 <td className="py-2 pr-3">
                   <EditableCell value={section.section_code} onChange={(v) => updateSection(idx, "section_code", v)} />
+                </td>
+                <td className="py-2 pr-3">
+                  <EditableSelectCell
+                    value={normalizeSectionState(section.state)}
+                    options={STATE_OPTIONS}
+                    onChange={(v) => updateSection(idx, "state", v as SectionState)}
+                    placeholder="State"
+                  />
                 </td>
                 <td className="py-2 pr-3">
                   <EditableSelectCell

@@ -409,6 +409,8 @@ class Section(db.Model):
     tags = Column(JSON, nullable=False)  # List[str] - additional tags/metadata
     # Denormalized for scheduling UI / exports (editable independently of Course.department)
     department = Column(String(128), nullable=False, default="")
+    # active = schedule & calendar; archived = excluded from solver & calendar
+    state = Column(String(16), nullable=False, default="active")
 
     # ========================================================================
     # RELATIONSHIPS
@@ -456,6 +458,7 @@ class Section(db.Model):
             "room_requirements": self.room_requirements or [],
             "tags": self.tags or [],
             "department": self.department or "",
+            "state": self.state or "active",
         }
 
 

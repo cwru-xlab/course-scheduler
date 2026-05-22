@@ -14,6 +14,7 @@ export const mockSchedulingInput: SchedulingInput = {
       room_requirements: ["projector"],
       crosslist_group_id: "CLG-1",
       tags: ["core_required"],
+      state: "active",
     },
     {
       id: "SEC-550-A",
@@ -27,6 +28,7 @@ export const mockSchedulingInput: SchedulingInput = {
       room_requirements: ["case_room"],
       crosslist_group_id: "CLG-1",
       tags: ["upper_level_required"],
+      state: "active",
     },
     {
       id: "SEC-220-A",
@@ -40,6 +42,7 @@ export const mockSchedulingInput: SchedulingInput = {
       room_requirements: [],
       crosslist_group_id: null,
       tags: ["elective"],
+      state: "active",
     },
     {
       id: "SEC-221-A",
@@ -53,6 +56,7 @@ export const mockSchedulingInput: SchedulingInput = {
       room_requirements: [],
       crosslist_group_id: null,
       tags: ["elective"],
+      state: "active",
     },
     {
       id: "SEC-330-A",
@@ -66,6 +70,7 @@ export const mockSchedulingInput: SchedulingInput = {
       room_requirements: ["projector"],
       crosslist_group_id: null,
       tags: ["core_required"],
+      state: "active",
     },
   ],
   instructors: [
