@@ -22,8 +22,13 @@ import {
   Share2,
   Unlock,
   Undo2,
+  Play,
+  CloudBackup,
+  Pencil,
+  FolderClock
 } from "lucide-react";
 import type {
+  BlockedTime,
   LockedAssignment,
   ScheduleSolution,
   SchedulingInput,
@@ -40,6 +45,7 @@ import {
   SCHEDULING_WINDOW_END_HOUR,
   SCHEDULING_WINDOW_START_HOUR,
 } from "@/lib/scheduling/timeWindow";
+import { isSectionArchived, normalizeSectionState } from "@/lib/scheduling/sectionState";
 
 type TimeslotDto = {
   id: string;
@@ -79,9 +85,11 @@ type SectionDto = {
   expected_enrollment?: number;
   enrollment_cap?: number;
   allowed_meeting_patterns?: string[];
+  previous_meeting_pattern?: string | null;
   room_requirements?: string[];
   crosslist_group_id?: string | null;
   tags?: string[];
+  state?: string | null;
 };
 
 type RoomDto = {
@@ -134,6 +142,19 @@ type CalendarAssignmentMap = Record<
   { timeslot_ids: string[]; room_id: string; meeting_pattern_id: string }
 >;
 
+type PlacementEvaluationCode = "blocked" | "capacity" | "conflict" | "other";
+
+type PlacementEvaluation = {
+  isValid: boolean;
+  message: string;
+  reasonCode?: PlacementEvaluationCode;
+};
+
+type BlockedRuleMatch = {
+  matches: boolean;
+  label: string;
+};
+
 function crosslistPeerSectionIds(sectionId: string, sections: SectionDto[]): string[] {
   const section = sections.find((s) => s.id === sectionId);
   const gid = section?.crosslist_group_id;
@@ -180,7 +201,7 @@ function normalizeAssignmentMapEntry(
     timeslot_ids:
       fromMap?.timeslot_ids?.length ? fromMap.timeslot_ids : section.timeslot_id ? [section.timeslot_id] : [],
     room_id: (fromMap?.room_id ?? section.room_id ?? "").trim(),
-    meeting_pattern_id: fromMap?.meeting_pattern_id ?? "",
+    meeting_pattern_id: fromMap?.meeting_pattern_id ?? section.previous_meeting_pattern ?? "",
   };
 }
 
@@ -260,6 +281,160 @@ function parseMinutes(hhmm: string): number {
 
   const [h, m] = raw.split(":").map((x) => parseInt(x, 10));
   return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+}
+
+function normalizeScopeValue(raw: unknown): string {
+  return String(raw ?? "")
+    .trim()
+    .toLowerCase();
+}
+
+function blockedDaysMatch(dayExpression: unknown, selectedDay: Day): boolean {
+  const raw = String(dayExpression ?? "").trim();
+  if (!raw) return true;
+  const pseudoTimeslot: TimeslotDto = {
+    id: "__blocked-day__",
+    days: raw,
+    start_time: "00:00",
+    end_time: "23:59",
+  };
+  return timeslotMatchesDay(pseudoTimeslot, selectedDay);
+}
+
+function blockedRuleOverlapsSlot(rule: BlockedTime, slot: TimeslotWithMinutes, selectedDay: Day): boolean {
+  const explicitIds = Array.isArray(rule.timeslot_ids)
+    ? rule.timeslot_ids.map((id) => String(id)).filter(Boolean)
+    : [];
+  if (explicitIds.includes(slot.id)) return true;
+
+  if (!blockedDaysMatch(rule.days, selectedDay)) return false;
+  if (!rule.start_time || !rule.end_time) return false;
+  const blockStart = parseMinutes(rule.start_time);
+  const blockEnd = parseMinutes(rule.end_time);
+  if (!Number.isFinite(blockStart) || !Number.isFinite(blockEnd) || blockEnd <= blockStart) {
+    return false;
+  }
+  return slot.start < blockEnd && slot.end > blockStart;
+}
+
+function blockedRuleTarget(raw: unknown, aliases: string[]): string {
+  if (!raw || typeof raw !== "object") return "";
+  const record = raw as Record<string, unknown>;
+  for (const key of aliases) {
+    const candidate = String(record[key] ?? "").trim();
+    if (candidate) return candidate;
+  }
+  return "";
+}
+
+function blockedRuleMatchesSection(
+  rule: BlockedTime,
+  section: SectionDto,
+  targetRoomId?: string,
+): BlockedRuleMatch {
+  const scope = normalizeScopeValue(rule.scope);
+  if (scope === "global") return { matches: true, label: "global policy" };
+
+  if (scope === "program" || scope === "department") {
+    const departmentTarget = blockedRuleTarget(rule, [
+      "department",
+      "program",
+      "program_id",
+      "target",
+      "target_id",
+      "scope_value",
+      "value",
+    ]);
+    const sectionDepartment = String(section.department ?? "").trim();
+    if (!departmentTarget || !sectionDepartment) {
+      return { matches: false, label: "department policy" };
+    }
+    return {
+      matches: sectionDepartment.localeCompare(departmentTarget, undefined, { sensitivity: "accent" }) === 0,
+      label: `department ${departmentTarget}`,
+    };
+  }
+
+  if (scope === "instructor" || scope === "professor") {
+    const instructorTarget = blockedRuleTarget(rule, [
+      "instructor_id",
+      "instructor",
+      "professor_id",
+      "professor",
+      "target",
+      "target_id",
+      "scope_value",
+      "value",
+    ]);
+    if (!instructorTarget) return { matches: false, label: "instructor policy" };
+    return {
+      matches:
+        String(section.instructor_id ?? "").trim().localeCompare(instructorTarget, undefined, {
+          sensitivity: "accent",
+        }) === 0,
+      label: `professor ${instructorTarget}`,
+    };
+  }
+
+  if (scope === "room") {
+    const roomTarget = blockedRuleTarget(rule, [
+      "room_id",
+      "room",
+      "target",
+      "target_id",
+      "scope_value",
+      "value",
+    ]);
+    if (!roomTarget) return { matches: false, label: "room policy" };
+    const selectedRoom = String(targetRoomId ?? "").trim();
+    return {
+      matches:
+        selectedRoom.localeCompare(roomTarget, undefined, { sensitivity: "accent" }) === 0,
+      label: `room ${roomTarget}`,
+    };
+  }
+
+  if (scope === "course" || scope === "section") {
+    const courseTarget = blockedRuleTarget(rule, [
+      "course_id",
+      "section_id",
+      "course",
+      "section",
+      "target",
+      "target_id",
+      "scope_value",
+      "value",
+    ]);
+    if (!courseTarget) return { matches: false, label: "course policy" };
+    const sectionCourseId = String(section.course_id ?? "").trim();
+    const sectionId = String(section.id ?? "").trim();
+    const matched =
+      sectionCourseId.localeCompare(courseTarget, undefined, { sensitivity: "accent" }) === 0 ||
+      sectionId.localeCompare(courseTarget, undefined, { sensitivity: "accent" }) === 0;
+    return { matches: matched, label: `course ${courseTarget}` };
+  }
+
+  return { matches: false, label: `${scope || "unknown"} policy` };
+}
+
+function dayAliasesFor(day: Day): string[] {
+  if (day === "Mon") return ["mon", "monday", "m"];
+  if (day === "Tue") return ["tue", "tues", "tuesday", "tu", "t"];
+  if (day === "Wed") return ["wed", "weds", "wednesday", "w"];
+  if (day === "Thu") return ["thu", "thur", "thurs", "thursday", "th", "r"];
+  return ["fri", "friday", "f"];
+}
+
+function meetingPatternIncludesDay(pattern: SchedulingInput["meeting_patterns"][number], day: Day): boolean {
+  const aliases = new Set(dayAliasesFor(day));
+  for (const allowed of pattern.allowed_days ?? []) {
+    const token = String(allowed ?? "").trim().toLowerCase();
+    if (!token) continue;
+    if (aliases.has(token)) return true;
+    const compact = token.toUpperCase().replace(/[^A-Z]/g, "");
+    if (/^[MTWRFSU]+$/.test(compact) && compact.includes(DAY_LETTER[day])) return true;
+  }
+  return false;
 }
 
 function formatTimeAmPm(hhmm: string): string {
@@ -709,6 +884,12 @@ export default function CalendarPage() {
     isValid: boolean;
     message: string | null;
   };
+type MeetingPatternPlacementOption = {
+  key: string;
+  meetingPatternId: string;
+  timeslotIds: string[];
+  label: string;
+};
   const [calendarDrag, setCalendarDrag] = useState<CalendarDragState | null>(null);
   const [pendingPlacementSectionId, setPendingPlacementSectionId] = useState<string | null>(null);
   const [placementPreview, setPlacementPreview] = useState<PlacementPreview | null>(null);
@@ -737,6 +918,15 @@ export default function CalendarPage() {
   } | null>(null);
   const [sectionModalError, setSectionModalError] = useState<string | null>(null);
   const [isSavingSection, setIsSavingSection] = useState(false);
+  const [meetingPatternSelectionModal, setMeetingPatternSelectionModal] = useState<{
+    sectionId: string;
+    roomId: string;
+    anchorSlotId: string;
+    options: MeetingPatternPlacementOption[];
+    selectedOptionKey: string;
+  } | null>(null);
+  const [meetingPatternSelectionError, setMeetingPatternSelectionError] = useState<string | null>(null);
+  const [toolbarActionHint, setToolbarActionHint] = useState<string | null>(null);
   // Keep multiple pinned highlights; hovering adds a temporary highlight.
   const activeLegendDepartmentKeys = useMemo(() => {
     const keys = new Set(selectedLegendDepartmentKeys);
@@ -809,9 +999,12 @@ export default function CalendarPage() {
                   expected_enrollment: section.expected_enrollment,
                   enrollment_cap: section.enrollment_cap,
                   allowed_meeting_patterns: section.allowed_meeting_patterns ?? [],
+                  previous_meeting_pattern:
+                    assignment?.meeting_pattern_id ?? section.previous_meeting_pattern ?? null,
                   room_requirements: section.room_requirements ?? [],
                   crosslist_group_id: section.crosslist_group_id ?? null,
                   tags: section.tags ?? [],
+                  state: section.state ?? "active",
                   room_id: assignment?.room_id ?? null,
                   // Legacy field retained for compatibility with existing rendering.
                   timeslot_id: assignment?.timeslot_ids?.[0] ?? null,
@@ -902,7 +1095,7 @@ export default function CalendarPage() {
               {
                 timeslot_ids: section.timeslot_id ? [section.timeslot_id] : [],
                 room_id: section.room_id ?? "",
-                meeting_pattern_id: "",
+                meeting_pattern_id: section.previous_meeting_pattern ?? "",
               },
             ]),
           );
@@ -950,6 +1143,153 @@ export default function CalendarPage() {
     data?.instructors.forEach((i) => map.set(i.id, i));
     return map;
   }, [data]);
+
+  const sectionById = useMemo(() => {
+    const map = new Map<string, SectionDto>();
+    data?.sections.forEach((section) => map.set(section.id, section));
+    return map;
+  }, [data]);
+
+  const findBlockedPlacementMessage = useCallback(
+    (
+      sectionId: string,
+      targetRoomId: string,
+      slot: TimeslotWithMinutes,
+      day: Day = selectedDay,
+    ): string | null => {
+      if (!solverInput) return null;
+      const section = sectionById.get(sectionId);
+      if (!section) return null;
+      for (const blocked of solverInput.blocked_times ?? []) {
+        const sectionScopeMatch = blockedRuleMatchesSection(blocked, section, targetRoomId);
+        if (!sectionScopeMatch.matches) continue;
+        if (!blockedRuleOverlapsSlot(blocked, slot, day)) continue;
+        const reason = String(blocked.reason ?? "").trim();
+        const title = [section.department, String(section.course_id)].filter(Boolean).join(" ").trim();
+        const timeRange = `${formatTimeAmPm(slot.start_time)}-${formatTimeAmPm(slot.end_time)}`;
+        const reasonText = reason ? ` Reason: ${reason}.` : "";
+        return `Cannot place ${title || section.id} into ${day} ${timeRange}. This timeslot is blocked by ${sectionScopeMatch.label}.${reasonText}`;
+      }
+      return null;
+    },
+    [sectionById, selectedDay, solverInput],
+  );
+
+  const buildMeetingPatternOptionsForPlacement = useCallback(
+    (sectionId: string, placedSlotId: string): MeetingPatternPlacementOption[] => {
+      if (!solverInput) return [];
+      const section = sectionById.get(sectionId);
+      if (!section) return [];
+      const allowedPatternSet =
+        section.allowed_meeting_patterns && section.allowed_meeting_patterns.length > 0
+          ? new Set(section.allowed_meeting_patterns)
+          : null;
+      const options: MeetingPatternPlacementOption[] = [];
+      for (const pattern of solverInput.meeting_patterns ?? []) {
+        if (allowedPatternSet && !allowedPatternSet.has(pattern.id)) continue;
+        if (!meetingPatternIncludesDay(pattern, selectedDay)) continue;
+        for (const set of pattern.compatible_timeslot_sets ?? []) {
+          const normalizedSet = (set ?? []).map((id) => String(id)).filter(Boolean);
+          if (!normalizedSet.includes(placedSlotId)) continue;
+          const slotLabels = normalizedSet
+            .map((slotId) => {
+              const slot = timeslotById.get(slotId);
+              if (!slot) return slotId;
+              const daysLabel = String(slot.days ?? slot.day ?? "").trim() || "?";
+              return `${daysLabel} ${formatTimeAmPm(slot.start_time)}-${formatTimeAmPm(slot.end_time)}`;
+            })
+            .join(", ");
+          options.push({
+            key: `${pattern.id}::${normalizedSet.join("|")}`,
+            meetingPatternId: pattern.id,
+            timeslotIds: normalizedSet,
+            label: `${pattern.id} (${slotLabels})`,
+          });
+        }
+      }
+      return options.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+    },
+    [sectionById, selectedDay, solverInput, timeslotById],
+  );
+
+  const validatePatternPlacement = useCallback(
+    (
+      sectionId: string,
+      targetRoomId: string,
+      nextTimeslotIds: string[],
+      baseAssignments: AssignmentMap,
+    ): { ok: true } | { ok: false; message: string } => {
+      if (!data) return { ok: false, message: "Calendar data is unavailable." };
+      const linkedSectionIds = crosslistPeerSectionIds(sectionId, data.sections);
+      const linkedSectionIdSet = new Set(linkedSectionIds);
+      const selectedSlotMap = new Map<string, TimeslotDto>();
+      for (const slotId of nextTimeslotIds) {
+        const slot = timeslotById.get(slotId);
+        if (!slot) return { ok: false, message: `Timeslot '${slotId}' is missing from the calendar.` };
+        selectedSlotMap.set(slotId, slot);
+      }
+
+      const slotOverlaps = (a: TimeslotDto, b: TimeslotDto): boolean => {
+        const days = DAYS.filter((day) => timeslotMatchesDay(a, day) && timeslotMatchesDay(b, day));
+        if (days.length === 0) return false;
+        const aStart = parseMinutes(a.start_time);
+        const aEnd = parseMinutes(a.end_time);
+        const bStart = parseMinutes(b.start_time);
+        const bEnd = parseMinutes(b.end_time);
+        return aStart < bEnd && aEnd > bStart;
+      };
+
+      for (const linkedSectionId of linkedSectionIds) {
+        for (const slotId of nextTimeslotIds) {
+          const slot = selectedSlotMap.get(slotId);
+          if (!slot) continue;
+          const slotWithMinutes: TimeslotWithMinutes = {
+            ...slot,
+            start: parseMinutes(slot.start_time),
+            end: parseMinutes(slot.end_time),
+          };
+          const daysForSlot = DAYS.filter((day) => timeslotMatchesDay(slot, day));
+          for (const day of daysForSlot.length ? daysForSlot : [selectedDay]) {
+            const blocked = findBlockedPlacementMessage(linkedSectionId, targetRoomId, slotWithMinutes, day);
+            if (blocked) {
+              return {
+                ok: false,
+                message: `${blocked} Suggested fix: choose a meeting pattern whose other day slots avoid blocked times.`,
+              };
+            }
+          }
+        }
+      }
+
+      for (const [otherSectionId, assignment] of Object.entries(baseAssignments)) {
+        if (linkedSectionIdSet.has(otherSectionId)) continue;
+        const otherRoomId = assignment?.room_id ?? "";
+        if (otherRoomId !== targetRoomId) continue;
+        const otherSlotIds = assignment?.timeslot_ids ?? [];
+        for (const slotId of nextTimeslotIds) {
+          const slot = selectedSlotMap.get(slotId);
+          if (!slot) continue;
+          for (const otherSlotId of otherSlotIds) {
+            const otherSlot = timeslotById.get(otherSlotId);
+            if (!otherSlot) continue;
+            if (!slotOverlaps(slot, otherSlot)) continue;
+            const section = sectionById.get(otherSectionId);
+            const sectionLabel = [section?.department, String(section?.course_id ?? otherSectionId)]
+              .filter(Boolean)
+              .join(" ")
+              .trim();
+            return {
+              ok: false,
+              message: `Cannot apply this meeting pattern: it conflicts with ${sectionLabel || otherSectionId} in room ${targetRoomId}. Suggested fix: pick another meeting pattern option or place the section in a different room.`,
+            };
+          }
+        }
+      }
+
+      return { ok: true };
+    },
+    [data, findBlockedPlacementMessage, sectionById, selectedDay, timeslotById],
+  );
 
   const departmentFilterOptions = useMemo(() => {
     if (!data?.sections.length) return [] as { key: string; label: string }[];
@@ -1052,6 +1392,135 @@ export default function CalendarPage() {
     }
   }, []);
 
+  const toSchedulingSections = useCallback(
+    (sections: SectionDto[]): SchedulingInput["sections"] =>
+      sections.map((section) => ({
+        id: section.id,
+        course_id: String(section.course_id),
+        department: (section.department ?? "").trim(),
+        section_code: section.section_code,
+        instructor_id: section.instructor_id,
+        expected_enrollment: section.expected_enrollment ?? 0,
+        enrollment_cap: section.enrollment_cap ?? section.expected_enrollment ?? 0,
+        allowed_meeting_patterns: section.allowed_meeting_patterns ?? [],
+        previous_meeting_pattern: section.previous_meeting_pattern ?? undefined,
+        room_requirements: section.room_requirements ?? [],
+        crosslist_group_id: section.crosslist_group_id ?? null,
+        tags: section.tags ?? [],
+        state: normalizeSectionState(section.state),
+      })),
+    [],
+  );
+
+  const mergeSectionsWithAssignments = useCallback(
+    (nextAssignments: AssignmentMap): SectionDto[] => {
+      if (!data) return [];
+      return data.sections.map((section) => {
+        const assignment = nextAssignments[section.id];
+        const nextMeetingPatternId =
+          assignment?.meeting_pattern_id || section.previous_meeting_pattern || null;
+        const nextAllowedPatterns = Array.from(
+          new Set([
+            ...(section.allowed_meeting_patterns ?? []),
+            ...(nextMeetingPatternId ? [nextMeetingPatternId] : []),
+          ]),
+        );
+        return {
+          ...section,
+          room_id: assignment?.room_id ?? section.room_id ?? null,
+          timeslot_id: assignment?.timeslot_ids?.[0] ?? section.timeslot_id ?? null,
+          previous_meeting_pattern: nextMeetingPatternId,
+          allowed_meeting_patterns: nextAllowedPatterns,
+        };
+      });
+    },
+    [data],
+  );
+
+  const persistCalendarAssignments = useCallback(
+    async (nextAssignments: AssignmentMap) => {
+      if (!data) return;
+      const mergedSections = mergeSectionsWithAssignments(nextAssignments);
+      try {
+        await persistSections(mergedSections);
+        setData((prev) => (prev ? { ...prev, sections: mergedSections } : prev));
+        if (solverInput) {
+          const nextInput: SchedulingInput = {
+            ...solverInput,
+            sections: toSchedulingSections(mergedSections),
+          };
+          setSolverInput(nextInput);
+        }
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event(SCHEDULING_DATA_REFRESH_EVENT));
+        }
+      } catch (err) {
+        setBackendSaveMessage({
+          type: "error",
+          text:
+            err instanceof Error
+              ? `Calendar placement saved locally but failed to sync backend: ${err.message}`
+              : "Calendar placement saved locally but failed to sync backend.",
+        });
+      }
+    },
+    [data, mergeSectionsWithAssignments, persistSections, solverInput, toSchedulingSections],
+  );
+
+  const applyMeetingPatternSelection = useCallback(() => {
+    if (!meetingPatternSelectionModal) return;
+    const selection = meetingPatternSelectionModal.options.find(
+      (option) => option.key === meetingPatternSelectionModal.selectedOptionKey,
+    );
+    if (!selection) {
+      setMeetingPatternSelectionError("Select a meeting pattern option.");
+      return;
+    }
+    const sectionId = meetingPatternSelectionModal.sectionId;
+    const targetRoomId = meetingPatternSelectionModal.roomId;
+    const nextTimeslotIds = Array.from(new Set(selection.timeslotIds));
+    const validation = validatePatternPlacement(sectionId, targetRoomId, nextTimeslotIds, assignmentsBySection);
+    if (!validation.ok) {
+      setMeetingPatternSelectionError(validation.message);
+      setDragFeedback({ status: "invalid", message: validation.message });
+      return;
+    }
+
+    const linkedSectionIds = data ? crosslistPeerSectionIds(sectionId, data.sections) : [sectionId];
+    const nextAssignments: AssignmentMap = { ...assignmentsBySection };
+    for (const linkedSectionId of linkedSectionIds) {
+      nextAssignments[linkedSectionId] = {
+        timeslot_ids: [...nextTimeslotIds],
+        room_id: targetRoomId,
+        meeting_pattern_id: selection.meetingPatternId,
+      };
+    }
+    setAssignmentsBySection(nextAssignments);
+    setSolverTimeslotIdsBySection((prev) => ({
+      ...prev,
+      ...Object.fromEntries(
+        linkedSectionIds.map((linkedSectionId) => [linkedSectionId, [...nextTimeslotIds]]),
+      ),
+    }));
+    void persistCalendarAssignments(nextAssignments);
+    setMeetingPatternSelectionModal(null);
+    setMeetingPatternSelectionError(null);
+    setDragFeedback({
+      status: "valid",
+      message: `Applied meeting pattern ${selection.meetingPatternId}. Section mapped to all compatible days and timeslots.`,
+    });
+    setBackendSaveMessage({
+      type: "success",
+      text: "Meeting pattern mapped successfully and synced to backend.",
+    });
+  }, [
+    assignmentsBySection,
+    data,
+    meetingPatternSelectionModal,
+    persistCalendarAssignments,
+    validatePatternPlacement,
+  ]);
+
   useEffect(() => {
     const validDepartmentKeys = new Set(departmentFilterOptions.map((option) => option.key));
     setSelectedDepartmentKeys((prev) => prev.filter((key) => validDepartmentKeys.has(key)));
@@ -1064,6 +1533,9 @@ export default function CalendarPage() {
 
   const sectionMatchesFilters = useCallback(
     (section: SectionDto) => {
+      if (isSectionArchived(section)) {
+        return false;
+      }
       const departmentMatch =
         selectedDepartmentKeys.length === 0 ||
         selectedDepartmentKeys.includes(departmentColorKey(section));
@@ -1617,6 +2089,8 @@ export default function CalendarPage() {
               ...section,
               room_id: assignment?.room_id ?? section.room_id ?? null,
               timeslot_id: assignment?.timeslot_ids?.[0] ?? section.timeslot_id ?? null,
+              previous_meeting_pattern:
+                assignment?.meeting_pattern_id ?? section.previous_meeting_pattern ?? null,
             };
           }),
         });
@@ -1677,12 +2151,57 @@ export default function CalendarPage() {
       .sort((a, b) => a - b);
   }, [dragPossibleTimeslots, axisStart, axisEnd]);
 
+  const dragBlockedTimeslotInfo = useMemo(() => {
+    const blockedSlotIds = new Set<string>();
+    const blockedReasonBySlotId = new Map<string, string>();
+    if (!calendarDrag?.sectionId || !dragPossibleTimeslots.length || !solverInput) {
+      return { blockedSlotIds, blockedReasonBySlotId };
+    }
+    const linkedSectionIds = linkedSectionIdsBySection.get(calendarDrag.sectionId) ?? [
+      calendarDrag.sectionId,
+    ];
+    for (const roomRow of roomRows) {
+      for (const slot of dragPossibleTimeslots) {
+        for (const linkedSectionId of linkedSectionIds) {
+          const blockedMessage = findBlockedPlacementMessage(linkedSectionId, roomRow.room.id, slot);
+          if (!blockedMessage) continue;
+          const key = `${roomRow.room.id}::${slot.id}`;
+          blockedSlotIds.add(key);
+          blockedReasonBySlotId.set(key, blockedMessage);
+          break;
+        }
+      }
+    }
+    return { blockedSlotIds, blockedReasonBySlotId };
+  }, [
+    calendarDrag?.sectionId,
+    dragPossibleTimeslots,
+    findBlockedPlacementMessage,
+    linkedSectionIdsBySection,
+    roomRows,
+    solverInput,
+  ]);
+
   const commitCalendarPlacement = useCallback(
     (sectionId: string, targetRoomId: string, selectedSlot: TimeslotWithMinutes) => {
       if (!data) return;
       const dragged = allDayEvents.find((x) => x.section.id === sectionId && x.timeslot);
       if (!dragged || !dragged.timeslot) return;
       const linkedSectionIds = linkedSectionIdsBySection.get(sectionId) ?? [sectionId];
+      for (const linkedSectionId of linkedSectionIds) {
+        const blockedMessage = findBlockedPlacementMessage(
+          linkedSectionId,
+          targetRoomId,
+          selectedSlot,
+        );
+        if (blockedMessage) {
+          setDragFeedback({
+            status: "invalid",
+            message: blockedMessage,
+          });
+          return;
+        }
+      }
       const linkedSectionIdSet = new Set(linkedSectionIds);
 
       const currentAssignment = assignmentsBySection[sectionId];
@@ -1806,6 +2325,7 @@ export default function CalendarPage() {
       dragError,
       dragFeedback,
       linkedSectionIdsBySection,
+      findBlockedPlacementMessage,
       selectedDay,
       solverTimeslotIdsBySection,
       timeslotById,
@@ -1935,10 +2455,20 @@ export default function CalendarPage() {
 
   const evaluatePlacement = useCallback(
     (sectionId: string, targetRoomId: string, slot: TimeslotWithMinutes) => {
-      if (!data) return { isValid: false, message: "Calendar data is unavailable." };
+      if (!data) {
+        return { isValid: false, message: "Calendar data is unavailable.", reasonCode: "other" } as PlacementEvaluation;
+      }
       const section = data.sections.find((s) => s.id === sectionId);
-      if (!section) return { isValid: false, message: "Section not found." };
+      if (!section) {
+        return { isValid: false, message: "Section not found.", reasonCode: "other" } as PlacementEvaluation;
+      }
       const linkedSectionIds = linkedSectionIdsBySection.get(sectionId) ?? [sectionId];
+      for (const linkedSectionId of linkedSectionIds) {
+        const blockedMessage = findBlockedPlacementMessage(linkedSectionId, targetRoomId, slot);
+        if (blockedMessage) {
+          return { isValid: false, message: blockedMessage, reasonCode: "blocked" } as PlacementEvaluation;
+        }
+      }
       const linkedSectionIdSet = new Set(linkedSectionIds);
       const targetRoom = data.rooms.find((room) => room.id === targetRoomId);
       const requiredSeats = linkedSectionIds.reduce((sum, linkedSectionId) => {
@@ -1953,7 +2483,8 @@ export default function CalendarPage() {
         return {
           isValid: false,
           message: `Invalid: ${section.department ?? ""} ${section.course_id} requires ${requiredSeats} seats, but room ${targetRoomId} capacity is ${targetRoom?.capacity}.`,
-        };
+          reasonCode: "capacity",
+        } as PlacementEvaluation;
       }
       const conflicts = allDayEvents.filter((eventItem) => {
         if (linkedSectionIdSet.has(eventItem.section.id)) return false;
@@ -1971,14 +2502,22 @@ export default function CalendarPage() {
         return {
           isValid: false,
           message: `Invalid: conflicts with ${conflictNames || "another class"} in room ${targetRoomId} at ${formatTimeAmPm(slot.start_time)}-${formatTimeAmPm(slot.end_time)}.`,
-        };
+          reasonCode: "conflict",
+        } as PlacementEvaluation;
       }
       return {
         isValid: true,
         message: `Valid placement: room ${targetRoomId}, ${selectedDay} ${formatTimeAmPm(slot.start_time)}-${formatTimeAmPm(slot.end_time)}.`,
-      };
+      } as PlacementEvaluation;
     },
-    [allDayEvents, assignmentsBySection, data, linkedSectionIdsBySection, selectedDay],
+    [
+      allDayEvents,
+      assignmentsBySection,
+      data,
+      findBlockedPlacementMessage,
+      linkedSectionIdsBySection,
+      selectedDay,
+    ],
   );
 
   const commitPlacementByClick = useCallback(
@@ -1989,6 +2528,17 @@ export default function CalendarPage() {
         return;
       }
       const linkedSectionIds = linkedSectionIdsBySection.get(sectionId) ?? [sectionId];
+      const needsPatternSelection = pendingPlacementSectionId === sectionId;
+      const patternOptions = needsPatternSelection
+        ? buildMeetingPatternOptionsForPlacement(sectionId, slot.id)
+        : [];
+      if (needsPatternSelection && patternOptions.length === 0) {
+        const message =
+          "No compatible meeting patterns include this day/time. Suggested fix: place the section in a different timeslot or update meeting pattern compatibility.";
+        setDragFeedback({ status: "invalid", message });
+        setBackendSaveMessage({ type: "error", text: message });
+        return;
+      }
       const nextAssignments: AssignmentMap = {
         ...assignmentsBySection,
       };
@@ -2007,18 +2557,48 @@ export default function CalendarPage() {
           linkedSectionIds.map((linkedSectionId) => [linkedSectionId, [slot.id]]),
         ),
       }));
+      void persistCalendarAssignments(nextAssignments);
+      if (needsPatternSelection) {
+        setMeetingPatternSelectionModal({
+          sectionId,
+          roomId: targetRoomId,
+          anchorSlotId: slot.id,
+          options: patternOptions,
+          selectedOptionKey: patternOptions[0].key,
+        });
+        setMeetingPatternSelectionError(null);
+      }
       setPendingPlacementSectionId(null);
       setPlacementPreview(null);
-      setDragFeedback({ status: "valid", message: check.message });
-      setBackendSaveMessage({
-        type: "success",
-        text:
-          linkedSectionIds.length > 1
-            ? "Cross-listed group placed on the calendar. Click Update Backend to persist this placement."
-            : "Section placed on the calendar. Click Update Backend to persist this placement.",
+      setDragFeedback({
+        status: "valid",
+        message: needsPatternSelection
+          ? "Section placed. Choose a meeting pattern to map this section across its additional days."
+          : check.message,
       });
+      setBackendSaveMessage(
+        needsPatternSelection
+          ? {
+              type: "success",
+              text: "Section placed. Select a meeting pattern to finish multi-day mapping.",
+            }
+          : {
+              type: "success",
+              text:
+                linkedSectionIds.length > 1
+                  ? "Cross-listed group placed on the calendar. Click Update Backend to persist this placement."
+                  : "Section placed on the calendar. Click Update Backend to persist this placement.",
+            },
+      );
     },
-    [assignmentsBySection, evaluatePlacement, linkedSectionIdsBySection],
+    [
+      assignmentsBySection,
+      buildMeetingPatternOptionsForPlacement,
+      evaluatePlacement,
+      linkedSectionIdsBySection,
+      pendingPlacementSectionId,
+      persistCalendarAssignments,
+    ],
   );
 
   const handleUpdateBackend = async () => {
@@ -2037,6 +2617,10 @@ export default function CalendarPage() {
           timeslot_id:
             assignment?.timeslot_ids?.[0] ??
             (section as unknown as { timeslot_id?: string | null }).timeslot_id ??
+            null,
+          previous_meeting_pattern:
+            assignment?.meeting_pattern_id ??
+            (section as unknown as { previous_meeting_pattern?: string | null }).previous_meeting_pattern ??
             null,
         };
       });
@@ -2060,19 +2644,7 @@ export default function CalendarPage() {
       if (solverInput) {
         const nextInput: SchedulingInput = {
           ...solverInput,
-          sections: mergedSections.map((section) => ({
-            id: section.id,
-            course_id: String(section.course_id),
-            department: (section.department ?? "").trim(),
-            section_code: section.section_code,
-            instructor_id: section.instructor_id,
-            expected_enrollment: section.expected_enrollment ?? 0,
-            enrollment_cap: section.enrollment_cap ?? section.expected_enrollment ?? 0,
-            allowed_meeting_patterns: section.allowed_meeting_patterns ?? [],
-            room_requirements: section.room_requirements ?? [],
-            crosslist_group_id: section.crosslist_group_id ?? null,
-            tags: section.tags ?? [],
-          })),
+          sections: toSchedulingSections(mergedSections),
         };
         setSolverInput(nextInput);
         updateLastRunStorage(nextInput, assignmentsBySection);
@@ -2150,6 +2722,10 @@ export default function CalendarPage() {
       tags: splitCsv(draft.tags),
       room_id: preservedRoomId || null,
       timeslot_id: preservedTimeslotIds[0] ?? null,
+      previous_meeting_pattern:
+        assignmentsBySection[draft.id.trim()]?.meeting_pattern_id ??
+        existingSection?.previous_meeting_pattern ??
+        null,
     };
 
     let nextSections: SectionDto[];
@@ -2189,19 +2765,7 @@ export default function CalendarPage() {
       if (solverInput) {
         const nextInput: SchedulingInput = {
           ...solverInput,
-          sections: nextSections.map((section) => ({
-            id: section.id,
-            course_id: String(section.course_id),
-            department: (section.department ?? "").trim(),
-            section_code: section.section_code,
-            instructor_id: section.instructor_id,
-            expected_enrollment: section.expected_enrollment ?? 0,
-            enrollment_cap: section.enrollment_cap ?? section.expected_enrollment ?? 0,
-            allowed_meeting_patterns: section.allowed_meeting_patterns ?? [],
-            room_requirements: section.room_requirements ?? [],
-            crosslist_group_id: section.crosslist_group_id ?? null,
-            tags: section.tags ?? [],
-          })),
+          sections: toSchedulingSections(nextSections),
         };
         setSolverInput(nextInput);
         updateLastRunStorage(nextInput, nextAssignments);
@@ -2211,7 +2775,7 @@ export default function CalendarPage() {
         type: "success",
         text:
           sectionModal.mode === "create"
-            ? "Section created. Click an available room/timeslot space to place it."
+            ? "Section created. Click an available room/timeslot space to place it, then choose a meeting pattern."
             : "Section updates saved to backend.",
       });
       if (typeof window !== "undefined") {
@@ -2222,7 +2786,7 @@ export default function CalendarPage() {
         setDragFeedback({
           status: "neutral",
           message:
-            "New section created. Hover over available room/timeslot space, then click to place it.",
+            "New section created. Hover over available room/timeslot space, then click to place it. You will choose the meeting pattern next.",
         });
       }
       setSectionModal(null);
@@ -2238,6 +2802,7 @@ export default function CalendarPage() {
     sectionModal,
     solverInput,
     solverTimeslotIdsBySection,
+    toSchedulingSections,
     validateSectionDraft,
   ]);
 
@@ -2402,94 +2967,156 @@ export default function CalendarPage() {
             Click through Monday–Friday to view scheduled sections.
           </p>
         </div>
-        <div className="flex gap-3 flex-wrap">
-          <button
-            type="button"
-            onClick={openSaveScheduleModal}
-            className="flex items-center justify-center rounded-lg h-10 px-4 bg-indigo-50 text-indigo-800 font-bold gap-2 border border-indigo-200 hover:bg-indigo-100 transition-colors"
-            title="Save this generated/edited schedule to history"
+        <div className="flex flex-col items-stretch gap-2 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2">
+            <div
+              onMouseEnter={() => setToolbarActionHint("Run solver using current backend data and placement locks.")}
+              onMouseLeave={() => setToolbarActionHint(null)}
+              onFocus={() => setToolbarActionHint("Run solver using current backend data and placement locks.")}
+              onBlur={() => setToolbarActionHint(null)}
+              className="contents"
+            >
+              <button
+                type="button"
+                disabled={solverRunStatus === "loading" || !data}
+                onClick={() => void handleRunSolverFromCalendar()}
+                className={clsx(
+                  "flex items-center justify-center rounded-lg size-10 font-bold border transition-colors",
+                  solverRunStatus !== "loading" && data
+                    ? "bg-[#137fec] text-white border-[#137fec] shadow-lg shadow-[#137fec]/20 hover:bg-[#0f6dca]"
+                    : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
+                )}
+                title="Run the solver using backend scheduling data and locks from this page"
+                aria-label="Run solver"
+              >
+                <Play className="size-4" />
+              </button>
+            </div>
+            <div
+              onMouseEnter={() => setToolbarActionHint("Persist valid calendar edits to backend tables.")}
+              onMouseLeave={() => setToolbarActionHint(null)}
+              onFocus={() => setToolbarActionHint("Persist valid calendar edits to backend tables.")}
+              onBlur={() => setToolbarActionHint(null)}
+              className="contents"
+            >
+              <button
+                type="button"
+                disabled={!hasValidUnsavedEdit || isSavingBackend}
+                onClick={handleUpdateBackend}
+                className={clsx(
+                  "flex items-center justify-center rounded-lg size-10 font-bold border transition-colors",
+                  hasValidUnsavedEdit && !isSavingBackend
+                    ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
+                    : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
+                )}
+                title={
+                  hasValidUnsavedEdit
+                    ? "Persist valid calendar edits to backend"
+                    : "Make a valid edit first to enable backend update"
+                }
+                aria-label="Update backend"
+              >
+                <CloudBackup className="size-4" />
+              </button>
+            </div>
+            <div className="hidden lg:block h-7 w-px bg-slate-200 mx-1" />
+            <Link
+              href="/editor/sections"
+              onMouseEnter={() => setToolbarActionHint("Open section editor tables to manage course data.")}
+              onMouseLeave={() => setToolbarActionHint(null)}
+              onFocus={() => setToolbarActionHint("Open section editor tables to manage course data.")}
+              onBlur={() => setToolbarActionHint(null)}
+              className="flex items-center justify-center rounded-lg size-10 bg-slate-100 text-slate-800 font-bold border border-slate-200 hover:bg-slate-200 transition-colors"
+              aria-label="Edit schedule data"
+            >
+              <Pencil className="size-4" />
+            </Link>
+            <button
+              type="button"
+              onClick={openSaveScheduleModal}
+              onMouseEnter={() => setToolbarActionHint("Save this schedule snapshot to history.")}
+              onMouseLeave={() => setToolbarActionHint(null)}
+              onFocus={() => setToolbarActionHint("Save this schedule snapshot to history.")}
+              onBlur={() => setToolbarActionHint(null)}
+              className="flex items-center justify-center rounded-lg size-10 bg-indigo-50 text-indigo-800 font-bold border border-indigo-200 hover:bg-indigo-100 transition-colors"
+              title="Save this generated/edited schedule to history"
+              aria-label="Save schedule"
+            >
+              <Save className="size-4" />
+            </button>
+            <Link
+              href="/history"
+              onMouseEnter={() => setToolbarActionHint("Open schedule history entries.")}
+              onMouseLeave={() => setToolbarActionHint(null)}
+              onFocus={() => setToolbarActionHint("Open schedule history entries.")}
+              onBlur={() => setToolbarActionHint(null)}
+              className="flex items-center justify-center rounded-lg size-10 bg-slate-100 text-slate-800 font-bold border border-slate-200 hover:bg-slate-200 transition-colors"
+              aria-label="History"
+            >
+              <FolderClock className="size-4" />
+            </Link>
+            <button
+              onMouseEnter={() => setToolbarActionHint("Export the visible calendar to PDF.")}
+              onMouseLeave={() => setToolbarActionHint(null)}
+              onFocus={() => setToolbarActionHint("Export the visible calendar to PDF.")}
+              onBlur={() => setToolbarActionHint(null)}
+              className="flex items-center justify-center rounded-lg size-10 bg-slate-100 text-slate-900 font-bold border border-slate-200 hover:bg-slate-200 transition-colors"
+              onClick={handleExportPdf}
+              aria-label="Export PDF"
+            >
+              <Share2 className="size-4" />
+            </button>
+            <div className="hidden lg:block h-7 w-px bg-slate-200 mx-1" />
+            <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden">
+              <button
+                type="button"
+                onClick={lockAllPlacementChanges}
+                onMouseEnter={() => setToolbarActionHint("Lock all changed placements for solver runs.")}
+                onMouseLeave={() => setToolbarActionHint(null)}
+                onFocus={() => setToolbarActionHint("Lock all changed placements for solver runs.")}
+                onBlur={() => setToolbarActionHint(null)}
+                className="flex items-center justify-center h-10 w-10 bg-amber-50 text-amber-900 font-bold hover:bg-amber-100 transition-colors"
+                title="Hard-lock every section whose placement differs from the saved baseline (needs room + times)"
+                aria-label="Lock all changes"
+              >
+                <Lock className="size-4" />
+              </button>
+              <div
+                onMouseEnter={() => setToolbarActionHint("Remove all placement locks from this calendar view.")}
+                onMouseLeave={() => setToolbarActionHint(null)}
+                onFocus={() => setToolbarActionHint("Remove all placement locks from this calendar view.")}
+                onBlur={() => setToolbarActionHint(null)}
+                className="contents"
+              >
+                <button
+                  type="button"
+                  disabled={!hasAnyPlacementLock}
+                  onClick={unlockAllPlacementLocks}
+                  className={clsx(
+                    "flex items-center justify-center h-10 w-10 font-bold border-l transition-colors",
+                    hasAnyPlacementLock
+                      ? "bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100"
+                      : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
+                  )}
+                  title="Remove all placement locks added from this calendar view"
+                  aria-label="Unlock all changes"
+                >
+                  <Unlock className="size-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+          <div
+            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 min-h-[34px] flex items-center"
+            aria-live="polite"
           >
-            <Save className="size-4" />
-            Save Schedule
-          </button>
-          <Link
-            href="/history"
-            className="flex items-center justify-center rounded-lg h-10 px-4 bg-slate-100 text-slate-800 font-bold gap-2 border border-slate-200 hover:bg-slate-200 transition-colors"
-          >
-            <Archive className="size-4" />
-            History
-          </Link>
-          <button
-            className="flex items-center justify-center rounded-lg h-10 px-4 bg-slate-100 text-slate-900 font-bold gap-2 border border-slate-200"
-            onClick={handleExportPdf}
-          >
-            <Share2 className="size-4" />
-            Export PDF
-          </button>
-          <button
-            type="button"
-            onClick={lockAllPlacementChanges}
-            className="flex items-center justify-center rounded-lg h-10 px-4 bg-amber-50 text-amber-900 font-bold gap-2 border border-amber-200 hover:bg-amber-100 transition-colors"
-            title="Hard-lock every section whose placement differs from the saved baseline (needs room + times)"
-          >
-            <Lock className="size-4" />
-            Lock all changes
-          </button>
-          <button
-            type="button"
-            disabled={!hasAnyPlacementLock}
-            onClick={unlockAllPlacementLocks}
-            className={clsx(
-              "flex items-center justify-center rounded-lg h-10 px-4 font-bold gap-2 border transition-colors",
-              hasAnyPlacementLock
-                ? "bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100"
-                : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
-            )}
-            title="Remove all placement locks added from this calendar view"
-          >
-            <Unlock className="size-4" />
-            Unlock all
-          </button>
-          <button
-            type="button"
-            disabled={solverRunStatus === "loading" || !data}
-            onClick={() => void handleRunSolverFromCalendar()}
-            className={clsx(
-              "flex items-center justify-center rounded-lg h-10 px-4 font-bold gap-2 border transition-colors",
-              solverRunStatus !== "loading" && data
-                ? "bg-[#137fec] text-white border-[#137fec] shadow-lg shadow-[#137fec]/20 hover:bg-[#0f6dca]"
-                : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
-            )}
-            title="Run the solver using backend scheduling data and locks from this page"
-          >
-            <Rocket className="size-4" />
-            {solverRunStatus === "loading" ? "Running…" : "Run Solver"}
-          </button>
-          <button
-            type="button"
-            disabled={!hasValidUnsavedEdit || isSavingBackend}
-            onClick={handleUpdateBackend}
-            className={clsx(
-              "flex items-center justify-center rounded-lg h-10 px-4 font-bold gap-2 border transition-colors",
-              hasValidUnsavedEdit && !isSavingBackend
-                ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
-                : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
-            )}
-            title={
-              hasValidUnsavedEdit
-                ? "Persist valid calendar edits to backend"
-                : "Make a valid edit first to enable backend update"
-            }
-          >
-            Update Backend
-          </button>
-          <Link
-            href="/editor/sections"
-            className="flex items-center justify-center rounded-lg h-10 px-4 bg-[#137fec] text-white font-bold gap-2 shadow-lg shadow-[#137fec]/20"
-          >
-            <Rocket className="size-4" />
-            Adjust Schedule Data
-          </Link>
+            {toolbarActionHint ?? "\u00A0"}
+          </div>
+          {hasValidUnsavedEdit && (
+            <p className="text-[11px] font-semibold text-emerald-700 px-1">
+              Unsaved valid edits are ready to sync.
+            </p>
+          )}
         </div>
       </div>
 
@@ -2632,7 +3259,8 @@ export default function CalendarPage() {
           </div>
           <p className="mt-2 text-[10px] text-slate-500 leading-relaxed">
             Shaded columns appear only while you drag; colors match slot duration on{" "}
-            <span className="font-semibold">{selectedDay}</span>.
+            <span className="font-semibold">{selectedDay}</span>. Red hatched columns are blocked for
+            the course currently being dragged.
           </p>
         </div>
       )}
@@ -2772,6 +3400,9 @@ export default function CalendarPage() {
                       .filter((slot) => slot.end > axisStart && slot.start < axisEnd)
                       .map((slot) => {
                         const durationMin = Math.max(0, slot.end - slot.start);
+                        const blockedKey = `${room.id}::${slot.id}`;
+                        const isBlockedForDraggedSection = dragBlockedTimeslotInfo.blockedSlotIds.has(blockedKey);
+                        const blockedReason = dragBlockedTimeslotInfo.blockedReasonBySlotId.get(blockedKey);
                         const leftPct =
                           (clamp(slot.start, axisStart, axisEnd) - axisStart) / axisRange;
                         const widthPct =
@@ -2785,10 +3416,21 @@ export default function CalendarPage() {
                             style={{
                               left: `${leftPct * 100}%`,
                               width: `${Math.max(widthPct * 100, 0.5)}%`,
-                              backgroundColor: rgbaFillForTimeslotDuration(durationMin, "strong"),
+                              backgroundColor: isBlockedForDraggedSection
+                                ? "rgba(220, 38, 38, 0.2)"
+                                : rgbaFillForTimeslotDuration(durationMin, "strong"),
+                              backgroundImage: isBlockedForDraggedSection
+                                ? "repeating-linear-gradient(135deg, rgba(220,38,38,0.38) 0px, rgba(220,38,38,0.38) 5px, rgba(255,255,255,0.0) 5px, rgba(255,255,255,0.0) 10px)"
+                                : undefined,
+                              outline: isBlockedForDraggedSection
+                                ? "1px solid rgba(220, 38, 38, 0.75)"
+                                : undefined,
                               zIndex: 0,
                             }}
-                            title={`${formatTimeAmPm(slot.start_time)}–${formatTimeAmPm(slot.end_time)} (${durationMin} min)`}
+                            title={
+                              blockedReason ??
+                              `${formatTimeAmPm(slot.start_time)}–${formatTimeAmPm(slot.end_time)} (${durationMin} min)`
+                            }
                           />
                         );
                       })}
@@ -2855,9 +3497,15 @@ export default function CalendarPage() {
                     (() => {
                       const slot = timeslotById.get(calendarDrag.preview.slotId);
                       if (!slot) return null;
+                      const blockedKey = `${room.id}::${slot.id}`;
+                      const isBlockedForDraggedSection = dragBlockedTimeslotInfo.blockedSlotIds.has(blockedKey);
                       const durationMin = timeslotDurationMinutes(slot);
-                      const bg = rgbaFillForTimeslotDuration(durationMin, "strong");
-                      const border = rgbaBorderForTimeslotDuration(durationMin);
+                      const bg = isBlockedForDraggedSection
+                        ? "rgba(239, 68, 68, 0.2)"
+                        : rgbaFillForTimeslotDuration(durationMin, "strong");
+                      const border = isBlockedForDraggedSection
+                        ? "rgba(220, 38, 38, 0.85)"
+                        : rgbaBorderForTimeslotDuration(durationMin);
                       const slotStartM = parseMinutes(slot.start_time);
                       const slotEndM = parseMinutes(slot.end_time);
                       const leftPct =
@@ -3141,6 +3789,9 @@ export default function CalendarPage() {
                   const timeLabelPv = `${formatTimeAmPm(st.start_time)} - ${formatTimeAmPm(st.end_time)}`;
                   const colorPv =
                     departmentPaletteByKey.get(departmentColorKey(section)) ?? solidPaletteAt(0);
+                  const previewBlocked = dragBlockedTimeslotInfo.blockedSlotIds.has(
+                    `${d.preview.targetRoomId}::${st.id}`,
+                  );
                   const previewMatchesHoveredDepartment =
                     activeLegendDepartmentKeys.size === 0 ||
                     activeLegendDepartmentKeys.has(departmentColorKey(section));
@@ -3148,7 +3799,8 @@ export default function CalendarPage() {
                     <div
                       key="calendar-drag-preview"
                       className={clsx(
-                        "absolute pointer-events-none z-[25] border-l-4 rounded-lg p-2.5 flex flex-col justify-between shadow-sm ring-2 ring-[#137fec]/40 ring-inset",
+                        "absolute pointer-events-none z-[25] border-l-4 rounded-lg p-2.5 flex flex-col justify-between shadow-sm ring-2 ring-inset",
+                        previewBlocked ? "ring-red-500/65" : "ring-[#137fec]/40",
                         !previewMatchesHoveredDepartment && "opacity-35",
                       )}
                       style={{
@@ -3462,6 +4114,19 @@ export default function CalendarPage() {
                   section, hover over an available room/time space and click to place it.
                 </div>
               )}
+              {sectionModal.mode === "edit" && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                  Assigned meeting pattern:{" "}
+                  <span className="font-semibold">
+                    {(() => {
+                      const sectionId = sectionModal.initialSectionId ?? "";
+                      const assignmentPattern = assignmentsBySection[sectionId]?.meeting_pattern_id;
+                      const persistedPattern = data.sections.find((s) => s.id === sectionId)?.previous_meeting_pattern;
+                      return assignmentPattern || persistedPattern || "None";
+                    })()}
+                  </span>
+                </div>
+              )}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label className="flex flex-col gap-1">
                   <span className="text-xs font-semibold text-slate-600">Section ID *</span>
@@ -3539,15 +4204,23 @@ export default function CalendarPage() {
                     disabled={isSavingSection}
                   />
                 </label>
-                <label className="flex flex-col gap-1 sm:col-span-2">
-                  <span className="text-xs font-semibold text-slate-600">Allowed Meeting Patterns (comma-separated)</span>
-                  <input
-                    className="rounded-lg border border-slate-200 px-3 py-2"
-                    value={sectionModal.draft.allowed_meeting_patterns}
-                    onChange={(e) => updateSectionModalDraft("allowed_meeting_patterns", e.target.value)}
-                    disabled={isSavingSection}
-                  />
-                </label>
+                {sectionModal.mode === "edit" ? (
+                  <label className="flex flex-col gap-1 sm:col-span-2">
+                    <span className="text-xs font-semibold text-slate-600">
+                      Allowed Meeting Patterns (comma-separated)
+                    </span>
+                    <input
+                      className="rounded-lg border border-slate-200 px-3 py-2"
+                      value={sectionModal.draft.allowed_meeting_patterns}
+                      onChange={(e) => updateSectionModalDraft("allowed_meeting_patterns", e.target.value)}
+                      disabled={isSavingSection}
+                    />
+                  </label>
+                ) : (
+                  <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                    Meeting pattern selection happens after you place the new section on the calendar.
+                  </div>
+                )}
                 <label className="flex flex-col gap-1 sm:col-span-2">
                   <span className="text-xs font-semibold text-slate-600">Room Requirements (comma-separated)</span>
                   <input
@@ -3603,6 +4276,82 @@ export default function CalendarPage() {
                   onClick={handleSaveSectionModal}
                 >
                   {isSavingSection ? "Saving..." : "Confirm & Save"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {meetingPatternSelectionModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px] flex items-center justify-center p-4"
+          onClick={() => {
+            setMeetingPatternSelectionModal(null);
+            setMeetingPatternSelectionError(null);
+          }}
+        >
+          <div
+            className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <h3 className="text-lg font-black text-slate-900">Select Meeting Pattern</h3>
+              <button
+                type="button"
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                onClick={() => {
+                  setMeetingPatternSelectionModal(null);
+                  setMeetingPatternSelectionError(null);
+                }}
+              >
+                Close
+              </button>
+            </div>
+            <div className="space-y-4 px-6 py-5 text-sm">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                Section is placed at room <span className="font-semibold">{meetingPatternSelectionModal.roomId}</span>. Choose a meeting pattern that includes this placed timeslot and maps the section to its additional days.
+              </div>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-600">Compatible Meeting Pattern Options</span>
+                <select
+                  className="rounded-lg border border-slate-200 px-3 py-2 bg-white"
+                  value={meetingPatternSelectionModal.selectedOptionKey}
+                  onChange={(e) =>
+                    setMeetingPatternSelectionModal((prev) =>
+                      prev ? { ...prev, selectedOptionKey: e.target.value } : prev,
+                    )
+                  }
+                >
+                  {meetingPatternSelectionModal.options.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {meetingPatternSelectionError && (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                  {meetingPatternSelectionError}
+                </div>
+              )}
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                  onClick={() => {
+                    setMeetingPatternSelectionModal(null);
+                    setMeetingPatternSelectionError(null);
+                  }}
+                >
+                  Later
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg px-3 py-2 text-sm font-bold text-white bg-[#137fec] hover:bg-[#0f6dca]"
+                  onClick={applyMeetingPatternSelection}
+                >
+                  Apply Pattern
                 </button>
               </div>
             </div>
