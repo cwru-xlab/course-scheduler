@@ -1,7 +1,5 @@
 export type Id = string;
 
-export type SectionState = "active" | "archived" | "new";
-
 export type Section = {
   id: Id;
   course_id: Id;
@@ -16,8 +14,6 @@ export type Section = {
   crosslist_group_id?: Id | null;
   tags: string[];
   previous_meeting_pattern?: Id;
-  /** active/new = schedule & show on calendar; archived = excluded from solver & calendar */
-  state?: SectionState;
 };
 
 export type Instructor = {
@@ -75,8 +71,6 @@ export type BlockedTime = {
   days: string;
   start_time: string;
   end_time: string;
-  instructor_id?: Id;
-  room_id?: Id;
   // Legacy fallback support for imported data.
   timeslot_ids?: Id[];
   reason: string;

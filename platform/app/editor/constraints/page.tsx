@@ -41,14 +41,6 @@ export default function ConstraintsPage() {
       [],
     [data],
   );
-  const instructorOptions = useMemo(
-    () =>
-      data?.instructors.map((i) => ({
-        key: i.id,
-        label: `${i.name || i.id} (${i.rank_type})`,
-      })) ?? [],
-    [data],
-  );
 
   const updateBackend = async () => {
     if (!data) return;
@@ -134,8 +126,6 @@ export default function ConstraintsPage() {
         />
         <BlockedTimesEditor
           blockedTimes={data.blocked_times}
-          instructorOptions={instructorOptions}
-          roomOptions={roomOptions}
           onUpdate={(blockedTimes) => updateField("blocked_times", blockedTimes)}
         />
         <LockedAssignmentsEditor

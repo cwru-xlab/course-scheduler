@@ -33,9 +33,6 @@ SPREADSHEET_SPECS: List[SheetSpec] = [
             "crosslist_group_id",
             "tags",
             "previous_meeting_pattern",
-            "state",
-            "prev_notes",
-            "new_notes",
         ],
     ),
     SheetSpec(
@@ -48,59 +45,19 @@ SPREADSHEET_SPECS: List[SheetSpec] = [
             "preferred_days",
             "preferred_patterns",
             "max_teaching_days",
-            "prev_notes",
-            "new_notes",
         ],
     ),
     SheetSpec(
         name="Rooms",
-        columns=[
-            "id",
-            "building",
-            "room_number",
-            "capacity",
-            "features",
-            "prev_notes",
-            "new_notes",
-        ],
+        columns=["id", "building", "room_number", "capacity", "features"],
     ),
     SheetSpec(
         name="Timeslots",
-        columns=[
-            "id",
-            "day",
-            "start_time",
-            "end_time",
-            "slot_type",
-            "prev_notes",
-            "new_notes",
-        ],
+        columns=["id", "day", "start_time", "end_time", "slot_type"],
     ),
     SheetSpec(
         name="MeetingPatterns",
-        columns=[
-            "id",
-            "slots_required",
-            "allowed_days",
-            "compatible_timeslot_sets",
-            "prev_notes",
-            "new_notes",
-        ],
-    ),
-    SheetSpec(
-        name="Notes",
-        columns=[
-            "scope",
-            "row_key",
-            "note_id",
-            "parent_note_id",
-            "seq",
-            "created_at",
-            "author",
-            "completed",
-            "body",
-            "source",
-        ],
+        columns=["id", "slots_required", "allowed_days", "compatible_timeslot_sets"],
     ),
     SheetSpec(
         name="CrosslistGroups",
@@ -112,16 +69,7 @@ SPREADSHEET_SPECS: List[SheetSpec] = [
     ),
     SheetSpec(
         name="BlockedTimes",
-        columns=[
-            "scope",
-            "days",
-            "start_time",
-            "end_time",
-            "instructor_id",
-            "room_id",
-            "timeslot_ids",
-            "reason",
-        ],
+        columns=["scope", "days", "start_time", "end_time", "reason"],
     ),
     SheetSpec(
         name="LockedAssignments",
@@ -161,31 +109,14 @@ LEGACY_SHEET_COLUMNS: Dict[str, List[str]] = {
 }
 
 
-_NOTE_SUFFIX = ("prev_notes", "new_notes")
-_ENTITY_SHEETS_WITH_NOTES = frozenset(
-    {"Sections", "Instructors", "Rooms", "Timeslots", "MeetingPatterns"}
-)
-
-
 def normalize_sheet_headers(sheet_name: str, headers: List[str]) -> List[str]:
     """
     Accept either the current schema or a legacy schema for certain sheets.
 
     Returns the canonical header list for the sheet if the provided headers are compatible.
-    Note columns (prev_notes, new_notes) are never returned here — the solver ignores them;
-    the platform reads those cells separately for note import/export.
     """
     spec = SHEET_NAME_TO_SPEC[sheet_name]
     expected = spec.columns
-
-    if sheet_name in _ENTITY_SHEETS_WITH_NOTES:
-        scheduling_only = [c for c in expected if c not in _NOTE_SUFFIX]
-        with_notes = scheduling_only + list(_NOTE_SUFFIX)
-        if headers[: len(with_notes)] == with_notes:
-            return scheduling_only
-        if headers[: len(scheduling_only)] == scheduling_only:
-            return scheduling_only
-
     if headers[: len(expected)] == expected:
         return expected
 
@@ -196,16 +127,6 @@ def normalize_sheet_headers(sheet_name: str, headers: List[str]) -> List[str]:
     raise ValueError(
         f"Sheet '{sheet_name}' has invalid headers. Expected: {expected}. Found: {headers[:len(expected)]}"
     )
-
-
-def normalize_section_state(raw: Any) -> str:
-    """Return 'active', 'new', or 'archived'. Blank/missing defaults to active."""
-    value = str(raw or "").strip().lower()
-    if value in ("archived", "archive"):
-        return "archived"
-    if value == "new":
-        return "new"
-    return "active"
 
 
 def parse_list_cell(value: Any) -> List[str]:
@@ -389,11 +310,6 @@ def format_room_number_for_export(value: Any) -> str:
 
 
 def build_template_workbook() -> Workbook:
-    try:
-        from spreadsheet_io.beautify import beautify_workbook
-    except ModuleNotFoundError:
-        from beautify import beautify_workbook  # type: ignore[no-redef]
-
     wb = Workbook()
     default_ws = wb.active
     wb.remove(default_ws)
@@ -401,8 +317,7 @@ def build_template_workbook() -> Workbook:
     for spec in SPREADSHEET_SPECS:
         ws = wb.create_sheet(spec.name)
         ws.append(spec.columns)
-
-    beautify_workbook(wb)
+        _autosize_columns(ws, spec.columns)
     return wb
 
 
@@ -414,8 +329,5 @@ def build_template_bytes() -> bytes:
 
 
 def _autosize_columns(ws: Worksheet, headers: List[str]) -> None:
-    """Legacy helper; prefer :func:`beautify.beautify_workbook`."""
-    from openpyxl.utils import get_column_letter
-
     for idx, header in enumerate(headers, start=1):
-        ws.column_dimensions[get_column_letter(idx)].width = max(len(header) + 2, 14)
+        ws.column_dimensions[chr(64 + idx)].width = max(len(header) + 2, 14)

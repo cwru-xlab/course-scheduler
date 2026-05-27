@@ -15,7 +15,6 @@ try:
         maybe_float,
         maybe_int,
         maybe_str,
-        normalize_section_state,
         normalize_sheet_headers,
         parse_list_cell,
         parse_nested_list_cell,
@@ -26,7 +25,6 @@ except ModuleNotFoundError:
         maybe_float,
         maybe_int,
         maybe_str,
-        normalize_section_state,
         normalize_sheet_headers,
         parse_list_cell,
         parse_nested_list_cell,
@@ -58,9 +56,7 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
     sections: List[Dict[str, Any]] = []
     seen_section_ids = set()
     for row in sections_rows:
-        section_id = maybe_str(row.get("id"))
-        if not section_id:
-            continue
+        section_id = _required_str(row, "id", "Sections")
         if section_id in seen_section_ids:
             continue
         seen_section_ids.add(section_id)
@@ -80,15 +76,12 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
                 "crosslist_group_id": maybe_str(row.get("crosslist_group_id")),
                 "tags": parse_list_cell(row.get("tags")),
                 "previous_meeting_pattern": maybe_str(row.get("previous_meeting_pattern")),
-                "state": normalize_section_state(row.get("state")),
             }
         )
 
     instructors: List[Dict[str, Any]] = []
     for row in instructors_rows:
-        instructor_id = maybe_str(row.get("id"))
-        if not instructor_id:
-            continue
+        instructor_id = _required_str(row, "id", "Instructors")
         instructors.append(
             {
                 "id": instructor_id,
@@ -105,9 +98,7 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
 
     rooms: List[Dict[str, Any]] = []
     for row in rooms_rows:
-        room_id = maybe_str(row.get("id"))
-        if not room_id:
-            continue
+        room_id = _required_str(row, "id", "Rooms")
         rooms.append(
             {
                 "id": room_id,
@@ -120,9 +111,7 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
 
     timeslots: List[Dict[str, Any]] = []
     for row in timeslots_rows:
-        slot_id = maybe_str(row.get("id"))
-        if not slot_id:
-            continue
+        slot_id = _required_str(row, "id", "Timeslots")
         timeslots.append(
             {
                 "id": slot_id,
@@ -135,9 +124,7 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
 
     meeting_patterns: List[Dict[str, Any]] = []
     for row in meeting_patterns_rows:
-        pattern_id = maybe_str(row.get("id"))
-        if not pattern_id:
-            continue
+        pattern_id = _required_str(row, "id", "MeetingPatterns")
         meeting_patterns.append(
             {
                 "id": pattern_id,
@@ -181,8 +168,6 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
                 "days": days or "",
                 "start_time": start_time or "",
                 "end_time": end_time or "",
-                "instructor_id": maybe_str(row.get("instructor_id")) or "",
-                "room_id": maybe_str(row.get("room_id")) or "",
                 "timeslot_ids": parse_list_cell(row.get("timeslot_ids")),
                 "reason": _str_with_default(row, "reason", "BlockedTimes", default="blocked"),
             }
@@ -257,17 +242,6 @@ def _read_rows(workbook, sheet_name: str) -> List[Dict[str, Any]]:
         active_values = values[: len(active_columns)]
         if all(v is None or str(v).strip() == "" for v in active_values):
             continue
-        # Ignore rows that only have content in note columns past scheduling fields.
-        if sheet_name in {
-            "Sections",
-            "Instructors",
-            "Rooms",
-            "Timeslots",
-            "MeetingPatterns",
-        }:
-            id_cell = active_values[0] if active_values else None
-            if id_cell is None or str(id_cell).strip() == "":
-                continue
         row = {
             column: active_values[idx] if idx < len(active_values) else None
             for idx, column in enumerate(active_columns)

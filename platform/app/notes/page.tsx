@@ -3,9 +3,23 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { MessageSquare, Reply } from "lucide-react";
-import type { RowNote as StoredRowNote } from "@/lib/notes/types";
-import { NOTES_STORAGE_PREFIX } from "@/lib/notes/types";
 import type { SchedulingInput } from "@/lib/scheduling/types";
+
+type StoredReply = {
+  id: string;
+  note: string;
+  author: string;
+  createdAt: string;
+};
+
+type StoredRowNote = {
+  id: string;
+  note: string;
+  author: string;
+  completed: boolean;
+  createdAt: string;
+  replies?: StoredReply[];
+};
 
 type FeedItem = {
   id: string;
@@ -24,7 +38,7 @@ type RowPreview = {
   fields: Array<{ label: string; value: string }>;
 };
 
-const STORAGE_PREFIX = NOTES_STORAGE_PREFIX;
+const STORAGE_PREFIX = "wsom-row-notes::";
 const SCHEDULING_DATA_STORAGE_KEY = "wsom-scheduling-data";
 const LAST_SOLVER_RUN_STORAGE_KEY = "wsom-last-solver-run";
 
@@ -81,7 +95,7 @@ export default function NotesFeedPage() {
   const [filterAuthor, setFilterAuthor] = useState<string>("all");
   const [filterKind, setFilterKind] = useState<"all" | "note" | "reply">("all");
 
-  const reloadFeed = () => {
+  useEffect(() => {
     if (typeof window === "undefined") return;
     const items: FeedItem[] = [];
     for (let i = 0; i < localStorage.length; i += 1) {
@@ -128,13 +142,6 @@ export default function NotesFeedPage() {
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
     setFeedItems(items);
-  };
-
-  useEffect(() => {
-    reloadFeed();
-    const onNotesUpdated = () => reloadFeed();
-    window.addEventListener("wsom-notes-updated", onNotesUpdated);
-    return () => window.removeEventListener("wsom-notes-updated", onNotesUpdated);
   }, []);
 
   useEffect(() => {
@@ -311,8 +318,6 @@ export default function NotesFeedPage() {
             { label: "Days", value: row.days || "N/A" },
             { label: "Start", value: row.start_time || "N/A" },
             { label: "End", value: row.end_time || "N/A" },
-            { label: "Professor", value: row.instructor_id || "N/A" },
-            { label: "Room", value: row.room_id || "N/A" },
             { label: "Reason", value: row.reason || "N/A" },
           ],
         };

@@ -401,7 +401,6 @@ class Section(db.Model):
     # Historical data (optional)
     last_year_time = Column(String, nullable=True)  # Previous year's timeslot reference
     last_year_room = Column(String, nullable=True)  # Previous year's room reference
-    previous_meeting_pattern = Column(String, nullable=True)  # Most recent assigned pattern ID
     
     # JSON columns: Store lists/dicts as JSON strings
     allowed_meeting_patterns = Column(JSON, nullable=False)  # List[str] - pattern IDs
@@ -409,8 +408,6 @@ class Section(db.Model):
     tags = Column(JSON, nullable=False)  # List[str] - additional tags/metadata
     # Denormalized for scheduling UI / exports (editable independently of Course.department)
     department = Column(String(128), nullable=False, default="")
-    # active = schedule & calendar; archived = excluded from solver & calendar
-    state = Column(String(16), nullable=False, default="active")
 
     # ========================================================================
     # RELATIONSHIPS
@@ -453,12 +450,10 @@ class Section(db.Model):
             "is_crosslisted": self.is_crosslisted,
             "last_year_time": self.last_year_time,
             "last_year_room": self.last_year_room,
-            "previous_meeting_pattern": self.previous_meeting_pattern,
             "allowed_meeting_patterns": self.allowed_meeting_patterns or [],
             "room_requirements": self.room_requirements or [],
             "tags": self.tags or [],
             "department": self.department or "",
-            "state": self.state or "active",
         }
 
 
@@ -556,8 +551,6 @@ class BlockedTime(db.Model):
     days = Column(String(32), nullable=True)  # e.g., "MWF" or "M,W,F"
     start_time = Column(String(16), nullable=True)  # e.g., "10:00"
     end_time = Column(String(16), nullable=True)  # e.g., "10:50"
-    instructor_id = Column(String, nullable=True)
-    room_id = Column(String, nullable=True)
     reason = Column(Text, nullable=False)  # Why these times are blocked
 
     def to_dict(self):
@@ -567,8 +560,6 @@ class BlockedTime(db.Model):
             "days": self.days,
             "start_time": self.start_time,
             "end_time": self.end_time,
-            "instructor_id": self.instructor_id,
-            "room_id": self.room_id,
             "reason": self.reason,
         }
 

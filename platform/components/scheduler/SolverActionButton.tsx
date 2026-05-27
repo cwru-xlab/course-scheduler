@@ -11,7 +11,6 @@ import type {
   SchedulingInput,
   ValidationError,
 } from "@/lib/scheduling/types";
-import { isSectionArchived } from "@/lib/scheduling/sectionState";
 
 type ApiSuccess = ScheduleSolution & { status: "ok" };
 type ApiError = {
@@ -32,8 +31,6 @@ export const SolverActionButton = ({ data }: { data: SchedulingInput | null }) =
   const [solverStatus, setSolverStatus] = useState<"idle" | "loading">("idle");
   const [solverError, setSolverError] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const archivedSectionCount =
-    data?.sections.filter((section) => isSectionArchived(section)).length ?? 0;
 
   const runSolverConfirmed = async () => {
     setIsConfirmOpen(false);
@@ -165,12 +162,6 @@ export const SolverActionButton = ({ data }: { data: SchedulingInput | null }) =
                   However, it will also re-optimize the schedule alignment, and will overwrite any manual adjustments
                   you may have made on the calendar page.
                 </p>
-                {archivedSectionCount > 0 && (
-                  <p className="text-amber-800">
-                    {archivedSectionCount} archived section
-                    {archivedSectionCount === 1 ? "" : "s"} will not be scheduled.
-                  </p>
-                )}
 
                 <div className="flex justify-end gap-2">
                   <Button variant="light" onPress={() => setIsConfirmOpen(false)}>

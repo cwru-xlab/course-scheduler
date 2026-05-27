@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 from io import BytesIO
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from openpyxl import Workbook
 
 try:
-    from spreadsheet_io.beautify import beautify_workbook
-    from spreadsheet_io.notes_export import apply_notes_to_workbook
     from spreadsheet_io.spreadsheet_utils import (
         SPREADSHEET_SPECS,
         normalize_spreadsheet_string_cell,
@@ -15,8 +13,6 @@ try:
         serialize_nested_list_cell,
     )
 except ModuleNotFoundError:
-    from beautify import beautify_workbook  # type: ignore[no-redef]
-    from notes_export import apply_notes_to_workbook  # type: ignore[no-redef]
     from spreadsheet_utils import (  # type: ignore[no-redef]
         SPREADSHEET_SPECS,
         normalize_spreadsheet_string_cell,
@@ -30,10 +26,7 @@ def _export_str(value: Any) -> str:
     return normalize_spreadsheet_string_cell(value)
 
 
-def scheduling_input_to_excel_bytes(
-    payload: Dict[str, Any],
-    note_entries: List[Dict[str, Any]] | None = None,
-) -> bytes:
+def scheduling_input_to_excel_bytes(payload: Dict[str, Any]) -> bytes:
     workbook = Workbook()
     default_ws = workbook.active
     workbook.remove(default_ws)
@@ -44,16 +37,6 @@ def scheduling_input_to_excel_bytes(
         rows = _rows_for_sheet(spec.name, payload)
         for row in rows:
             ws.append([row.get(column, "") for column in spec.columns])
-
-    populated_notes = [
-        entry
-        for entry in (note_entries or [])
-        if isinstance(entry, dict) and entry.get("notes")
-    ]
-    if populated_notes:
-        apply_notes_to_workbook(workbook, populated_notes)
-
-    beautify_workbook(workbook)
 
     output = BytesIO()
     workbook.save(output)
@@ -80,9 +63,6 @@ def _rows_for_sheet(sheet_name: str, payload: Dict[str, Any]) -> list[Dict[str, 
                 "previous_meeting_pattern": _export_str(
                     item.get("previous_meeting_pattern") or ""
                 ),
-                "state": _export_str(item.get("state") or "active"),
-                "prev_notes": "",
-                "new_notes": "",
             }
             for item in payload.get("sections", [])
         ]
@@ -103,8 +83,6 @@ def _rows_for_sheet(sheet_name: str, payload: Dict[str, Any]) -> list[Dict[str, 
                     "max_teaching_days": _export_str(
                         preferences.get("max_teaching_days") or ""
                     ),
-                    "prev_notes": "",
-                    "new_notes": "",
                 }
             )
         return rows
@@ -116,8 +94,6 @@ def _rows_for_sheet(sheet_name: str, payload: Dict[str, Any]) -> list[Dict[str, 
                 "room_number": _export_str(item.get("room_number", "")),
                 "capacity": item.get("capacity", ""),
                 "features": serialize_list_cell(item.get("features")),
-                "prev_notes": "",
-                "new_notes": "",
             }
             for item in payload.get("rooms", [])
         ]
@@ -129,8 +105,6 @@ def _rows_for_sheet(sheet_name: str, payload: Dict[str, Any]) -> list[Dict[str, 
                 "start_time": _export_str(item.get("start_time", "")),
                 "end_time": _export_str(item.get("end_time", "")),
                 "slot_type": _export_str(item.get("slot_type", "") or ""),
-                "prev_notes": "",
-                "new_notes": "",
             }
             for item in payload.get("timeslots", [])
         ]
@@ -143,8 +117,6 @@ def _rows_for_sheet(sheet_name: str, payload: Dict[str, Any]) -> list[Dict[str, 
                 "compatible_timeslot_sets": serialize_nested_list_cell(
                     item.get("compatible_timeslot_sets")
                 ),
-                "prev_notes": "",
-                "new_notes": "",
             }
             for item in payload.get("meeting_patterns", [])
         ]
@@ -172,9 +144,6 @@ def _rows_for_sheet(sheet_name: str, payload: Dict[str, Any]) -> list[Dict[str, 
                 "days": _export_str(item.get("days", "")),
                 "start_time": _export_str(item.get("start_time", "")),
                 "end_time": _export_str(item.get("end_time", "")),
-                "instructor_id": _export_str(item.get("instructor_id", "")),
-                "room_id": _export_str(item.get("room_id", "")),
-                "timeslot_ids": serialize_list_cell(item.get("timeslot_ids")),
                 "reason": _export_str(item.get("reason", "")),
             }
             for item in payload.get("blocked_times", [])

@@ -10,7 +10,6 @@ type EditableSelectCellProps = {
   className?: string;
   placeholder?: string;
   isSearchable?: boolean;
-  isDisabled?: boolean;
 };
 
 export const EditableSelectCell = ({
@@ -20,7 +19,6 @@ export const EditableSelectCell = ({
   className = "",
   placeholder = "Select...",
   isSearchable = false,
-  isDisabled = false,
 }: EditableSelectCellProps) => {
   if (isSearchable) {
     return (
@@ -37,7 +35,6 @@ export const EditableSelectCell = ({
         placeholder={placeholder}
         aria-label={placeholder}
         defaultItems={options}
-        isDisabled={isDisabled}
       >
         {(option) => (
           <AutocompleteItem key={option.key}>{option.label}</AutocompleteItem>
@@ -59,7 +56,6 @@ export const EditableSelectCell = ({
       className={`min-w-[100px] ${className}`}
       placeholder={placeholder}
       aria-label={placeholder}
-      isDisabled={isDisabled}
     >
       {options.map((option) => (
         <SelectItem key={option.key}>{option.label}</SelectItem>

@@ -20,9 +20,6 @@ import {
   SoftLocksEditor,
 } from "./editors/ConstraintsEditors";
 
-import { ImportSpreadsheetWarningModal } from "@/components/scheduler/ImportSpreadsheetWarningModal";
-import { collectRowNotesForExport } from "@/lib/notes/storage";
-import { importSpreadsheetFile } from "@/lib/spreadsheet-import-client";
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 import type { ScheduleSolution, SchedulingInput, ValidationError } from "@/lib/scheduling/types";
 
@@ -40,6 +37,10 @@ type ApiError = {
 type UpdateSectionsApiSuccess = { status: "ok" };
 type UpdateSectionsApiError = { status: "error"; errors: ValidationError[] };
 type UpdateSectionsApiResponse = UpdateSectionsApiSuccess | UpdateSectionsApiError;
+type ImportSpreadsheetResponse =
+  | { status: "ok"; scheduling_input: SchedulingInput }
+  | { status: "error"; errors: ValidationError[] };
+
 const LAST_SOLVER_RUN_STORAGE_KEY = "wsom-last-solver-run";
 
 export const SchedulerDemo = () => {
@@ -65,7 +66,6 @@ export const SchedulerDemo = () => {
     "idle" | "importing" | "import-success" | "import-error" | "exporting" | "export-error"
   >("idle");
   const [spreadsheetMessage, setSpreadsheetMessage] = useState("");
-  const [importWarningOpen, setImportWarningOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const timeslotLabelMap = useMemo(() => {
@@ -212,11 +212,6 @@ export const SchedulerDemo = () => {
   };
 
   const handleImportButtonPress = () => {
-    setImportWarningOpen(true);
-  };
-
-  const handleImportWarningConfirm = () => {
-    setImportWarningOpen(false);
     fileInputRef.current?.click();
   };
 
@@ -224,16 +219,27 @@ export const SchedulerDemo = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    const formData = new FormData();
+    formData.set("file", file, file.name);
+
     setSpreadsheetStatus("importing");
     setSpreadsheetMessage("");
     setErrors([]);
 
     try {
-      const result = await importSpreadsheetFile(file);
-      if (!result.ok) {
-        setErrors(result.errors);
+      const response = await fetch("/api/import-scheduling-spreadsheet", {
+        method: "POST",
+        body: formData,
+      });
+      const result = (await response.json()) as ImportSpreadsheetResponse;
+
+      if (!response.ok || result.status === "error") {
+        const importErrors =
+          result.status === "error" && Array.isArray(result.errors) ? result.errors : [];
+        const message = importErrors[0]?.message ?? "Failed to import spreadsheet.";
+        setErrors(importErrors);
         setSpreadsheetStatus("import-error");
-        setSpreadsheetMessage(result.message);
+        setSpreadsheetMessage(message);
         return;
       }
 
@@ -242,7 +248,7 @@ export const SchedulerDemo = () => {
       setDiagnostics(undefined);
       setHasChangesSinceLastUpdate(true);
       setSpreadsheetStatus("import-success");
-      setSpreadsheetMessage(result.message);
+      setSpreadsheetMessage("Spreadsheet imported and loaded into editor state.");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to import spreadsheet.";
       setErrors([{ code: "network_error", message }]);
@@ -262,7 +268,7 @@ export const SchedulerDemo = () => {
       const response = await fetch("/api/export-scheduling-spreadsheet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input: data, notes: collectRowNotesForExport() }),
+        body: JSON.stringify({ input: data }),
       });
       if (!response.ok) {
         let message = "Failed to export spreadsheet.";
@@ -519,8 +525,6 @@ export const SchedulerDemo = () => {
             />
             <BlockedTimesEditor
               blockedTimes={data.blocked_times}
-              instructorOptions={instructorOptions}
-              roomOptions={roomOptions}
               onUpdate={(blockedTimes) => markDirtyAndUpdateField("blocked_times", blockedTimes)}
             />
             <LockedAssignmentsEditor
@@ -557,11 +561,6 @@ export const SchedulerDemo = () => {
         </span>
       </div>
 
-      <ImportSpreadsheetWarningModal
-        isOpen={importWarningOpen}
-        onCancel={() => setImportWarningOpen(false)}
-        onConfirm={handleImportWarningConfirm}
-      />
       <div className="flex items-center gap-3 flex-wrap">
         <input
           ref={fileInputRef}
