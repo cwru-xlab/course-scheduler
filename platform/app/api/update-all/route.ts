@@ -144,14 +144,33 @@ export async function POST(request: NextRequest) {
       };
     };
 
-    // Update order: FK-safe (parents before children).
-    // Instructors, rooms, timeslots, and meeting patterns have no FK deps,
-    // so they go first. Sections reference courses + instructors (the backend
-    // auto-creates missing Course/Instructor rows, but sending instructors
-    // first keeps their full metadata). Constraints reference sections, so
-    // they go last.
+    // Update order: FK-safe on Postgres (SQLite was lenient).
+    // Sections must be replaced first so old rows do not block DELETE on parents.
+    // Constraints reference sections, so they go last.
 
-    // 1) Instructors
+    // 1) Sections (clears existing section rows and their FK refs)
+    {
+      const result = await callSolver("/update-sections", { sections });
+      if (!result.ok) {
+        return NextResponse.json(
+          { status: "error", errors: result.errors },
+          { status: result.status },
+        );
+      }
+      const skippedSections = Array.isArray(result.data?.skipped_sections)
+        ? (result.data.skipped_sections as Array<Record<string, unknown>>)
+        : [];
+      const duplicateIds = skippedSections
+        .filter((row) => row.duplicate === true && typeof row.id === "string")
+        .map((row) => row.id as string);
+      if (duplicateIds.length > 0) {
+        warnings.push(
+          `Duplicate section IDs were skipped: ${duplicateIds.join(", ")}.`,
+        );
+      }
+    }
+
+    // 2) Instructors
     {
       const payload = instructors.map((inst) => ({
         id: inst.id,
@@ -177,7 +196,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 2) Rooms
+    // 3) Rooms
     {
       const payload = rooms.map((room) => ({
         id: room.id,
@@ -205,7 +224,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 3) Timeslots
+    // 4) Timeslots
     {
       const payload = timeslots.map((slot) => ({
         id: slot.id,
@@ -226,7 +245,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 4) Meeting patterns
+    // 5) Meeting patterns
     {
       const payload = meeting_patterns.map((p) => ({
         id: p.id,
@@ -242,28 +261,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { status: "error", errors: result.errors },
           { status: result.status },
-        );
-      }
-    }
-
-    // 5) Sections (references courses + instructors; backend auto-creates missing parent rows)
-    {
-      const result = await callSolver("/update-sections", { sections });
-      if (!result.ok) {
-        return NextResponse.json(
-          { status: "error", errors: result.errors },
-          { status: result.status },
-        );
-      }
-      const skippedSections = Array.isArray(result.data?.skipped_sections)
-        ? (result.data.skipped_sections as Array<Record<string, unknown>>)
-        : [];
-      const duplicateIds = skippedSections
-        .filter((row) => row.duplicate === true && typeof row.id === "string")
-        .map((row) => row.id as string);
-      if (duplicateIds.length > 0) {
-        warnings.push(
-          `Duplicate section IDs were skipped: ${duplicateIds.join(", ")}.`,
         );
       }
     }

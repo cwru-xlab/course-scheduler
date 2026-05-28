@@ -2641,9 +2641,11 @@ def update_sections():
         SectionPreferences.query.delete()
         Section.query.delete()
 
-        # Auto-create referenced Course / Instructor rows that don't exist yet.
+        # Auto-create referenced parent rows that don't exist yet (FK-safe insert on Postgres).
         existing_course_ids = {c.id for c in db.session.query(Course.id).all()}  # type: ignore[attr-defined]
         existing_instructor_ids = {i.id for i in db.session.query(Instructor.id).all()}  # type: ignore[attr-defined]
+        existing_room_ids = {r.id for r in db.session.query(Room.id).all()}  # type: ignore[attr-defined]
+        existing_timeslot_ids = {t.id for t in db.session.query(Timeslot.id).all()}  # type: ignore[attr-defined]
 
         for item in sections_payload:
             cid = item.get("course_id")
@@ -2664,6 +2666,31 @@ def update_sections():
                     rank_type="Unknown",
                 ))
                 existing_instructor_ids.add(iid)
+
+            rid = item.get("room_id")
+            if rid and rid not in existing_room_ids:
+                db.session.add(Room(
+                    id=rid,
+                    building="Unknown",
+                    room_number=str(rid),
+                    capacity=0,
+                    room_type="lecture",
+                    has_av=False,
+                    is_accessible=True,
+                    features=[],
+                ))
+                existing_room_ids.add(rid)
+
+            tsid = item.get("timeslot_id")
+            if tsid and tsid not in existing_timeslot_ids:
+                db.session.add(Timeslot(
+                    id=tsid,
+                    days="",
+                    start_time=_parse_time("09:00"),
+                    end_time=_parse_time("10:00"),
+                    slot_type="standard",
+                ))
+                existing_timeslot_ids.add(tsid)
 
         db.session.flush()
 
@@ -2792,16 +2819,39 @@ def update_instructors():
         )
 
     try:
-        InstructorPreferences.query.delete()
-        Instructor.query.delete()
-        for item in instructors_payload:
-            prefs = item.get("preferences", {}) or {}
-            instructor = Instructor(
-                id=item.get("id"),
-                name=item.get("name") or item.get("id"),
-                rank_type=item.get("rank_type") or "Adjunct",
+        incoming_ids = {
+            str(item.get("id")).strip()
+            for item in instructors_payload
+            if item.get("id") is not None and str(item.get("id")).strip()
+        }
+        # Do not DELETE FROM instructors while sections still reference them (Postgres FK).
+        if incoming_ids:
+            InstructorPreferences.query.filter(
+                ~InstructorPreferences.instructor_id.in_(incoming_ids)
+            ).delete(synchronize_session=False)
+            Instructor.query.filter(~Instructor.id.in_(incoming_ids)).delete(
+                synchronize_session=False
             )
-            db.session.add(instructor)
+        else:
+            InstructorPreferences.query.delete()
+            Instructor.query.delete()
+
+        for item in instructors_payload:
+            instructor_id = item.get("id")
+            if instructor_id is None or str(instructor_id).strip() == "":
+                continue
+            prefs = item.get("preferences", {}) or {}
+            instructor = Instructor.query.get(instructor_id)
+            if instructor is None:
+                instructor = Instructor(
+                    id=instructor_id,
+                    name=item.get("name") or instructor_id,
+                    rank_type=item.get("rank_type") or "Adjunct",
+                )
+                db.session.add(instructor)
+            else:
+                instructor.name = item.get("name") or instructor_id
+                instructor.rank_type = item.get("rank_type") or instructor.rank_type
             db.session.flush()
             if prefs:
                 pref_model = instructor.preferences
@@ -2855,20 +2905,45 @@ def update_rooms():
         )
 
     try:
-        RoomPreferences.query.delete()
-        Room.query.delete()
-        for item in rooms_payload:
-            room = Room(
-                id=item.get("id"),
-                building=item.get("building") or "Unknown",
-                room_number=item.get("room_number") or item.get("id") or "TBD",
-                capacity=int(item.get("capacity") or 0),
-                room_type=item.get("room_type") or "lecture",
-                has_av=bool(item.get("has_av", False)),
-                is_accessible=bool(item.get("is_accessible", True)),
-                features=item.get("features", []) or [],
+        incoming_ids = {
+            str(item.get("id")).strip()
+            for item in rooms_payload
+            if item.get("id") is not None and str(item.get("id")).strip()
+        }
+        if incoming_ids:
+            RoomPreferences.query.filter(~RoomPreferences.room_id.in_(incoming_ids)).delete(
+                synchronize_session=False
             )
-            db.session.add(room)
+            Room.query.filter(~Room.id.in_(incoming_ids)).delete(synchronize_session=False)
+        else:
+            RoomPreferences.query.delete()
+            Room.query.delete()
+
+        for item in rooms_payload:
+            room_id = item.get("id")
+            if room_id is None or str(room_id).strip() == "":
+                continue
+            room = Room.query.get(room_id)
+            if room is None:
+                room = Room(
+                    id=room_id,
+                    building=item.get("building") or "Unknown",
+                    room_number=item.get("room_number") or room_id or "TBD",
+                    capacity=int(item.get("capacity") or 0),
+                    room_type=item.get("room_type") or "lecture",
+                    has_av=bool(item.get("has_av", False)),
+                    is_accessible=bool(item.get("is_accessible", True)),
+                    features=item.get("features", []) or [],
+                )
+                db.session.add(room)
+            else:
+                room.building = item.get("building") or room.building
+                room.room_number = item.get("room_number") or room.room_number
+                room.capacity = int(item.get("capacity") or room.capacity or 0)
+                room.room_type = item.get("room_type") or room.room_type
+                room.has_av = bool(item.get("has_av", room.has_av))
+                room.is_accessible = bool(item.get("is_accessible", room.is_accessible))
+                room.features = item.get("features", []) or []
         db.session.commit()
     except Exception as exc:  # pylint: disable=broad-except
         db.session.rollback()
@@ -2910,16 +2985,39 @@ def update_timeslots():
         )
 
     try:
-        Timeslot.query.delete()
-        for item in slots_payload:
-            slot = Timeslot(
-                id=item.get("id"),
-                days=item.get("days") or item.get("day") or "",
-                start_time=_parse_time(item.get("start_time")),
-                end_time=_parse_time(item.get("end_time")),
-                slot_type=item.get("slot_type") or "standard",
+        incoming_ids = {
+            str(item.get("id")).strip()
+            for item in slots_payload
+            if item.get("id") is not None and str(item.get("id")).strip()
+        }
+        if incoming_ids:
+            Timeslot.query.filter(~Timeslot.id.in_(incoming_ids)).delete(
+                synchronize_session=False
             )
-            db.session.add(slot)
+        else:
+            Timeslot.query.delete()
+
+        for item in slots_payload:
+            slot_id = item.get("id")
+            if slot_id is None or str(slot_id).strip() == "":
+                continue
+            slot = Timeslot.query.get(slot_id)
+            parsed_start = _parse_time(item.get("start_time"))
+            parsed_end = _parse_time(item.get("end_time"))
+            if slot is None:
+                slot = Timeslot(
+                    id=slot_id,
+                    days=item.get("days") or item.get("day") or "",
+                    start_time=parsed_start,
+                    end_time=parsed_end,
+                    slot_type=item.get("slot_type") or "standard",
+                )
+                db.session.add(slot)
+            else:
+                slot.days = item.get("days") or item.get("day") or slot.days
+                slot.start_time = parsed_start
+                slot.end_time = parsed_end
+                slot.slot_type = item.get("slot_type") or slot.slot_type
         db.session.commit()
     except Exception as exc:  # pylint: disable=broad-except
         db.session.rollback()
