@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 import os
 import re
 from importlib import import_module
@@ -29,7 +30,11 @@ except ModuleNotFoundError:
 
 from spreadsheet_io.export_to_spreadsheet import scheduling_input_to_excel_bytes
 from spreadsheet_io.import_from_spreadsheet import parse_scheduling_input_from_excel_bytes
-from spreadsheet_io.spreadsheet_utils import build_template_bytes, parse_nested_list_cell
+from spreadsheet_io.spreadsheet_utils import (
+    build_template_bytes,
+    normalize_section_state,
+    parse_nested_list_cell,
+)
 
 from model import (
     BlockedTime,
@@ -206,6 +211,16 @@ def _ensure_schema_migrations() -> None:
                             "ALTER TABLE sections ADD COLUMN department VARCHAR(128) NOT NULL DEFAULT ''"
                         )
                     )
+                if "previous_meeting_pattern" not in section_cols:
+                    conn.execute(
+                        text("ALTER TABLE sections ADD COLUMN previous_meeting_pattern VARCHAR")
+                    )
+                if "state" not in section_cols:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE sections ADD COLUMN state VARCHAR(16) NOT NULL DEFAULT 'active'"
+                        )
+                    )
             if "blocked_times" in tables:
                 blocked_cols = {c["name"] for c in inspector.get_columns("blocked_times")}
                 if "days" not in blocked_cols:
@@ -214,6 +229,10 @@ def _ensure_schema_migrations() -> None:
                     conn.execute(text("ALTER TABLE blocked_times ADD COLUMN start_time VARCHAR(16)"))
                 if "end_time" not in blocked_cols:
                     conn.execute(text("ALTER TABLE blocked_times ADD COLUMN end_time VARCHAR(16)"))
+                if "instructor_id" not in blocked_cols:
+                    conn.execute(text("ALTER TABLE blocked_times ADD COLUMN instructor_id VARCHAR"))
+                if "room_id" not in blocked_cols:
+                    conn.execute(text("ALTER TABLE blocked_times ADD COLUMN room_id VARCHAR"))
             if "crosslist_groups" in tables:
                 crosslist_cols = [c["name"] for c in inspector.get_columns("crosslist_groups")]
                 if "require_same_room" in crosslist_cols:
@@ -312,7 +331,85 @@ def _section_to_dict(section) -> dict:
         "crosslist_group_id": getattr(section, "crosslist_group_id", None),
         "tags": getattr(section, "tags", []),
         "department": getattr(section, "department", "") or "",
+        "state": getattr(section, "state", None) or "active",
     }
+
+
+def _is_section_archived(section) -> bool:
+    section_dict = _section_to_dict(section)
+    return normalize_section_state(section_dict.get("state")) == "archived"
+
+
+def _filter_archived_for_solve(input_data: SchedulingInput) -> SchedulingInput:
+    """Exclude archived sections and related locks/groups from solve input."""
+    archived_ids = {
+        _section_to_dict(s)["id"]
+        for s in input_data.sections
+        if _is_section_archived(s)
+    }
+    if not archived_ids:
+        return input_data
+
+    remaining_sections = [
+        s for s in input_data.sections if _section_to_dict(s)["id"] not in archived_ids
+    ]
+    remaining_crosslists = []
+    for group in input_data.crosslist_groups:
+        group_dict = group.to_dict() if hasattr(group, "to_dict") else group
+        members = [
+            sid
+            for sid in group_dict.get("member_section_ids", [])
+            if sid not in archived_ids
+        ]
+        if len(members) >= 2:
+            remaining_crosslists.append({
+                "id": group_dict.get("id") if isinstance(group_dict, dict) else group.id,
+                "member_section_ids": members,
+            })
+    remaining_no_overlap = []
+    for group in input_data.no_overlap_groups:
+        group_dict = group.to_dict() if hasattr(group, "to_dict") else group
+        members = [
+            sid
+            for sid in group_dict.get("member_section_ids", [])
+            if sid not in archived_ids
+        ]
+        if len(members) >= 2:
+            remaining_no_overlap.append({
+                "id": group_dict.get("id") if isinstance(group_dict, dict) else group.id,
+                "member_section_ids": members,
+                "reason": group_dict.get("reason") if isinstance(group_dict, dict) else group.reason,
+            })
+    remaining_locks = [
+        lock
+        for lock in input_data.locked_assignments
+        if (lock.to_dict() if hasattr(lock, "to_dict") else lock).get("section_id")
+        not in archived_ids
+    ]
+    remaining_soft_locks = [
+        lock
+        for lock in input_data.soft_locks
+        if (lock.to_dict() if hasattr(lock, "to_dict") else lock).get("section_id")
+        not in archived_ids
+    ]
+
+    return SchedulingInput({
+        "courses": input_data.courses,
+        "majors": input_data.majors,
+        "major_preferences": input_data.major_preferences,
+        "department_preferences": input_data.department_preferences,
+        "section_preferences": input_data.section_preferences,
+        "sections": remaining_sections,
+        "instructors": input_data.instructors,
+        "rooms": input_data.rooms,
+        "timeslots": input_data.timeslots,
+        "meeting_patterns": input_data.meeting_patterns,
+        "crosslist_groups": remaining_crosslists,
+        "no_overlap_groups": remaining_no_overlap,
+        "blocked_times": input_data.blocked_times,
+        "locked_assignments": remaining_locks,
+        "soft_locks": remaining_soft_locks,
+    })
 
 
 def _room_to_dict(room) -> dict:
@@ -1478,6 +1575,7 @@ def _solve_schedule(input_data: SchedulingInput):
     Returns:
         Dict payload with status, solution or errors/diagnostics.
     """
+    input_data = _filter_archived_for_solve(input_data)
     input_data = _split_placeholder_instructors(input_data)
     errors: List[dict] = []
     errors.extend(
@@ -2324,6 +2422,12 @@ def solve():
 
     print("[solve] Starting solve request...", flush=True)
     input_data = SchedulingInput(data["input"])
+    archived_count = sum(1 for s in input_data.sections if _is_section_archived(s))
+    if archived_count:
+        print(
+            f"[solve] {archived_count} archived section(s) will be excluded from scheduling",
+            flush=True,
+        )
 
     remove_instructors = data.get("remove_instructors")
     if remove_instructors:
@@ -2469,8 +2573,15 @@ def export_scheduling_spreadsheet():
             400,
         )
 
+    note_entries = data.get("notes") if isinstance(data, dict) else None
+    if note_entries is not None and not isinstance(note_entries, list):
+        note_entries = None
+
     try:
-        workbook_bytes = scheduling_input_to_excel_bytes(input_payload)
+        workbook_bytes = scheduling_input_to_excel_bytes(
+            input_payload,
+            note_entries=note_entries,
+        )
     except Exception as exc:  # pylint: disable=broad-except
         return (
             jsonify(
@@ -2607,11 +2718,13 @@ def update_sections():
                 is_crosslisted=bool(item.get("is_crosslisted", False)),
                 last_year_time=item.get("last_year_time"),
                 last_year_room=item.get("last_year_room"),
+                previous_meeting_pattern=item.get("previous_meeting_pattern"),
                 allowed_meeting_patterns=item.get("allowed_meeting_patterns", []),
                 room_requirements=item.get("room_requirements", []),
                 crosslist_group_id=item.get("crosslist_group_id"),
                 tags=item.get("tags", []),
                 department=department,
+                state=normalize_section_state(item.get("state")),
             )
             db.session.add(section)
 
@@ -2944,6 +3057,8 @@ def update_constraints():
                     days=item.get("days"),
                     start_time=item.get("start_time"),
                     end_time=item.get("end_time"),
+                    instructor_id=item.get("instructor_id"),
+                    room_id=item.get("room_id"),
                     reason=item.get("reason") or "blocked",
                 )
             )

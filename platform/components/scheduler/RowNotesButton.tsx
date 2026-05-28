@@ -6,21 +6,10 @@ import { Button } from "@heroui/button";
 import { Checkbox } from "@heroui/checkbox";
 import { MessageSquare } from "lucide-react";
 
-type RowNote = {
-  id: string;
-  note: string;
-  author: string;
-  completed: boolean;
-  createdAt: string;
-  replies?: RowReply[];
-};
-
-type RowReply = {
-  id: string;
-  note: string;
-  author: string;
-  createdAt: string;
-};
+import { useAuth } from "@/lib/auth-client";
+import { formatNoteAuthor } from "@/lib/note-author";
+import type { RowNote, RowReply } from "@/lib/notes/types";
+import { notesStorageKey } from "@/lib/notes/types";
 
 type RowNotesButtonProps = {
   scope: string;
@@ -28,8 +17,7 @@ type RowNotesButtonProps = {
   title: string;
 };
 
-const storageKeyFor = (scope: string, rowId: string) =>
-  `wsom-row-notes::${scope}::${rowId}`;
+const storageKeyFor = (scope: string, rowId: string) => notesStorageKey(scope, rowId);
 
 /** Query params written by the Notes Feed so we can open this modal on arrival. */
 const OPEN_NOTES_QUERY = "openRowNotes";
@@ -43,14 +31,13 @@ const NOTES_MODAL_Z = 1000;
 const NOTES_DELETE_MODAL_Z = 1100;
 
 export const RowNotesButton = ({ scope, rowId, title }: RowNotesButtonProps) => {
+  const { user, loading: authLoading } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [notes, setNotes] = useState<RowNote[]>([]);
   const [noteDraft, setNoteDraft] = useState("");
-  const [authorDraft, setAuthorDraft] = useState("");
   const [pendingDeleteNote, setPendingDeleteNote] = useState<RowNote | null>(null);
   const [expandedNoteId, setExpandedNoteId] = useState<string | null>(null);
   const [replyDraft, setReplyDraft] = useState("");
-  const [replyAuthorDraft, setReplyAuthorDraft] = useState("");
   const pendingModalFocusRef = useRef<{ noteId: string; replyId?: string } | null>(null);
   /** Used to find `<tr>` / card container; `getElementById` alone is unreliable with some layouts. */
   const triggerWrapRef = useRef<HTMLSpanElement | null>(null);
@@ -165,8 +152,8 @@ export const RowNotesButton = ({ scope, rowId, title }: RowNotesButtonProps) => 
 
   const addNote = () => {
     const note = noteDraft.trim();
-    const author = authorDraft.trim();
-    if (!note || !author) return;
+    if (!note || !user) return;
+    const author = formatNoteAuthor(user);
     const next: RowNote[] = [
       {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -180,7 +167,6 @@ export const RowNotesButton = ({ scope, rowId, title }: RowNotesButtonProps) => 
     ];
     persistNotes(next);
     setNoteDraft("");
-    setAuthorDraft("");
   };
 
   const toggleCompleted = (id: string, value: boolean) => {
@@ -195,14 +181,13 @@ export const RowNotesButton = ({ scope, rowId, title }: RowNotesButtonProps) => 
     if (expandedNoteId === id) {
       setExpandedNoteId(null);
       setReplyDraft("");
-      setReplyAuthorDraft("");
     }
   };
 
   const addReply = (noteId: string) => {
     const note = replyDraft.trim();
-    const author = replyAuthorDraft.trim();
-    if (!note || !author) return;
+    if (!note || !user) return;
+    const author = formatNoteAuthor(user);
     const next = notes.map((n) =>
       n.id === noteId
         ? {
@@ -221,8 +206,9 @@ export const RowNotesButton = ({ scope, rowId, title }: RowNotesButtonProps) => 
     );
     persistNotes(next);
     setReplyDraft("");
-    setReplyAuthorDraft("");
   };
+
+  const canSignNotes = Boolean(user) && !authLoading;
 
   return (
     <>
@@ -340,31 +326,21 @@ export const RowNotesButton = ({ scope, rowId, title }: RowNotesButtonProps) => 
                               ))
                             )}
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            <textarea
-                              className="sm:col-span-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#137fec]"
-                              rows={2}
-                              value={replyDraft}
-                              onChange={(e) => setReplyDraft(e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              placeholder="Reply to this note..."
-                            />
-                            <textarea
-                              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#137fec]"
-                              rows={2}
-                              value={replyAuthorDraft}
-                              onChange={(e) => setReplyAuthorDraft(e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              placeholder="Your name..."
-                            />
-                          </div>
+                          <textarea
+                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#137fec]"
+                            rows={2}
+                            value={replyDraft}
+                            onChange={(e) => setReplyDraft(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder="Reply to this note..."
+                          />
                           <div className="flex justify-end">
                             <Button
                               size="sm"
                               color="primary"
                               variant="flat"
                               onPress={() => addReply(n.id)}
-                              isDisabled={!replyDraft.trim() || !replyAuthorDraft.trim()}
+                              isDisabled={!replyDraft.trim() || !canSignNotes}
                             >
                               Send reply
                             </Button>
@@ -379,29 +355,25 @@ export const RowNotesButton = ({ scope, rowId, title }: RowNotesButtonProps) => 
 
               <div className="rounded-lg border border-slate-200 p-3">
                 <div className="text-xs font-semibold text-slate-500 mb-2">Add a note</div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <textarea
-                    className="sm:col-span-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#137fec]"
-                    rows={3}
-                    value={noteDraft}
-                    onChange={(e) => setNoteDraft(e.target.value)}
-                    placeholder="Write your note..."
-                  />
-                  <textarea
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#137fec]"
-                    rows={3}
-                    value={authorDraft}
-                    onChange={(e) => setAuthorDraft(e.target.value)}
-                    placeholder="Sign off with your name..."
-                  />
-                </div>
+                <textarea
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#137fec]"
+                  rows={3}
+                  value={noteDraft}
+                  onChange={(e) => setNoteDraft(e.target.value)}
+                  placeholder="Write your note..."
+                />
+                {user && (
+                  <p className="mt-2 text-[11px] text-slate-500">
+                    Signed as {formatNoteAuthor(user)}
+                  </p>
+                )}
                 <div className="mt-2 flex justify-end">
                   <Button
                     size="sm"
                     color="primary"
                     variant="flat"
                     onPress={addNote}
-                    isDisabled={!noteDraft.trim() || !authorDraft.trim()}
+                    isDisabled={!noteDraft.trim() || !canSignNotes}
                   >
                     Save Note
                   </Button>

@@ -229,6 +229,8 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
 // Blocked Times Editor
 type BlockedTimesEditorProps = {
   blockedTimes: BlockedTime[];
+  instructorOptions: { key: string; label: string }[];
+  roomOptions: { key: string; label: string }[];
   onUpdate: (blockedTimes: BlockedTime[]) => void;
 };
 
@@ -276,10 +278,17 @@ const createEmptyBlockedTime = (): BlockedTime => ({
   days: "",
   start_time: "",
   end_time: "",
+  instructor_id: undefined,
+  room_id: undefined,
   reason: "",
 });
 
-export const BlockedTimesEditor = ({ blockedTimes, onUpdate }: BlockedTimesEditorProps) => {
+export const BlockedTimesEditor = ({
+  blockedTimes,
+  instructorOptions,
+  roomOptions,
+  onUpdate,
+}: BlockedTimesEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const updateBlockedTime = (index: number, field: keyof BlockedTime, value: unknown) => {
@@ -290,6 +299,8 @@ export const BlockedTimesEditor = ({ blockedTimes, onUpdate }: BlockedTimesEdito
 
   const addBlockedTime = () => onUpdate([...blockedTimes, createEmptyBlockedTime()]);
   const deleteBlockedTime = (index: number) => onUpdate(blockedTimes.filter((_, i) => i !== index));
+  const instructorOptionsWithNone = [{ key: "__none__", label: "(Any instructor)" }, ...instructorOptions];
+  const roomOptionsWithNone = [{ key: "__none__", label: "(Any room)" }, ...roomOptions];
 
   const blockedDaysToSelection = (days: string | null | undefined): string[] =>
     (days ?? "")
@@ -321,6 +332,8 @@ export const BlockedTimesEditor = ({ blockedTimes, onUpdate }: BlockedTimesEdito
           blocked.days,
           blocked.start_time,
           blocked.end_time,
+          blocked.instructor_id ?? "",
+          blocked.room_id ?? "",
           ...(blocked.timeslot_ids ?? []),
           blocked.reason,
         ]
@@ -352,6 +365,8 @@ export const BlockedTimesEditor = ({ blockedTimes, onUpdate }: BlockedTimesEdito
               <th className="pb-2 pr-3">Days</th>
               <th className="pb-2 pr-3">Start</th>
               <th className="pb-2 pr-3">End</th>
+              <th className="pb-2 pr-3">Professor</th>
+              <th className="pb-2 pr-3">Room</th>
               <th className="pb-2 pr-3">Reason</th>
               <th className="pb-2 pr-3">View Notes</th>
               <th className="pb-2 pr-3"></th>
@@ -368,7 +383,20 @@ export const BlockedTimesEditor = ({ blockedTimes, onUpdate }: BlockedTimesEdito
                   <EditableSelectCell
                     value={blocked.scope}
                     options={SCOPE_OPTIONS}
-                    onChange={(v) => updateBlockedTime(idx, "scope", v as BlockedTime["scope"])}
+                    onChange={(v) => {
+                      const nextScope = v as BlockedTime["scope"];
+                      const newBlockedTimes = [...blockedTimes];
+                      const current = newBlockedTimes[idx];
+                      if (!current) return;
+                      newBlockedTimes[idx] = {
+                        ...current,
+                        scope: nextScope,
+                        instructor_id:
+                          nextScope === "instructor" ? current.instructor_id : undefined,
+                        room_id: nextScope === "room" ? current.room_id : undefined,
+                      };
+                      onUpdate(newBlockedTimes);
+                    }}
                   />
                 </td>
                 <td className="py-2 pr-3">
@@ -394,6 +422,38 @@ export const BlockedTimesEditor = ({ blockedTimes, onUpdate }: BlockedTimesEdito
                     options={BLOCKED_TIME_OPTIONS}
                     onChange={(v) => updateBlockedTime(idx, "end_time", v)}
                     placeholder="Select end"
+                    isSearchable
+                  />
+                </td>
+                <td className="py-2 pr-3">
+                  <EditableSelectCell
+                    value={blocked.instructor_id ?? "__none__"}
+                    options={instructorOptionsWithNone}
+                    onChange={(v) =>
+                      updateBlockedTime(
+                        idx,
+                        "instructor_id",
+                        blocked.scope === "instructor" && v !== "__none__" ? v : undefined,
+                      )
+                    }
+                    placeholder={blocked.scope === "instructor" ? "Select professor" : "N/A"}
+                    isDisabled={blocked.scope !== "instructor"}
+                    isSearchable
+                  />
+                </td>
+                <td className="py-2 pr-3">
+                  <EditableSelectCell
+                    value={blocked.room_id ?? "__none__"}
+                    options={roomOptionsWithNone}
+                    onChange={(v) =>
+                      updateBlockedTime(
+                        idx,
+                        "room_id",
+                        blocked.scope === "room" && v !== "__none__" ? v : undefined,
+                      )
+                    }
+                    placeholder={blocked.scope === "room" ? "Select room" : "N/A"}
+                    isDisabled={blocked.scope !== "room"}
                     isSearchable
                   />
                 </td>
