@@ -2,9 +2,15 @@
 
 import { useMemo, useState } from "react";
 
+import { EditorColumnFilters } from "./EditorColumnFilters";
 import { EditorConfigurableTable } from "./EditorConfigurableTable";
 import { EditorRowActions } from "./EditorRowActions";
 import { EditorTableShell } from "./EditorTableShell";
+import {
+  applyEditorColumnFilters,
+  type EditorColumnFilterDef,
+  type EditorFiltersState,
+} from "./editorFilters";
 import { SECTION_COLUMN_SPECS } from "./editorColumnSpecs";
 import { SectionEditModal } from "./modals/SectionEditModal";
 
@@ -62,6 +68,7 @@ export const SectionsEditor = ({
   onUpdate,
 }: SectionsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const updateSection = (index: number, field: keyof Section, value: unknown) => {
@@ -88,12 +95,77 @@ export const SectionsEditor = ({
     [instructorOptions],
   );
 
+  const sectionFilterDefs = useMemo((): EditorColumnFilterDef<SectionRow>[] => [
+    {
+      columnId: "id",
+      label: "ID",
+      control: { kind: "multiSearch", textMatch: "startsWith" },
+      getValue: ({ section }) => section.id,
+    },
+    {
+      columnId: "dept",
+      label: "Dept",
+      control: { kind: "multiSelect", showSearch: true },
+      getValue: ({ section }) => section.department ?? "",
+    },
+    {
+      columnId: "course",
+      label: "Course",
+      control: { kind: "multiSearch", textMatch: "contains" },
+      getValue: ({ section }) => section.course_id,
+    },
+    {
+      columnId: "code",
+      label: "Code",
+      control: { kind: "multiSearch", textMatch: "startsWith" },
+      getValue: ({ section }) => section.section_code,
+    },
+    {
+      columnId: "state",
+      label: "State",
+      control: { kind: "multiSelect" },
+      options: STATE_OPTIONS,
+      getValue: ({ section }) => normalizeSectionState(section.state),
+    },
+    {
+      columnId: "instructor",
+      label: "Instructor",
+      control: { kind: "multiSelect", showSearch: true },
+      options: instructorOptions,
+      getValue: ({ section }) => section.instructor_id,
+    },
+    {
+      columnId: "enroll",
+      label: "Enroll",
+      control: { kind: "numberCompare" },
+      getValue: ({ section }) => section.expected_enrollment,
+    },
+    {
+      columnId: "cap",
+      label: "Cap",
+      control: { kind: "numberCompare" },
+      getValue: ({ section }) => section.enrollment_cap,
+    },
+    {
+      columnId: "patterns",
+      label: "Patterns",
+      control: { kind: "multiSelect", showSearch: true },
+      options: meetingPatternOptions,
+      arrayValue: true,
+      getValue: ({ section }) => section.allowed_meeting_patterns,
+    },
+  ], [instructorOptions, meetingPatternOptions]);
+
+  const sectionRows = useMemo(
+    (): SectionRow[] => sections.map((section, index) => ({ section, index })),
+    [sections],
+  );
+
   const filteredSections = useMemo((): SectionRow[] => {
     const query = searchQuery.trim().toLowerCase();
-    return sections
-      .map((section, index) => ({ section, index }))
-      .filter(({ section }) => {
-        if (!query) return true;
+    let rows = sectionRows;
+    if (query) {
+      rows = rows.filter(({ section }) => {
         const instructorLabel = instructorLabelById.get(section.instructor_id) ?? "";
         const searchable = [
           section.id,
@@ -107,7 +179,9 @@ export const SectionsEditor = ({
           .toLowerCase();
         return searchable.includes(query);
       });
-  }, [searchQuery, sections, instructorLabelById]);
+    }
+    return applyEditorColumnFilters(rows, columnFilters, sectionFilterDefs);
+  }, [searchQuery, sectionRows, instructorLabelById, columnFilters, sectionFilterDefs]);
 
   const renderCell = (columnId: string, { section, index: idx }: SectionRow) => {
     switch (columnId) {
@@ -231,8 +305,16 @@ export const SectionsEditor = ({
       onSearchChange={setSearchQuery}
       searchPlaceholder="Search sections..."
       searchHint="Search by ID, department, course, code, or instructor."
+      filterBar={
+        <EditorColumnFilters
+          defs={sectionFilterDefs}
+          rows={sectionRows}
+          filters={columnFilters}
+          onChange={setColumnFilters}
+        />
+      }
       emptyMessage='No sections. Click "Add Section" to create one.'
-      noMatchMessage="No sections match your search."
+      noMatchMessage="No sections match your search or filters."
       isEmpty={sections.length === 0}
       hasNoMatches={sections.length > 0 && filteredSections.length === 0}
     >

@@ -3,9 +3,15 @@
 import { useMemo, useState } from "react";
 import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
-import { Input } from "@heroui/input";
-
+import { EditorColumnFilters } from "./EditorColumnFilters";
 import { EditorConfigurableTable } from "./EditorConfigurableTable";
+import { EditorSearchFilterBar } from "./EditorSearchFilterBar";
+import {
+  applyEditorColumnFilters,
+  type EditorColumnFilterDef,
+  type EditorFiltersState,
+} from "./editorFilters";
+import { TIMESLOT_TIME_OPTIONS } from "./timeslotEditorConstants";
 import { EditorRowActions } from "./EditorRowActions";
 import {
   BLOCKED_TIME_COLUMN_SPECS,
@@ -48,6 +54,7 @@ const createEmptyCrossListGroup = (existing: CrossListGroup[]): CrossListGroup =
 
 export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: CrossListGroupsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const updateGroup = (index: number, field: keyof CrossListGroup, value: unknown) => {
@@ -59,18 +66,46 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
   const addGroup = () => onUpdate([...groups, createEmptyCrossListGroup(groups)]);
   const deleteGroup = (index: number) => onUpdate(groups.filter((_, i) => i !== index));
 
+  type CrossListRow = { group: CrossListGroup; index: number };
+
+  const crossListFilterDefs = useMemo(
+    (): EditorColumnFilterDef<CrossListRow>[] => [
+      {
+        columnId: "id",
+        label: "ID",
+        control: { kind: "multiSearch", textMatch: "startsWith" },
+        getValue: ({ group }) => group.id,
+      },
+      {
+        columnId: "members",
+        label: "Member Sections",
+        control: { kind: "multiSelect", showSearch: true },
+        options: sectionOptions,
+        arrayValue: true,
+        getValue: ({ group }) => group.member_section_ids,
+      },
+    ],
+    [sectionOptions],
+  );
+
+  const crossListRows = useMemo(
+    (): CrossListRow[] => groups.map((group, index) => ({ group, index })),
+    [groups],
+  );
+
   const filteredGroups = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    return groups
-      .map((group, index) => ({ group, index }))
-      .filter(({ group }) => {
-        if (!query) return true;
+    let rows = crossListRows;
+    if (query) {
+      rows = rows.filter(({ group }) => {
         const searchable = [group.id, ...group.member_section_ids]
           .join(" ")
           .toLowerCase();
         return searchable.includes(query);
       });
-  }, [groups, searchQuery]);
+    }
+    return applyEditorColumnFilters(rows, columnFilters, crossListFilterDefs);
+  }, [crossListRows, searchQuery, columnFilters, crossListFilterDefs]);
 
   const renderCrossListCell = (
     columnId: string,
@@ -96,17 +131,22 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
   return (
     <Card className="w-full shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between">
-        <h3 className="text-lg font-semibold">Cross-List Groups ({groups.length})</h3>
+        <h3 className="text-lg font-semibold">Cross-List Groups ({filteredGroups.length})</h3>
         <Button size="sm" color="primary" variant="flat" onPress={addGroup}>+ Add</Button>
       </CardHeader>
       <CardBody className="w-full min-w-0 overflow-hidden text-sm">
-        <Input
-          value={searchQuery}
-          onValueChange={setSearchQuery}
-          placeholder="Search cross-list groups..."
-          size="sm"
-          className="mb-3 max-w-md"
-          isClearable
+        <EditorSearchFilterBar
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchPlaceholder="Search cross-list groups..."
+          filterBar={
+            <EditorColumnFilters
+              defs={crossListFilterDefs}
+              rows={crossListRows}
+              filters={columnFilters}
+              onChange={setColumnFilters}
+            />
+          }
         />
         <EditorConfigurableTable
           editorKey="constraints-crosslist-groups"
@@ -134,7 +174,9 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
         />
         {groups.length === 0 && <div className="py-4 text-center text-default-400">No cross-list groups.</div>}
         {groups.length > 0 && filteredGroups.length === 0 && (
-          <div className="py-4 text-center text-default-400">No cross-list groups match your search.</div>
+          <div className="py-4 text-center text-default-400">
+            No cross-list groups match your search or filters.
+          </div>
         )}
       </CardBody>
       {editIndex !== null && groups[editIndex] ? (
@@ -169,6 +211,7 @@ const createEmptyNoOverlapGroup = (existing: NoOverlapGroup[]): NoOverlapGroup =
 
 export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOverlapGroupsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const updateGroup = (index: number, field: keyof NoOverlapGroup, value: unknown) => {
@@ -180,18 +223,52 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
   const addGroup = () => onUpdate([...groups, createEmptyNoOverlapGroup(groups)]);
   const deleteGroup = (index: number) => onUpdate(groups.filter((_, i) => i !== index));
 
+  type NoOverlapRow = { group: NoOverlapGroup; index: number };
+
+  const noOverlapFilterDefs = useMemo(
+    (): EditorColumnFilterDef<NoOverlapRow>[] => [
+      {
+        columnId: "id",
+        label: "ID",
+        control: { kind: "multiSearch", textMatch: "startsWith" },
+        getValue: ({ group }) => group.id,
+      },
+      {
+        columnId: "members",
+        label: "Member Sections",
+        control: { kind: "multiSelect", showSearch: true },
+        options: sectionOptions,
+        arrayValue: true,
+        getValue: ({ group }) => group.member_section_ids,
+      },
+      {
+        columnId: "reason",
+        label: "Reason",
+        control: { kind: "multiSearch", textMatch: "contains" },
+        getValue: ({ group }) => group.reason,
+      },
+    ],
+    [sectionOptions],
+  );
+
+  const noOverlapRows = useMemo(
+    (): NoOverlapRow[] => groups.map((group, index) => ({ group, index })),
+    [groups],
+  );
+
   const filteredGroups = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    return groups
-      .map((group, index) => ({ group, index }))
-      .filter(({ group }) => {
-        if (!query) return true;
+    let rows = noOverlapRows;
+    if (query) {
+      rows = rows.filter(({ group }) => {
         const searchable = [group.id, ...group.member_section_ids, group.reason]
           .join(" ")
           .toLowerCase();
         return searchable.includes(query);
       });
-  }, [groups, searchQuery]);
+    }
+    return applyEditorColumnFilters(rows, columnFilters, noOverlapFilterDefs);
+  }, [noOverlapRows, searchQuery, columnFilters, noOverlapFilterDefs]);
 
   const renderNoOverlapCell = (
     columnId: string,
@@ -225,17 +302,22 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
   return (
     <Card className="w-full shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between">
-        <h3 className="text-lg font-semibold">No-Overlap Groups ({groups.length})</h3>
+        <h3 className="text-lg font-semibold">No-Overlap Groups ({filteredGroups.length})</h3>
         <Button size="sm" color="primary" variant="flat" onPress={addGroup}>+ Add</Button>
       </CardHeader>
       <CardBody className="w-full min-w-0 overflow-hidden text-sm">
-        <Input
-          value={searchQuery}
-          onValueChange={setSearchQuery}
-          placeholder="Search no-overlap groups..."
-          size="sm"
-          className="mb-3 max-w-md"
-          isClearable
+        <EditorSearchFilterBar
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchPlaceholder="Search no-overlap groups..."
+          filterBar={
+            <EditorColumnFilters
+              defs={noOverlapFilterDefs}
+              rows={noOverlapRows}
+              filters={columnFilters}
+              onChange={setColumnFilters}
+            />
+          }
         />
         <EditorConfigurableTable
           editorKey="constraints-no-overlap-groups"
@@ -263,7 +345,9 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
         />
         {groups.length === 0 && <div className="py-4 text-center text-default-400">No no-overlap groups.</div>}
         {groups.length > 0 && filteredGroups.length === 0 && (
-          <div className="py-4 text-center text-default-400">No no-overlap groups match your search.</div>
+          <div className="py-4 text-center text-default-400">
+            No no-overlap groups match your search or filters.
+          </div>
         )}
       </CardBody>
       {editIndex !== null && groups[editIndex] ? (
@@ -347,6 +431,7 @@ export const BlockedTimesEditor = ({
   onUpdate,
 }: BlockedTimesEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const updateBlockedTime = (index: number, field: keyof BlockedTime, value: unknown) => {
@@ -379,12 +464,73 @@ export const BlockedTimesEditor = ({
     return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
   };
 
+  type BlockedTimeRow = { blocked: BlockedTime; index: number };
+
+  const blockedTimeFilterDefs = useMemo(
+    (): EditorColumnFilterDef<BlockedTimeRow>[] => [
+      {
+        columnId: "scope",
+        label: "Scope",
+        control: { kind: "multiSelect" },
+        options: SCOPE_OPTIONS,
+        getValue: ({ blocked }) => blocked.scope,
+      },
+      {
+        columnId: "days",
+        label: "Days",
+        control: { kind: "multiSelect" },
+        options: BLOCKED_DAY_OPTIONS,
+        arrayValue: true,
+        getValue: ({ blocked }) => blockedDaysToSelection(blocked.days),
+      },
+      {
+        columnId: "start",
+        label: "Start",
+        control: { kind: "timeCompare" },
+        options: TIMESLOT_TIME_OPTIONS,
+        getValue: ({ blocked }) => normalizeBlockedTimeValue(blocked.start_time),
+      },
+      {
+        columnId: "end",
+        label: "End",
+        control: { kind: "timeCompare" },
+        options: TIMESLOT_TIME_OPTIONS,
+        getValue: ({ blocked }) => normalizeBlockedTimeValue(blocked.end_time),
+      },
+      {
+        columnId: "professor",
+        label: "Professor",
+        control: { kind: "multiSelect", showSearch: true },
+        options: instructorOptionsWithNone,
+        getValue: ({ blocked }) => blocked.instructor_id ?? "__none__",
+      },
+      {
+        columnId: "room",
+        label: "Room",
+        control: { kind: "multiSelect", showSearch: true },
+        options: roomOptionsWithNone,
+        getValue: ({ blocked }) => blocked.room_id ?? "__none__",
+      },
+      {
+        columnId: "reason",
+        label: "Reason",
+        control: { kind: "multiSearch", textMatch: "contains" },
+        getValue: ({ blocked }) => blocked.reason,
+      },
+    ],
+    [instructorOptions, roomOptions],
+  );
+
+  const blockedTimeRows = useMemo(
+    (): BlockedTimeRow[] => blockedTimes.map((blocked, index) => ({ blocked, index })),
+    [blockedTimes],
+  );
+
   const filteredBlockedTimes = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    return blockedTimes
-      .map((blocked, index) => ({ blocked, index }))
-      .filter(({ blocked }) => {
-        if (!query) return true;
+    let rows = blockedTimeRows;
+    if (query) {
+      rows = rows.filter(({ blocked }) => {
         const searchable = [
           blocked.scope,
           blocked.days,
@@ -399,7 +545,9 @@ export const BlockedTimesEditor = ({
           .toLowerCase();
         return searchable.includes(query);
       });
-  }, [blockedTimes, searchQuery]);
+    }
+    return applyEditorColumnFilters(rows, columnFilters, blockedTimeFilterDefs);
+  }, [blockedTimeRows, searchQuery, columnFilters, blockedTimeFilterDefs]);
 
   const renderBlockedTimeCell = (
     columnId: string,
@@ -505,17 +653,22 @@ export const BlockedTimesEditor = ({
   return (
     <Card className="w-full shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between">
-        <h3 className="text-lg font-semibold">Blocked Times ({blockedTimes.length})</h3>
+        <h3 className="text-lg font-semibold">Blocked Times ({filteredBlockedTimes.length})</h3>
         <Button size="sm" color="primary" variant="flat" onPress={addBlockedTime}>+ Add</Button>
       </CardHeader>
       <CardBody className="w-full min-w-0 overflow-hidden text-sm">
-        <Input
-          value={searchQuery}
-          onValueChange={setSearchQuery}
-          placeholder="Search blocked times..."
-          size="sm"
-          className="mb-3 max-w-md"
-          isClearable
+        <EditorSearchFilterBar
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchPlaceholder="Search blocked times..."
+          filterBar={
+            <EditorColumnFilters
+              defs={blockedTimeFilterDefs}
+              rows={blockedTimeRows}
+              filters={columnFilters}
+              onChange={setColumnFilters}
+            />
+          }
         />
         <EditorConfigurableTable
           editorKey="constraints-blocked-times"
@@ -543,7 +696,9 @@ export const BlockedTimesEditor = ({
         />
         {blockedTimes.length === 0 && <div className="py-4 text-center text-default-400">No blocked times.</div>}
         {blockedTimes.length > 0 && filteredBlockedTimes.length === 0 && (
-          <div className="py-4 text-center text-default-400">No blocked times match your search.</div>
+          <div className="py-4 text-center text-default-400">
+            No blocked times match your search or filters.
+          </div>
         )}
       </CardBody>
       {editIndex !== null && blockedTimes[editIndex] ? (
@@ -587,6 +742,7 @@ export const LockedAssignmentsEditor = ({
   onUpdate 
 }: LockedAssignmentsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const updateLock = (index: number, field: keyof LockedAssignment, value: unknown) => {
@@ -603,18 +759,54 @@ export const LockedAssignmentsEditor = ({
     ...roomOptions,
   ];
 
+  type LockedRow = { lock: LockedAssignment; index: number };
+
+  const lockedFilterDefs = useMemo(
+    (): EditorColumnFilterDef<LockedRow>[] => [
+      {
+        columnId: "section",
+        label: "Section",
+        control: { kind: "multiSelect", showSearch: true },
+        options: sectionOptions,
+        getValue: ({ lock }) => lock.section_id,
+      },
+      {
+        columnId: "timeslots",
+        label: "Fixed Timeslots",
+        control: { kind: "multiSelect", showSearch: true },
+        options: timeslotOptions,
+        arrayValue: true,
+        getValue: ({ lock }) => lock.fixed_timeslot_set ?? [],
+      },
+      {
+        columnId: "room",
+        label: "Fixed Room",
+        control: { kind: "multiSelect", showSearch: true },
+        options: roomOptionsWithNone,
+        getValue: ({ lock }) => lock.fixed_room ?? "__none__",
+      },
+    ],
+    [roomOptions, sectionOptions, timeslotOptions],
+  );
+
+  const lockedRows = useMemo(
+    (): LockedRow[] => lockedAssignments.map((lock, index) => ({ lock, index })),
+    [lockedAssignments],
+  );
+
   const filteredLocks = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    return lockedAssignments
-      .map((lock, index) => ({ lock, index }))
-      .filter(({ lock }) => {
-        if (!query) return true;
+    let rows = lockedRows;
+    if (query) {
+      rows = rows.filter(({ lock }) => {
         const searchable = [lock.section_id, ...(lock.fixed_timeslot_set ?? []), lock.fixed_room ?? ""]
           .join(" ")
           .toLowerCase();
         return searchable.includes(query);
       });
-  }, [lockedAssignments, searchQuery]);
+    }
+    return applyEditorColumnFilters(rows, columnFilters, lockedFilterDefs);
+  }, [lockedRows, searchQuery, columnFilters, lockedFilterDefs]);
 
   const renderLockedCell = (
     columnId: string,
@@ -656,17 +848,22 @@ export const LockedAssignmentsEditor = ({
   return (
     <Card className="w-full shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between">
-        <h3 className="text-lg font-semibold">Locked Assignments (Hard) ({lockedAssignments.length})</h3>
+        <h3 className="text-lg font-semibold">Locked Assignments (Hard) ({filteredLocks.length})</h3>
         <Button size="sm" color="primary" variant="flat" onPress={addLock}>+ Add</Button>
       </CardHeader>
       <CardBody className="w-full min-w-0 overflow-hidden text-sm">
-        <Input
-          value={searchQuery}
-          onValueChange={setSearchQuery}
-          placeholder="Search locked assignments..."
-          size="sm"
-          className="mb-3 max-w-md"
-          isClearable
+        <EditorSearchFilterBar
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchPlaceholder="Search locked assignments..."
+          filterBar={
+            <EditorColumnFilters
+              defs={lockedFilterDefs}
+              rows={lockedRows}
+              filters={columnFilters}
+              onChange={setColumnFilters}
+            />
+          }
         />
         <EditorConfigurableTable
           editorKey="constraints-locked-assignments"
@@ -694,7 +891,9 @@ export const LockedAssignmentsEditor = ({
         />
         {lockedAssignments.length === 0 && <div className="py-4 text-center text-default-400">No locked assignments.</div>}
         {lockedAssignments.length > 0 && filteredLocks.length === 0 && (
-          <div className="py-4 text-center text-default-400">No locked assignments match your search.</div>
+          <div className="py-4 text-center text-default-400">
+            No locked assignments match your search or filters.
+          </div>
         )}
       </CardBody>
       {editIndex !== null && lockedAssignments[editIndex] ? (
@@ -740,6 +939,7 @@ export const SoftLocksEditor = ({
   onUpdate 
 }: SoftLocksEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const updateLock = (index: number, field: keyof SoftLock, value: unknown) => {
@@ -756,12 +956,52 @@ export const SoftLocksEditor = ({
     ...roomOptions,
   ];
 
+  type SoftLockRow = { lock: SoftLock; index: number };
+
+  const softLockFilterDefs = useMemo(
+    (): EditorColumnFilterDef<SoftLockRow>[] => [
+      {
+        columnId: "section",
+        label: "Section",
+        control: { kind: "multiSelect", showSearch: true },
+        options: sectionOptions,
+        getValue: ({ lock }) => lock.section_id,
+      },
+      {
+        columnId: "timeslots",
+        label: "Preferred Timeslots",
+        control: { kind: "multiSelect", showSearch: true },
+        options: timeslotOptions,
+        arrayValue: true,
+        getValue: ({ lock }) => lock.preferred_timeslot_set ?? [],
+      },
+      {
+        columnId: "room",
+        label: "Preferred Room",
+        control: { kind: "multiSelect", showSearch: true },
+        options: roomOptionsWithNone,
+        getValue: ({ lock }) => lock.preferred_room ?? "__none__",
+      },
+      {
+        columnId: "weight",
+        label: "Weight",
+        control: { kind: "numberCompare" },
+        getValue: ({ lock }) => lock.weight,
+      },
+    ],
+    [roomOptions, sectionOptions, timeslotOptions],
+  );
+
+  const softLockRows = useMemo(
+    (): SoftLockRow[] => softLocks.map((lock, index) => ({ lock, index })),
+    [softLocks],
+  );
+
   const filteredLocks = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    return softLocks
-      .map((lock, index) => ({ lock, index }))
-      .filter(({ lock }) => {
-        if (!query) return true;
+    let rows = softLockRows;
+    if (query) {
+      rows = rows.filter(({ lock }) => {
         const searchable = [
           lock.section_id,
           ...(lock.preferred_timeslot_set ?? []),
@@ -772,7 +1012,9 @@ export const SoftLocksEditor = ({
           .toLowerCase();
         return searchable.includes(query);
       });
-  }, [searchQuery, softLocks]);
+    }
+    return applyEditorColumnFilters(rows, columnFilters, softLockFilterDefs);
+  }, [searchQuery, softLockRows, columnFilters, softLockFilterDefs]);
 
   const renderSoftLockCell = (
     columnId: string,
@@ -818,17 +1060,22 @@ export const SoftLocksEditor = ({
   return (
     <Card className="w-full shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between">
-        <h3 className="text-lg font-semibold">Soft Locks (Preferences) ({softLocks.length})</h3>
+        <h3 className="text-lg font-semibold">Soft Locks (Preferences) ({filteredLocks.length})</h3>
         <Button size="sm" color="primary" variant="flat" onPress={addLock}>+ Add</Button>
       </CardHeader>
       <CardBody className="w-full min-w-0 overflow-hidden text-sm">
-        <Input
-          value={searchQuery}
-          onValueChange={setSearchQuery}
-          placeholder="Search soft locks..."
-          size="sm"
-          className="mb-3 max-w-md"
-          isClearable
+        <EditorSearchFilterBar
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchPlaceholder="Search soft locks..."
+          filterBar={
+            <EditorColumnFilters
+              defs={softLockFilterDefs}
+              rows={softLockRows}
+              filters={columnFilters}
+              onChange={setColumnFilters}
+            />
+          }
         />
         <EditorConfigurableTable
           editorKey="constraints-soft-locks"
@@ -856,7 +1103,9 @@ export const SoftLocksEditor = ({
         />
         {softLocks.length === 0 && <div className="py-4 text-center text-default-400">No soft locks.</div>}
         {softLocks.length > 0 && filteredLocks.length === 0 && (
-          <div className="py-4 text-center text-default-400">No soft locks match your search.</div>
+          <div className="py-4 text-center text-default-400">
+            No soft locks match your search or filters.
+          </div>
         )}
       </CardBody>
       {editIndex !== null && softLocks[editIndex] ? (

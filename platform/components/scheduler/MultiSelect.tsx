@@ -14,6 +14,9 @@ import { Input } from "@heroui/input";
 import { Select, SelectItem } from "@heroui/select";
 
 import {
+  EDITOR_SELECT_ITEM_CLASS_NAMES,
+  EDITOR_SELECT_TRIGGER_CLASS_NAMES,
+  editorSelectListboxProps,
   editorSelectPopoverProps,
   menuMinWidthForOptions,
 } from "./editorDropdownWidth";
@@ -140,8 +143,8 @@ export const MultiSelect = ({
 
   const listboxProps = useMemo(
     () => ({
+      ...editorSelectListboxProps(menuMinWidth),
       ...(showSearch && topContent ? { topContent } : {}),
-      style: { minWidth: menuMinWidth },
     }),
     [showSearch, topContent, menuMinWidth],
   );
@@ -161,9 +164,7 @@ export const MultiSelect = ({
         placeholder={placeholder}
         label={label}
         aria-label={label ? undefined : placeholder}
-        classNames={{
-          trigger: "min-h-unit-8 h-auto py-1",
-        }}
+        classNames={EDITOR_SELECT_TRIGGER_CLASS_NAMES}
         popoverProps={popoverProps}
         listboxProps={listboxProps}
       >
@@ -173,7 +174,13 @@ export const MultiSelect = ({
           </SelectItem>
         ) : (
           filteredOptions.map((option) => (
-            <SelectItem key={option.key}>{option.label}</SelectItem>
+            <SelectItem
+              key={option.key}
+              textValue={option.label}
+              classNames={EDITOR_SELECT_ITEM_CLASS_NAMES}
+            >
+              {option.label}
+            </SelectItem>
           ))
         )}
       </Select>

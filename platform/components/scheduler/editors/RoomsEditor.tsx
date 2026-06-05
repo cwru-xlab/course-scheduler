@@ -2,9 +2,15 @@
 
 import { useMemo, useState } from "react";
 
+import { EditorColumnFilters } from "./EditorColumnFilters";
 import { EditorConfigurableTable } from "./EditorConfigurableTable";
 import { EditorRowActions } from "./EditorRowActions";
 import { EditorTableShell } from "./EditorTableShell";
+import {
+  applyEditorColumnFilters,
+  type EditorColumnFilterDef,
+  type EditorFiltersState,
+} from "./editorFilters";
 import { ROOM_COLUMN_SPECS } from "./editorColumnSpecs";
 import { RoomEditModal } from "./modals/RoomEditModal";
 
@@ -32,6 +38,7 @@ const createEmptyRoom = (existing: Room[]): Room => ({
 
 export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const updateRoom = (index: number, field: keyof Room, value: unknown) => {
@@ -48,12 +55,53 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
     onUpdate(rooms.filter((_, i) => i !== index));
   };
 
+  const roomFilterDefs = useMemo(
+    (): EditorColumnFilterDef<RoomRow>[] => [
+      {
+        columnId: "id",
+        label: "ID",
+        control: { kind: "multiSearch", textMatch: "startsWith" },
+        getValue: ({ room }) => room.id,
+      },
+      {
+        columnId: "building",
+        label: "Building",
+        control: { kind: "multiSelect" },
+        getValue: ({ room }) => room.building,
+      },
+      {
+        columnId: "room_number",
+        label: "Room #",
+        control: { kind: "multiSearch", textMatch: "startsWith" },
+        getValue: ({ room }) => room.room_number,
+      },
+      {
+        columnId: "capacity",
+        label: "Capacity",
+        control: { kind: "numberCompare" },
+        getValue: ({ room }) => room.capacity,
+      },
+      {
+        columnId: "features",
+        label: "Features",
+        control: { kind: "multiSearch", textMatch: "startsWith" },
+        arrayValue: true,
+        getValue: ({ room }) => room.features,
+      },
+    ],
+    [],
+  );
+
+  const roomRows = useMemo(
+    (): RoomRow[] => rooms.map((room, index) => ({ room, index })),
+    [rooms],
+  );
+
   const filteredRooms = useMemo((): RoomRow[] => {
     const query = searchQuery.trim().toLowerCase();
-    return rooms
-      .map((room, index) => ({ room, index }))
-      .filter(({ room }) => {
-        if (!query) return true;
+    let rows = roomRows;
+    if (query) {
+      rows = rows.filter(({ room }) => {
         const searchable = [
           room.id,
           room.building,
@@ -65,7 +113,9 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
           .toLowerCase();
         return searchable.includes(query);
       });
-  }, [rooms, searchQuery]);
+    }
+    return applyEditorColumnFilters(rows, columnFilters, roomFilterDefs);
+  }, [roomRows, searchQuery, columnFilters, roomFilterDefs]);
 
   const renderCell = (columnId: string, { room, index: idx }: RoomRow) => {
     switch (columnId) {
@@ -106,14 +156,22 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
 
   return (
     <EditorTableShell
-      title={`Rooms (${rooms.length})`}
+      title={`Rooms (${filteredRooms.length})`}
       addLabel="+ Add Room"
       onAdd={addRoom}
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
       searchPlaceholder="Search rooms..."
+      filterBar={
+        <EditorColumnFilters
+          defs={roomFilterDefs}
+          rows={roomRows}
+          filters={columnFilters}
+          onChange={setColumnFilters}
+        />
+      }
       emptyMessage='No rooms. Click "Add Room" to create one.'
-      noMatchMessage="No rooms match your search."
+      noMatchMessage="No rooms match your search or filters."
       isEmpty={rooms.length === 0}
       hasNoMatches={rooms.length > 0 && filteredRooms.length === 0}
     >

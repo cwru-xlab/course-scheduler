@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
-import { Input } from "@heroui/input";
+import { EditorSearchFilterBar } from "./EditorSearchFilterBar";
 
 /** Table header cell: fits within table-fixed column width. */
 export const editorTh =
@@ -21,6 +21,8 @@ type EditorTableShellProps = {
   searchPlaceholder: string;
   /** Optional helper text shown below the search field. */
   searchHint?: string;
+  /** Column filter UI rendered to the right of the search field. */
+  filterBar?: ReactNode;
   emptyMessage: string;
   noMatchMessage: string;
   isEmpty: boolean;
@@ -36,6 +38,7 @@ export function EditorTableShell({
   onSearchChange,
   searchPlaceholder,
   searchHint,
+  filterBar,
   emptyMessage,
   noMatchMessage,
   isEmpty,
@@ -51,18 +54,13 @@ export function EditorTableShell({
         </Button>
       </CardHeader>
       <CardBody className="w-full min-w-0 overflow-hidden text-sm">
-        <div className="mb-3 max-w-md">
-          <Input
-            value={searchQuery}
-            onValueChange={onSearchChange}
-            placeholder={searchPlaceholder}
-            size="sm"
-            isClearable
-          />
-          {searchHint ? (
-            <p className="mt-1.5 text-xs text-default-400">{searchHint}</p>
-          ) : null}
-        </div>
+        <EditorSearchFilterBar
+          searchQuery={searchQuery}
+          onSearchChange={onSearchChange}
+          searchPlaceholder={searchPlaceholder}
+          searchHint={searchHint}
+          filterBar={filterBar}
+        />
         <div className="w-full min-w-0">{children}</div>
         {isEmpty && (
           <div className="py-4 text-center text-default-400">{emptyMessage}</div>

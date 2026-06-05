@@ -2,9 +2,15 @@
 
 import { useMemo, useState } from "react";
 
+import { EditorColumnFilters } from "./EditorColumnFilters";
 import { EditorConfigurableTable } from "./EditorConfigurableTable";
 import { EditorRowActions } from "./EditorRowActions";
 import { EditorTableShell } from "./EditorTableShell";
+import {
+  applyEditorColumnFilters,
+  type EditorColumnFilterDef,
+  type EditorFiltersState,
+} from "./editorFilters";
 import { INSTRUCTOR_COLUMN_SPECS } from "./editorColumnSpecs";
 import { InstructorEditModal } from "./modals/InstructorEditModal";
 
@@ -58,6 +64,7 @@ export const InstructorsEditor = ({
   onUpdate,
 }: InstructorsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const updateInstructor = (index: number, field: string, value: unknown) => {
@@ -82,12 +89,71 @@ export const InstructorsEditor = ({
     onUpdate(instructors.filter((_, i) => i !== index));
   };
 
+  const instructorFilterDefs = useMemo(
+    (): EditorColumnFilterDef<InstructorRow>[] => [
+      {
+        columnId: "id",
+        label: "ID",
+        control: { kind: "multiSearch", textMatch: "startsWith" },
+        getValue: ({ inst }) => inst.id,
+      },
+      {
+        columnId: "name",
+        label: "Name",
+        control: { kind: "multiSearch", textMatch: "contains" },
+        getValue: ({ inst }) => inst.name,
+      },
+      {
+        columnId: "rank",
+        label: "Rank",
+        control: { kind: "multiSelect" },
+        options: RANK_OPTIONS,
+        getValue: ({ inst }) => inst.rank_type,
+      },
+      {
+        columnId: "unavailable",
+        label: "Unavailable",
+        control: { kind: "multiSelect", showSearch: true },
+        options: timeslotOptions,
+        arrayValue: true,
+        getValue: ({ inst }) => inst.unavailable_times,
+      },
+      {
+        columnId: "pref_days",
+        label: "Pref. Days",
+        control: { kind: "multiSelect" },
+        options: DAY_OPTIONS,
+        arrayValue: true,
+        getValue: ({ inst }) => inst.preferences.preferred_days,
+      },
+      {
+        columnId: "pref_patterns",
+        label: "Pref. Patterns",
+        control: { kind: "multiSelect" },
+        options: meetingPatternOptions,
+        arrayValue: true,
+        getValue: ({ inst }) => inst.preferences.preferred_patterns,
+      },
+      {
+        columnId: "max_days",
+        label: "Max Days",
+        control: { kind: "numberCompare" },
+        getValue: ({ inst }) => inst.preferences.max_teaching_days ?? "",
+      },
+    ],
+    [meetingPatternOptions, timeslotOptions],
+  );
+
+  const instructorRows = useMemo(
+    (): InstructorRow[] => instructors.map((inst, index) => ({ inst, index })),
+    [instructors],
+  );
+
   const filteredInstructors = useMemo((): InstructorRow[] => {
     const query = searchQuery.trim().toLowerCase();
-    return instructors
-      .map((inst, index) => ({ inst, index }))
-      .filter(({ inst }) => {
-        if (!query) return true;
+    let rows = instructorRows;
+    if (query) {
+      rows = rows.filter(({ inst }) => {
         const searchable = [
           inst.id,
           inst.name,
@@ -101,7 +167,9 @@ export const InstructorsEditor = ({
           .toLowerCase();
         return searchable.includes(query);
       });
-  }, [instructors, searchQuery]);
+    }
+    return applyEditorColumnFilters(rows, columnFilters, instructorFilterDefs);
+  }, [instructorRows, searchQuery, columnFilters, instructorFilterDefs]);
 
   const renderCell = (columnId: string, { inst, index: idx }: InstructorRow) => {
     switch (columnId) {
@@ -160,14 +228,22 @@ export const InstructorsEditor = ({
 
   return (
     <EditorTableShell
-      title={`Instructors (${instructors.length})`}
+      title={`Instructors (${filteredInstructors.length})`}
       addLabel="+ Add Instructor"
       onAdd={addInstructor}
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
       searchPlaceholder="Search instructors..."
+      filterBar={
+        <EditorColumnFilters
+          defs={instructorFilterDefs}
+          rows={instructorRows}
+          filters={columnFilters}
+          onChange={setColumnFilters}
+        />
+      }
       emptyMessage='No instructors. Click "Add Instructor" to create one.'
-      noMatchMessage="No instructors match your search."
+      noMatchMessage="No instructors match your search or filters."
       isEmpty={instructors.length === 0}
       hasNoMatches={instructors.length > 0 && filteredInstructors.length === 0}
     >

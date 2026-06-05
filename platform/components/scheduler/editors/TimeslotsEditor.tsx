@@ -6,9 +6,15 @@ import { EditableCell } from "../EditableCell";
 import { EditableSelectCell } from "../EditableSelectCell";
 import { MultiSelect } from "../MultiSelect";
 import { RowNotesButton } from "../RowNotesButton";
+import { EditorColumnFilters } from "./EditorColumnFilters";
 import { EditorConfigurableTable } from "./EditorConfigurableTable";
 import { EditorRowActions } from "./EditorRowActions";
 import { EditorTableShell } from "./EditorTableShell";
+import {
+  applyEditorColumnFilters,
+  type EditorColumnFilterDef,
+  type EditorFiltersState,
+} from "./editorFilters";
 import { TIMESLOT_COLUMN_SPECS } from "./editorColumnSpecs";
 import { TimeslotEditModal } from "./modals/TimeslotEditModal";
 import {
@@ -42,6 +48,7 @@ const createEmptyTimeslot = (existing: Timeslot[]): Timeslot => ({
 
 export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const updateTimeslot = (index: number, field: keyof Timeslot, value: unknown) => {
@@ -58,12 +65,57 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
     onUpdate(timeslots.filter((_, i) => i !== index));
   };
 
+  const timeslotFilterDefs = useMemo(
+    (): EditorColumnFilterDef<TimeslotRow>[] => [
+      {
+        columnId: "id",
+        label: "ID",
+        control: { kind: "multiSearch", textMatch: "contains" },
+        getValue: ({ slot }) => slot.id,
+      },
+      {
+        columnId: "days",
+        label: "Days",
+        control: { kind: "multiSelect" },
+        options: TIMESLOT_DAY_OPTIONS,
+        arrayValue: true,
+        getValue: ({ slot }) => splitTimeslotDays(slot.day),
+      },
+      {
+        columnId: "start",
+        label: "Start",
+        control: { kind: "timeCompare" },
+        options: TIMESLOT_TIME_OPTIONS,
+        getValue: ({ slot }) => clampTimeToBounds(toTimeOnly(slot.start_time)),
+      },
+      {
+        columnId: "end",
+        label: "End",
+        control: { kind: "timeCompare" },
+        options: TIMESLOT_TIME_OPTIONS,
+        getValue: ({ slot }) => clampTimeToBounds(toTimeOnly(slot.end_time)),
+      },
+      {
+        columnId: "block",
+        label: "Block",
+        control: { kind: "singleSelect" },
+        options: TIMESLOT_BLOCK_TYPE_OPTIONS,
+        getValue: ({ slot }) => slot.slot_type ?? "standard",
+      },
+    ],
+    [],
+  );
+
+  const timeslotRows = useMemo(
+    (): TimeslotRow[] => timeslots.map((slot, index) => ({ slot, index })),
+    [timeslots],
+  );
+
   const filteredTimeslots = useMemo((): TimeslotRow[] => {
     const query = searchQuery.trim().toLowerCase();
-    return timeslots
-      .map((slot, index) => ({ slot, index }))
-      .filter(({ slot }) => {
-        if (!query) return true;
+    let rows = timeslotRows;
+    if (query) {
+      rows = rows.filter(({ slot }) => {
         const searchable = [
           slot.id,
           slot.day,
@@ -75,7 +127,9 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
           .toLowerCase();
         return searchable.includes(query);
       });
-  }, [searchQuery, timeslots]);
+    }
+    return applyEditorColumnFilters(rows, columnFilters, timeslotFilterDefs);
+  }, [searchQuery, timeslotRows, columnFilters, timeslotFilterDefs]);
 
   const renderCell = (columnId: string, { slot, index: idx }: TimeslotRow) => {
     switch (columnId) {
@@ -126,14 +180,22 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
 
   return (
     <EditorTableShell
-      title={`Timeslots (${timeslots.length})`}
+      title={`Timeslots (${filteredTimeslots.length})`}
       addLabel="+ Add Timeslot"
       onAdd={addTimeslot}
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
       searchPlaceholder="Search timeslots..."
+      filterBar={
+        <EditorColumnFilters
+          defs={timeslotFilterDefs}
+          rows={timeslotRows}
+          filters={columnFilters}
+          onChange={setColumnFilters}
+        />
+      }
       emptyMessage='No timeslots. Click "Add Timeslot" to create one.'
-      noMatchMessage="No timeslots match your search."
+      noMatchMessage="No timeslots match your search or filters."
       isEmpty={timeslots.length === 0}
       hasNoMatches={timeslots.length > 0 && filteredTimeslots.length === 0}
     >
