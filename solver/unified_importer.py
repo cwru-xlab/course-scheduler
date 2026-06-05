@@ -58,6 +58,11 @@ def _enrich_parsed_data(parsed: ParsedData) -> None:
     if not parsed.timeslots:
         parsed.timeslots = default_timeslots()
 
+    for ts in parsed.timeslots:
+        if "days" in ts and "day" not in ts:
+            ts["day"] = ts["days"]
+        elif "day" in ts and "days" not in ts:
+            ts["days"] = ts["day"]
     # Normalize instructor and room IDs if necessary.
     for inst in parsed.instructors:
         inst_id = str(inst.get("id", "")).strip()

@@ -682,13 +682,13 @@ def _build_section_to_crosslist_group(crosslists: List, sections: List) -> Dict[
 
 
 def _build_crosslist_totals(crosslists: List, sections: List) -> Dict[str, int]:
-    """Compute total required seats per cross-list group.
+    """Compute max required seats per cross-list group.
 
     Args:
         sections: All section definitions.
 
     Returns:
-        Mapping of cross-list group ID to summed required section capacity.
+        Mapping of cross-list group ID to max required section capacity.
     """
     totals: Dict[str, int] = {}
     section_to_group = _build_section_to_crosslist_group(crosslists, sections)
@@ -698,7 +698,7 @@ def _build_crosslist_totals(crosslists: List, sections: List) -> Dict[str, int]:
         crosslist_id = section_to_group.get(str(section_id)) if section_id else None
         if crosslist_id:
             totals.setdefault(crosslist_id, 0)
-            totals[crosslist_id] += _required_section_capacity(section_dict)
+            totals[crosslist_id] = max(totals[crosslist_id], _required_section_capacity(section_dict))
     return totals
 
 

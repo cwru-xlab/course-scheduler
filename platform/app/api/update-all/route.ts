@@ -150,7 +150,12 @@ export async function POST(request: NextRequest) {
 
     // 1) Sections (clears existing section rows and their FK refs)
     {
-      const result = await callSolver("/update-sections", { sections });
+      const sectionsWithoutCrosslistIds = sections.map(({ crosslist_group_id, ...section }) => ({
+        ...section,
+        crosslist_group_id: null
+      }));
+
+      const result = await callSolver("/update-sections", { sections: sectionsWithoutCrosslistIds });
       if (!result.ok) {
         return NextResponse.json(
           { status: "error", errors: result.errors },
