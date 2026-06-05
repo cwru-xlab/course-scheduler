@@ -19,6 +19,8 @@ type EditorTableShellProps = {
   searchQuery: string;
   onSearchChange: (value: string) => void;
   searchPlaceholder: string;
+  /** Optional helper text shown below the search field. */
+  searchHint?: string;
   emptyMessage: string;
   noMatchMessage: string;
   isEmpty: boolean;
@@ -33,6 +35,7 @@ export function EditorTableShell({
   searchQuery,
   onSearchChange,
   searchPlaceholder,
+  searchHint,
   emptyMessage,
   noMatchMessage,
   isEmpty,
@@ -48,14 +51,18 @@ export function EditorTableShell({
         </Button>
       </CardHeader>
       <CardBody className="w-full min-w-0 overflow-hidden text-sm">
-        <Input
-          value={searchQuery}
-          onValueChange={onSearchChange}
-          placeholder={searchPlaceholder}
-          size="sm"
-          className="mb-3 max-w-md"
-          isClearable
-        />
+        <div className="mb-3 max-w-md">
+          <Input
+            value={searchQuery}
+            onValueChange={onSearchChange}
+            placeholder={searchPlaceholder}
+            size="sm"
+            isClearable
+          />
+          {searchHint ? (
+            <p className="mt-1.5 text-xs text-default-400">{searchHint}</p>
+          ) : null}
+        </div>
         <div className="w-full min-w-0">{children}</div>
         {isEmpty && (
           <div className="py-4 text-center text-default-400">{emptyMessage}</div>

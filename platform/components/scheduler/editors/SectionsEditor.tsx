@@ -83,31 +83,31 @@ export const SectionsEditor = ({
     ...crosslistGroupOptions,
   ];
 
+  const instructorLabelById = useMemo(
+    () => new Map(instructorOptions.map((o) => [o.key, o.label])),
+    [instructorOptions],
+  );
+
   const filteredSections = useMemo((): SectionRow[] => {
     const query = searchQuery.trim().toLowerCase();
     return sections
       .map((section, index) => ({ section, index }))
       .filter(({ section }) => {
         if (!query) return true;
+        const instructorLabel = instructorLabelById.get(section.instructor_id) ?? "";
         const searchable = [
           section.id,
           section.department ?? "",
           section.course_id,
           section.section_code,
           section.instructor_id,
-          section.expected_enrollment,
-          section.enrollment_cap,
-          section.crosslist_group_id ?? "",
-          section.previous_meeting_pattern ?? "",
-          ...section.allowed_meeting_patterns,
-          ...section.room_requirements,
-          ...section.tags,
+          instructorLabel,
         ]
           .join(" ")
           .toLowerCase();
         return searchable.includes(query);
       });
-  }, [searchQuery, sections]);
+  }, [searchQuery, sections, instructorLabelById]);
 
   const renderCell = (columnId: string, { section, index: idx }: SectionRow) => {
     switch (columnId) {
@@ -224,12 +224,13 @@ export const SectionsEditor = ({
 
   return (
     <EditorTableShell
-      title={`Sections (${sections.length})`}
+      title={`Sections (${filteredSections.length})`}
       addLabel="+ Add Section"
       onAdd={addSection}
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
       searchPlaceholder="Search sections..."
+      searchHint="Search by ID, department, course, code, or instructor."
       emptyMessage='No sections. Click "Add Section" to create one.'
       noMatchMessage="No sections match your search."
       isEmpty={sections.length === 0}
