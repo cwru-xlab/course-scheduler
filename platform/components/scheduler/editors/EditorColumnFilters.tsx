@@ -239,15 +239,27 @@ export function EditorColumnFilters<TRow>({
 
   return (
     <>
-      <Button
-        size="sm"
-        color="primary"
-        variant="flat"
-        className="shrink-0 font-semibold"
-        onPress={() => setIsOpen(true)}
-      >
-        Filters ({appliedCount})
-      </Button>
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          color="primary"
+          variant="flat"
+          className="font-semibold"
+          onPress={() => setIsOpen(true)}
+        >
+          Filters ({appliedCount})
+        </Button>
+        {hasAnyFilter ? (
+          <Button
+            size="sm"
+            variant="flat"
+            className="font-semibold"
+            onPress={() => onChange({})}
+          >
+            Clear all filters
+          </Button>
+        ) : null}
+      </div>
 
       <EditorModalShell
         isOpen={isOpen}
