@@ -69,6 +69,7 @@ export const SectionsEditor = ({
 }: SectionsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
+  const [hideArchived, setHideArchived] = useState(false);
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const updateSection = (index: number, field: keyof Section, value: unknown) => {
@@ -164,6 +165,9 @@ export const SectionsEditor = ({
   const filteredSections = useMemo((): SectionRow[] => {
     const query = searchQuery.trim().toLowerCase();
     let rows = sectionRows;
+    if (hideArchived) {
+      rows = rows.filter(({ section }) => !isSectionArchived(section));
+    }
     if (query) {
       rows = rows.filter(({ section }) => {
         const instructorLabel = instructorLabelById.get(section.instructor_id) ?? "";
@@ -181,7 +185,7 @@ export const SectionsEditor = ({
       });
     }
     return applyEditorColumnFilters(rows, columnFilters, sectionFilterDefs);
-  }, [searchQuery, sectionRows, instructorLabelById, columnFilters, sectionFilterDefs]);
+  }, [searchQuery, hideArchived, sectionRows, instructorLabelById, columnFilters, sectionFilterDefs]);
 
   const renderCell = (columnId: string, { section, index: idx }: SectionRow) => {
     switch (columnId) {
@@ -306,12 +310,23 @@ export const SectionsEditor = ({
       searchPlaceholder="Search sections..."
       searchHint="Search by ID, department, course, code, or instructor."
       filterBar={
-        <EditorColumnFilters
-          defs={sectionFilterDefs}
-          rows={sectionRows}
-          filters={columnFilters}
-          onChange={setColumnFilters}
-        />
+        <div className="flex flex-wrap items-center gap-3">
+          <EditorColumnFilters
+            defs={sectionFilterDefs}
+            rows={sectionRows}
+            filters={columnFilters}
+            onChange={setColumnFilters}
+          />
+          <label className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              className="size-3.5 rounded border-slate-300 text-primary accent-[#137fec]"
+              checked={hideArchived}
+              onChange={(e) => setHideArchived(e.target.checked)}
+            />
+            <span>Hide archived sections</span>
+          </label>
+        </div>
       }
       emptyMessage='No sections. Click "Add Section" to create one.'
       noMatchMessage="No sections match your search or filters."
