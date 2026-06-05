@@ -1,9 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Button } from "@heroui/button";
 
-import { EditorTableShell, editorTd, editorTh } from "./EditorTableShell";
+import { EditorConfigurableTable } from "./EditorConfigurableTable";
+import { EditorRowActions } from "./EditorRowActions";
+import { EditorTableShell } from "./EditorTableShell";
+import { SECTION_COLUMN_SPECS } from "./editorColumnSpecs";
+import { SectionEditModal } from "./modals/SectionEditModal";
 
 import { EditableCell } from "../EditableCell";
 import { EditableArrayCell } from "../EditableArrayCell";
@@ -33,6 +36,8 @@ type SectionsEditorProps = {
   onUpdate: (sections: Section[]) => void;
 };
 
+type SectionRow = { section: Section; index: number };
+
 const createEmptySection = (existing: Section[]): Section => ({
   id: nextIntegerId(existing.map((s) => s.id)),
   course_id: "",
@@ -57,6 +62,7 @@ export const SectionsEditor = ({
   onUpdate,
 }: SectionsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const updateSection = (index: number, field: keyof Section, value: unknown) => {
     const newSections = [...sections];
@@ -77,7 +83,7 @@ export const SectionsEditor = ({
     ...crosslistGroupOptions,
   ];
 
-  const filteredSections = useMemo(() => {
+  const filteredSections = useMemo((): SectionRow[] => {
     const query = searchQuery.trim().toLowerCase();
     return sections
       .map((section, index) => ({ section, index }))
@@ -103,6 +109,119 @@ export const SectionsEditor = ({
       });
   }, [searchQuery, sections]);
 
+  const renderCell = (columnId: string, { section, index: idx }: SectionRow) => {
+    switch (columnId) {
+      case "id":
+        return <EditableCell value={section.id} onChange={(v) => updateSection(idx, "id", v)} />;
+      case "dept":
+        return (
+          <EditableCell
+            value={section.department ?? ""}
+            onChange={(v) => updateSection(idx, "department", v)}
+            placeholder="e.g. FIN"
+          />
+        );
+      case "course":
+        return (
+          <EditableCell
+            value={section.course_id}
+            onChange={(v) => updateSection(idx, "course_id", v)}
+            placeholder="COURSE-XXX"
+          />
+        );
+      case "code":
+        return (
+          <EditableCell
+            value={section.section_code}
+            onChange={(v) => updateSection(idx, "section_code", v)}
+          />
+        );
+      case "state":
+        return (
+          <EditableSelectCell
+            value={normalizeSectionState(section.state)}
+            options={STATE_OPTIONS}
+            onChange={(v) => updateSection(idx, "state", v as SectionState)}
+            placeholder="State"
+          />
+        );
+      case "instructor":
+        return (
+          <EditableSelectCell
+            value={section.instructor_id}
+            options={instructorOptions}
+            onChange={(v) => updateSection(idx, "instructor_id", v)}
+            placeholder="Select instructor"
+          />
+        );
+      case "enroll":
+        return (
+          <EditableCell
+            type="number"
+            value={section.expected_enrollment}
+            onChange={(v) => updateSection(idx, "expected_enrollment", v)}
+          />
+        );
+      case "cap":
+        return (
+          <EditableCell
+            type="number"
+            value={section.enrollment_cap}
+            onChange={(v) => updateSection(idx, "enrollment_cap", v)}
+          />
+        );
+      case "patterns":
+        return (
+          <MultiSelect
+            value={section.allowed_meeting_patterns}
+            options={meetingPatternOptions}
+            onChange={(v) => updateSection(idx, "allowed_meeting_patterns", v)}
+            placeholder="Select patterns"
+          />
+        );
+      case "assigned":
+        return (
+          <EditableSelectCell
+            value={section.previous_meeting_pattern ?? "__none__"}
+            options={[{ key: "__none__", label: "(None)" }, ...meetingPatternOptions]}
+            onChange={(v) =>
+              updateSection(idx, "previous_meeting_pattern", v === "__none__" ? undefined : v)
+            }
+            placeholder="Pattern"
+          />
+        );
+      case "room_req":
+        return (
+          <EditableArrayCell
+            value={section.room_requirements}
+            onChange={(v) => updateSection(idx, "room_requirements", v)}
+            placeholder="features"
+            nowrapPlaceholder
+          />
+        );
+      case "crosslist":
+        return (
+          <EditableSelectCell
+            value={section.crosslist_group_id ?? "__none__"}
+            options={crosslistOptionsWithNone}
+            onChange={(v) => updateSection(idx, "crosslist_group_id", v === "__none__" ? null : v)}
+            placeholder="None"
+          />
+        );
+      case "tags":
+        return (
+          <EditableArrayCell
+            value={section.tags}
+            onChange={(v) => updateSection(idx, "tags", v)}
+            placeholder="tags"
+            nowrapPlaceholder
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <EditorTableShell
       title={`Sections (${sections.length})`}
@@ -116,125 +235,51 @@ export const SectionsEditor = ({
       isEmpty={sections.length === 0}
       hasNoMatches={sections.length > 0 && filteredSections.length === 0}
     >
-      <table className="w-full table-fixed border-collapse">
-        <thead>
-          <tr>
-            <th className={`${editorTh} w-[4%]`}>ID</th>
-            <th className={`${editorTh} w-[6%]`}>Dept</th>
-            <th className={`${editorTh} w-[8%]`}>Course</th>
-            <th className={`${editorTh} w-[4%]`}>Code</th>
-            <th className={`${editorTh} w-[5%]`}>State</th>
-            <th className={`${editorTh} w-[12%]`}>Instructor</th>
-            <th className={`${editorTh} w-[4%]`}>Enroll</th>
-            <th className={`${editorTh} w-[4%]`}>Cap</th>
-            <th className={`${editorTh} w-[12%]`}>Patterns</th>
-            <th className={`${editorTh} w-[9%]`}>Assigned</th>
-            <th className={`${editorTh} w-[8%]`}>Room Req</th>
-            <th className={`${editorTh} w-[8%]`}>Crosslist</th>
-            <th className={`${editorTh} w-[6%]`}>Tags</th>
-            <th className={`${editorTh} w-[7%]`}>Notes</th>
-            <th className={`${editorTh} w-[3%]`} aria-label="Actions" />
-          </tr>
-        </thead>
-        <tbody>
-          {filteredSections.map(({ section, index: idx }) => (
-              <tr
-                key={`${section.id}-${idx}`}
-                id={`note-sections-${encodeURIComponent(String(section.id))}`}
-                className={`border-t border-default-200${
-                  isSectionArchived(section)
-                    ? " opacity-60"
-                    : isSectionNew(section)
-                      ? " bg-primary-50/40"
-                      : ""
-                }`}
-              >
-                <td className={editorTd}>
-                  <EditableCell value={section.id} onChange={(v) => updateSection(idx, "id", v)} />
-                </td>
-                <td className={editorTd}>
-                  <EditableCell
-                    value={section.department ?? ""}
-                    onChange={(v) => updateSection(idx, "department", v)}
-                    placeholder="e.g. FIN"
-                  />
-                </td>
-                <td className={editorTd}>
-                  <EditableCell value={section.course_id} onChange={(v) => updateSection(idx, "course_id", v)} placeholder="COURSE-XXX" />
-                </td>
-                <td className={editorTd}>
-                  <EditableCell value={section.section_code} onChange={(v) => updateSection(idx, "section_code", v)} />
-                </td>
-                <td className={editorTd}>
-                  <EditableSelectCell
-                    value={normalizeSectionState(section.state)}
-                    options={STATE_OPTIONS}
-                    onChange={(v) => updateSection(idx, "state", v as SectionState)}
-                    placeholder="State"
-                  />
-                </td>
-                <td className={editorTd}>
-                  <EditableSelectCell
-                    value={section.instructor_id}
-                    options={instructorOptions}
-                    onChange={(v) => updateSection(idx, "instructor_id", v)}
-                    placeholder="Select instructor"
-                  />
-                </td>
-                <td className={editorTd}>
-                  <EditableCell type="number" value={section.expected_enrollment} onChange={(v) => updateSection(idx, "expected_enrollment", v)} />
-                </td>
-                <td className={editorTd}>
-                  <EditableCell type="number" value={section.enrollment_cap} onChange={(v) => updateSection(idx, "enrollment_cap", v)} />
-                </td>
-                <td className={editorTd}>
-                  <MultiSelect
-                    value={section.allowed_meeting_patterns}
-                    options={meetingPatternOptions}
-                    onChange={(v) => updateSection(idx, "allowed_meeting_patterns", v)}
-                    placeholder="Select patterns"
-                  />
-                </td>
-                <td className={editorTd}>
-                  <EditableSelectCell
-                    value={section.previous_meeting_pattern ?? "__none__"}
-                    options={[{ key: "__none__", label: "(None)" }, ...meetingPatternOptions]}
-                    onChange={(v) =>
-                      updateSection(idx, "previous_meeting_pattern", v === "__none__" ? undefined : v)
-                    }
-                    placeholder="Pattern"
-                  />
-                </td>
-                <td className={editorTd}>
-                  <EditableArrayCell value={section.room_requirements} onChange={(v) => updateSection(idx, "room_requirements", v)} placeholder="features" />
-                </td>
-                <td className={editorTd}>
-                  <EditableSelectCell
-                    value={section.crosslist_group_id ?? "__none__"}
-                    options={crosslistOptionsWithNone}
-                    onChange={(v) => updateSection(idx, "crosslist_group_id", v === "__none__" ? null : v)}
-                    placeholder="None"
-                  />
-                </td>
-                <td className={editorTd}>
-                  <EditableArrayCell value={section.tags} onChange={(v) => updateSection(idx, "tags", v)} placeholder="tags" />
-                </td>
-                <td className={editorTd}>
-                  <RowNotesButton
-                    scope="sections"
-                    rowId={String(section.id)}
-                    title={`Section Notes - ${section.department ?? ""} ${section.course_id}`.trim()}
-                  />
-                </td>
-                <td className={editorTd}>
-                  <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteSection(idx)}>
-                    ✕
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-      </table>
+      <EditorConfigurableTable
+        editorKey="sections"
+        columnSpecs={SECTION_COLUMN_SPECS}
+        rows={filteredSections}
+        getRowKey={({ section, index }) => `${section.id}-${index}`}
+        getRowId={({ section }) =>
+          `note-sections-${encodeURIComponent(String(section.id))}`
+        }
+        getRowClassName={({ section }) => {
+          const base = "border-t border-default-200";
+          if (isSectionArchived(section)) return `${base} opacity-60`;
+          if (isSectionNew(section)) return `${base} bg-primary-50/40`;
+          return base;
+        }}
+        renderCell={renderCell}
+        renderActions={({ section, index: idx }) => (
+          <EditorRowActions
+            notes={
+              <RowNotesButton
+                scope="sections"
+                rowId={String(section.id)}
+                title={`Section Notes - ${section.department ?? ""} ${section.course_id}`.trim()}
+              />
+            }
+            rowLabel={`section ${section.id} (${section.course_id} ${section.section_code})`}
+            onEdit={() => setEditIndex(idx)}
+            onDelete={() => deleteSection(idx)}
+          />
+        )}
+      />
+      {editIndex !== null && sections[editIndex] ? (
+        <SectionEditModal
+          isOpen
+          section={sections[editIndex]}
+          instructorOptions={instructorOptions}
+          meetingPatternOptions={meetingPatternOptions}
+          crosslistGroupOptions={crosslistGroupOptions}
+          onClose={() => setEditIndex(null)}
+          onSave={(updated) => {
+            const next = [...sections];
+            next[editIndex] = updated;
+            onUpdate(next);
+          }}
+        />
+      ) : null}
     </EditorTableShell>
   );
 };

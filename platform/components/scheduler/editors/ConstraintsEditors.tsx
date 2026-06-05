@@ -5,7 +5,22 @@ import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Input } from "@heroui/input";
 
-import { editorTd, editorTh } from "./EditorTableShell";
+import { EditorConfigurableTable } from "./EditorConfigurableTable";
+import { EditorRowActions } from "./EditorRowActions";
+import {
+  BLOCKED_TIME_COLUMN_SPECS,
+  CROSSLIST_GROUP_COLUMN_SPECS,
+  LOCKED_ASSIGNMENT_COLUMN_SPECS,
+  NO_OVERLAP_GROUP_COLUMN_SPECS,
+  SOFT_LOCK_COLUMN_SPECS,
+} from "./editorColumnSpecs";
+import {
+  BlockedTimeEditModal,
+  CrossListGroupEditModal,
+  LockedAssignmentEditModal,
+  NoOverlapGroupEditModal,
+  SoftLockEditModal,
+} from "./modals/ConstraintEditModals";
 
 import { EditableCell } from "../EditableCell";
 import { EditableSelectCell } from "../EditableSelectCell";
@@ -33,6 +48,7 @@ const createEmptyCrossListGroup = (existing: CrossListGroup[]): CrossListGroup =
 
 export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: CrossListGroupsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const updateGroup = (index: number, field: keyof CrossListGroup, value: unknown) => {
     const newGroups = [...groups];
@@ -56,6 +72,27 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
       });
   }, [groups, searchQuery]);
 
+  const renderCrossListCell = (
+    columnId: string,
+    { group, index: idx }: { group: CrossListGroup; index: number },
+  ) => {
+    switch (columnId) {
+      case "id":
+        return <EditableCell value={group.id} onChange={(v) => updateGroup(idx, "id", v)} />;
+      case "members":
+        return (
+          <MultiSelect
+            value={group.member_section_ids}
+            options={sectionOptions}
+            onChange={(v) => updateGroup(idx, "member_section_ids", v)}
+            placeholder="Select sections"
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <Card className="w-full shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between">
@@ -71,52 +108,48 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
           className="mb-3 max-w-md"
           isClearable
         />
-        <table className="w-full table-fixed border-collapse">
-          <thead>
-            <tr>
-              <th className={`${editorTh} w-[12%]`}>ID</th>
-              <th className={`${editorTh} w-[58%]`}>Member Sections</th>
-              <th className={`${editorTh} w-[22%]`}>Notes</th>
-              <th className={`${editorTh} w-[8%]`} aria-label="Actions" />
-            </tr>
-          </thead>
-          <tbody>
-            {filteredGroups.map(({ group, index: idx }) => (
-              <tr
-                key={`${group.id}-${idx}`}
-                id={`note-constraints-crosslist-groups-${encodeURIComponent(String(group.id))}`}
-                className="border-t border-default-200"
-              >
-                <td className={editorTd}>
-                  <EditableCell value={group.id} onChange={(v) => updateGroup(idx, "id", v)} />
-                </td>
-                <td className={editorTd}>
-                  <MultiSelect
-                    value={group.member_section_ids}
-                    options={sectionOptions}
-                    onChange={(v) => updateGroup(idx, "member_section_ids", v)}
-                    placeholder="Select sections"
-                  />
-                </td>
-                <td className={editorTd}>
-                  <RowNotesButton
-                    scope="constraints-crosslist-groups"
-                    rowId={String(group.id)}
-                    title={`Cross-List Group Notes - ${group.id}`}
-                  />
-                </td>
-                <td className={editorTd}>
-                  <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteGroup(idx)}>✕</Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <EditorConfigurableTable
+          editorKey="constraints-crosslist-groups"
+          columnSpecs={CROSSLIST_GROUP_COLUMN_SPECS}
+          rows={filteredGroups}
+          getRowKey={({ group, index }) => `${group.id}-${index}`}
+          getRowId={({ group }) =>
+            `note-constraints-crosslist-groups-${encodeURIComponent(String(group.id))}`
+          }
+          renderCell={renderCrossListCell}
+          renderActions={({ group, index: idx }) => (
+            <EditorRowActions
+              notes={
+                <RowNotesButton
+                  scope="constraints-crosslist-groups"
+                  rowId={String(group.id)}
+                  title={`Cross-List Group Notes - ${group.id}`}
+                />
+              }
+              rowLabel={`cross-list group ${group.id}`}
+              onEdit={() => setEditIndex(idx)}
+              onDelete={() => deleteGroup(idx)}
+            />
+          )}
+        />
         {groups.length === 0 && <div className="py-4 text-center text-default-400">No cross-list groups.</div>}
         {groups.length > 0 && filteredGroups.length === 0 && (
           <div className="py-4 text-center text-default-400">No cross-list groups match your search.</div>
         )}
       </CardBody>
+      {editIndex !== null && groups[editIndex] ? (
+        <CrossListGroupEditModal
+          isOpen
+          group={groups[editIndex]}
+          sectionOptions={sectionOptions}
+          onClose={() => setEditIndex(null)}
+          onSave={(updated) => {
+            const next = [...groups];
+            next[editIndex] = updated;
+            onUpdate(next);
+          }}
+        />
+      ) : null}
     </Card>
   );
 };
@@ -136,6 +169,7 @@ const createEmptyNoOverlapGroup = (existing: NoOverlapGroup[]): NoOverlapGroup =
 
 export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOverlapGroupsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const updateGroup = (index: number, field: keyof NoOverlapGroup, value: unknown) => {
     const newGroups = [...groups];
@@ -159,6 +193,35 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
       });
   }, [groups, searchQuery]);
 
+  const renderNoOverlapCell = (
+    columnId: string,
+    { group, index: idx }: { group: NoOverlapGroup; index: number },
+  ) => {
+    switch (columnId) {
+      case "id":
+        return <EditableCell value={group.id} onChange={(v) => updateGroup(idx, "id", v)} />;
+      case "members":
+        return (
+          <MultiSelect
+            value={group.member_section_ids}
+            options={sectionOptions}
+            onChange={(v) => updateGroup(idx, "member_section_ids", v)}
+            placeholder="Select sections"
+          />
+        );
+      case "reason":
+        return (
+          <EditableCell
+            value={group.reason}
+            onChange={(v) => updateGroup(idx, "reason", v)}
+            placeholder="reason"
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <Card className="w-full shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between">
@@ -174,56 +237,48 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
           className="mb-3 max-w-md"
           isClearable
         />
-        <table className="w-full table-fixed border-collapse">
-          <thead>
-            <tr>
-              <th className={`${editorTh} w-[10%]`}>ID</th>
-              <th className={`${editorTh} w-[50%]`}>Member Sections</th>
-              <th className={`${editorTh} w-[18%]`}>Reason</th>
-              <th className={`${editorTh} w-[14%]`}>Notes</th>
-              <th className={`${editorTh} w-[8%]`} aria-label="Actions" />
-            </tr>
-          </thead>
-          <tbody>
-            {filteredGroups.map(({ group, index: idx }) => (
-              <tr
-                key={`${group.id}-${idx}`}
-                id={`note-constraints-no-overlap-groups-${encodeURIComponent(String(group.id))}`}
-                className="border-t border-default-200"
-              >
-                <td className={editorTd}>
-                  <EditableCell value={group.id} onChange={(v) => updateGroup(idx, "id", v)} />
-                </td>
-                <td className={editorTd}>
-                  <MultiSelect
-                    value={group.member_section_ids}
-                    options={sectionOptions}
-                    onChange={(v) => updateGroup(idx, "member_section_ids", v)}
-                    placeholder="Select sections"
-                  />
-                </td>
-                <td className={editorTd}>
-                  <EditableCell value={group.reason} onChange={(v) => updateGroup(idx, "reason", v)} placeholder="reason" />
-                </td>
-                <td className={editorTd}>
-                  <RowNotesButton
-                    scope="constraints-no-overlap-groups"
-                    rowId={String(group.id)}
-                    title={`No-Overlap Group Notes - ${group.id}`}
-                  />
-                </td>
-                <td className={editorTd}>
-                  <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteGroup(idx)}>✕</Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <EditorConfigurableTable
+          editorKey="constraints-no-overlap-groups"
+          columnSpecs={NO_OVERLAP_GROUP_COLUMN_SPECS}
+          rows={filteredGroups}
+          getRowKey={({ group, index }) => `${group.id}-${index}`}
+          getRowId={({ group }) =>
+            `note-constraints-no-overlap-groups-${encodeURIComponent(String(group.id))}`
+          }
+          renderCell={renderNoOverlapCell}
+          renderActions={({ group, index: idx }) => (
+            <EditorRowActions
+              notes={
+                <RowNotesButton
+                  scope="constraints-no-overlap-groups"
+                  rowId={String(group.id)}
+                  title={`No-Overlap Group Notes - ${group.id}`}
+                />
+              }
+              rowLabel={`no-overlap group ${group.id}`}
+              onEdit={() => setEditIndex(idx)}
+              onDelete={() => deleteGroup(idx)}
+            />
+          )}
+        />
         {groups.length === 0 && <div className="py-4 text-center text-default-400">No no-overlap groups.</div>}
         {groups.length > 0 && filteredGroups.length === 0 && (
           <div className="py-4 text-center text-default-400">No no-overlap groups match your search.</div>
         )}
       </CardBody>
+      {editIndex !== null && groups[editIndex] ? (
+        <NoOverlapGroupEditModal
+          isOpen
+          group={groups[editIndex]}
+          sectionOptions={sectionOptions}
+          onClose={() => setEditIndex(null)}
+          onSave={(updated) => {
+            const next = [...groups];
+            next[editIndex] = updated;
+            onUpdate(next);
+          }}
+        />
+      ) : null}
     </Card>
   );
 };
@@ -292,6 +347,7 @@ export const BlockedTimesEditor = ({
   onUpdate,
 }: BlockedTimesEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const updateBlockedTime = (index: number, field: keyof BlockedTime, value: unknown) => {
     const newBlockedTimes = [...blockedTimes];
@@ -345,6 +401,107 @@ export const BlockedTimesEditor = ({
       });
   }, [blockedTimes, searchQuery]);
 
+  const renderBlockedTimeCell = (
+    columnId: string,
+    { blocked, index: idx }: { blocked: BlockedTime; index: number },
+  ) => {
+    switch (columnId) {
+      case "scope":
+        return (
+          <EditableSelectCell
+            value={blocked.scope}
+            options={SCOPE_OPTIONS}
+            onChange={(v) => {
+              const nextScope = v as BlockedTime["scope"];
+              const newBlockedTimes = [...blockedTimes];
+              const current = newBlockedTimes[idx];
+              if (!current) return;
+              newBlockedTimes[idx] = {
+                ...current,
+                scope: nextScope,
+                instructor_id: nextScope === "instructor" ? current.instructor_id : undefined,
+                room_id: nextScope === "room" ? current.room_id : undefined,
+              };
+              onUpdate(newBlockedTimes);
+            }}
+          />
+        );
+      case "days":
+        return (
+          <MultiSelect
+            value={blockedDaysToSelection(blocked.days)}
+            options={BLOCKED_DAY_OPTIONS}
+            onChange={(v) => updateBlockedTime(idx, "days", v.join(","))}
+            placeholder="Select days"
+          />
+        );
+      case "start":
+        return (
+          <EditableSelectCell
+            value={normalizeBlockedTimeValue(blocked.start_time)}
+            options={BLOCKED_TIME_OPTIONS}
+            onChange={(v) => updateBlockedTime(idx, "start_time", v)}
+            placeholder="Select start"
+            isSearchable
+          />
+        );
+      case "end":
+        return (
+          <EditableSelectCell
+            value={normalizeBlockedTimeValue(blocked.end_time)}
+            options={BLOCKED_TIME_OPTIONS}
+            onChange={(v) => updateBlockedTime(idx, "end_time", v)}
+            placeholder="Select end"
+            isSearchable
+          />
+        );
+      case "professor":
+        return (
+          <EditableSelectCell
+            value={blocked.instructor_id ?? "__none__"}
+            options={instructorOptionsWithNone}
+            onChange={(v) =>
+              updateBlockedTime(
+                idx,
+                "instructor_id",
+                blocked.scope === "instructor" && v !== "__none__" ? v : undefined,
+              )
+            }
+            placeholder={blocked.scope === "instructor" ? "Select professor" : "N/A"}
+            isDisabled={blocked.scope !== "instructor"}
+            isSearchable
+          />
+        );
+      case "room":
+        return (
+          <EditableSelectCell
+            value={blocked.room_id ?? "__none__"}
+            options={roomOptionsWithNone}
+            onChange={(v) =>
+              updateBlockedTime(
+                idx,
+                "room_id",
+                blocked.scope === "room" && v !== "__none__" ? v : undefined,
+              )
+            }
+            placeholder={blocked.scope === "room" ? "Select room" : "N/A"}
+            isDisabled={blocked.scope !== "room"}
+            isSearchable
+          />
+        );
+      case "reason":
+        return (
+          <EditableCell
+            value={blocked.reason}
+            onChange={(v) => updateBlockedTime(idx, "reason", v)}
+            placeholder="reason"
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <Card className="w-full shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between">
@@ -360,127 +517,49 @@ export const BlockedTimesEditor = ({
           className="mb-3 max-w-md"
           isClearable
         />
-        <table className="w-full table-fixed border-collapse">
-          <thead>
-            <tr>
-              <th className={`${editorTh} w-[10%]`}>Scope</th>
-              <th className={`${editorTh} w-[16%]`}>Days</th>
-              <th className={`${editorTh} w-[10%]`}>Start</th>
-              <th className={`${editorTh} w-[10%]`}>End</th>
-              <th className={`${editorTh} w-[14%]`}>Professor</th>
-              <th className={`${editorTh} w-[14%]`}>Room</th>
-              <th className={`${editorTh} w-[14%]`}>Reason</th>
-              <th className={`${editorTh} w-[8%]`}>Notes</th>
-              <th className={`${editorTh} w-[4%]`} aria-label="Actions" />
-            </tr>
-          </thead>
-          <tbody>
-            {filteredBlockedTimes.map(({ blocked, index: idx }) => (
-              <tr
-                key={idx}
-                id={`note-constraints-blocked-times-${encodeURIComponent(`${blocked.scope}-${blocked.reason || "row"}-${idx}`)}`}
-                className="border-t border-default-200"
-              >
-                <td className={editorTd}>
-                  <EditableSelectCell
-                    value={blocked.scope}
-                    options={SCOPE_OPTIONS}
-                    onChange={(v) => {
-                      const nextScope = v as BlockedTime["scope"];
-                      const newBlockedTimes = [...blockedTimes];
-                      const current = newBlockedTimes[idx];
-                      if (!current) return;
-                      newBlockedTimes[idx] = {
-                        ...current,
-                        scope: nextScope,
-                        instructor_id:
-                          nextScope === "instructor" ? current.instructor_id : undefined,
-                        room_id: nextScope === "room" ? current.room_id : undefined,
-                      };
-                      onUpdate(newBlockedTimes);
-                    }}
-                  />
-                </td>
-                <td className={editorTd}>
-                  <MultiSelect
-                    value={blockedDaysToSelection(blocked.days)}
-                    options={BLOCKED_DAY_OPTIONS}
-                    onChange={(v) => updateBlockedTime(idx, "days", v.join(","))}
-                    placeholder="Select days"
-                  />
-                </td>
-                <td className={editorTd}>
-                  <EditableSelectCell
-                    value={normalizeBlockedTimeValue(blocked.start_time)}
-                    options={BLOCKED_TIME_OPTIONS}
-                    onChange={(v) => updateBlockedTime(idx, "start_time", v)}
-                    placeholder="Select start"
-                    isSearchable
-                  />
-                </td>
-                <td className={editorTd}>
-                  <EditableSelectCell
-                    value={normalizeBlockedTimeValue(blocked.end_time)}
-                    options={BLOCKED_TIME_OPTIONS}
-                    onChange={(v) => updateBlockedTime(idx, "end_time", v)}
-                    placeholder="Select end"
-                    isSearchable
-                  />
-                </td>
-                <td className={editorTd}>
-                  <EditableSelectCell
-                    value={blocked.instructor_id ?? "__none__"}
-                    options={instructorOptionsWithNone}
-                    onChange={(v) =>
-                      updateBlockedTime(
-                        idx,
-                        "instructor_id",
-                        blocked.scope === "instructor" && v !== "__none__" ? v : undefined,
-                      )
-                    }
-                    placeholder={blocked.scope === "instructor" ? "Select professor" : "N/A"}
-                    isDisabled={blocked.scope !== "instructor"}
-                    isSearchable
-                  />
-                </td>
-                <td className={editorTd}>
-                  <EditableSelectCell
-                    value={blocked.room_id ?? "__none__"}
-                    options={roomOptionsWithNone}
-                    onChange={(v) =>
-                      updateBlockedTime(
-                        idx,
-                        "room_id",
-                        blocked.scope === "room" && v !== "__none__" ? v : undefined,
-                      )
-                    }
-                    placeholder={blocked.scope === "room" ? "Select room" : "N/A"}
-                    isDisabled={blocked.scope !== "room"}
-                    isSearchable
-                  />
-                </td>
-                <td className={editorTd}>
-                  <EditableCell value={blocked.reason} onChange={(v) => updateBlockedTime(idx, "reason", v)} placeholder="reason" />
-                </td>
-                <td className={editorTd}>
-                  <RowNotesButton
-                    scope="constraints-blocked-times"
-                    rowId={`${blocked.scope}-${blocked.reason || "row"}-${idx}`}
-                    title={`Blocked Time Notes - Row ${idx + 1}`}
-                  />
-                </td>
-                <td className={editorTd}>
-                  <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteBlockedTime(idx)}>✕</Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <EditorConfigurableTable
+          editorKey="constraints-blocked-times"
+          columnSpecs={BLOCKED_TIME_COLUMN_SPECS}
+          rows={filteredBlockedTimes}
+          getRowKey={(_, index) => String(index)}
+          getRowId={({ blocked }, idx) =>
+            `note-constraints-blocked-times-${encodeURIComponent(`${blocked.scope}-${blocked.reason || "row"}-${idx}`)}`
+          }
+          renderCell={renderBlockedTimeCell}
+          renderActions={({ blocked }, idx) => (
+            <EditorRowActions
+              notes={
+                <RowNotesButton
+                  scope="constraints-blocked-times"
+                  rowId={`${blocked.scope}-${blocked.reason || "row"}-${idx}`}
+                  title={`Blocked Time Notes - Row ${idx + 1}`}
+                />
+              }
+              rowLabel={`blocked time row ${idx + 1} (${blocked.scope})`}
+              onEdit={() => setEditIndex(idx)}
+              onDelete={() => deleteBlockedTime(idx)}
+            />
+          )}
+        />
         {blockedTimes.length === 0 && <div className="py-4 text-center text-default-400">No blocked times.</div>}
         {blockedTimes.length > 0 && filteredBlockedTimes.length === 0 && (
           <div className="py-4 text-center text-default-400">No blocked times match your search.</div>
         )}
       </CardBody>
+      {editIndex !== null && blockedTimes[editIndex] ? (
+        <BlockedTimeEditModal
+          isOpen
+          blocked={blockedTimes[editIndex]}
+          instructorOptions={instructorOptions}
+          roomOptions={roomOptions}
+          onClose={() => setEditIndex(null)}
+          onSave={(updated) => {
+            const next = [...blockedTimes];
+            next[editIndex] = updated;
+            onUpdate(next);
+          }}
+        />
+      ) : null}
     </Card>
   );
 };
@@ -508,6 +587,7 @@ export const LockedAssignmentsEditor = ({
   onUpdate 
 }: LockedAssignmentsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const updateLock = (index: number, field: keyof LockedAssignment, value: unknown) => {
     const newLocks = [...lockedAssignments];
@@ -536,6 +616,43 @@ export const LockedAssignmentsEditor = ({
       });
   }, [lockedAssignments, searchQuery]);
 
+  const renderLockedCell = (
+    columnId: string,
+    { lock, index: idx }: { lock: LockedAssignment; index: number },
+  ) => {
+    switch (columnId) {
+      case "section":
+        return (
+          <EditableSelectCell
+            value={lock.section_id}
+            options={sectionOptions}
+            onChange={(v) => updateLock(idx, "section_id", v)}
+            placeholder="Select section"
+          />
+        );
+      case "timeslots":
+        return (
+          <MultiSelect
+            value={lock.fixed_timeslot_set ?? []}
+            options={timeslotOptions}
+            onChange={(v) => updateLock(idx, "fixed_timeslot_set", v.length > 0 ? v : undefined)}
+            placeholder="Select timeslots"
+          />
+        );
+      case "room":
+        return (
+          <EditableSelectCell
+            value={lock.fixed_room ?? "__none__"}
+            options={roomOptionsWithNone}
+            onChange={(v) => updateLock(idx, "fixed_room", v === "__none__" ? undefined : v)}
+            placeholder="Select room"
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <Card className="w-full shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between">
@@ -551,66 +668,50 @@ export const LockedAssignmentsEditor = ({
           className="mb-3 max-w-md"
           isClearable
         />
-        <table className="w-full table-fixed border-collapse">
-          <thead>
-            <tr>
-              <th className={`${editorTh} w-[18%]`}>Section</th>
-              <th className={`${editorTh} w-[42%]`}>Fixed Timeslots</th>
-              <th className={`${editorTh} w-[18%]`}>Fixed Room</th>
-              <th className={`${editorTh} w-[14%]`}>Notes</th>
-              <th className={`${editorTh} w-[8%]`} aria-label="Actions" />
-            </tr>
-          </thead>
-          <tbody>
-            {filteredLocks.map(({ lock, index: idx }) => (
-              <tr
-                key={idx}
-                id={`note-constraints-locked-assignments-${encodeURIComponent(`${lock.section_id || "row"}-${idx}`)}`}
-                className="border-t border-default-200"
-              >
-                <td className={editorTd}>
-                  <EditableSelectCell
-                    value={lock.section_id}
-                    options={sectionOptions}
-                    onChange={(v) => updateLock(idx, "section_id", v)}
-                    placeholder="Select section"
-                  />
-                </td>
-                <td className={editorTd}>
-                  <MultiSelect
-                    value={lock.fixed_timeslot_set ?? []}
-                    options={timeslotOptions}
-                    onChange={(v) => updateLock(idx, "fixed_timeslot_set", v.length > 0 ? v : undefined)}
-                    placeholder="Select timeslots"
-                  />
-                </td>
-                <td className={editorTd}>
-                  <EditableSelectCell
-                    value={lock.fixed_room ?? "__none__"}
-                    options={roomOptionsWithNone}
-                    onChange={(v) => updateLock(idx, "fixed_room", v === "__none__" ? undefined : v)}
-                    placeholder="Select room"
-                  />
-                </td>
-                <td className={editorTd}>
-                  <RowNotesButton
-                    scope="constraints-locked-assignments"
-                    rowId={`${lock.section_id || "row"}-${idx}`}
-                    title={`Locked Assignment Notes - ${lock.section_id || `Row ${idx + 1}`}`}
-                  />
-                </td>
-                <td className={editorTd}>
-                  <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteLock(idx)}>✕</Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <EditorConfigurableTable
+          editorKey="constraints-locked-assignments"
+          columnSpecs={LOCKED_ASSIGNMENT_COLUMN_SPECS}
+          rows={filteredLocks}
+          getRowKey={(_, index) => String(index)}
+          getRowId={({ lock }, idx) =>
+            `note-constraints-locked-assignments-${encodeURIComponent(`${lock.section_id || "row"}-${idx}`)}`
+          }
+          renderCell={renderLockedCell}
+          renderActions={({ lock }, idx) => (
+            <EditorRowActions
+              notes={
+                <RowNotesButton
+                  scope="constraints-locked-assignments"
+                  rowId={`${lock.section_id || "row"}-${idx}`}
+                  title={`Locked Assignment Notes - ${lock.section_id || `Row ${idx + 1}`}`}
+                />
+              }
+              rowLabel={`locked assignment for section ${lock.section_id || `row ${idx + 1}`}`}
+              onEdit={() => setEditIndex(idx)}
+              onDelete={() => deleteLock(idx)}
+            />
+          )}
+        />
         {lockedAssignments.length === 0 && <div className="py-4 text-center text-default-400">No locked assignments.</div>}
         {lockedAssignments.length > 0 && filteredLocks.length === 0 && (
           <div className="py-4 text-center text-default-400">No locked assignments match your search.</div>
         )}
       </CardBody>
+      {editIndex !== null && lockedAssignments[editIndex] ? (
+        <LockedAssignmentEditModal
+          isOpen
+          lock={lockedAssignments[editIndex]}
+          sectionOptions={sectionOptions}
+          timeslotOptions={timeslotOptions}
+          roomOptions={roomOptions}
+          onClose={() => setEditIndex(null)}
+          onSave={(updated) => {
+            const next = [...lockedAssignments];
+            next[editIndex] = updated;
+            onUpdate(next);
+          }}
+        />
+      ) : null}
     </Card>
   );
 };
@@ -639,6 +740,7 @@ export const SoftLocksEditor = ({
   onUpdate 
 }: SoftLocksEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const updateLock = (index: number, field: keyof SoftLock, value: unknown) => {
     const newLocks = [...softLocks];
@@ -672,6 +774,47 @@ export const SoftLocksEditor = ({
       });
   }, [searchQuery, softLocks]);
 
+  const renderSoftLockCell = (
+    columnId: string,
+    { lock, index: idx }: { lock: SoftLock; index: number },
+  ) => {
+    switch (columnId) {
+      case "section":
+        return (
+          <EditableSelectCell
+            value={lock.section_id}
+            options={sectionOptions}
+            onChange={(v) => updateLock(idx, "section_id", v)}
+            placeholder="Select section"
+          />
+        );
+      case "timeslots":
+        return (
+          <MultiSelect
+            value={lock.preferred_timeslot_set ?? []}
+            options={timeslotOptions}
+            onChange={(v) => updateLock(idx, "preferred_timeslot_set", v.length > 0 ? v : undefined)}
+            placeholder="Select timeslots"
+          />
+        );
+      case "room":
+        return (
+          <EditableSelectCell
+            value={lock.preferred_room ?? "__none__"}
+            options={roomOptionsWithNone}
+            onChange={(v) => updateLock(idx, "preferred_room", v === "__none__" ? undefined : v)}
+            placeholder="Select room"
+          />
+        );
+      case "weight":
+        return (
+          <EditableCell type="number" value={lock.weight} onChange={(v) => updateLock(idx, "weight", v)} />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <Card className="w-full shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between">
@@ -687,70 +830,50 @@ export const SoftLocksEditor = ({
           className="mb-3 max-w-md"
           isClearable
         />
-        <table className="w-full table-fixed border-collapse">
-          <thead>
-            <tr>
-              <th className={`${editorTh} w-[16%]`}>Section</th>
-              <th className={`${editorTh} w-[36%]`}>Preferred Timeslots</th>
-              <th className={`${editorTh} w-[16%]`}>Preferred Room</th>
-              <th className={`${editorTh} w-[10%]`}>Weight</th>
-              <th className={`${editorTh} w-[14%]`}>Notes</th>
-              <th className={`${editorTh} w-[8%]`} aria-label="Actions" />
-            </tr>
-          </thead>
-          <tbody>
-            {filteredLocks.map(({ lock, index: idx }) => (
-              <tr
-                key={idx}
-                id={`note-constraints-soft-locks-${encodeURIComponent(`${lock.section_id || "row"}-${idx}`)}`}
-                className="border-t border-default-200"
-              >
-                <td className={editorTd}>
-                  <EditableSelectCell
-                    value={lock.section_id}
-                    options={sectionOptions}
-                    onChange={(v) => updateLock(idx, "section_id", v)}
-                    placeholder="Select section"
-                  />
-                </td>
-                <td className={editorTd}>
-                  <MultiSelect
-                    value={lock.preferred_timeslot_set ?? []}
-                    options={timeslotOptions}
-                    onChange={(v) => updateLock(idx, "preferred_timeslot_set", v.length > 0 ? v : undefined)}
-                    placeholder="Select timeslots"
-                  />
-                </td>
-                <td className={editorTd}>
-                  <EditableSelectCell
-                    value={lock.preferred_room ?? "__none__"}
-                    options={roomOptionsWithNone}
-                    onChange={(v) => updateLock(idx, "preferred_room", v === "__none__" ? undefined : v)}
-                    placeholder="Select room"
-                  />
-                </td>
-                <td className={editorTd}>
-                  <EditableCell type="number" value={lock.weight} onChange={(v) => updateLock(idx, "weight", v)} />
-                </td>
-                <td className={editorTd}>
-                  <RowNotesButton
-                    scope="constraints-soft-locks"
-                    rowId={`${lock.section_id || "row"}-${idx}`}
-                    title={`Soft Lock Notes - ${lock.section_id || `Row ${idx + 1}`}`}
-                  />
-                </td>
-                <td className={editorTd}>
-                  <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteLock(idx)}>✕</Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <EditorConfigurableTable
+          editorKey="constraints-soft-locks"
+          columnSpecs={SOFT_LOCK_COLUMN_SPECS}
+          rows={filteredLocks}
+          getRowKey={(_, index) => String(index)}
+          getRowId={({ lock }, idx) =>
+            `note-constraints-soft-locks-${encodeURIComponent(`${lock.section_id || "row"}-${idx}`)}`
+          }
+          renderCell={renderSoftLockCell}
+          renderActions={({ lock }, idx) => (
+            <EditorRowActions
+              notes={
+                <RowNotesButton
+                  scope="constraints-soft-locks"
+                  rowId={`${lock.section_id || "row"}-${idx}`}
+                  title={`Soft Lock Notes - ${lock.section_id || `Row ${idx + 1}`}`}
+                />
+              }
+              rowLabel={`soft lock for section ${lock.section_id || `row ${idx + 1}`}`}
+              onEdit={() => setEditIndex(idx)}
+              onDelete={() => deleteLock(idx)}
+            />
+          )}
+        />
         {softLocks.length === 0 && <div className="py-4 text-center text-default-400">No soft locks.</div>}
         {softLocks.length > 0 && filteredLocks.length === 0 && (
           <div className="py-4 text-center text-default-400">No soft locks match your search.</div>
         )}
       </CardBody>
+      {editIndex !== null && softLocks[editIndex] ? (
+        <SoftLockEditModal
+          isOpen
+          lock={softLocks[editIndex]}
+          sectionOptions={sectionOptions}
+          timeslotOptions={timeslotOptions}
+          roomOptions={roomOptions}
+          onClose={() => setEditIndex(null)}
+          onSave={(updated) => {
+            const next = [...softLocks];
+            next[editIndex] = updated;
+            onUpdate(next);
+          }}
+        />
+      ) : null}
     </Card>
   );
 };

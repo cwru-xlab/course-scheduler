@@ -1,9 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Button } from "@heroui/button";
 
-import { EditorTableShell, editorTd, editorTh } from "./EditorTableShell";
+import { EditorConfigurableTable } from "./EditorConfigurableTable";
+import { EditorRowActions } from "./EditorRowActions";
+import { EditorTableShell } from "./EditorTableShell";
+import { ROOM_COLUMN_SPECS } from "./editorColumnSpecs";
+import { RoomEditModal } from "./modals/RoomEditModal";
 
 import { EditableCell } from "../EditableCell";
 import { EditableArrayCell } from "../EditableArrayCell";
@@ -11,6 +14,8 @@ import { RowNotesButton } from "../RowNotesButton";
 
 import type { Room } from "@/lib/scheduling/types";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
+
+type RoomRow = { room: Room; index: number };
 
 type RoomsEditorProps = {
   rooms: Room[];
@@ -27,6 +32,7 @@ const createEmptyRoom = (existing: Room[]): Room => ({
 
 export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const updateRoom = (index: number, field: keyof Room, value: unknown) => {
     const newRooms = [...rooms];
@@ -42,7 +48,7 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
     onUpdate(rooms.filter((_, i) => i !== index));
   };
 
-  const filteredRooms = useMemo(() => {
+  const filteredRooms = useMemo((): RoomRow[] => {
     const query = searchQuery.trim().toLowerCase();
     return rooms
       .map((room, index) => ({ room, index }))
@@ -61,6 +67,43 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
       });
   }, [rooms, searchQuery]);
 
+  const renderCell = (columnId: string, { room, index: idx }: RoomRow) => {
+    switch (columnId) {
+      case "id":
+        return <EditableCell value={room.id} onChange={(v) => updateRoom(idx, "id", v)} />;
+      case "building":
+        return (
+          <EditableCell
+            value={room.building}
+            onChange={(v) => updateRoom(idx, "building", v)}
+            placeholder="Building"
+          />
+        );
+      case "room_number":
+        return (
+          <EditableCell
+            value={room.room_number}
+            onChange={(v) => updateRoom(idx, "room_number", v)}
+            placeholder="101"
+          />
+        );
+      case "capacity":
+        return (
+          <EditableCell type="number" value={room.capacity} onChange={(v) => updateRoom(idx, "capacity", v)} />
+        );
+      case "features":
+        return (
+          <EditableArrayCell
+            value={room.features}
+            onChange={(v) => updateRoom(idx, "features", v)}
+            placeholder="projector, etc"
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <EditorTableShell
       title={`Rooms (${rooms.length})`}
@@ -74,56 +117,40 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
       isEmpty={rooms.length === 0}
       hasNoMatches={rooms.length > 0 && filteredRooms.length === 0}
     >
-      <table className="w-full table-fixed border-collapse">
-        <thead>
-          <tr>
-            <th className={`${editorTh} w-[8%]`}>ID</th>
-            <th className={`${editorTh} w-[18%]`}>Building</th>
-            <th className={`${editorTh} w-[12%]`}>Room #</th>
-            <th className={`${editorTh} w-[10%]`}>Capacity</th>
-            <th className={`${editorTh} w-[38%]`}>Features</th>
-            <th className={`${editorTh} w-[10%]`}>Notes</th>
-            <th className={`${editorTh} w-[4%]`} aria-label="Actions" />
-          </tr>
-        </thead>
-          <tbody>
-            {filteredRooms.map(({ room, index: idx }) => (
-              <tr
-                key={`${room.id}-${idx}`}
-                id={`note-rooms-${encodeURIComponent(String(room.id))}`}
-                className="border-t border-default-200"
-              >
-                <td className={editorTd}>
-                  <EditableCell value={room.id} onChange={(v) => updateRoom(idx, "id", v)} />
-                </td>
-                <td className={editorTd}>
-                  <EditableCell value={room.building} onChange={(v) => updateRoom(idx, "building", v)} placeholder="Building" />
-                </td>
-                <td className={editorTd}>
-                  <EditableCell value={room.room_number} onChange={(v) => updateRoom(idx, "room_number", v)} placeholder="101" />
-                </td>
-                <td className={editorTd}>
-                  <EditableCell type="number" value={room.capacity} onChange={(v) => updateRoom(idx, "capacity", v)} />
-                </td>
-                <td className={editorTd}>
-                  <EditableArrayCell value={room.features} onChange={(v) => updateRoom(idx, "features", v)} placeholder="projector, etc" />
-                </td>
-                <td className={editorTd}>
-                  <RowNotesButton
-                    scope="rooms"
-                    rowId={String(room.id)}
-                    title={`Room Notes - ${room.building} ${room.room_number}`.trim()}
-                  />
-                </td>
-                <td className={editorTd}>
-                  <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteRoom(idx)}>
-                    ✕
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-      </table>
+      <EditorConfigurableTable
+        editorKey="rooms"
+        columnSpecs={ROOM_COLUMN_SPECS}
+        rows={filteredRooms}
+        getRowKey={({ room, index }) => `${room.id}-${index}`}
+        getRowId={({ room }) => `note-rooms-${encodeURIComponent(String(room.id))}`}
+        renderCell={renderCell}
+        renderActions={({ room, index: idx }) => (
+          <EditorRowActions
+            notes={
+              <RowNotesButton
+                scope="rooms"
+                rowId={String(room.id)}
+                title={`Room Notes - ${room.building} ${room.room_number}`.trim()}
+              />
+            }
+            rowLabel={`room ${room.building} ${room.room_number} (${room.id})`}
+            onEdit={() => setEditIndex(idx)}
+            onDelete={() => deleteRoom(idx)}
+          />
+        )}
+      />
+      {editIndex !== null && rooms[editIndex] ? (
+        <RoomEditModal
+          isOpen
+          room={rooms[editIndex]}
+          onClose={() => setEditIndex(null)}
+          onSave={(updated) => {
+            const next = [...rooms];
+            next[editIndex] = updated;
+            onUpdate(next);
+          }}
+        />
+      ) : null}
     </EditorTableShell>
   );
 };

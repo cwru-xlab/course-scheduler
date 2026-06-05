@@ -1,9 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Button } from "@heroui/button";
 
-import { EditorTableShell, editorTd, editorTh } from "./EditorTableShell";
+import { EditorConfigurableTable } from "./EditorConfigurableTable";
+import { EditorRowActions } from "./EditorRowActions";
+import { EditorTableShell } from "./EditorTableShell";
+import { INSTRUCTOR_COLUMN_SPECS } from "./editorColumnSpecs";
+import { InstructorEditModal } from "./modals/InstructorEditModal";
 
 import { EditableCell } from "../EditableCell";
 import { EditableSelectCell } from "../EditableSelectCell";
@@ -12,6 +15,8 @@ import { RowNotesButton } from "../RowNotesButton";
 
 import type { Instructor } from "@/lib/scheduling/types";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
+
+type InstructorRow = { inst: Instructor; index: number };
 
 type InstructorsEditorProps = {
   instructors: Instructor[];
@@ -53,6 +58,7 @@ export const InstructorsEditor = ({
   onUpdate,
 }: InstructorsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const updateInstructor = (index: number, field: string, value: unknown) => {
     const newInstructors = [...instructors];
@@ -76,7 +82,7 @@ export const InstructorsEditor = ({
     onUpdate(instructors.filter((_, i) => i !== index));
   };
 
-  const filteredInstructors = useMemo(() => {
+  const filteredInstructors = useMemo((): InstructorRow[] => {
     const query = searchQuery.trim().toLowerCase();
     return instructors
       .map((inst, index) => ({ inst, index }))
@@ -97,6 +103,61 @@ export const InstructorsEditor = ({
       });
   }, [instructors, searchQuery]);
 
+  const renderCell = (columnId: string, { inst, index: idx }: InstructorRow) => {
+    switch (columnId) {
+      case "id":
+        return <EditableCell value={inst.id} onChange={(v) => updateInstructor(idx, "id", v)} />;
+      case "name":
+        return <EditableCell value={inst.name} onChange={(v) => updateInstructor(idx, "name", v)} />;
+      case "rank":
+        return (
+          <EditableSelectCell
+            value={inst.rank_type}
+            options={RANK_OPTIONS}
+            onChange={(v) => updateInstructor(idx, "rank_type", v)}
+          />
+        );
+      case "unavailable":
+        return (
+          <MultiSelect
+            value={inst.unavailable_times}
+            options={timeslotOptions}
+            onChange={(v) => updateInstructor(idx, "unavailable_times", v)}
+            placeholder="Select timeslots"
+          />
+        );
+      case "pref_days":
+        return (
+          <MultiSelect
+            value={inst.preferences.preferred_days}
+            options={DAY_OPTIONS}
+            onChange={(v) => updateInstructor(idx, "preferences.preferred_days", v)}
+            placeholder="Select days"
+          />
+        );
+      case "pref_patterns":
+        return (
+          <MultiSelect
+            value={inst.preferences.preferred_patterns}
+            options={meetingPatternOptions}
+            onChange={(v) => updateInstructor(idx, "preferences.preferred_patterns", v)}
+            placeholder="Select patterns"
+          />
+        );
+      case "max_days":
+        return (
+          <EditableCell
+            type="number"
+            value={inst.preferences.max_teaching_days ?? ""}
+            onChange={(v) => updateInstructor(idx, "preferences.max_teaching_days", v || undefined)}
+            placeholder="—"
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <EditorTableShell
       title={`Instructors (${instructors.length})`}
@@ -110,88 +171,42 @@ export const InstructorsEditor = ({
       isEmpty={instructors.length === 0}
       hasNoMatches={instructors.length > 0 && filteredInstructors.length === 0}
     >
-      <table className="w-full table-fixed border-collapse">
-        <thead>
-          <tr>
-            <th className={`${editorTh} w-[8%]`}>ID</th>
-            <th className={`${editorTh} w-[14%]`}>Name</th>
-            <th className={`${editorTh} w-[10%]`}>Rank</th>
-            <th className={`${editorTh} w-[22%]`}>Unavailable</th>
-            <th className={`${editorTh} w-[14%]`}>Pref. Days</th>
-            <th className={`${editorTh} w-[20%]`}>Pref. Patterns</th>
-            <th className={`${editorTh} w-[8%]`}>Max Days</th>
-            <th className={`${editorTh} w-[10%]`}>Notes</th>
-            <th className={`${editorTh} w-[4%]`} aria-label="Actions" />
-          </tr>
-        </thead>
-          <tbody>
-            {filteredInstructors.map(({ inst, index: idx }) => (
-              <tr
-                key={`${inst.id}-${idx}`}
-                id={`note-instructors-${encodeURIComponent(String(inst.id))}`}
-                className="border-t border-default-200"
-              >
-                <td className={editorTd}>
-                  <EditableCell value={inst.id} onChange={(v) => updateInstructor(idx, "id", v)} />
-                </td>
-                <td className={editorTd}>
-                  <EditableCell value={inst.name} onChange={(v) => updateInstructor(idx, "name", v)} />
-                </td>
-                <td className={editorTd}>
-                  <EditableSelectCell
-                    value={inst.rank_type}
-                    options={RANK_OPTIONS}
-                    onChange={(v) => updateInstructor(idx, "rank_type", v)}
-                  />
-                </td>
-                <td className={editorTd}>
-                  <MultiSelect
-                    value={inst.unavailable_times}
-                    options={timeslotOptions}
-                    onChange={(v) => updateInstructor(idx, "unavailable_times", v)}
-                    placeholder="Select timeslots"
-                  />
-                </td>
-                <td className={editorTd}>
-                  <MultiSelect
-                    value={inst.preferences.preferred_days}
-                    options={DAY_OPTIONS}
-                    onChange={(v) => updateInstructor(idx, "preferences.preferred_days", v)}
-                    placeholder="Select days"
-                  />
-                </td>
-                <td className={editorTd}>
-                  <MultiSelect
-                    value={inst.preferences.preferred_patterns}
-                    options={meetingPatternOptions}
-                    onChange={(v) => updateInstructor(idx, "preferences.preferred_patterns", v)}
-                    placeholder="Select patterns"
-                  />
-                </td>
-                <td className={editorTd}>
-                  <EditableCell
-                    type="number"
-                    value={inst.preferences.max_teaching_days ?? ""}
-                    onChange={(v) => updateInstructor(idx, "preferences.max_teaching_days", v || undefined)}
-                    placeholder="—"
-                  />
-                </td>
-                <td className={editorTd}>
-                  <RowNotesButton
-                    scope="instructors"
-                    rowId={String(inst.id)}
-                    title={`Instructor Notes - ${inst.name || inst.id}`}
-                  />
-                </td>
-                <td className={editorTd}>
-                  <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteInstructor(idx)}>
-                    ✕
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-      </table>
+      <EditorConfigurableTable
+        editorKey="instructors"
+        columnSpecs={INSTRUCTOR_COLUMN_SPECS}
+        rows={filteredInstructors}
+        getRowKey={({ inst, index }) => `${inst.id}-${index}`}
+        getRowId={({ inst }) => `note-instructors-${encodeURIComponent(String(inst.id))}`}
+        renderCell={renderCell}
+        renderActions={({ inst, index: idx }) => (
+          <EditorRowActions
+            notes={
+              <RowNotesButton
+                scope="instructors"
+                rowId={String(inst.id)}
+                title={`Instructor Notes - ${inst.name || inst.id}`}
+              />
+            }
+            rowLabel={`instructor ${inst.name || inst.id} (${inst.id})`}
+            onEdit={() => setEditIndex(idx)}
+            onDelete={() => deleteInstructor(idx)}
+          />
+        )}
+      />
+      {editIndex !== null && instructors[editIndex] ? (
+        <InstructorEditModal
+          isOpen
+          instructor={instructors[editIndex]}
+          meetingPatternOptions={meetingPatternOptions}
+          timeslotOptions={timeslotOptions}
+          onClose={() => setEditIndex(null)}
+          onSave={(updated) => {
+            const next = [...instructors];
+            next[editIndex] = updated;
+            onUpdate(next);
+          }}
+        />
+      ) : null}
     </EditorTableShell>
   );
 };

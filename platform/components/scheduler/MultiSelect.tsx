@@ -13,6 +13,11 @@ import {
 import { Input } from "@heroui/input";
 import { Select, SelectItem } from "@heroui/select";
 
+import {
+  editorSelectPopoverProps,
+  menuMinWidthForOptions,
+} from "./editorDropdownWidth";
+
 type MultiSelectProps = {
   value: string[];
   options: { key: string; label: string }[];
@@ -127,9 +132,18 @@ export const MultiSelect = ({
     [showSearch, label],
   );
 
+  const menuMinWidth = useMemo(() => menuMinWidthForOptions(options), [options]);
+  const popoverProps = useMemo(
+    () => editorSelectPopoverProps(menuMinWidth),
+    [menuMinWidth],
+  );
+
   const listboxProps = useMemo(
-    () => (showSearch && topContent ? { topContent } : undefined),
-    [showSearch, topContent],
+    () => ({
+      ...(showSearch && topContent ? { topContent } : {}),
+      style: { minWidth: menuMinWidth },
+    }),
+    [showSearch, topContent, menuMinWidth],
   );
 
   return (
@@ -150,6 +164,7 @@ export const MultiSelect = ({
         classNames={{
           trigger: "min-h-unit-8 h-auto py-1",
         }}
+        popoverProps={popoverProps}
         listboxProps={listboxProps}
       >
         {noMatches ? (

@@ -1,7 +1,13 @@
 "use client";
 
+import { useMemo } from "react";
 import { Select, SelectItem } from "@heroui/select";
 import { Autocomplete, AutocompleteItem } from "@heroui/autocomplete";
+
+import {
+  editorSelectPopoverProps,
+  menuMinWidthForOptions,
+} from "./editorDropdownWidth";
 
 type EditableSelectCellProps = {
   value: string;
@@ -22,6 +28,12 @@ export const EditableSelectCell = ({
   isSearchable = false,
   isDisabled = false,
 }: EditableSelectCellProps) => {
+  const menuMinWidth = useMemo(() => menuMinWidthForOptions(options), [options]);
+  const popoverProps = useMemo(
+    () => editorSelectPopoverProps(menuMinWidth),
+    [menuMinWidth],
+  );
+
   if (isSearchable) {
     return (
       <Autocomplete
@@ -38,6 +50,8 @@ export const EditableSelectCell = ({
         aria-label={placeholder}
         defaultItems={options}
         isDisabled={isDisabled}
+        popoverProps={popoverProps}
+        listboxProps={{ style: { minWidth: menuMinWidth } }}
       >
         {(option) => (
           <AutocompleteItem key={option.key}>{option.label}</AutocompleteItem>
@@ -60,6 +74,8 @@ export const EditableSelectCell = ({
       placeholder={placeholder}
       aria-label={placeholder}
       isDisabled={isDisabled}
+      popoverProps={popoverProps}
+      listboxProps={{ style: { minWidth: menuMinWidth } }}
     >
       {options.map((option) => (
         <SelectItem key={option.key}>{option.label}</SelectItem>
