@@ -1,7 +1,18 @@
 "use client";
 
+import { useMemo } from "react";
 import { Select, SelectItem } from "@heroui/select";
 import { Autocomplete, AutocompleteItem } from "@heroui/autocomplete";
+
+import {
+  EDITOR_AUTOCOMPLETE_CLASS_NAMES,
+  EDITOR_AUTOCOMPLETE_ITEM_CLASS_NAMES,
+  EDITOR_SELECT_ITEM_CLASS_NAMES,
+  EDITOR_SELECT_TRIGGER_CLASS_NAMES,
+  editorSelectListboxProps,
+  editorSelectPopoverProps,
+  menuMinWidthForOptions,
+} from "./editorDropdownWidth";
 
 type EditableSelectCellProps = {
   value: string;
@@ -22,6 +33,12 @@ export const EditableSelectCell = ({
   isSearchable = false,
   isDisabled = false,
 }: EditableSelectCellProps) => {
+  const menuMinWidth = useMemo(() => menuMinWidthForOptions(options), [options]);
+  const popoverProps = useMemo(
+    () => editorSelectPopoverProps(menuMinWidth),
+    [menuMinWidth],
+  );
+
   if (isSearchable) {
     return (
       <Autocomplete
@@ -33,14 +50,23 @@ export const EditableSelectCell = ({
             onChange(selected);
           }
         }}
-        className={`min-w-[140px] ${className}`}
+        className={`w-full min-w-0 max-w-full ${className}`}
         placeholder={placeholder}
         aria-label={placeholder}
         defaultItems={options}
         isDisabled={isDisabled}
+        popoverProps={popoverProps}
+        listboxProps={editorSelectListboxProps(menuMinWidth)}
+        classNames={EDITOR_AUTOCOMPLETE_CLASS_NAMES}
       >
         {(option) => (
-          <AutocompleteItem key={option.key}>{option.label}</AutocompleteItem>
+          <AutocompleteItem
+            key={option.key}
+            textValue={option.label}
+            classNames={EDITOR_AUTOCOMPLETE_ITEM_CLASS_NAMES}
+          >
+            {option.label}
+          </AutocompleteItem>
         )}
       </Autocomplete>
     );
@@ -56,13 +82,22 @@ export const EditableSelectCell = ({
           onChange(selected);
         }
       }}
-      className={`min-w-[100px] ${className}`}
+      className={`w-full min-w-0 max-w-full ${className}`}
       placeholder={placeholder}
       aria-label={placeholder}
       isDisabled={isDisabled}
+      popoverProps={popoverProps}
+      listboxProps={editorSelectListboxProps(menuMinWidth)}
+      classNames={EDITOR_SELECT_TRIGGER_CLASS_NAMES}
     >
       {options.map((option) => (
-        <SelectItem key={option.key}>{option.label}</SelectItem>
+        <SelectItem
+          key={option.key}
+          textValue={option.label}
+          classNames={EDITOR_SELECT_ITEM_CLASS_NAMES}
+        >
+          {option.label}
+        </SelectItem>
       ))}
     </Select>
   );

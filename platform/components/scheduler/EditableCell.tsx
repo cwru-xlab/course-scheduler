@@ -71,7 +71,7 @@ export const EditableCell = ({
         onChange={(e) => setEditValue(e.target.value)}
         onBlur={handleSave}
         onKeyDown={handleKeyDown}
-        className={`min-w-[60px] ${className}`}
+        className={`w-full min-w-0 max-w-full ${className}`}
         placeholder={placeholder}
         min={min}
         max={max}
@@ -83,7 +83,7 @@ export const EditableCell = ({
   return (
     <div
       onClick={() => setIsEditing(true)}
-      className={`cursor-pointer rounded px-1 py-0.5 hover:bg-default-100 ${className}`}
+      className={`cursor-pointer rounded px-1 py-0.5 hover:bg-default-100 truncate ${className}`}
       title="Click to edit"
     >
       {(displayValue ?? value) || <span className="text-default-400">{placeholder || "—"}</span>}

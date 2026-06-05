@@ -8,6 +8,8 @@ type EditableArrayCellProps = {
   onChange: (value: string[]) => void;
   className?: string;
   placeholder?: string;
+  /** Keep empty-state placeholder on one line (for narrow table columns). */
+  nowrapPlaceholder?: boolean;
 };
 
 export const EditableArrayCell = ({
@@ -15,6 +17,7 @@ export const EditableArrayCell = ({
   onChange,
   className = "",
   placeholder = "comma-separated",
+  nowrapPlaceholder = false,
 }: EditableArrayCellProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value.join(", "));
@@ -69,16 +72,22 @@ export const EditableArrayCell = ({
     );
   }
 
+  const placeholderClass = nowrapPlaceholder
+    ? "text-default-400 block truncate whitespace-nowrap"
+    : "text-default-400";
+
   return (
     <div
       onClick={() => setIsEditing(true)}
-      className={`cursor-pointer rounded px-1 py-0.5 hover:bg-default-100 ${className}`}
+      className={`min-w-0 cursor-pointer overflow-hidden rounded px-1 py-0.5 hover:bg-default-100 ${className}`}
       title="Click to edit (comma-separated)"
     >
       {value.length > 0 ? (
-        value.join(", ")
+        <span className={nowrapPlaceholder ? "block truncate" : undefined}>
+          {value.join(", ")}
+        </span>
       ) : (
-        <span className="text-default-400">{placeholder || "—"}</span>
+        <span className={placeholderClass}>{placeholder || "—"}</span>
       )}
     </div>
   );

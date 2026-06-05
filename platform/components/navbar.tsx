@@ -14,13 +14,21 @@ import NextLink from "next/link";
 import { usePathname } from "next/navigation";
 
 import { UserMenu } from "@/components/user-menu";
+import { isFullBleedRoute, pageHorizontalGutterClassName } from "@/lib/layout/pageGutters";
 
 export const Navbar = () => {
   const pathname = usePathname();
+  const isFullBleed = isFullBleedRoute(pathname);
   const isEditorActive = pathname.startsWith("/editor");
   return (
     <header className="sticky top-0 z-50 w-full border-b border-slate-200 dark:border-default-200 bg-white/80 dark:bg-default-100/80 backdrop-blur-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div
+        className={clsx(
+          isFullBleed
+            ? `w-full ${pageHorizontalGutterClassName}`
+            : `max-w-7xl mx-auto ${pageHorizontalGutterClassName}`,
+        )}
+      >
         <div className="flex h-16 items-center justify-between">
           <NextLink
             href="/"

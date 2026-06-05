@@ -212,15 +212,18 @@ export const RowNotesButton = ({ scope, rowId, title }: RowNotesButtonProps) => 
 
   return (
     <>
-      <span ref={triggerWrapRef} className="inline-flex">
+      <span ref={triggerWrapRef} className="inline-flex shrink-0">
         <Button
           size="sm"
           variant="light"
           onPress={() => setIsOpen(true)}
-          className="text-xs font-semibold"
-          startContent={<MessageSquare className="size-3.5" />}
+          className="h-8 min-w-[2.5rem] shrink-0 gap-0.5 px-1.5"
+          aria-label={`View notes (${notes.length})`}
         >
-          View Notes ({notes.length})
+          <MessageSquare className="size-4 shrink-0 text-slate-600" aria-hidden />
+          <span className="min-w-[1ch] text-xs font-semibold tabular-nums leading-none text-slate-600">
+            {notes.length}
+          </span>
         </Button>
       </span>
 

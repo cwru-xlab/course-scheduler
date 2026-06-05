@@ -1,9 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Button } from "@heroui/button";
-import { Card, CardBody, CardHeader } from "@heroui/card";
-import { Input } from "@heroui/input";
+
+import { EditorColumnFilters } from "./EditorColumnFilters";
+import { EditorConfigurableTable } from "./EditorConfigurableTable";
+import { EditorRowActions } from "./EditorRowActions";
+import { EditorTableShell } from "./EditorTableShell";
+import {
+  applyEditorColumnFilters,
+  type EditorColumnFilterDef,
+  type EditorFiltersState,
+} from "./editorFilters";
+import { SECTION_COLUMN_SPECS } from "./editorColumnSpecs";
+import { SectionEditModal } from "./modals/SectionEditModal";
 
 import { EditableCell } from "../EditableCell";
 import { EditableArrayCell } from "../EditableArrayCell";
@@ -33,6 +42,8 @@ type SectionsEditorProps = {
   onUpdate: (sections: Section[]) => void;
 };
 
+type SectionRow = { section: Section; index: number };
+
 const createEmptySection = (existing: Section[]): Section => ({
   id: nextIntegerId(existing.map((s) => s.id)),
   course_id: "",
@@ -57,6 +68,8 @@ export const SectionsEditor = ({
   onUpdate,
 }: SectionsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
+  const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const updateSection = (index: number, field: keyof Section, value: unknown) => {
     const newSections = [...sections];
@@ -77,175 +90,279 @@ export const SectionsEditor = ({
     ...crosslistGroupOptions,
   ];
 
-  const filteredSections = useMemo(() => {
+  const instructorLabelById = useMemo(
+    () => new Map(instructorOptions.map((o) => [o.key, o.label])),
+    [instructorOptions],
+  );
+
+  const sectionFilterDefs = useMemo((): EditorColumnFilterDef<SectionRow>[] => [
+    {
+      columnId: "id",
+      label: "ID",
+      control: { kind: "multiSearch", textMatch: "startsWith" },
+      getValue: ({ section }) => section.id,
+    },
+    {
+      columnId: "dept",
+      label: "Dept",
+      control: { kind: "multiSelect", showSearch: true },
+      getValue: ({ section }) => section.department ?? "",
+    },
+    {
+      columnId: "course",
+      label: "Course",
+      control: { kind: "multiSearch", textMatch: "contains" },
+      getValue: ({ section }) => section.course_id,
+    },
+    {
+      columnId: "code",
+      label: "Code",
+      control: { kind: "multiSearch", textMatch: "startsWith" },
+      getValue: ({ section }) => section.section_code,
+    },
+    {
+      columnId: "state",
+      label: "State",
+      control: { kind: "multiSelect" },
+      options: STATE_OPTIONS,
+      getValue: ({ section }) => normalizeSectionState(section.state),
+    },
+    {
+      columnId: "instructor",
+      label: "Instructor",
+      control: { kind: "multiSelect", showSearch: true },
+      options: instructorOptions,
+      getValue: ({ section }) => section.instructor_id,
+    },
+    {
+      columnId: "enroll",
+      label: "Enroll",
+      control: { kind: "numberCompare" },
+      getValue: ({ section }) => section.expected_enrollment,
+    },
+    {
+      columnId: "cap",
+      label: "Cap",
+      control: { kind: "numberCompare" },
+      getValue: ({ section }) => section.enrollment_cap,
+    },
+    {
+      columnId: "patterns",
+      label: "Patterns",
+      control: { kind: "multiSelect", showSearch: true },
+      options: meetingPatternOptions,
+      arrayValue: true,
+      getValue: ({ section }) => section.allowed_meeting_patterns,
+    },
+  ], [instructorOptions, meetingPatternOptions]);
+
+  const sectionRows = useMemo(
+    (): SectionRow[] => sections.map((section, index) => ({ section, index })),
+    [sections],
+  );
+
+  const filteredSections = useMemo((): SectionRow[] => {
     const query = searchQuery.trim().toLowerCase();
-    return sections
-      .map((section, index) => ({ section, index }))
-      .filter(({ section }) => {
-        if (!query) return true;
+    let rows = sectionRows;
+    if (query) {
+      rows = rows.filter(({ section }) => {
+        const instructorLabel = instructorLabelById.get(section.instructor_id) ?? "";
         const searchable = [
           section.id,
           section.department ?? "",
           section.course_id,
           section.section_code,
           section.instructor_id,
-          section.expected_enrollment,
-          section.enrollment_cap,
-          section.crosslist_group_id ?? "",
-          section.previous_meeting_pattern ?? "",
-          ...section.allowed_meeting_patterns,
-          ...section.room_requirements,
-          ...section.tags,
+          instructorLabel,
         ]
           .join(" ")
           .toLowerCase();
         return searchable.includes(query);
       });
-  }, [searchQuery, sections]);
+    }
+    return applyEditorColumnFilters(rows, columnFilters, sectionFilterDefs);
+  }, [searchQuery, sectionRows, instructorLabelById, columnFilters, sectionFilterDefs]);
+
+  const renderCell = (columnId: string, { section, index: idx }: SectionRow) => {
+    switch (columnId) {
+      case "id":
+        return <EditableCell value={section.id} onChange={(v) => updateSection(idx, "id", v)} />;
+      case "dept":
+        return (
+          <EditableCell
+            value={section.department ?? ""}
+            onChange={(v) => updateSection(idx, "department", v)}
+            placeholder="e.g. FIN"
+          />
+        );
+      case "course":
+        return (
+          <EditableCell
+            value={section.course_id}
+            onChange={(v) => updateSection(idx, "course_id", v)}
+            placeholder="COURSE-XXX"
+          />
+        );
+      case "code":
+        return (
+          <EditableCell
+            value={section.section_code}
+            onChange={(v) => updateSection(idx, "section_code", v)}
+          />
+        );
+      case "state":
+        return (
+          <EditableSelectCell
+            value={normalizeSectionState(section.state)}
+            options={STATE_OPTIONS}
+            onChange={(v) => updateSection(idx, "state", v as SectionState)}
+            placeholder="State"
+          />
+        );
+      case "instructor":
+        return (
+          <EditableSelectCell
+            value={section.instructor_id}
+            options={instructorOptions}
+            onChange={(v) => updateSection(idx, "instructor_id", v)}
+            placeholder="Select instructor"
+          />
+        );
+      case "enroll":
+        return (
+          <EditableCell
+            type="number"
+            value={section.expected_enrollment}
+            onChange={(v) => updateSection(idx, "expected_enrollment", v)}
+          />
+        );
+      case "cap":
+        return (
+          <EditableCell
+            type="number"
+            value={section.enrollment_cap}
+            onChange={(v) => updateSection(idx, "enrollment_cap", v)}
+          />
+        );
+      case "patterns":
+        return (
+          <MultiSelect
+            value={section.allowed_meeting_patterns}
+            options={meetingPatternOptions}
+            onChange={(v) => updateSection(idx, "allowed_meeting_patterns", v)}
+            placeholder="Select patterns"
+          />
+        );
+      case "assigned":
+        return (
+          <EditableSelectCell
+            value={section.previous_meeting_pattern ?? "__none__"}
+            options={[{ key: "__none__", label: "(None)" }, ...meetingPatternOptions]}
+            onChange={(v) =>
+              updateSection(idx, "previous_meeting_pattern", v === "__none__" ? undefined : v)
+            }
+            placeholder="Pattern"
+          />
+        );
+      case "room_req":
+        return (
+          <EditableArrayCell
+            value={section.room_requirements}
+            onChange={(v) => updateSection(idx, "room_requirements", v)}
+            placeholder="features"
+            nowrapPlaceholder
+          />
+        );
+      case "crosslist":
+        return (
+          <EditableSelectCell
+            value={section.crosslist_group_id ?? "__none__"}
+            options={crosslistOptionsWithNone}
+            onChange={(v) => updateSection(idx, "crosslist_group_id", v === "__none__" ? null : v)}
+            placeholder="None"
+          />
+        );
+      case "tags":
+        return (
+          <EditableArrayCell
+            value={section.tags}
+            onChange={(v) => updateSection(idx, "tags", v)}
+            placeholder="tags"
+            nowrapPlaceholder
+          />
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <h3 className="text-lg font-semibold">Sections ({sections.length})</h3>
-        <Button size="sm" color="primary" variant="flat" onPress={addSection}>
-          + Add Section
-        </Button>
-      </CardHeader>
-      <CardBody className="overflow-x-auto text-sm">
-        <Input
-          value={searchQuery}
-          onValueChange={setSearchQuery}
-          placeholder="Search sections..."
-          size="sm"
-          className="mb-3 max-w-md"
-          isClearable
+    <EditorTableShell
+      title={`Sections (${filteredSections.length})`}
+      addLabel="+ Add Section"
+      onAdd={addSection}
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery}
+      searchPlaceholder="Search sections..."
+      searchHint="Search by ID, department, course, code, or instructor."
+      filterBar={
+        <EditorColumnFilters
+          defs={sectionFilterDefs}
+          rows={sectionRows}
+          filters={columnFilters}
+          onChange={setColumnFilters}
         />
-        <table className="min-w-full">
-          <thead className="text-left text-default-500">
-            <tr>
-              <th className="pb-2 pr-3">ID</th>
-              <th className="pb-2 pr-3">Department</th>
-              <th className="pb-2 pr-3">Course</th>
-              <th className="pb-2 pr-3">Code</th>
-              <th className="pb-2 pr-3">State</th>
-              <th className="pb-2 pr-3">Instructor</th>
-              <th className="pb-2 pr-3">Enroll</th>
-              <th className="pb-2 pr-3">Cap</th>
-              <th className="pb-2 pr-3">Meeting Patterns</th>
-              <th className="pb-2 pr-3">Assigned Pattern</th>
-              <th className="pb-2 pr-3">Room Req</th>
-              <th className="pb-2 pr-3">Crosslist Group</th>
-              <th className="pb-2 pr-3">Tags</th>
-              <th className="pb-2 pr-3">View Notes</th>
-              <th className="pb-2 pr-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredSections.map(({ section, index: idx }) => (
-              <tr
-                key={`${section.id}-${idx}`}
-                id={`note-sections-${encodeURIComponent(String(section.id))}`}
-                className={`border-t border-default-200${
-                  isSectionArchived(section)
-                    ? " opacity-60"
-                    : isSectionNew(section)
-                      ? " bg-primary-50/40"
-                      : ""
-                }`}
-              >
-                <td className="py-2 pr-3">
-                  <EditableCell value={section.id} onChange={(v) => updateSection(idx, "id", v)} />
-                </td>
-                <td className="py-2 pr-3">
-                  <EditableCell
-                    value={section.department ?? ""}
-                    onChange={(v) => updateSection(idx, "department", v)}
-                    placeholder="e.g. FIN"
-                  />
-                </td>
-                <td className="py-2 pr-3">
-                  <EditableCell value={section.course_id} onChange={(v) => updateSection(idx, "course_id", v)} placeholder="COURSE-XXX" />
-                </td>
-                <td className="py-2 pr-3">
-                  <EditableCell value={section.section_code} onChange={(v) => updateSection(idx, "section_code", v)} />
-                </td>
-                <td className="py-2 pr-3">
-                  <EditableSelectCell
-                    value={normalizeSectionState(section.state)}
-                    options={STATE_OPTIONS}
-                    onChange={(v) => updateSection(idx, "state", v as SectionState)}
-                    placeholder="State"
-                  />
-                </td>
-                <td className="py-2 pr-3">
-                  <EditableSelectCell
-                    value={section.instructor_id}
-                    options={instructorOptions}
-                    onChange={(v) => updateSection(idx, "instructor_id", v)}
-                    placeholder="Select instructor"
-                  />
-                </td>
-                <td className="py-2 pr-3">
-                  <EditableCell type="number" value={section.expected_enrollment} onChange={(v) => updateSection(idx, "expected_enrollment", v)} />
-                </td>
-                <td className="py-2 pr-3">
-                  <EditableCell type="number" value={section.enrollment_cap} onChange={(v) => updateSection(idx, "enrollment_cap", v)} />
-                </td>
-                <td className="py-2 pr-3">
-                  <MultiSelect
-                    value={section.allowed_meeting_patterns}
-                    options={meetingPatternOptions}
-                    onChange={(v) => updateSection(idx, "allowed_meeting_patterns", v)}
-                    placeholder="Select patterns"
-                  />
-                </td>
-                <td className="py-2 pr-3">
-                  <EditableSelectCell
-                    value={section.previous_meeting_pattern ?? "__none__"}
-                    options={[{ key: "__none__", label: "(None)" }, ...meetingPatternOptions]}
-                    onChange={(v) =>
-                      updateSection(idx, "previous_meeting_pattern", v === "__none__" ? undefined : v)
-                    }
-                    placeholder="Pattern"
-                  />
-                </td>
-                <td className="py-2 pr-3">
-                  <EditableArrayCell value={section.room_requirements} onChange={(v) => updateSection(idx, "room_requirements", v)} placeholder="features" />
-                </td>
-                <td className="py-2 pr-3">
-                  <EditableSelectCell
-                    value={section.crosslist_group_id ?? "__none__"}
-                    options={crosslistOptionsWithNone}
-                    onChange={(v) => updateSection(idx, "crosslist_group_id", v === "__none__" ? null : v)}
-                    placeholder="None"
-                  />
-                </td>
-                <td className="py-2 pr-3">
-                  <EditableArrayCell value={section.tags} onChange={(v) => updateSection(idx, "tags", v)} placeholder="tags" />
-                </td>
-                <td className="py-2 pr-3">
-                  <RowNotesButton
-                    scope="sections"
-                    rowId={String(section.id)}
-                    title={`Section Notes - ${section.department ?? ""} ${section.course_id}`.trim()}
-                  />
-                </td>
-                <td className="py-2 pr-3">
-                  <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteSection(idx)}>
-                    ✕
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {sections.length === 0 && (
-          <div className="py-4 text-center text-default-400">No sections. Click "Add Section" to create one.</div>
+      }
+      emptyMessage='No sections. Click "Add Section" to create one.'
+      noMatchMessage="No sections match your search or filters."
+      isEmpty={sections.length === 0}
+      hasNoMatches={sections.length > 0 && filteredSections.length === 0}
+    >
+      <EditorConfigurableTable
+        editorKey="sections"
+        columnSpecs={SECTION_COLUMN_SPECS}
+        rows={filteredSections}
+        getRowKey={({ section, index }) => `${section.id}-${index}`}
+        getRowId={({ section }) =>
+          `note-sections-${encodeURIComponent(String(section.id))}`
+        }
+        getRowClassName={({ section }) => {
+          const base = "border-t border-default-200";
+          if (isSectionArchived(section)) return `${base} opacity-60`;
+          if (isSectionNew(section)) return `${base} bg-primary-50/40`;
+          return base;
+        }}
+        renderCell={renderCell}
+        renderActions={({ section, index: idx }) => (
+          <EditorRowActions
+            notes={
+              <RowNotesButton
+                scope="sections"
+                rowId={String(section.id)}
+                title={`Section Notes - ${section.department ?? ""} ${section.course_id}`.trim()}
+              />
+            }
+            rowLabel={`section ${section.id} (${section.course_id} ${section.section_code})`}
+            onEdit={() => setEditIndex(idx)}
+            onDelete={() => deleteSection(idx)}
+          />
         )}
-        {sections.length > 0 && filteredSections.length === 0 && (
-          <div className="py-4 text-center text-default-400">No sections match your search.</div>
-        )}
-      </CardBody>
-    </Card>
+      />
+      {editIndex !== null && sections[editIndex] ? (
+        <SectionEditModal
+          isOpen
+          section={sections[editIndex]}
+          instructorOptions={instructorOptions}
+          meetingPatternOptions={meetingPatternOptions}
+          crosslistGroupOptions={crosslistGroupOptions}
+          onClose={() => setEditIndex(null)}
+          onSave={(updated) => {
+            const next = [...sections];
+            next[editIndex] = updated;
+            onUpdate(next);
+          }}
+        />
+      ) : null}
+    </EditorTableShell>
   );
 };

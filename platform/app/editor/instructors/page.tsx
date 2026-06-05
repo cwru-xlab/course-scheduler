@@ -63,7 +63,7 @@ export default function InstructorsPage() {
   if (!data) return <div className="text-slate-500">No data.</div>;
 
   return (
-    <div className="space-y-6">
+    <div className="w-full min-w-0 space-y-6">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
           <EditorPageTitleDropdown current="instructors" title="Instructors" />
