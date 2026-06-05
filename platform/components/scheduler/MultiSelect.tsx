@@ -143,7 +143,7 @@ export const MultiSelect = ({
           onChange(selected);
         }}
         onClose={() => setSearch("")}
-        className="min-w-[150px]"
+        className="w-full min-w-0 max-w-full"
         placeholder={placeholder}
         label={label}
         aria-label={label ? undefined : placeholder}

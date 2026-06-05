@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Button } from "@heroui/button";
-import { Card, CardBody, CardHeader } from "@heroui/card";
-import { Input } from "@heroui/input";
+
+import { EditorTableShell, editorTd, editorTh } from "./EditorTableShell";
 
 import { EditableCell } from "../EditableCell";
 import { EditableSelectCell } from "../EditableSelectCell";
@@ -148,34 +148,30 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
   }, [searchQuery, timeslots]);
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <h3 className="text-lg font-semibold">Timeslots ({timeslots.length})</h3>
-        <Button size="sm" color="primary" variant="flat" onPress={addTimeslot}>
-          + Add Timeslot
-        </Button>
-      </CardHeader>
-      <CardBody className="overflow-x-auto text-sm">
-        <Input
-          value={searchQuery}
-          onValueChange={setSearchQuery}
-          placeholder="Search timeslots..."
-          size="sm"
-          className="mb-3 max-w-md"
-          isClearable
-        />
-        <table className="min-w-full">
-          <thead className="text-left text-default-500">
-            <tr>
-              <th className="pb-2 pr-3">ID</th>
-              <th className="pb-2 pr-3">Days</th>
-              <th className="pb-2 pr-3">Start Time</th>
-              <th className="pb-2 pr-3">End Time</th>
-              <th className="pb-2 pr-3">Block Type</th>
-              <th className="pb-2 pr-3">View Notes</th>
-              <th className="pb-2 pr-3"></th>
-            </tr>
-          </thead>
+    <EditorTableShell
+      title={`Timeslots (${timeslots.length})`}
+      addLabel="+ Add Timeslot"
+      onAdd={addTimeslot}
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery}
+      searchPlaceholder="Search timeslots..."
+      emptyMessage='No timeslots. Click "Add Timeslot" to create one.'
+      noMatchMessage="No timeslots match your search."
+      isEmpty={timeslots.length === 0}
+      hasNoMatches={timeslots.length > 0 && filteredTimeslots.length === 0}
+    >
+      <table className="w-full table-fixed border-collapse">
+        <thead>
+          <tr>
+            <th className={`${editorTh} w-[10%]`}>ID</th>
+            <th className={`${editorTh} w-[22%]`}>Days</th>
+            <th className={`${editorTh} w-[18%]`}>Start</th>
+            <th className={`${editorTh} w-[18%]`}>End</th>
+            <th className={`${editorTh} w-[14%]`}>Block</th>
+            <th className={`${editorTh} w-[12%]`}>Notes</th>
+            <th className={`${editorTh} w-[6%]`} aria-label="Actions" />
+          </tr>
+        </thead>
           <tbody>
             {filteredTimeslots.map(({ slot, index: idx }) => (
               <tr
@@ -183,10 +179,10 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
                 id={`note-timeslots-${encodeURIComponent(String(slot.id))}`}
                 className="border-t border-default-200"
               >
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableCell value={slot.id} onChange={(v) => updateTimeslot(idx, "id", v)} />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <MultiSelect
                     value={splitDays(slot.day)}
                     options={DAY_OPTIONS}
@@ -194,7 +190,7 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
                     placeholder="Select days"
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableSelectCell
                     value={clampTimeToBounds(toTimeOnly(slot.start_time))}
                     options={TIME_OPTIONS}
@@ -203,7 +199,7 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
                     isSearchable
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableSelectCell
                     value={clampTimeToBounds(toTimeOnly(slot.end_time))}
                     options={TIME_OPTIONS}
@@ -212,7 +208,7 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
                     isSearchable
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableSelectCell
                     value={slot.slot_type ?? "standard"}
                     options={BLOCK_TYPE_OPTIONS}
@@ -220,14 +216,14 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
                     placeholder="Select block type"
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <RowNotesButton
                     scope="timeslots"
                     rowId={String(slot.id)}
                     title={`Timeslot Notes - ${slot.id}`}
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteTimeslot(idx)}>
                     ✕
                   </Button>
@@ -235,14 +231,7 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
               </tr>
             ))}
           </tbody>
-        </table>
-        {timeslots.length === 0 && (
-          <div className="py-4 text-center text-default-400">No timeslots. Click "Add Timeslot" to create one.</div>
-        )}
-        {timeslots.length > 0 && filteredTimeslots.length === 0 && (
-          <div className="py-4 text-center text-default-400">No timeslots match your search.</div>
-        )}
-      </CardBody>
-    </Card>
+      </table>
+    </EditorTableShell>
   );
 };

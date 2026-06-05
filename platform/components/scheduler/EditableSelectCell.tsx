@@ -33,7 +33,7 @@ export const EditableSelectCell = ({
             onChange(selected);
           }
         }}
-        className={`min-w-[140px] ${className}`}
+        className={`w-full min-w-0 max-w-full ${className}`}
         placeholder={placeholder}
         aria-label={placeholder}
         defaultItems={options}
@@ -56,7 +56,7 @@ export const EditableSelectCell = ({
           onChange(selected);
         }
       }}
-      className={`min-w-[100px] ${className}`}
+      className={`w-full min-w-0 max-w-full ${className}`}
       placeholder={placeholder}
       aria-label={placeholder}
       isDisabled={isDisabled}

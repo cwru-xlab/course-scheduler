@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Button } from "@heroui/button";
-import { Card, CardBody, CardHeader } from "@heroui/card";
-import { Input } from "@heroui/input";
+
+import { EditorTableShell, editorTd, editorTh } from "./EditorTableShell";
 
 import { EditableCell } from "../EditableCell";
 import { EditableArrayCell } from "../EditableArrayCell";
@@ -104,44 +104,40 @@ export const SectionsEditor = ({
   }, [searchQuery, sections]);
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <h3 className="text-lg font-semibold">Sections ({sections.length})</h3>
-        <Button size="sm" color="primary" variant="flat" onPress={addSection}>
-          + Add Section
-        </Button>
-      </CardHeader>
-      <CardBody className="overflow-x-auto text-sm">
-        <Input
-          value={searchQuery}
-          onValueChange={setSearchQuery}
-          placeholder="Search sections..."
-          size="sm"
-          className="mb-3 max-w-md"
-          isClearable
-        />
-        <table className="min-w-full">
-          <thead className="text-left text-default-500">
-            <tr>
-              <th className="pb-2 pr-3">ID</th>
-              <th className="pb-2 pr-3">Department</th>
-              <th className="pb-2 pr-3">Course</th>
-              <th className="pb-2 pr-3">Code</th>
-              <th className="pb-2 pr-3">State</th>
-              <th className="pb-2 pr-3">Instructor</th>
-              <th className="pb-2 pr-3">Enroll</th>
-              <th className="pb-2 pr-3">Cap</th>
-              <th className="pb-2 pr-3">Meeting Patterns</th>
-              <th className="pb-2 pr-3">Assigned Pattern</th>
-              <th className="pb-2 pr-3">Room Req</th>
-              <th className="pb-2 pr-3">Crosslist Group</th>
-              <th className="pb-2 pr-3">Tags</th>
-              <th className="pb-2 pr-3">View Notes</th>
-              <th className="pb-2 pr-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredSections.map(({ section, index: idx }) => (
+    <EditorTableShell
+      title={`Sections (${sections.length})`}
+      addLabel="+ Add Section"
+      onAdd={addSection}
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery}
+      searchPlaceholder="Search sections..."
+      emptyMessage='No sections. Click "Add Section" to create one.'
+      noMatchMessage="No sections match your search."
+      isEmpty={sections.length === 0}
+      hasNoMatches={sections.length > 0 && filteredSections.length === 0}
+    >
+      <table className="w-full table-fixed border-collapse">
+        <thead>
+          <tr>
+            <th className={`${editorTh} w-[4%]`}>ID</th>
+            <th className={`${editorTh} w-[6%]`}>Dept</th>
+            <th className={`${editorTh} w-[8%]`}>Course</th>
+            <th className={`${editorTh} w-[4%]`}>Code</th>
+            <th className={`${editorTh} w-[5%]`}>State</th>
+            <th className={`${editorTh} w-[12%]`}>Instructor</th>
+            <th className={`${editorTh} w-[4%]`}>Enroll</th>
+            <th className={`${editorTh} w-[4%]`}>Cap</th>
+            <th className={`${editorTh} w-[12%]`}>Patterns</th>
+            <th className={`${editorTh} w-[9%]`}>Assigned</th>
+            <th className={`${editorTh} w-[8%]`}>Room Req</th>
+            <th className={`${editorTh} w-[8%]`}>Crosslist</th>
+            <th className={`${editorTh} w-[6%]`}>Tags</th>
+            <th className={`${editorTh} w-[7%]`}>Notes</th>
+            <th className={`${editorTh} w-[3%]`} aria-label="Actions" />
+          </tr>
+        </thead>
+        <tbody>
+          {filteredSections.map(({ section, index: idx }) => (
               <tr
                 key={`${section.id}-${idx}`}
                 id={`note-sections-${encodeURIComponent(String(section.id))}`}
@@ -153,23 +149,23 @@ export const SectionsEditor = ({
                       : ""
                 }`}
               >
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableCell value={section.id} onChange={(v) => updateSection(idx, "id", v)} />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableCell
                     value={section.department ?? ""}
                     onChange={(v) => updateSection(idx, "department", v)}
                     placeholder="e.g. FIN"
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableCell value={section.course_id} onChange={(v) => updateSection(idx, "course_id", v)} placeholder="COURSE-XXX" />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableCell value={section.section_code} onChange={(v) => updateSection(idx, "section_code", v)} />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableSelectCell
                     value={normalizeSectionState(section.state)}
                     options={STATE_OPTIONS}
@@ -177,7 +173,7 @@ export const SectionsEditor = ({
                     placeholder="State"
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableSelectCell
                     value={section.instructor_id}
                     options={instructorOptions}
@@ -185,13 +181,13 @@ export const SectionsEditor = ({
                     placeholder="Select instructor"
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableCell type="number" value={section.expected_enrollment} onChange={(v) => updateSection(idx, "expected_enrollment", v)} />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableCell type="number" value={section.enrollment_cap} onChange={(v) => updateSection(idx, "enrollment_cap", v)} />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <MultiSelect
                     value={section.allowed_meeting_patterns}
                     options={meetingPatternOptions}
@@ -199,7 +195,7 @@ export const SectionsEditor = ({
                     placeholder="Select patterns"
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableSelectCell
                     value={section.previous_meeting_pattern ?? "__none__"}
                     options={[{ key: "__none__", label: "(None)" }, ...meetingPatternOptions]}
@@ -209,10 +205,10 @@ export const SectionsEditor = ({
                     placeholder="Pattern"
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableArrayCell value={section.room_requirements} onChange={(v) => updateSection(idx, "room_requirements", v)} placeholder="features" />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableSelectCell
                     value={section.crosslist_group_id ?? "__none__"}
                     options={crosslistOptionsWithNone}
@@ -220,17 +216,17 @@ export const SectionsEditor = ({
                     placeholder="None"
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableArrayCell value={section.tags} onChange={(v) => updateSection(idx, "tags", v)} placeholder="tags" />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <RowNotesButton
                     scope="sections"
                     rowId={String(section.id)}
                     title={`Section Notes - ${section.department ?? ""} ${section.course_id}`.trim()}
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteSection(idx)}>
                     ✕
                   </Button>
@@ -238,14 +234,7 @@ export const SectionsEditor = ({
               </tr>
             ))}
           </tbody>
-        </table>
-        {sections.length === 0 && (
-          <div className="py-4 text-center text-default-400">No sections. Click "Add Section" to create one.</div>
-        )}
-        {sections.length > 0 && filteredSections.length === 0 && (
-          <div className="py-4 text-center text-default-400">No sections match your search.</div>
-        )}
-      </CardBody>
-    </Card>
+      </table>
+    </EditorTableShell>
   );
 };

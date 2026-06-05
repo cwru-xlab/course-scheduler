@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Button } from "@heroui/button";
-import { Card, CardBody, CardHeader } from "@heroui/card";
-import { Input } from "@heroui/input";
+
+import { EditorTableShell, editorTd, editorTh } from "./EditorTableShell";
 
 import { EditableCell } from "../EditableCell";
 import { EditableArrayCell } from "../EditableArrayCell";
@@ -62,34 +62,30 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
   }, [rooms, searchQuery]);
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <h3 className="text-lg font-semibold">Rooms ({rooms.length})</h3>
-        <Button size="sm" color="primary" variant="flat" onPress={addRoom}>
-          + Add Room
-        </Button>
-      </CardHeader>
-      <CardBody className="overflow-x-auto text-sm">
-        <Input
-          value={searchQuery}
-          onValueChange={setSearchQuery}
-          placeholder="Search rooms..."
-          size="sm"
-          className="mb-3 max-w-md"
-          isClearable
-        />
-        <table className="min-w-full">
-          <thead className="text-left text-default-500">
-            <tr>
-              <th className="pb-2 pr-3">ID</th>
-              <th className="pb-2 pr-3">Building</th>
-              <th className="pb-2 pr-3">Room #</th>
-              <th className="pb-2 pr-3">Capacity</th>
-              <th className="pb-2 pr-3">Features</th>
-              <th className="pb-2 pr-3">View Notes</th>
-              <th className="pb-2 pr-3"></th>
-            </tr>
-          </thead>
+    <EditorTableShell
+      title={`Rooms (${rooms.length})`}
+      addLabel="+ Add Room"
+      onAdd={addRoom}
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery}
+      searchPlaceholder="Search rooms..."
+      emptyMessage='No rooms. Click "Add Room" to create one.'
+      noMatchMessage="No rooms match your search."
+      isEmpty={rooms.length === 0}
+      hasNoMatches={rooms.length > 0 && filteredRooms.length === 0}
+    >
+      <table className="w-full table-fixed border-collapse">
+        <thead>
+          <tr>
+            <th className={`${editorTh} w-[8%]`}>ID</th>
+            <th className={`${editorTh} w-[18%]`}>Building</th>
+            <th className={`${editorTh} w-[12%]`}>Room #</th>
+            <th className={`${editorTh} w-[10%]`}>Capacity</th>
+            <th className={`${editorTh} w-[38%]`}>Features</th>
+            <th className={`${editorTh} w-[10%]`}>Notes</th>
+            <th className={`${editorTh} w-[4%]`} aria-label="Actions" />
+          </tr>
+        </thead>
           <tbody>
             {filteredRooms.map(({ room, index: idx }) => (
               <tr
@@ -97,29 +93,29 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
                 id={`note-rooms-${encodeURIComponent(String(room.id))}`}
                 className="border-t border-default-200"
               >
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableCell value={room.id} onChange={(v) => updateRoom(idx, "id", v)} />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableCell value={room.building} onChange={(v) => updateRoom(idx, "building", v)} placeholder="Building" />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableCell value={room.room_number} onChange={(v) => updateRoom(idx, "room_number", v)} placeholder="101" />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableCell type="number" value={room.capacity} onChange={(v) => updateRoom(idx, "capacity", v)} />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableArrayCell value={room.features} onChange={(v) => updateRoom(idx, "features", v)} placeholder="projector, etc" />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <RowNotesButton
                     scope="rooms"
                     rowId={String(room.id)}
                     title={`Room Notes - ${room.building} ${room.room_number}`.trim()}
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteRoom(idx)}>
                     ✕
                   </Button>
@@ -127,14 +123,7 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
               </tr>
             ))}
           </tbody>
-        </table>
-        {rooms.length === 0 && (
-          <div className="py-4 text-center text-default-400">No rooms. Click "Add Room" to create one.</div>
-        )}
-        {rooms.length > 0 && filteredRooms.length === 0 && (
-          <div className="py-4 text-center text-default-400">No rooms match your search.</div>
-        )}
-      </CardBody>
-    </Card>
+      </table>
+    </EditorTableShell>
   );
 };

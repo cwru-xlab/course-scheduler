@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Button } from "@heroui/button";
-import { Card, CardBody, CardHeader } from "@heroui/card";
-import { Input } from "@heroui/input";
+
+import { EditorTableShell, editorTd, editorTh } from "./EditorTableShell";
 
 import { EditableCell } from "../EditableCell";
 import { EditableSelectCell } from "../EditableSelectCell";
@@ -98,36 +98,32 @@ export const InstructorsEditor = ({
   }, [instructors, searchQuery]);
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <h3 className="text-lg font-semibold">Instructors ({instructors.length})</h3>
-        <Button size="sm" color="primary" variant="flat" onPress={addInstructor}>
-          + Add Instructor
-        </Button>
-      </CardHeader>
-      <CardBody className="overflow-x-auto text-sm">
-        <Input
-          value={searchQuery}
-          onValueChange={setSearchQuery}
-          placeholder="Search instructors..."
-          size="sm"
-          className="mb-3 max-w-md"
-          isClearable
-        />
-        <table className="w-full table-fixed">
-          <thead className="text-left text-default-500">
-            <tr>
-              <th className="pb-2 pr-3 w-[8%]">ID</th>
-              <th className="pb-2 pr-3 w-[14%]">Name</th>
-              <th className="pb-2 pr-3 w-[10%]">Rank</th>
-              <th className="pb-2 pr-3 w-[22%]">Unavailable Times</th>
-              <th className="pb-2 pr-3 w-[14%]">Preferred Days</th>
-              <th className="pb-2 pr-3 w-[20%]">Preferred Patterns</th>
-              <th className="pb-2 pr-3 w-[8%]">Max Days</th>
-              <th className="pb-2 pr-3 w-[14%]">View Notes</th>
-              <th className="pb-2 pr-3 w-[4%]"></th>
-            </tr>
-          </thead>
+    <EditorTableShell
+      title={`Instructors (${instructors.length})`}
+      addLabel="+ Add Instructor"
+      onAdd={addInstructor}
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery}
+      searchPlaceholder="Search instructors..."
+      emptyMessage='No instructors. Click "Add Instructor" to create one.'
+      noMatchMessage="No instructors match your search."
+      isEmpty={instructors.length === 0}
+      hasNoMatches={instructors.length > 0 && filteredInstructors.length === 0}
+    >
+      <table className="w-full table-fixed border-collapse">
+        <thead>
+          <tr>
+            <th className={`${editorTh} w-[8%]`}>ID</th>
+            <th className={`${editorTh} w-[14%]`}>Name</th>
+            <th className={`${editorTh} w-[10%]`}>Rank</th>
+            <th className={`${editorTh} w-[22%]`}>Unavailable</th>
+            <th className={`${editorTh} w-[14%]`}>Pref. Days</th>
+            <th className={`${editorTh} w-[20%]`}>Pref. Patterns</th>
+            <th className={`${editorTh} w-[8%]`}>Max Days</th>
+            <th className={`${editorTh} w-[10%]`}>Notes</th>
+            <th className={`${editorTh} w-[4%]`} aria-label="Actions" />
+          </tr>
+        </thead>
           <tbody>
             {filteredInstructors.map(({ inst, index: idx }) => (
               <tr
@@ -135,20 +131,20 @@ export const InstructorsEditor = ({
                 id={`note-instructors-${encodeURIComponent(String(inst.id))}`}
                 className="border-t border-default-200"
               >
-                <td className="py-2 pr-3 align-top">
+                <td className={editorTd}>
                   <EditableCell value={inst.id} onChange={(v) => updateInstructor(idx, "id", v)} />
                 </td>
-                <td className="py-2 pr-3 align-top">
+                <td className={editorTd}>
                   <EditableCell value={inst.name} onChange={(v) => updateInstructor(idx, "name", v)} />
                 </td>
-                <td className="py-2 pr-3 align-top">
+                <td className={editorTd}>
                   <EditableSelectCell
                     value={inst.rank_type}
                     options={RANK_OPTIONS}
                     onChange={(v) => updateInstructor(idx, "rank_type", v)}
                   />
                 </td>
-                <td className="py-2 pr-3 align-top">
+                <td className={editorTd}>
                   <MultiSelect
                     value={inst.unavailable_times}
                     options={timeslotOptions}
@@ -156,7 +152,7 @@ export const InstructorsEditor = ({
                     placeholder="Select timeslots"
                   />
                 </td>
-                <td className="py-2 pr-3 align-top">
+                <td className={editorTd}>
                   <MultiSelect
                     value={inst.preferences.preferred_days}
                     options={DAY_OPTIONS}
@@ -164,7 +160,7 @@ export const InstructorsEditor = ({
                     placeholder="Select days"
                   />
                 </td>
-                <td className="py-2 pr-3 align-top">
+                <td className={editorTd}>
                   <MultiSelect
                     value={inst.preferences.preferred_patterns}
                     options={meetingPatternOptions}
@@ -172,7 +168,7 @@ export const InstructorsEditor = ({
                     placeholder="Select patterns"
                   />
                 </td>
-                <td className="py-2 pr-3 align-top">
+                <td className={editorTd}>
                   <EditableCell
                     type="number"
                     value={inst.preferences.max_teaching_days ?? ""}
@@ -180,14 +176,14 @@ export const InstructorsEditor = ({
                     placeholder="—"
                   />
                 </td>
-                <td className="py-2 pr-3 align-top">
+                <td className={editorTd}>
                   <RowNotesButton
                     scope="instructors"
                     rowId={String(inst.id)}
                     title={`Instructor Notes - ${inst.name || inst.id}`}
                   />
                 </td>
-                <td className="py-2 pr-3 align-top">
+                <td className={editorTd}>
                   <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteInstructor(idx)}>
                     ✕
                   </Button>
@@ -195,14 +191,7 @@ export const InstructorsEditor = ({
               </tr>
             ))}
           </tbody>
-        </table>
-        {instructors.length === 0 && (
-          <div className="py-4 text-center text-default-400">No instructors. Click "Add Instructor" to create one.</div>
-        )}
-        {instructors.length > 0 && filteredInstructors.length === 0 && (
-          <div className="py-4 text-center text-default-400">No instructors match your search.</div>
-        )}
-      </CardBody>
-    </Card>
+      </table>
+    </EditorTableShell>
   );
 };

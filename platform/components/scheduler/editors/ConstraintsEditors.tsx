@@ -5,6 +5,8 @@ import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Input } from "@heroui/input";
 
+import { editorTd, editorTh } from "./EditorTableShell";
+
 import { EditableCell } from "../EditableCell";
 import { EditableSelectCell } from "../EditableSelectCell";
 import { MultiSelect } from "../MultiSelect";
@@ -55,12 +57,12 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
   }, [groups, searchQuery]);
 
   return (
-    <Card>
+    <Card className="w-full shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between">
         <h3 className="text-lg font-semibold">Cross-List Groups ({groups.length})</h3>
         <Button size="sm" color="primary" variant="flat" onPress={addGroup}>+ Add</Button>
       </CardHeader>
-      <CardBody className="overflow-x-auto text-sm">
+      <CardBody className="w-full min-w-0 overflow-hidden text-sm">
         <Input
           value={searchQuery}
           onValueChange={setSearchQuery}
@@ -69,13 +71,13 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
           className="mb-3 max-w-md"
           isClearable
         />
-        <table className="min-w-full">
-          <thead className="text-left text-default-500">
+        <table className="w-full table-fixed border-collapse">
+          <thead>
             <tr>
-              <th className="pb-2 pr-3">ID</th>
-              <th className="pb-2 pr-3">Member Sections</th>
-              <th className="pb-2 pr-3">View Notes</th>
-              <th className="pb-2 pr-3"></th>
+              <th className={`${editorTh} w-[12%]`}>ID</th>
+              <th className={`${editorTh} w-[58%]`}>Member Sections</th>
+              <th className={`${editorTh} w-[22%]`}>Notes</th>
+              <th className={`${editorTh} w-[8%]`} aria-label="Actions" />
             </tr>
           </thead>
           <tbody>
@@ -85,10 +87,10 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
                 id={`note-constraints-crosslist-groups-${encodeURIComponent(String(group.id))}`}
                 className="border-t border-default-200"
               >
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableCell value={group.id} onChange={(v) => updateGroup(idx, "id", v)} />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <MultiSelect
                     value={group.member_section_ids}
                     options={sectionOptions}
@@ -96,14 +98,14 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
                     placeholder="Select sections"
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <RowNotesButton
                     scope="constraints-crosslist-groups"
                     rowId={String(group.id)}
                     title={`Cross-List Group Notes - ${group.id}`}
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteGroup(idx)}>✕</Button>
                 </td>
               </tr>
@@ -158,12 +160,12 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
   }, [groups, searchQuery]);
 
   return (
-    <Card>
+    <Card className="w-full shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between">
         <h3 className="text-lg font-semibold">No-Overlap Groups ({groups.length})</h3>
         <Button size="sm" color="primary" variant="flat" onPress={addGroup}>+ Add</Button>
       </CardHeader>
-      <CardBody className="overflow-x-auto text-sm">
+      <CardBody className="w-full min-w-0 overflow-hidden text-sm">
         <Input
           value={searchQuery}
           onValueChange={setSearchQuery}
@@ -172,14 +174,14 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
           className="mb-3 max-w-md"
           isClearable
         />
-        <table className="min-w-full">
-          <thead className="text-left text-default-500">
+        <table className="w-full table-fixed border-collapse">
+          <thead>
             <tr>
-              <th className="pb-2 pr-3">ID</th>
-              <th className="pb-2 pr-3">Member Sections</th>
-              <th className="pb-2 pr-3">Reason</th>
-              <th className="pb-2 pr-3">View Notes</th>
-              <th className="pb-2 pr-3"></th>
+              <th className={`${editorTh} w-[10%]`}>ID</th>
+              <th className={`${editorTh} w-[50%]`}>Member Sections</th>
+              <th className={`${editorTh} w-[18%]`}>Reason</th>
+              <th className={`${editorTh} w-[14%]`}>Notes</th>
+              <th className={`${editorTh} w-[8%]`} aria-label="Actions" />
             </tr>
           </thead>
           <tbody>
@@ -189,10 +191,10 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
                 id={`note-constraints-no-overlap-groups-${encodeURIComponent(String(group.id))}`}
                 className="border-t border-default-200"
               >
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableCell value={group.id} onChange={(v) => updateGroup(idx, "id", v)} />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <MultiSelect
                     value={group.member_section_ids}
                     options={sectionOptions}
@@ -200,17 +202,17 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
                     placeholder="Select sections"
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableCell value={group.reason} onChange={(v) => updateGroup(idx, "reason", v)} placeholder="reason" />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <RowNotesButton
                     scope="constraints-no-overlap-groups"
                     rowId={String(group.id)}
                     title={`No-Overlap Group Notes - ${group.id}`}
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteGroup(idx)}>✕</Button>
                 </td>
               </tr>
@@ -344,12 +346,12 @@ export const BlockedTimesEditor = ({
   }, [blockedTimes, searchQuery]);
 
   return (
-    <Card>
+    <Card className="w-full shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between">
         <h3 className="text-lg font-semibold">Blocked Times ({blockedTimes.length})</h3>
         <Button size="sm" color="primary" variant="flat" onPress={addBlockedTime}>+ Add</Button>
       </CardHeader>
-      <CardBody className="overflow-x-auto text-sm">
+      <CardBody className="w-full min-w-0 overflow-hidden text-sm">
         <Input
           value={searchQuery}
           onValueChange={setSearchQuery}
@@ -358,18 +360,18 @@ export const BlockedTimesEditor = ({
           className="mb-3 max-w-md"
           isClearable
         />
-        <table className="min-w-full">
-          <thead className="text-left text-default-500">
+        <table className="w-full table-fixed border-collapse">
+          <thead>
             <tr>
-              <th className="pb-2 pr-3">Scope</th>
-              <th className="pb-2 pr-3">Days</th>
-              <th className="pb-2 pr-3">Start</th>
-              <th className="pb-2 pr-3">End</th>
-              <th className="pb-2 pr-3">Professor</th>
-              <th className="pb-2 pr-3">Room</th>
-              <th className="pb-2 pr-3">Reason</th>
-              <th className="pb-2 pr-3">View Notes</th>
-              <th className="pb-2 pr-3"></th>
+              <th className={`${editorTh} w-[10%]`}>Scope</th>
+              <th className={`${editorTh} w-[16%]`}>Days</th>
+              <th className={`${editorTh} w-[10%]`}>Start</th>
+              <th className={`${editorTh} w-[10%]`}>End</th>
+              <th className={`${editorTh} w-[14%]`}>Professor</th>
+              <th className={`${editorTh} w-[14%]`}>Room</th>
+              <th className={`${editorTh} w-[14%]`}>Reason</th>
+              <th className={`${editorTh} w-[8%]`}>Notes</th>
+              <th className={`${editorTh} w-[4%]`} aria-label="Actions" />
             </tr>
           </thead>
           <tbody>
@@ -379,7 +381,7 @@ export const BlockedTimesEditor = ({
                 id={`note-constraints-blocked-times-${encodeURIComponent(`${blocked.scope}-${blocked.reason || "row"}-${idx}`)}`}
                 className="border-t border-default-200"
               >
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableSelectCell
                     value={blocked.scope}
                     options={SCOPE_OPTIONS}
@@ -399,7 +401,7 @@ export const BlockedTimesEditor = ({
                     }}
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <MultiSelect
                     value={blockedDaysToSelection(blocked.days)}
                     options={BLOCKED_DAY_OPTIONS}
@@ -407,7 +409,7 @@ export const BlockedTimesEditor = ({
                     placeholder="Select days"
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableSelectCell
                     value={normalizeBlockedTimeValue(blocked.start_time)}
                     options={BLOCKED_TIME_OPTIONS}
@@ -416,7 +418,7 @@ export const BlockedTimesEditor = ({
                     isSearchable
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableSelectCell
                     value={normalizeBlockedTimeValue(blocked.end_time)}
                     options={BLOCKED_TIME_OPTIONS}
@@ -425,7 +427,7 @@ export const BlockedTimesEditor = ({
                     isSearchable
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableSelectCell
                     value={blocked.instructor_id ?? "__none__"}
                     options={instructorOptionsWithNone}
@@ -441,7 +443,7 @@ export const BlockedTimesEditor = ({
                     isSearchable
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableSelectCell
                     value={blocked.room_id ?? "__none__"}
                     options={roomOptionsWithNone}
@@ -457,17 +459,17 @@ export const BlockedTimesEditor = ({
                     isSearchable
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableCell value={blocked.reason} onChange={(v) => updateBlockedTime(idx, "reason", v)} placeholder="reason" />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <RowNotesButton
                     scope="constraints-blocked-times"
                     rowId={`${blocked.scope}-${blocked.reason || "row"}-${idx}`}
                     title={`Blocked Time Notes - Row ${idx + 1}`}
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteBlockedTime(idx)}>✕</Button>
                 </td>
               </tr>
@@ -535,12 +537,12 @@ export const LockedAssignmentsEditor = ({
   }, [lockedAssignments, searchQuery]);
 
   return (
-    <Card>
+    <Card className="w-full shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between">
         <h3 className="text-lg font-semibold">Locked Assignments (Hard) ({lockedAssignments.length})</h3>
         <Button size="sm" color="primary" variant="flat" onPress={addLock}>+ Add</Button>
       </CardHeader>
-      <CardBody className="overflow-x-auto text-sm">
+      <CardBody className="w-full min-w-0 overflow-hidden text-sm">
         <Input
           value={searchQuery}
           onValueChange={setSearchQuery}
@@ -549,14 +551,14 @@ export const LockedAssignmentsEditor = ({
           className="mb-3 max-w-md"
           isClearable
         />
-        <table className="min-w-full">
-          <thead className="text-left text-default-500">
+        <table className="w-full table-fixed border-collapse">
+          <thead>
             <tr>
-              <th className="pb-2 pr-3">Section</th>
-              <th className="pb-2 pr-3">Fixed Timeslots</th>
-              <th className="pb-2 pr-3">Fixed Room</th>
-              <th className="pb-2 pr-3">View Notes</th>
-              <th className="pb-2 pr-3"></th>
+              <th className={`${editorTh} w-[18%]`}>Section</th>
+              <th className={`${editorTh} w-[42%]`}>Fixed Timeslots</th>
+              <th className={`${editorTh} w-[18%]`}>Fixed Room</th>
+              <th className={`${editorTh} w-[14%]`}>Notes</th>
+              <th className={`${editorTh} w-[8%]`} aria-label="Actions" />
             </tr>
           </thead>
           <tbody>
@@ -566,7 +568,7 @@ export const LockedAssignmentsEditor = ({
                 id={`note-constraints-locked-assignments-${encodeURIComponent(`${lock.section_id || "row"}-${idx}`)}`}
                 className="border-t border-default-200"
               >
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableSelectCell
                     value={lock.section_id}
                     options={sectionOptions}
@@ -574,7 +576,7 @@ export const LockedAssignmentsEditor = ({
                     placeholder="Select section"
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <MultiSelect
                     value={lock.fixed_timeslot_set ?? []}
                     options={timeslotOptions}
@@ -582,7 +584,7 @@ export const LockedAssignmentsEditor = ({
                     placeholder="Select timeslots"
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableSelectCell
                     value={lock.fixed_room ?? "__none__"}
                     options={roomOptionsWithNone}
@@ -590,14 +592,14 @@ export const LockedAssignmentsEditor = ({
                     placeholder="Select room"
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <RowNotesButton
                     scope="constraints-locked-assignments"
                     rowId={`${lock.section_id || "row"}-${idx}`}
                     title={`Locked Assignment Notes - ${lock.section_id || `Row ${idx + 1}`}`}
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteLock(idx)}>✕</Button>
                 </td>
               </tr>
@@ -671,12 +673,12 @@ export const SoftLocksEditor = ({
   }, [searchQuery, softLocks]);
 
   return (
-    <Card>
+    <Card className="w-full shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between">
         <h3 className="text-lg font-semibold">Soft Locks (Preferences) ({softLocks.length})</h3>
         <Button size="sm" color="primary" variant="flat" onPress={addLock}>+ Add</Button>
       </CardHeader>
-      <CardBody className="overflow-x-auto text-sm">
+      <CardBody className="w-full min-w-0 overflow-hidden text-sm">
         <Input
           value={searchQuery}
           onValueChange={setSearchQuery}
@@ -685,15 +687,15 @@ export const SoftLocksEditor = ({
           className="mb-3 max-w-md"
           isClearable
         />
-        <table className="min-w-full">
-          <thead className="text-left text-default-500">
+        <table className="w-full table-fixed border-collapse">
+          <thead>
             <tr>
-              <th className="pb-2 pr-3">Section</th>
-              <th className="pb-2 pr-3">Preferred Timeslots</th>
-              <th className="pb-2 pr-3">Preferred Room</th>
-              <th className="pb-2 pr-3">Weight</th>
-              <th className="pb-2 pr-3">View Notes</th>
-              <th className="pb-2 pr-3"></th>
+              <th className={`${editorTh} w-[16%]`}>Section</th>
+              <th className={`${editorTh} w-[36%]`}>Preferred Timeslots</th>
+              <th className={`${editorTh} w-[16%]`}>Preferred Room</th>
+              <th className={`${editorTh} w-[10%]`}>Weight</th>
+              <th className={`${editorTh} w-[14%]`}>Notes</th>
+              <th className={`${editorTh} w-[8%]`} aria-label="Actions" />
             </tr>
           </thead>
           <tbody>
@@ -703,7 +705,7 @@ export const SoftLocksEditor = ({
                 id={`note-constraints-soft-locks-${encodeURIComponent(`${lock.section_id || "row"}-${idx}`)}`}
                 className="border-t border-default-200"
               >
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableSelectCell
                     value={lock.section_id}
                     options={sectionOptions}
@@ -711,7 +713,7 @@ export const SoftLocksEditor = ({
                     placeholder="Select section"
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <MultiSelect
                     value={lock.preferred_timeslot_set ?? []}
                     options={timeslotOptions}
@@ -719,7 +721,7 @@ export const SoftLocksEditor = ({
                     placeholder="Select timeslots"
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableSelectCell
                     value={lock.preferred_room ?? "__none__"}
                     options={roomOptionsWithNone}
@@ -727,17 +729,17 @@ export const SoftLocksEditor = ({
                     placeholder="Select room"
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <EditableCell type="number" value={lock.weight} onChange={(v) => updateLock(idx, "weight", v)} />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <RowNotesButton
                     scope="constraints-soft-locks"
                     rowId={`${lock.section_id || "row"}-${idx}`}
                     title={`Soft Lock Notes - ${lock.section_id || `Row ${idx + 1}`}`}
                   />
                 </td>
-                <td className="py-2 pr-3">
+                <td className={editorTd}>
                   <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteLock(idx)}>✕</Button>
                 </td>
               </tr>

@@ -79,22 +79,22 @@ export const MeetingPatternsEditor = ({
   };
 
   return (
-    <Card>
+    <Card className="w-full shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between">
         <h3 className="text-lg font-semibold">Meeting Patterns ({meetingPatterns.length})</h3>
         <Button size="sm" color="primary" variant="flat" onPress={addPattern}>
           + Add Pattern
         </Button>
       </CardHeader>
-      <CardBody className="space-y-4 text-sm">
+      <CardBody className="w-full min-w-0 space-y-4 text-sm overflow-hidden">
         {meetingPatterns.map((pattern, idx) => (
           <div
             key={`${pattern.id}-${idx}`}
             id={`note-meeting-patterns-${encodeURIComponent(String(pattern.id))}`}
             className="border border-default-200 rounded-lg p-3"
           >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
+              <div className="flex items-center gap-4 flex-wrap min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-default-500">ID:</span>
                   <EditableCell value={pattern.id} onChange={(v) => updatePattern(idx, "id", v)} />
