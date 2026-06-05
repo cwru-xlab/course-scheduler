@@ -1,11 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
+import { Pencil, Trash2 } from "lucide-react";
 
 import { EditableCell } from "../EditableCell";
 import { MultiSelect } from "../MultiSelect";
 import { RowNotesButton } from "../RowNotesButton";
+import { useEditorActions } from "./EditorActionProvider";
+import { MeetingPatternEditModal } from "./modals/MeetingPatternEditModal";
 
 import type { MeetingPattern } from "@/lib/scheduling/types";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
@@ -38,6 +42,9 @@ export const MeetingPatternsEditor = ({
   timeslotOptions,
   onUpdate,
 }: MeetingPatternsEditorProps) => {
+  const { requestDelete, showSuccess } = useEditorActions();
+  const [editIndex, setEditIndex] = useState<number | null>(null);
+
   const updatePattern = (index: number, field: keyof MeetingPattern, value: unknown) => {
     const newPatterns = [...meetingPatterns];
     newPatterns[index] = { ...newPatterns[index], [field]: value };
@@ -79,22 +86,22 @@ export const MeetingPatternsEditor = ({
   };
 
   return (
-    <Card>
+    <Card className="w-full shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between">
         <h3 className="text-lg font-semibold">Meeting Patterns ({meetingPatterns.length})</h3>
         <Button size="sm" color="primary" variant="flat" onPress={addPattern}>
           + Add Pattern
         </Button>
       </CardHeader>
-      <CardBody className="space-y-4 text-sm">
+      <CardBody className="w-full min-w-0 space-y-4 text-sm overflow-hidden">
         {meetingPatterns.map((pattern, idx) => (
           <div
             key={`${pattern.id}-${idx}`}
             id={`note-meeting-patterns-${encodeURIComponent(String(pattern.id))}`}
             className="border border-default-200 rounded-lg p-3"
           >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
+              <div className="flex items-center gap-4 flex-wrap min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-default-500">ID:</span>
                   <EditableCell value={pattern.id} onChange={(v) => updatePattern(idx, "id", v)} />
@@ -113,14 +120,38 @@ export const MeetingPatternsEditor = ({
                   />
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 <RowNotesButton
                   scope="meeting-patterns"
                   rowId={String(pattern.id)}
                   title={`Meeting Pattern Notes - ${pattern.id}`}
                 />
-                <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deletePattern(idx)}>
-                  ✕
+                <Button
+                  size="sm"
+                  variant="light"
+                  isIconOnly
+                  aria-label={`Edit pattern ${pattern.id}`}
+                  onPress={() => setEditIndex(idx)}
+                >
+                  <Pencil className="size-4 text-slate-600" />
+                </Button>
+                <Button
+                  size="sm"
+                  color="danger"
+                  variant="light"
+                  isIconOnly
+                  aria-label={`Delete pattern ${pattern.id}`}
+                  onPress={() =>
+                    requestDelete({
+                      rowLabel: `meeting pattern ${pattern.id}`,
+                      onConfirm: () => {
+                        deletePattern(idx);
+                        showSuccess(`Successfully deleted meeting pattern ${pattern.id}.`);
+                      },
+                    })
+                  }
+                >
+                  <Trash2 className="size-4" />
                 </Button>
               </div>
             </div>
@@ -144,7 +175,23 @@ export const MeetingPatternsEditor = ({
                         onChange={(v) => updateTimeslotSet(idx, setIdx, v)}
                         placeholder="Select timeslots"
                       />
-                      <Button size="sm" color="danger" variant="light" isIconOnly onPress={() => deleteTimeslotSet(idx, setIdx)}>
+                      <Button
+                        size="sm"
+                        color="danger"
+                        variant="light"
+                        isIconOnly
+                        onPress={() =>
+                          requestDelete({
+                            rowLabel: `timeslot set ${setIdx + 1} on pattern ${pattern.id}`,
+                            onConfirm: () => {
+                              deleteTimeslotSet(idx, setIdx);
+                              showSuccess(
+                                `Successfully deleted timeslot set ${setIdx + 1} on pattern ${pattern.id}.`,
+                              );
+                            },
+                          })
+                        }
+                      >
                         ✕
                       </Button>
                     </div>
@@ -158,6 +205,19 @@ export const MeetingPatternsEditor = ({
           <div className="py-4 text-center text-default-400">No meeting patterns. Click "Add Pattern" to create one.</div>
         )}
       </CardBody>
+      {editIndex !== null && meetingPatterns[editIndex] ? (
+        <MeetingPatternEditModal
+          isOpen
+          pattern={meetingPatterns[editIndex]}
+          timeslotOptions={timeslotOptions}
+          onClose={() => setEditIndex(null)}
+          onSave={(updated) => {
+            const next = [...meetingPatterns];
+            next[editIndex] = updated;
+            onUpdate(next);
+          }}
+        />
+      ) : null}
     </Card>
   );
 };
