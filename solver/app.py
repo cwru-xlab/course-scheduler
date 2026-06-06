@@ -3108,7 +3108,7 @@ def update_constraints():
                     text(
                         """
                         INSERT INTO crosslist_groups (id, member_section_ids, require_same_room)
-                        VALUES (:id, :member_section_ids, 1)
+                        VALUES (:id, :member_section_ids, :require_same_room)
                         """
                     ),
                     {
@@ -3116,6 +3116,7 @@ def update_constraints():
                         "member_section_ids": json.dumps(
                             item.get("member_section_ids", []) or []
                         ),
+                        "require_same_room": True,
                     },
                 )
             else:
