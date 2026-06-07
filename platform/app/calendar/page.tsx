@@ -180,6 +180,18 @@ function crosslistPeerSectionIds(sectionId: string, sections: SectionDto[]): str
   return peers.length ? peers : [sectionId];
 }
 
+/** Cross-listed sections share one room; capacity need is the max member cap (not the sum). */
+function requiredSeatsForLinkedSections(
+  linkedSectionIds: string[],
+  sections: SectionDto[],
+): number {
+  return linkedSectionIds.reduce((maxSeats, linkedSectionId) => {
+    const linkedSection = sections.find((section) => section.id === linkedSectionId);
+    const seats = linkedSection?.enrollment_cap ?? linkedSection?.expected_enrollment ?? 0;
+    return Math.max(maxSeats, seats);
+  }, 0);
+}
+
 function mergePlacementLocks(
   baseLocks: LockedAssignment[],
   lockedSectionIds: string[],
@@ -2410,11 +2422,7 @@ type MeetingPatternPlacementOption = {
       const currentAssignment = assignmentsBySection[sectionId];
       const currentRoomId = currentAssignment?.room_id ?? dragged.section.room_id ?? "";
       const targetRoom = data.rooms.find((room) => room.id === targetRoomId);
-      const requiredSeats = linkedSectionIds.reduce((sum, linkedSectionId) => {
-        const linkedSection = data.sections.find((section) => section.id === linkedSectionId);
-        const seats = linkedSection?.enrollment_cap ?? linkedSection?.expected_enrollment ?? 0;
-        return sum + seats;
-      }, 0);
+      const requiredSeats = requiredSeatsForLinkedSections(linkedSectionIds, data.sections);
       if (
         targetRoomId !== currentRoomId &&
         Number.isFinite(targetRoom?.capacity) &&
@@ -2682,11 +2690,7 @@ type MeetingPatternPlacementOption = {
       }
       const linkedSectionIdSet = new Set(linkedSectionIds);
       const targetRoom = data.rooms.find((room) => room.id === targetRoomId);
-      const requiredSeats = linkedSectionIds.reduce((sum, linkedSectionId) => {
-        const linkedSection = data.sections.find((s) => s.id === linkedSectionId);
-        const seats = linkedSection?.enrollment_cap ?? linkedSection?.expected_enrollment ?? 0;
-        return sum + seats;
-      }, 0);
+      const requiredSeats = requiredSeatsForLinkedSections(linkedSectionIds, data.sections);
       if (
         Number.isFinite(targetRoom?.capacity) &&
         requiredSeats > (targetRoom?.capacity ?? 0)
