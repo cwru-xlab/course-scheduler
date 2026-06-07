@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -9,8 +9,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
   Archive,
+  ArrowLeft,
   BarChart3,
   Filter,
+  Link2,
   Lock,
   Maximize2,
   Minimize2,
@@ -27,6 +29,20 @@ import {
   Pencil,
   FolderClock
 } from "lucide-react";
+import { CrosslistCalendarEventCard, CrosslistLegendSwatch } from "./CrosslistCalendarEventCard";
+import {
+  assignCalendarEventLanes,
+  calendarEventConflictsWithSectionIds,
+  calendarEventDisplayLabel,
+  calendarEventMatchesFilters,
+  findCalendarEventBySectionId,
+  getCalendarEventKey,
+  getCalendarEventRoomId,
+  isCrosslistGroupEvent,
+  mergeCrosslistCalendarEvents,
+  type CalendarEvent,
+  type RawCalendarEvent,
+} from "./calendarEvents";
 import type {
   BlockedTime,
   LockedAssignment,
@@ -458,6 +474,121 @@ function formatMinutesAsAmPm(totalMinutes: number): string {
 /** Explicit start–end line for PDF/print (not inferred from the grid). */
 function formatScheduleTimeRange(startMin: number, endMin: number): string {
   return `${formatMinutesAsAmPm(startMin)} – ${formatMinutesAsAmPm(endMin)}`;
+}
+
+type CrosslistScheduleSummary = {
+  isScheduled: boolean;
+  dayLabels: string[];
+  slotLines: string[];
+  roomLabel: string | null;
+};
+
+function describeCrosslistGroupSchedule(
+  members: SectionDto[],
+  assignmentsBySection: CalendarAssignmentMap,
+  solverTimeslotIdsBySection: Record<string, string[]>,
+  timeslotById: Map<string, TimeslotDto>,
+  rooms: RoomDto[],
+): CrosslistScheduleSummary {
+  const timeslotIdSet = new Set<string>();
+  let roomId: string | null = null;
+
+  for (const member of members) {
+    const timeslotIds =
+      assignmentsBySection[member.id]?.timeslot_ids ??
+      solverTimeslotIdsBySection[member.id] ??
+      (member.timeslot_id ? [member.timeslot_id] : []);
+    for (const id of timeslotIds) {
+      if (id) timeslotIdSet.add(String(id));
+    }
+    if (!roomId) {
+      roomId = assignmentsBySection[member.id]?.room_id ?? member.room_id ?? null;
+    }
+  }
+
+  const slots = Array.from(timeslotIdSet)
+    .map((id) => timeslotById.get(id))
+    .filter((slot): slot is TimeslotDto => !!slot)
+    .sort(
+      (a, b) =>
+        parseMinutes(a.start_time) - parseMinutes(b.start_time) ||
+        String(a.days ?? a.day ?? "").localeCompare(String(b.days ?? b.day ?? "")),
+    );
+
+  const dayLabels = DAYS.filter((day) =>
+    slots.some((slot) => timeslotMatchesDay(slot, day)),
+  );
+
+  const slotLines = slots.map((slot) => {
+    const daysRaw = String(slot.days ?? slot.day ?? "").trim();
+    const dayPart = daysRaw || dayLabels.join("/") || "—";
+    return `${dayPart} · ${formatTimeAmPm(slot.start_time)}–${formatTimeAmPm(slot.end_time)}`;
+  });
+
+  const room = roomId ? rooms.find((entry) => entry.id === roomId) : null;
+  const roomLabel = room
+    ? [room.building, formatRoomNumberForDisplay(room.room_number)].filter(Boolean).join(" ") ||
+      room.id
+    : roomId;
+
+  return {
+    isScheduled: slots.length > 0,
+    dayLabels: [...dayLabels],
+    slotLines,
+    roomLabel: roomLabel ? String(roomLabel) : null,
+  };
+}
+
+function CrosslistScheduleBanner({
+  members,
+  assignmentsBySection,
+  solverTimeslotIdsBySection,
+  timeslotById,
+  rooms,
+}: {
+  members: SectionDto[];
+  assignmentsBySection: CalendarAssignmentMap;
+  solverTimeslotIdsBySection: Record<string, string[]>;
+  timeslotById: Map<string, TimeslotDto>;
+  rooms: RoomDto[];
+}) {
+  const schedule = describeCrosslistGroupSchedule(
+    members,
+    assignmentsBySection,
+    solverTimeslotIdsBySection,
+    timeslotById,
+    rooms,
+  );
+
+  return (
+    <div className="shrink-0 border-b border-slate-100 bg-slate-50 px-6 py-3 text-xs text-slate-700">
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+        Schedule
+      </div>
+      {!schedule.isScheduled ? (
+        <p className="text-slate-500">Not scheduled yet.</p>
+      ) : (
+        <div className="space-y-1">
+          {schedule.dayLabels.length > 0 && (
+            <p>
+              <span className="font-semibold text-slate-600">Days: </span>
+              {schedule.dayLabels.join(", ")}
+            </p>
+          )}
+          <p>
+            <span className="font-semibold text-slate-600">Time: </span>
+            {schedule.slotLines.join(" · ")}
+          </p>
+          {schedule.roomLabel && (
+            <p>
+              <span className="font-semibold text-slate-600">Room: </span>
+              {schedule.roomLabel}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function formatRoomNumberForDisplay(roomNumber?: string): string {
@@ -911,10 +1042,15 @@ type MeetingPatternPlacementOption = {
   const [selectedInstructorIds, setSelectedInstructorIds] = useState<string[]>([]);
   const [hoveredDepartmentKey, setHoveredDepartmentKey] = useState<string | null>(null);
   const [selectedLegendDepartmentKeys, setSelectedLegendDepartmentKeys] = useState<string[]>([]);
+  const [crosslistPickerModal, setCrosslistPickerModal] = useState<{
+    crosslistGroupId: string;
+    memberSections: SectionDto[];
+  } | null>(null);
   const [sectionModal, setSectionModal] = useState<{
     mode: "create" | "edit";
     initialSectionId?: string;
     draft: SectionFormDraft;
+    returnToCrosslistGroupId?: string;
   } | null>(null);
   const [sectionModalError, setSectionModalError] = useState<string | null>(null);
   const [isSavingSection, setIsSavingSection] = useState(false);
@@ -938,6 +1074,20 @@ type MeetingPatternPlacementOption = {
   useLayoutEffect(() => {
     setDragFeedbackToastMount(document.body);
   }, []);
+
+  useEffect(() => {
+    if (!crosslistPickerModal && !sectionModal && !meetingPatternSelectionModal) {
+      return;
+    }
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+    };
+  }, [crosslistPickerModal, sectionModal, meetingPatternSelectionModal]);
 
   useEffect(() => {
     let mounted = true;
@@ -1340,6 +1490,38 @@ type MeetingPatternPlacementOption = {
     });
   }, []);
 
+  const openCrosslistGroupPicker = useCallback(
+    (crosslistGroupId: string, memberSections: SectionDto[]) => {
+      setCrosslistPickerModal({ crosslistGroupId, memberSections });
+    },
+    [],
+  );
+
+  const openSectionEditorFromCrosslist = useCallback(
+    (section: SectionDto, crosslistGroupId: string) => {
+      setCrosslistPickerModal(null);
+      setSectionModalError(null);
+      setSectionModal({
+        mode: "edit",
+        initialSectionId: section.id,
+        draft: toSectionFormDraft(section),
+        returnToCrosslistGroupId: crosslistGroupId,
+      });
+    },
+    [],
+  );
+
+  const returnToCrosslistPickerFromSectionModal = useCallback(() => {
+    if (!sectionModal?.returnToCrosslistGroupId || !data) return;
+    const crosslistGroupId = sectionModal.returnToCrosslistGroupId;
+    const memberSections = data.sections.filter(
+      (section) => String(section.crosslist_group_id ?? "").trim() === crosslistGroupId,
+    );
+    setSectionModal(null);
+    setSectionModalError(null);
+    openCrosslistGroupPicker(crosslistGroupId, memberSections);
+  }, [data, openCrosslistGroupPicker, sectionModal?.returnToCrosslistGroupId]);
+
   const validateSectionDraft = useCallback(
     (
       draft: SectionFormDraft,
@@ -1603,6 +1785,27 @@ type MeetingPatternPlacementOption = {
     );
   }, [data, departmentPaletteByKey]);
 
+  const crosslistGroupLegend = useMemo(() => {
+    if (!data?.sections.length) return [];
+    const membersByGroup = new Map<string, SectionDto[]>();
+    for (const section of data.sections) {
+      const groupId = String(section.crosslist_group_id ?? "").trim();
+      if (!groupId) continue;
+      const members = membersByGroup.get(groupId) ?? [];
+      members.push(section);
+      membersByGroup.set(groupId, members);
+    }
+    return Array.from(membersByGroup.entries())
+      .filter(([, members]) => members.length >= 2)
+      .map(([groupId, members]) => {
+        const sortedMembers = [...members].sort((a, b) => a.id.localeCompare(b.id));
+        const swatch =
+          departmentPaletteByKey.get(departmentColorKey(sortedMembers[0])) ?? solidPaletteAt(0);
+        return { groupId, members: sortedMembers, swatch };
+      })
+      .sort((a, b) => a.groupId.localeCompare(b.groupId));
+  }, [data, departmentPaletteByKey]);
+
   const allDayEvents = useMemo(() => {
     if (!data) return [];
     const baseEvents = data.sections
@@ -1624,22 +1827,16 @@ type MeetingPatternPlacementOption = {
         return a.start - b.start;
       });
 
-    // Greedy interval partitioning so overlapping classes are rendered in separate lanes.
-    const laneEndTimes: number[] = [];
-    return baseEvents.map((event) => {
-      let lane = laneEndTimes.findIndex((laneEnd) => laneEnd <= event.start);
-      if (lane === -1) {
-        lane = laneEndTimes.length;
-        laneEndTimes.push(event.end);
-      } else {
-        laneEndTimes[lane] = event.end;
-      }
-      return { ...event, lane };
-    });
+    return assignCalendarEventLanes(
+      mergeCrosslistCalendarEvents(baseEvents as RawCalendarEvent[]),
+    );
   }, [assignmentsBySection, data, selectedDay, solverTimeslotIdsBySection, timeslotById]);
 
   const dayEvents = useMemo(
-    () => allDayEvents.filter((event) => sectionMatchesFilters(event.section)),
+    () =>
+      allDayEvents.filter((event) =>
+        calendarEventMatchesFilters(event, sectionMatchesFilters),
+      ),
     [allDayEvents, sectionMatchesFilters],
   );
 
@@ -1663,17 +1860,9 @@ type MeetingPatternPlacementOption = {
       .filter((x) => x.timeslot && timeslotMatchesDay(x.timeslot, day))
       .sort((a, b) => a.start - b.start);
 
-    const laneEndTimes: number[] = [];
-    return baseEvents.map((event) => {
-      let lane = laneEndTimes.findIndex((laneEnd) => laneEnd <= event.start);
-      if (lane === -1) {
-        lane = laneEndTimes.length;
-        laneEndTimes.push(event.end);
-      } else {
-        laneEndTimes[lane] = event.end;
-      }
-      return { ...event, lane };
-    });
+    return assignCalendarEventLanes(
+      mergeCrosslistCalendarEvents(baseEvents as RawCalendarEvent[]),
+    );
   };
 
   const allEventsByRoom = useMemo(() => {
@@ -1709,8 +1898,12 @@ type MeetingPatternPlacementOption = {
         EVENT_TOP_PADDING_PX * 2 +
         laneCount * EVENT_HEIGHT_PX +
         Math.max(0, laneCount - 1) * EVENT_GAP_PX;
-      const visibleEvents = eventsWithLane.filter((event) => sectionMatchesFilters(event.section));
-      const hiddenEvents = eventsWithLane.filter((event) => !sectionMatchesFilters(event.section));
+      const visibleEvents = eventsWithLane.filter((event) =>
+        calendarEventMatchesFilters(event, sectionMatchesFilters),
+      );
+      const hiddenEvents = eventsWithLane.filter(
+        (event) => !calendarEventMatchesFilters(event, sectionMatchesFilters),
+      );
       return { room, visibleEvents, hiddenEvents, rowHeight: Math.max(100, needed) };
     });
   }, [allEventsByRoom, data, sectionMatchesFilters]);
@@ -2185,7 +2378,7 @@ type MeetingPatternPlacementOption = {
   const commitCalendarPlacement = useCallback(
     (sectionId: string, targetRoomId: string, selectedSlot: TimeslotWithMinutes) => {
       if (!data) return;
-      const dragged = allDayEvents.find((x) => x.section.id === sectionId && x.timeslot);
+      const dragged = findCalendarEventBySectionId(allDayEvents, sectionId);
       if (!dragged || !dragged.timeslot) return;
       const linkedSectionIds = linkedSectionIdsBySection.get(sectionId) ?? [sectionId];
       for (const linkedSectionId of linkedSectionIds) {
@@ -2237,7 +2430,7 @@ type MeetingPatternPlacementOption = {
       });
       const uniqueNextTimeslotIds = Array.from(new Set(nextTimeslotIds));
       const alreadyPlaced = linkedSectionIds.every((linkedSectionId) => {
-        const linkedEvent = allDayEvents.find((eventItem) => eventItem.section.id === linkedSectionId);
+        const linkedEvent = findCalendarEventBySectionId(allDayEvents, linkedSectionId);
         const linkedAssignment = assignmentsBySection[linkedSectionId];
         const linkedCurrentRoomId = linkedAssignment?.room_id ?? linkedEvent?.section.room_id ?? "";
         const linkedCurrentTimeslotIds =
@@ -2291,23 +2484,31 @@ type MeetingPatternPlacementOption = {
 
       const selectedStart = selectedSlot.start;
       const selectedEnd = selectedSlot.end;
+      const resolveEventRoomId = (eventItem: CalendarEvent) =>
+        getCalendarEventRoomId(
+          eventItem,
+          (memberId) =>
+            assignmentsBySection[memberId]?.room_id ??
+            data.sections.find((section) => section.id === memberId)?.room_id ??
+            "",
+        );
+
       const conflicts = allDayEvents.filter((eventItem) => {
-        if (linkedSectionIdSet.has(eventItem.section.id)) return false;
-        const itemRoomId =
-          nextAssignments[eventItem.section.id]?.room_id ?? eventItem.section.room_id ?? "";
+        if (!calendarEventConflictsWithSectionIds(eventItem, linkedSectionIdSet)) return false;
+        const itemRoomId = resolveEventRoomId(eventItem);
         if (itemRoomId !== targetRoomId) return false;
         return selectedStart < eventItem.end && selectedEnd > eventItem.start;
       });
 
       if (conflicts.length > 0) {
         const conflictNames = conflicts
-          .map((c) => `${c.section.department ?? ""} ${c.section.course_id}`.trim())
+          .map((c) => calendarEventDisplayLabel(c))
           .filter(Boolean)
           .slice(0, 3)
           .join(", ");
         setDragFeedback({
           status: "invalid",
-          message: `Invalid: ${dragged.section.department ?? ""} ${dragged.section.course_id} conflicts with ${conflictNames || "another class"} in room ${targetRoomId} at ${formatTimeAmPm(selectedSlot.start_time)}-${formatTimeAmPm(selectedSlot.end_time)}.`,
+          message: `Invalid: ${calendarEventDisplayLabel(dragged)} conflicts with ${conflictNames || "another class"} in room ${targetRoomId} at ${formatTimeAmPm(selectedSlot.start_time)}-${formatTimeAmPm(selectedSlot.end_time)}.`,
         });
       } else {
         setDragFeedback({
@@ -2487,15 +2688,20 @@ type MeetingPatternPlacementOption = {
         } as PlacementEvaluation;
       }
       const conflicts = allDayEvents.filter((eventItem) => {
-        if (linkedSectionIdSet.has(eventItem.section.id)) return false;
-        const itemRoomId =
-          assignmentsBySection[eventItem.section.id]?.room_id ?? eventItem.section.room_id ?? "";
+        if (!calendarEventConflictsWithSectionIds(eventItem, linkedSectionIdSet)) return false;
+        const itemRoomId = getCalendarEventRoomId(
+          eventItem,
+          (memberId) =>
+            assignmentsBySection[memberId]?.room_id ??
+            data.sections.find((section) => section.id === memberId)?.room_id ??
+            "",
+        );
         if (itemRoomId !== targetRoomId) return false;
         return slot.start < eventItem.end && slot.end > eventItem.start;
       });
       if (conflicts.length > 0) {
         const conflictNames = conflicts
-          .map((c) => `${c.section.department ?? ""} ${c.section.course_id}`.trim())
+          .map((c) => calendarEventDisplayLabel(c))
           .filter(Boolean)
           .slice(0, 3)
           .join(", ");
@@ -3240,6 +3446,41 @@ type MeetingPatternPlacementOption = {
         </div>
       )}
 
+      {crosslistGroupLegend.length > 0 && (
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex flex-wrap items-center gap-x-1 gap-y-2">
+            <div className="flex items-center gap-2 mb-1 w-full sm:w-auto sm:mb-0 sm:mr-2">
+              <Link2 className="size-4 text-slate-400 shrink-0" aria-hidden />
+              <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest">
+                Crosslist groups
+              </span>
+            </div>
+            {crosslistGroupLegend.map((item) => (
+              <button
+                key={item.groupId}
+                type="button"
+                onClick={() => openCrosslistGroupPicker(item.groupId, item.members)}
+                className="flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50/80 px-2.5 py-1.5 mr-1 mb-1 transition-all hover:border-slate-300 hover:bg-slate-100 hover:shadow-sm"
+              >
+                <CrosslistLegendSwatch swatch={item.swatch} />
+                <span
+                  className="text-xs font-semibold text-slate-800 max-w-[12rem] truncate"
+                  title={item.groupId}
+                >
+                  {item.groupId}
+                </span>
+                <span className="text-[10px] font-semibold text-slate-500">
+                  ({item.members.length})
+                </span>
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[10px] text-slate-500 leading-relaxed">
+            Click a group to view or edit the sections scheduled together in that cross-list.
+          </p>
+        </div>
+      )}
+
       {calendarDrag?.sectionId && dragPossibleTimeslots.length > 0 && (
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -3352,7 +3593,7 @@ type MeetingPatternPlacementOption = {
                 <div
                   key={room.id}
                   ref={(el) => setRoomTrackRef(room.id, el)}
-                  className="relative border-b border-slate-200/80 last:border-b-0"
+                  className="relative overflow-visible border-b border-slate-200/80 last:border-b-0 z-0 has-[[data-crosslist-hover=true]]:z-30"
                   style={{ minHeight: rowHeight }}
                   onPointerMove={(e) => {
                     if (!pendingPlacementSectionId || calendarDrag) return;
@@ -3579,190 +3820,237 @@ type MeetingPatternPlacementOption = {
                       );
                     })()}
 
-                  {visibleEvents.map(({ section, timeslot, start, end, lane }) => {
-                const leftPct =
-                  (clamp(start, axisStart, axisEnd) - axisStart) / axisRange;
-                const widthPct =
-                  (clamp(end, axisStart, axisEnd) -
-                    clamp(start, axisStart, axisEnd)) /
-                  axisRange;
+                  {visibleEvents.map((event) => {
+                    const { section, timeslot, start, end, lane } = event;
+                    const leftPct =
+                      (clamp(start, axisStart, axisEnd) - axisStart) / axisRange;
+                    const widthPct =
+                      (clamp(end, axisStart, axisEnd) - clamp(start, axisStart, axisEnd)) /
+                      axisRange;
                     const top = EVENT_TOP_PADDING_PX + lane * (EVENT_HEIGHT_PX + EVENT_GAP_PX);
-
-                const inst = instructorById.get(section.instructor_id);
-                const professor = inst?.name ?? section.instructor_id ?? "—";
-                const title = section.department + " " + section.course_id;
                     const timeLabel = `${formatTimeAmPm(timeslot?.start_time ?? "00:00")} - ${formatTimeAmPm(timeslot?.end_time ?? "00:00")}`;
                     const color =
                       departmentPaletteByKey.get(departmentColorKey(section)) ?? solidPaletteAt(0);
                     const matchesHoveredDepartment =
-                      activeLegendDepartmentKeys.size === 0 ||
-                      activeLegendDepartmentKeys.has(departmentColorKey(section));
+                      isCrosslistGroupEvent(event)
+                        ? (event.crosslistMembers ?? []).some((member) =>
+                            activeLegendDepartmentKeys.size === 0 ||
+                            activeLegendDepartmentKeys.has(departmentColorKey(member)),
+                          )
+                        : activeLegendDepartmentKeys.size === 0 ||
+                          activeLegendDepartmentKeys.has(departmentColorKey(section));
+                    const dragSectionId = isCrosslistGroupEvent(event)
+                      ? section.id
+                      : section.id;
+                    const isDragSource = calendarDrag?.sectionId === dragSectionId;
+                    const placementLocked = isCrosslistGroupEvent(event)
+                      ? (event.crosslistMembers ?? []).some((member) =>
+                          isPlacementLocked(member.id),
+                        )
+                      : isPlacementLocked(section.id);
 
-                const isDragSource = calendarDrag?.sectionId === section.id;
-                const placementLocked = isPlacementLocked(section.id);
-                return (
-                  <div
-                    key={`${room.id}-${section.id}`}
-                    className={clsx(
-                      "absolute border-l-4 rounded-lg p-2.5 flex flex-col justify-between z-10 shadow-sm select-none",
-                      solverInput && "cursor-grab touch-none active:cursor-grabbing",
-                      !isDragSource && "hover:shadow-md",
-                      isDragSource &&
-                        calendarDrag?.hasMoved &&
-                        "opacity-[0.12] pointer-events-none",
-                      !matchesHoveredDepartment && "opacity-35",
-                      activeLegendDepartmentKeys.size > 0 &&
-                        matchesHoveredDepartment &&
-                        "ring-2 ring-slate-300/80 shadow-md",
-                    )}
-                    style={{
-                      left: `${leftPct * 100}%`,
-                      width: `${Math.max(widthPct * 100, 0.5)}%`,
-                      top,
-                      height: EVENT_HEIGHT_PX,
-                      backgroundColor: color.cardBg,
-                      backgroundImage: color.cardPattern,
-                      borderLeftColor: color.cardBorder,
-                    }}
-                    title={`${title} • ${professor} • ${timeLabel} • Room ${room.id}`}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setCalendarContextMenu({
-                        clientX: e.clientX,
-                        clientY: e.clientY,
-                        sectionId: section.id,
-                      });
-                    }}
-                    onPointerDown={(e) => {
-                      if (!solverInput || e.button !== 0) return;
-                      e.stopPropagation();
-                      e.preventDefault();
-                      calendarDragPointerYRef.current = e.clientY;
-                      const targetEl = e.currentTarget;
-                      targetEl.setPointerCapture(e.pointerId);
-                      setDragError(null);
-                      setBackendSaveMessage(null);
-                      setCalendarDrag({
-                        sectionId: section.id,
-                        pointerId: e.pointerId,
-                        startX: e.clientX,
-                        startY: e.clientY,
-                        hasMoved: false,
-                        originLane: lane,
-                        preview: {
-                          targetRoomId: room.id,
-                          slotId: timeslot!.id,
-                          startMin: start,
-                          endMin: end,
-                        },
-                      });
-                    }}
-                    onPointerMove={(e) => {
-                      setCalendarDrag((prev) => {
-                        if (!prev || e.pointerId !== prev.pointerId) return prev;
-                        const dist = Math.hypot(e.clientX - prev.startX, e.clientY - prev.startY);
-                        const hasMoved = prev.hasMoved || dist > 8;
-                        if (!data) return { ...prev, hasMoved };
-                        const draggedE = allDayEvents.find(
-                          (x) => x.section.id === prev.sectionId && x.timeslot,
-                        );
-                        if (!draggedE) return { ...prev, hasMoved };
-                        const duration = draggedE.end - draggedE.start;
-                        let roomId =
-                          findRoomIdAtClientY(e.clientY) ??
-                          draggedE.section.room_id ??
-                          "";
-                        if (!roomId) return { ...prev, hasMoved };
-                        const mins = minutesFromPointerInRoom(e.clientX, roomId);
-                        if (mins === null) return { ...prev, hasMoved };
-                        const slot = selectSlotNearMinutes(
-                          data.timeslots,
-                          selectedDay,
-                          duration,
-                          mins,
-                        );
-                        if (!slot) return { ...prev, hasMoved };
-                        return {
-                          ...prev,
-                          hasMoved,
+                    const sharedPointerHandlers = {
+                      onContextMenu: (e: ReactMouseEvent<HTMLDivElement>) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setCalendarContextMenu({
+                          clientX: e.clientX,
+                          clientY: e.clientY,
+                          sectionId: section.id,
+                        });
+                      },
+                      onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => {
+                        if (!solverInput || e.button !== 0) return;
+                        e.stopPropagation();
+                        e.preventDefault();
+                        calendarDragPointerYRef.current = e.clientY;
+                        const targetEl = e.currentTarget;
+                        targetEl.setPointerCapture(e.pointerId);
+                        setDragError(null);
+                        setBackendSaveMessage(null);
+                        setCalendarDrag({
+                          sectionId: dragSectionId,
+                          pointerId: e.pointerId,
+                          startX: e.clientX,
+                          startY: e.clientY,
+                          hasMoved: false,
+                          originLane: lane,
                           preview: {
-                            targetRoomId: roomId,
-                            slotId: slot.id,
-                            startMin: slot.start,
-                            endMin: slot.end,
+                            targetRoomId: room.id,
+                            slotId: timeslot!.id,
+                            startMin: start,
+                            endMin: end,
                           },
-                        };
-                      });
-                    }}
-                    onPointerUp={(e) => {
-                      setCalendarDrag((prev) => {
-                        if (!prev || e.pointerId !== prev.pointerId) return prev;
-                        try {
-                          (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-                        } catch {
-                          /* noop */
-                        }
-                        const moved =
-                          prev.hasMoved ||
-                          Math.hypot(e.clientX - prev.startX, e.clientY - prev.startY) > 8;
-                        if (!moved) {
-                          suppressCardClickRef.current = false;
-                        } else {
-                          suppressCardClickRef.current = true;
-                          const slotFull = timeslotById.get(prev.preview.slotId);
-                          if (slotFull) {
-                            commitCalendarPlacement(prev.sectionId, prev.preview.targetRoomId, {
-                              ...slotFull,
-                              start: prev.preview.startMin,
-                              end: prev.preview.endMin,
-                            });
+                        });
+                      },
+                      onPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => {
+                        setCalendarDrag((prev) => {
+                          if (!prev || e.pointerId !== prev.pointerId) return prev;
+                          const dist = Math.hypot(e.clientX - prev.startX, e.clientY - prev.startY);
+                          const hasMoved = prev.hasMoved || dist > 8;
+                          if (!data) return { ...prev, hasMoved };
+                          const draggedE = findCalendarEventBySectionId(allDayEvents, prev.sectionId);
+                          if (!draggedE) return { ...prev, hasMoved };
+                          const duration = draggedE.end - draggedE.start;
+                          let roomId =
+                            findRoomIdAtClientY(e.clientY) ??
+                            draggedE.section.room_id ??
+                            "";
+                          if (!roomId) return { ...prev, hasMoved };
+                          const mins = minutesFromPointerInRoom(e.clientX, roomId);
+                          if (mins === null) return { ...prev, hasMoved };
+                          const slot = selectSlotNearMinutes(
+                            data.timeslots,
+                            selectedDay,
+                            duration,
+                            mins,
+                          );
+                          if (!slot) return { ...prev, hasMoved };
+                          return {
+                            ...prev,
+                            hasMoved,
+                            preview: {
+                              targetRoomId: roomId,
+                              slotId: slot.id,
+                              startMin: slot.start,
+                              endMin: slot.end,
+                            },
+                          };
+                        });
+                      },
+                      onPointerUp: (e: ReactPointerEvent<HTMLDivElement>) => {
+                        setCalendarDrag((prev) => {
+                          if (!prev || e.pointerId !== prev.pointerId) return prev;
+                          try {
+                            (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+                          } catch {
+                            /* noop */
                           }
-                        }
-                        return null;
-                      });
-                    }}
-                    onPointerCancel={(e) => {
-                      setCalendarDrag((prev) => {
-                        if (!prev || e.pointerId !== prev.pointerId) return prev;
-                        try {
-                          (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-                        } catch {
-                          /* noop */
-                        }
-                        return null;
-                      });
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (suppressCardClickRef.current) {
-                        suppressCardClickRef.current = false;
-                        return;
-                      }
-                      setSectionModalError(null);
-                      setSectionModal({
-                        mode: "edit",
-                        initialSectionId: section.id,
-                        draft: toSectionFormDraft(section),
-                      });
-                    }}
-                  >
-                    {placementLocked && (
-                      <Lock
-                        className="pointer-events-none absolute right-1 top-1 size-3.5 text-slate-800 drop-shadow-sm opacity-90"
-                        aria-label="Placement locked for solver"
-                      />
-                    )}
-                      <div className="font-black text-[10px] truncate text-slate-900 pr-4">
-                        {title}
+                          const moved =
+                            prev.hasMoved ||
+                            Math.hypot(e.clientX - prev.startX, e.clientY - prev.startY) > 8;
+                          if (!moved) {
+                            suppressCardClickRef.current = false;
+                          } else {
+                            suppressCardClickRef.current = true;
+                            const slotFull = timeslotById.get(prev.preview.slotId);
+                            if (slotFull) {
+                              commitCalendarPlacement(prev.sectionId, prev.preview.targetRoomId, {
+                                ...slotFull,
+                                start: prev.preview.startMin,
+                                end: prev.preview.endMin,
+                              });
+                            }
+                          }
+                          return null;
+                        });
+                      },
+                      onPointerCancel: (e: ReactPointerEvent<HTMLDivElement>) => {
+                        setCalendarDrag((prev) => {
+                          if (!prev || e.pointerId !== prev.pointerId) return prev;
+                          try {
+                            (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+                          } catch {
+                            /* noop */
+                          }
+                          return null;
+                        });
+                      },
+                    };
+
+                    if (isCrosslistGroupEvent(event) && event.crosslistGroupId && event.crosslistMembers) {
+                      return (
+                        <CrosslistCalendarEventCard
+                          key={getCalendarEventKey(event, room.id)}
+                          crosslistGroupId={event.crosslistGroupId}
+                          members={event.crosslistMembers}
+                          timeLabel={timeLabel}
+                          color={color}
+                          matchesHoveredDepartment={matchesHoveredDepartment}
+                          isDragSource={isDragSource}
+                          hasDragMoved={Boolean(calendarDrag?.hasMoved)}
+                          placementLocked={placementLocked}
+                          draggable={Boolean(solverInput)}
+                          style={{
+                            left: `${leftPct * 100}%`,
+                            width: `${Math.max(widthPct * 100, 0.5)}%`,
+                            top,
+                            height: EVENT_HEIGHT_PX,
+                          }}
+                          instructorById={instructorById}
+                          {...sharedPointerHandlers}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (suppressCardClickRef.current) {
+                              suppressCardClickRef.current = false;
+                              return;
+                            }
+                            openCrosslistGroupPicker(event.crosslistGroupId!, event.crosslistMembers!);
+                          }}
+                        />
+                      );
+                    }
+
+                    const inst = instructorById.get(section.instructor_id);
+                    const professor = inst?.name ?? section.instructor_id ?? "—";
+                    const title = section.department + " " + section.course_id;
+
+                    return (
+                      <div
+                        key={getCalendarEventKey(event, room.id)}
+                        className={clsx(
+                          "absolute border-l-4 rounded-lg p-2.5 flex flex-col justify-between z-10 shadow-sm select-none",
+                          solverInput && "cursor-grab touch-none active:cursor-grabbing",
+                          !isDragSource && "hover:shadow-md",
+                          isDragSource &&
+                            calendarDrag?.hasMoved &&
+                            "opacity-[0.12] pointer-events-none",
+                          !matchesHoveredDepartment && "opacity-35",
+                          activeLegendDepartmentKeys.size > 0 &&
+                            matchesHoveredDepartment &&
+                            "ring-2 ring-slate-300/80 shadow-md",
+                        )}
+                        style={{
+                          left: `${leftPct * 100}%`,
+                          width: `${Math.max(widthPct * 100, 0.5)}%`,
+                          top,
+                          height: EVENT_HEIGHT_PX,
+                          backgroundColor: color.cardBg,
+                          backgroundImage: color.cardPattern,
+                          borderLeftColor: color.cardBorder,
+                        }}
+                        title={`${title} • ${professor} • ${timeLabel} • Room ${room.id}`}
+                        {...sharedPointerHandlers}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (suppressCardClickRef.current) {
+                            suppressCardClickRef.current = false;
+                            return;
+                          }
+                          setSectionModalError(null);
+                          setSectionModal({
+                            mode: "edit",
+                            initialSectionId: section.id,
+                            draft: toSectionFormDraft(section),
+                          });
+                        }}
+                      >
+                        {placementLocked && (
+                          <Lock
+                            className="pointer-events-none absolute right-1 top-1 size-3.5 text-slate-800 drop-shadow-sm opacity-90"
+                            aria-label="Placement locked for solver"
+                          />
+                        )}
+                        <div className="font-black text-[10px] truncate text-slate-900 pr-4">
+                          {title}
+                        </div>
+                        <div className="text-[9px] font-bold leading-tight text-slate-700">
+                          <div className="truncate">{professor}</div>
+                          <div className="text-[8px] leading-snug truncate">{timeLabel}</div>
+                        </div>
                       </div>
-                    <div className="text-[9px] font-bold leading-tight text-slate-700">
-                      <div className="truncate">{professor}</div>
-                      <div className="text-[8px] leading-snug truncate">{timeLabel}</div>
-                    </div>
-                  </div>
-                );
-              })}
+                    );
+                  })}
                 </div>
               ))}
 
@@ -3785,7 +4073,11 @@ type MeetingPatternPlacementOption = {
                   if (!section || !st) return null;
                   const instPv = instructorById.get(section.instructor_id);
                   const professorPv = instPv?.name ?? section.instructor_id ?? "—";
-                  const ttlPv = `${section.department} ${section.course_id}`;
+                  const draggedEvent = findCalendarEventBySectionId(allDayEvents, d.sectionId);
+                  const ttlPv =
+                    draggedEvent && isCrosslistGroupEvent(draggedEvent)
+                      ? draggedEvent.crosslistGroupId
+                      : `${section.department} ${section.course_id}`;
                   const timeLabelPv = `${formatTimeAmPm(st.start_time)} - ${formatTimeAmPm(st.end_time)}`;
                   const colorPv =
                     departmentPaletteByKey.get(departmentColorKey(section)) ?? solidPaletteAt(0);
@@ -4078,183 +4370,286 @@ type MeetingPatternPlacementOption = {
         </div>
       )}
 
-      {sectionModal && (
-        <div
-          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px] flex items-center justify-center p-4"
-          onClick={() => {
-            if (isSavingSection) return;
-            setSectionModal(null);
-            setSectionModalError(null);
-          }}
-        >
+      {crosslistPickerModal &&
+        dragFeedbackToastMount &&
+        createPortal(
           <div
-            className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-[1px] overscroll-none"
+            role="presentation"
+            onClick={() => setCrosslistPickerModal(null)}
           >
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-              <h3 className="text-lg font-black text-slate-900">
-                {sectionModal.mode === "create" ? "Add Section" : "Edit Section"}
-              </h3>
-              <button
-                type="button"
-                disabled={isSavingSection}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
-                onClick={() => {
-                  setSectionModal(null);
-                  setSectionModalError(null);
-                }}
-              >
-                Close
-              </button>
-            </div>
-            <div className="space-y-4 px-6 py-5 text-sm">
-              {sectionModal.mode === "create" && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                  Rooms and timeslots are assigned directly on the calendar. After creating this
-                  section, hover over an available room/time space and click to place it.
-                </div>
-              )}
-              {sectionModal.mode === "edit" && (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                  Assigned meeting pattern:{" "}
-                  <span className="font-semibold">
-                    {(() => {
-                      const sectionId = sectionModal.initialSectionId ?? "";
-                      const assignmentPattern = assignmentsBySection[sectionId]?.meeting_pattern_id;
-                      const persistedPattern = data.sections.find((s) => s.id === sectionId)?.previous_meeting_pattern;
-                      return assignmentPattern || persistedPattern || "None";
-                    })()}
-                  </span>
-                </div>
-              )}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-slate-600">Section ID *</span>
-                  <input
-                    className="rounded-lg border border-slate-200 px-3 py-2"
-                    value={sectionModal.draft.id}
-                    onChange={(e) => updateSectionModalDraft("id", e.target.value)}
-                    disabled={sectionModal.mode === "edit" || isSavingSection}
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-slate-600">Department</span>
-                  <input
-                    className="rounded-lg border border-slate-200 px-3 py-2"
-                    value={sectionModal.draft.department}
-                    onChange={(e) => updateSectionModalDraft("department", e.target.value)}
-                    disabled={isSavingSection}
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-slate-600">Course ID *</span>
-                  <input
-                    className="rounded-lg border border-slate-200 px-3 py-2"
-                    value={sectionModal.draft.course_id}
-                    onChange={(e) => updateSectionModalDraft("course_id", e.target.value)}
-                    disabled={isSavingSection}
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-slate-600">Section Code *</span>
-                  <input
-                    className="rounded-lg border border-slate-200 px-3 py-2"
-                    value={sectionModal.draft.section_code}
-                    onChange={(e) => updateSectionModalDraft("section_code", e.target.value)}
-                    disabled={isSavingSection}
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-slate-600">Instructor *</span>
-                  <select
-                    className="rounded-lg border border-slate-200 px-3 py-2 bg-white"
-                    value={sectionModal.draft.instructor_id}
-                    onChange={(e) => updateSectionModalDraft("instructor_id", e.target.value)}
-                    disabled={isSavingSection}
+            <div
+              className="flex max-h-[min(85vh,640px)] w-full max-w-lg flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="crosslist-picker-modal-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">
+                <div>
+                  <h3
+                    id="crosslist-picker-modal-title"
+                    className="text-lg font-black text-slate-900"
                   >
-                    <option value="">Select instructor</option>
-                    {data.instructors.map((inst) => (
-                      <option key={inst.id} value={inst.id}>
-                        {inst.name?.trim() || inst.id}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-slate-600">Expected Enrollment *</span>
-                  <input
-                    type="number"
-                    min={0}
-                    className="rounded-lg border border-slate-200 px-3 py-2"
-                    value={sectionModal.draft.expected_enrollment}
-                    onChange={(e) =>
-                      updateSectionModalDraft("expected_enrollment", Number(e.target.value))
-                    }
-                    disabled={isSavingSection}
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-slate-600">Enrollment Cap *</span>
-                  <input
-                    type="number"
-                    min={0}
-                    className="rounded-lg border border-slate-200 px-3 py-2"
-                    value={sectionModal.draft.enrollment_cap}
-                    onChange={(e) => updateSectionModalDraft("enrollment_cap", Number(e.target.value))}
-                    disabled={isSavingSection}
-                  />
-                </label>
-                {sectionModal.mode === "edit" ? (
-                  <label className="flex flex-col gap-1 sm:col-span-2">
-                    <span className="text-xs font-semibold text-slate-600">
-                      Allowed Meeting Patterns (comma-separated)
+                    Cross-list {crosslistPickerModal.crosslistGroupId}
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {crosslistPickerModal.memberSections.length} courses linked. Select a section to
+                    view or edit its details.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                  onClick={() => setCrosslistPickerModal(null)}
+                >
+                  Close
+                </button>
+              </div>
+              {data && (
+                <CrosslistScheduleBanner
+                  members={crosslistPickerModal.memberSections}
+                  assignmentsBySection={assignmentsBySection}
+                  solverTimeslotIdsBySection={solverTimeslotIdsBySection}
+                  timeslotById={timeslotById}
+                  rooms={data.rooms}
+                />
+              )}
+              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 space-y-2">
+                {crosslistPickerModal.memberSections.map((member) => {
+                  const professor =
+                    instructorById.get(member.instructor_id)?.name?.trim() ||
+                    member.instructor_id ||
+                    "—";
+                  const courseLine = [
+                    (member.department ?? "").toString().trim(),
+                    String(member.course_id),
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
+                  return (
+                    <button
+                      key={member.id}
+                      type="button"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left hover:border-violet-300 hover:bg-violet-50/60 transition-colors"
+                      onClick={() =>
+                        openSectionEditorFromCrosslist(
+                          member,
+                          crosslistPickerModal.crosslistGroupId,
+                        )
+                      }
+                    >
+                      <div className="font-bold text-sm text-slate-900">{courseLine}</div>
+                      <div className="text-xs text-slate-600 mt-0.5">
+                        Section {member.section_code} · {member.id}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5">{professor}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>,
+          dragFeedbackToastMount,
+        )}
+
+      {sectionModal &&
+        dragFeedbackToastMount &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-[1px] overscroll-none"
+            role="presentation"
+            onClick={() => {
+              if (isSavingSection) return;
+              setSectionModal(null);
+              setSectionModalError(null);
+            }}
+          >
+            <div
+              className="flex max-h-[min(85vh,720px)] w-full max-w-2xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="section-modal-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  {sectionModal.returnToCrosslistGroupId && (
+                    <button
+                      type="button"
+                      disabled={isSavingSection}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                      onClick={returnToCrosslistPickerFromSectionModal}
+                    >
+                      <ArrowLeft className="size-4" />
+                      Back
+                    </button>
+                  )}
+                  <h3 id="section-modal-title" className="truncate text-lg font-black text-slate-900">
+                    {sectionModal.mode === "create" ? "Add Section" : "Edit Section"}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  disabled={isSavingSection}
+                  className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                  onClick={() => {
+                    setSectionModal(null);
+                    setSectionModalError(null);
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto space-y-4 px-6 py-5 text-sm">
+                {sectionModal.mode === "create" && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    Rooms and timeslots are assigned directly on the calendar. After creating this
+                    section, hover over an available room/time space and click to place it.
+                  </div>
+                )}
+                {sectionModal.mode === "edit" && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                    Assigned meeting pattern:{" "}
+                    <span className="font-semibold">
+                      {(() => {
+                        const sectionId = sectionModal.initialSectionId ?? "";
+                        const assignmentPattern = assignmentsBySection[sectionId]?.meeting_pattern_id;
+                        const persistedPattern = data.sections.find((s) => s.id === sectionId)?.previous_meeting_pattern;
+                        return assignmentPattern || persistedPattern || "None";
+                      })()}
                     </span>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-slate-600">Section ID *</span>
                     <input
                       className="rounded-lg border border-slate-200 px-3 py-2"
-                      value={sectionModal.draft.allowed_meeting_patterns}
-                      onChange={(e) => updateSectionModalDraft("allowed_meeting_patterns", e.target.value)}
+                      value={sectionModal.draft.id}
+                      onChange={(e) => updateSectionModalDraft("id", e.target.value)}
+                      disabled={sectionModal.mode === "edit" || isSavingSection}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-slate-600">Department</span>
+                    <input
+                      className="rounded-lg border border-slate-200 px-3 py-2"
+                      value={sectionModal.draft.department}
+                      onChange={(e) => updateSectionModalDraft("department", e.target.value)}
                       disabled={isSavingSection}
                     />
                   </label>
-                ) : (
-                  <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                    Meeting pattern selection happens after you place the new section on the calendar.
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-slate-600">Course ID *</span>
+                    <input
+                      className="rounded-lg border border-slate-200 px-3 py-2"
+                      value={sectionModal.draft.course_id}
+                      onChange={(e) => updateSectionModalDraft("course_id", e.target.value)}
+                      disabled={isSavingSection}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-slate-600">Section Code *</span>
+                    <input
+                      className="rounded-lg border border-slate-200 px-3 py-2"
+                      value={sectionModal.draft.section_code}
+                      onChange={(e) => updateSectionModalDraft("section_code", e.target.value)}
+                      disabled={isSavingSection}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-slate-600">Instructor *</span>
+                    <select
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2"
+                      value={sectionModal.draft.instructor_id}
+                      onChange={(e) => updateSectionModalDraft("instructor_id", e.target.value)}
+                      disabled={isSavingSection}
+                    >
+                      <option value="">Select instructor</option>
+                      {data.instructors.map((inst) => (
+                        <option key={inst.id} value={inst.id}>
+                          {inst.name?.trim() || inst.id}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-slate-600">Expected Enrollment *</span>
+                    <input
+                      type="number"
+                      min={0}
+                      className="rounded-lg border border-slate-200 px-3 py-2"
+                      value={sectionModal.draft.expected_enrollment}
+                      onChange={(e) =>
+                        updateSectionModalDraft("expected_enrollment", Number(e.target.value))
+                      }
+                      disabled={isSavingSection}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-slate-600">Enrollment Cap *</span>
+                    <input
+                      type="number"
+                      min={0}
+                      className="rounded-lg border border-slate-200 px-3 py-2"
+                      value={sectionModal.draft.enrollment_cap}
+                      onChange={(e) => updateSectionModalDraft("enrollment_cap", Number(e.target.value))}
+                      disabled={isSavingSection}
+                    />
+                  </label>
+                  {sectionModal.mode === "edit" ? (
+                    <label className="flex flex-col gap-1 sm:col-span-2">
+                      <span className="text-xs font-semibold text-slate-600">
+                        Allowed Meeting Patterns (comma-separated)
+                      </span>
+                      <input
+                        className="rounded-lg border border-slate-200 px-3 py-2"
+                        value={sectionModal.draft.allowed_meeting_patterns}
+                        onChange={(e) => updateSectionModalDraft("allowed_meeting_patterns", e.target.value)}
+                        disabled={isSavingSection}
+                      />
+                    </label>
+                  ) : (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 sm:col-span-2">
+                      Meeting pattern selection happens after you place the new section on the calendar.
+                    </div>
+                  )}
+                  <label className="flex flex-col gap-1 sm:col-span-2">
+                    <span className="text-xs font-semibold text-slate-600">Room Requirements (comma-separated)</span>
+                    <input
+                      className="rounded-lg border border-slate-200 px-3 py-2"
+                      value={sectionModal.draft.room_requirements}
+                      onChange={(e) => updateSectionModalDraft("room_requirements", e.target.value)}
+                      disabled={isSavingSection}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-slate-600">Crosslist Group ID</span>
+                    <input
+                      className="rounded-lg border border-slate-200 px-3 py-2"
+                      value={sectionModal.draft.crosslist_group_id}
+                      onChange={(e) => updateSectionModalDraft("crosslist_group_id", e.target.value)}
+                      disabled={isSavingSection}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-slate-600">Tags (comma-separated)</span>
+                    <input
+                      className="rounded-lg border border-slate-200 px-3 py-2"
+                      value={sectionModal.draft.tags}
+                      onChange={(e) => updateSectionModalDraft("tags", e.target.value)}
+                      disabled={isSavingSection}
+                    />
+                  </label>
+                </div>
+                {sectionModalError && (
+                  <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                    {sectionModalError}
                   </div>
                 )}
-                <label className="flex flex-col gap-1 sm:col-span-2">
-                  <span className="text-xs font-semibold text-slate-600">Room Requirements (comma-separated)</span>
-                  <input
-                    className="rounded-lg border border-slate-200 px-3 py-2"
-                    value={sectionModal.draft.room_requirements}
-                    onChange={(e) => updateSectionModalDraft("room_requirements", e.target.value)}
-                    disabled={isSavingSection}
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-slate-600">Crosslist Group ID</span>
-                  <input
-                    className="rounded-lg border border-slate-200 px-3 py-2"
-                    value={sectionModal.draft.crosslist_group_id}
-                    onChange={(e) => updateSectionModalDraft("crosslist_group_id", e.target.value)}
-                    disabled={isSavingSection}
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-slate-600">Tags (comma-separated)</span>
-                  <input
-                    className="rounded-lg border border-slate-200 px-3 py-2"
-                    value={sectionModal.draft.tags}
-                    onChange={(e) => updateSectionModalDraft("tags", e.target.value)}
-                    disabled={isSavingSection}
-                  />
-                </label>
               </div>
-              {sectionModalError && (
-                <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                  {sectionModalError}
-                </div>
-              )}
-              <div className="flex justify-end gap-2">
+              <div className="flex shrink-0 justify-end gap-2 border-t border-slate-200 px-6 py-4">
                 <button
                   type="button"
                   disabled={isSavingSection}
@@ -4279,63 +4674,77 @@ type MeetingPatternPlacementOption = {
                 </button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          dragFeedbackToastMount,
+        )}
 
-      {meetingPatternSelectionModal && (
-        <div
-          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px] flex items-center justify-center p-4"
-          onClick={() => {
-            setMeetingPatternSelectionModal(null);
-            setMeetingPatternSelectionError(null);
-          }}
-        >
+      {meetingPatternSelectionModal &&
+        dragFeedbackToastMount &&
+        createPortal(
           <div
-            className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-[1px] overscroll-none"
+            role="presentation"
+            onClick={() => {
+              setMeetingPatternSelectionModal(null);
+              setMeetingPatternSelectionError(null);
+            }}
           >
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-              <h3 className="text-lg font-black text-slate-900">Select Meeting Pattern</h3>
-              <button
-                type="button"
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
-                onClick={() => {
-                  setMeetingPatternSelectionModal(null);
-                  setMeetingPatternSelectionError(null);
-                }}
-              >
-                Close
-              </button>
-            </div>
-            <div className="space-y-4 px-6 py-5 text-sm">
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                Section is placed at room <span className="font-semibold">{meetingPatternSelectionModal.roomId}</span>. Choose a meeting pattern that includes this placed timeslot and maps the section to its additional days.
-              </div>
-              <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-slate-600">Compatible Meeting Pattern Options</span>
-                <select
-                  className="rounded-lg border border-slate-200 px-3 py-2 bg-white"
-                  value={meetingPatternSelectionModal.selectedOptionKey}
-                  onChange={(e) =>
-                    setMeetingPatternSelectionModal((prev) =>
-                      prev ? { ...prev, selectedOptionKey: e.target.value } : prev,
-                    )
-                  }
+            <div
+              className="flex max-h-[min(85vh,640px)] w-full max-w-2xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="meeting-pattern-modal-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">
+                <h3 id="meeting-pattern-modal-title" className="text-lg font-black text-slate-900">
+                  Select Meeting Pattern
+                </h3>
+                <button
+                  type="button"
+                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                  onClick={() => {
+                    setMeetingPatternSelectionModal(null);
+                    setMeetingPatternSelectionError(null);
+                  }}
                 >
-                  {meetingPatternSelectionModal.options.map((option) => (
-                    <option key={option.key} value={option.key}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {meetingPatternSelectionError && (
-                <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                  {meetingPatternSelectionError}
+                  Close
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto space-y-4 px-6 py-5 text-sm">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                  Section is placed at room{" "}
+                  <span className="font-semibold">{meetingPatternSelectionModal.roomId}</span>. Choose a
+                  meeting pattern that includes this placed timeslot and maps the section to its
+                  additional days.
                 </div>
-              )}
-              <div className="flex justify-end gap-2">
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-slate-600">
+                    Compatible Meeting Pattern Options
+                  </span>
+                  <select
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-2"
+                    value={meetingPatternSelectionModal.selectedOptionKey}
+                    onChange={(e) =>
+                      setMeetingPatternSelectionModal((prev) =>
+                        prev ? { ...prev, selectedOptionKey: e.target.value } : prev,
+                      )
+                    }
+                  >
+                    {meetingPatternSelectionModal.options.map((option) => (
+                      <option key={option.key} value={option.key}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {meetingPatternSelectionError && (
+                  <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                    {meetingPatternSelectionError}
+                  </div>
+                )}
+              </div>
+              <div className="flex shrink-0 justify-end gap-2 border-t border-slate-200 px-6 py-4">
                 <button
                   type="button"
                   className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
@@ -4348,16 +4757,16 @@ type MeetingPatternPlacementOption = {
                 </button>
                 <button
                   type="button"
-                  className="rounded-lg px-3 py-2 text-sm font-bold text-white bg-[#137fec] hover:bg-[#0f6dca]"
+                  className="rounded-lg bg-[#137fec] px-3 py-2 text-sm font-bold text-white hover:bg-[#0f6dca]"
                   onClick={applyMeetingPatternSelection}
                 >
                   Apply Pattern
                 </button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          dragFeedbackToastMount,
+        )}
 
       <div className="hidden print:block print-calendar">
         {DAYS.map((day) => {
@@ -4401,6 +4810,51 @@ type MeetingPatternPlacementOption = {
                       const { section, start, end } = event;
                       const color =
                         departmentPaletteByKey.get(departmentColorKey(section)) ?? solidPaletteAt(0);
+
+                      if (isCrosslistGroupEvent(event) && event.crosslistGroupId && event.crosslistMembers) {
+                        return (
+                          <div
+                            key={eventKey}
+                            className="print-event-item flex gap-3 border-b border-slate-200 px-3 py-2.5 text-sm last:border-b-0"
+                            style={{
+                              borderLeftWidth: 4,
+                              borderLeftStyle: "solid",
+                              borderLeftColor: color.printBorder,
+                              backgroundColor: color.printBg,
+                            }}
+                          >
+                            <div className="w-40 shrink-0 text-xs font-semibold leading-snug text-slate-900">
+                              {formatScheduleTimeRange(start, end)}
+                            </div>
+                            <div className="min-w-0 flex-1 leading-snug">
+                              <div className="font-bold text-slate-900 break-words">
+                                Cross-list {event.crosslistGroupId}
+                              </div>
+                              <ul className="mt-1 list-disc pl-4 text-slate-800 space-y-0.5">
+                                {event.crosslistMembers.map((member) => {
+                                  const professorName =
+                                    instructorById.get(member.instructor_id)?.name?.trim() ||
+                                    member.instructor_id;
+                                  const dept = (member.department ?? "").toString().trim();
+                                  const courseLine = [dept, String(member.course_id)]
+                                    .filter(Boolean)
+                                    .join(" ");
+                                  const sectionBit = member.section_code
+                                    ? ` · Section ${member.section_code}`
+                                    : "";
+                                  const line = `${courseLine}${sectionBit} (${professorName})`;
+                                  return (
+                                    <li key={member.id} className="break-words">
+                                      {line}
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </div>
+                          </div>
+                        );
+                      }
+
                       const professorName =
                         instructorById.get(section.instructor_id)?.name?.trim() ||
                         section.instructor_id;
@@ -4448,13 +4902,13 @@ type MeetingPatternPlacementOption = {
                           </div>
                           {renderEventRow(
                             sorted[0],
-                            `print-event-${day}-${room.id}-${sorted[0].section.id}-0`,
+                            `print-event-${day}-${room.id}-${getCalendarEventKey(sorted[0], room.id)}-0`,
                           )}
                         </div>
                         {sorted.slice(1).map((event, idx) =>
                           renderEventRow(
                             event,
-                            `print-event-${day}-${room.id}-${event.section.id}-${idx + 1}`,
+                            `print-event-${day}-${room.id}-${getCalendarEventKey(event, room.id)}-${idx + 1}`,
                           ),
                         )}
                       </div>
