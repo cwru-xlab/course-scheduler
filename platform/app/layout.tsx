@@ -8,6 +8,7 @@ import { Providers } from "./providers";
 import { siteConfig } from "@/config/site";
 import { fontSans } from "@/config/fonts";
 import { Navbar } from "@/components/navbar";
+import { SolverProgressPercent } from "@/components/SolverProgressIndicator";
 import { SchedulingDataProvider } from "@/lib/scheduling/useSchedulingData";
 
 export const metadata: Metadata = {
@@ -46,6 +47,7 @@ export default function RootLayout({
           <SchedulingDataProvider>
             <div className="relative flex flex-col min-h-screen bg-[var(--weatherhead-surface)] dark:bg-default-100">
               <Navbar />
+              <SolverProgressPercent />
               <main className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-16 pb-8 grow">
                 {children}
               </main>

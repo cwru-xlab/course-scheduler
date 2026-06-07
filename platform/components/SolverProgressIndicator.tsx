@@ -1,7 +1,9 @@
 "use client";
 
 import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
+import { pageHorizontalInsetRightClassName } from "@/lib/layout/pageGutters";
 
+/** Thin green bar flush against the bottom edge of the sticky topbar. */
 export function SolverProgressIndicator() {
   const { isRunning, progress } = useSolverProgress();
 
@@ -22,5 +24,21 @@ export function SolverProgressIndicator() {
         aria-label="Solver progress"
       />
     </div>
+  );
+}
+
+/** Percent label below the topbar, aligned with the user menu on the right. */
+export function SolverProgressPercent() {
+  const { isRunning, progress } = useSolverProgress();
+
+  if (!isRunning) return null;
+
+  return (
+    <span
+      className={`pointer-events-none fixed top-16 z-40 mt-0.5 text-[10px] font-semibold tabular-nums text-emerald-600 ${pageHorizontalInsetRightClassName}`}
+      aria-live="polite"
+    >
+      {progress}%
+    </span>
   );
 }

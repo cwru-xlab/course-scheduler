@@ -15,12 +15,10 @@ import { usePathname } from "next/navigation";
 
 import { UserMenu } from "@/components/user-menu";
 import { SolverProgressIndicator } from "@/components/SolverProgressIndicator";
-import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
 import { isFullBleedRoute, pageHorizontalGutterClassName } from "@/lib/layout/pageGutters";
 
 export const Navbar = () => {
   const pathname = usePathname();
-  const { isRunning, progress } = useSolverProgress();
   const isFullBleed = isFullBleedRoute(pathname);
   const isEditorActive = pathname.startsWith("/editor");
   return (
@@ -111,19 +109,9 @@ export const Navbar = () => {
           </nav>
 
           {/* Calendar page portals the Undo control here so it stays in the sticky header */}
-          <div className="relative flex flex-1 items-center justify-end gap-2 md:flex-none md:justify-end">
-            <div className="flex items-center gap-2">
-              <div id="calendar-navbar-slot" className="flex items-center gap-2" />
-              <UserMenu />
-            </div>
-            {isRunning && (
-              <span
-                className="pointer-events-none absolute right-0 top-full mt-0.5 text-[10px] font-semibold tabular-nums text-emerald-600"
-                aria-live="polite"
-              >
-                {progress}%
-              </span>
-            )}
+          <div className="flex flex-1 items-center justify-end gap-2 md:flex-none md:justify-end">
+            <div id="calendar-navbar-slot" className="flex items-center gap-2" />
+            <UserMenu />
           </div>
         </div>
       </div>
