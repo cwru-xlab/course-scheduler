@@ -62,6 +62,7 @@ import {
   SCHEDULING_WINDOW_START_HOUR,
 } from "@/lib/scheduling/timeWindow";
 import { isSectionArchived, normalizeSectionState } from "@/lib/scheduling/sectionState";
+import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
 
 type TimeslotDto = {
   id: string;
@@ -924,6 +925,8 @@ export default function CalendarPage() {
   type AssignmentMap = CalendarAssignmentMap;
 
   const router = useRouter();
+  const { begin: beginSolverProgress, succeed: succeedSolverProgress, fail: failSolverProgress } =
+    useSolverProgress();
   const [lockedSectionIds, setLockedSectionIds] = useState<string[]>([]);
   const [solverRunStatus, setSolverRunStatus] = useState<"idle" | "loading">("idle");
   const [solverRunError, setSolverRunError] = useState<string | null>(null);
@@ -2195,6 +2198,7 @@ type MeetingPatternPlacementOption = {
   const handleRunSolverFromCalendar = useCallback(async () => {
     setSolverRunError(null);
     setSolverRunStatus("loading");
+    beginSolverProgress();
     try {
       let input: SchedulingInput | null = solverInput;
       if (!input) {
@@ -2251,6 +2255,7 @@ type MeetingPatternPlacementOption = {
             }),
           );
         }
+        failSolverProgress();
         router.push("/solver-errors");
         return;
       }
@@ -2292,16 +2297,21 @@ type MeetingPatternPlacementOption = {
         status: "valid",
         message: "Solver finished. Schedule updated on this page.",
       });
+      succeedSolverProgress();
     } catch (e) {
+      failSolverProgress();
       setSolverRunError(e instanceof Error ? e.message : "Failed to run solver.");
     } finally {
       setSolverRunStatus("idle");
     }
   }, [
     assignmentsBySection,
+    beginSolverProgress,
     data,
+    failSolverProgress,
     lockedSectionIds,
     router,
+    succeedSolverProgress,
     solverInput,
     updateLastRunStorage,
   ]);
