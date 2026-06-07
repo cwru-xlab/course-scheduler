@@ -12,6 +12,7 @@ import type {
   ValidationError,
 } from "@/lib/scheduling/types";
 import { isSectionArchived } from "@/lib/scheduling/sectionState";
+import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
 
 type ApiSuccess = ScheduleSolution & { status: "ok" };
 type ApiError = {
@@ -29,6 +30,7 @@ const LAST_SOLVER_ERROR_STORAGE_KEY = "wsom-last-solver-error";
 
 export const SolverActionButton = ({ data }: { data: SchedulingInput | null }) => {
   const router = useRouter();
+  const { begin, succeed, fail } = useSolverProgress();
   const [solverStatus, setSolverStatus] = useState<"idle" | "loading">("idle");
   const [solverError, setSolverError] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -44,6 +46,7 @@ export const SolverActionButton = ({ data }: { data: SchedulingInput | null }) =
     if (!data) return;
     setSolverStatus("loading");
     setSolverError(null);
+    begin();
 
     try {
       const controller = new AbortController();
@@ -60,6 +63,7 @@ export const SolverActionButton = ({ data }: { data: SchedulingInput | null }) =
       try {
         result = JSON.parse(raw) as ApiSuccess | ApiError;
       } catch {
+        fail();
         setSolverError(
           `Schedule API returned non-JSON response (status ${response.status}).`,
         );
@@ -83,9 +87,11 @@ export const SolverActionButton = ({ data }: { data: SchedulingInput | null }) =
               }),
             );
           }
+          fail();
           router.push("/solver-errors");
           return;
         }
+        fail();
         setSolverError(nextError);
         return;
       }
@@ -100,8 +106,10 @@ export const SolverActionButton = ({ data }: { data: SchedulingInput | null }) =
           }),
         );
       }
+      succeed();
       router.push("/calendar");
     } catch (error) {
+      fail();
       const message =
         error instanceof DOMException && error.name === "AbortError"
           ? "Solver request timed out. The schedule may be too complex — try relaxing constraints."
