@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 
 import type { SchedulingInput, ValidationError } from "@/lib/scheduling/types";
+import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
 
 type SolverDiagnostics = {
   feasible_if_relax?: string[];
@@ -51,6 +52,7 @@ function readStoredError(): StoredSolverError | null {
 
 export default function SolverErrorsPage() {
   const router = useRouter();
+  const { begin, succeed, fail } = useSolverProgress();
   const [stored, setStored] = useState<StoredSolverError | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [retryStatus, setRetryStatus] = useState<"idle" | "loading" | "error">("idle");
@@ -65,6 +67,7 @@ export default function SolverErrorsPage() {
     if (!stored?.input) return;
     setRetryStatus("loading");
     setRetryError("");
+    begin();
     try {
       const response = await fetch("/api/schedule", {
         method: "POST",
@@ -84,14 +87,17 @@ export default function SolverErrorsPage() {
             createdAt: new Date().toISOString(),
           }),
         );
+        succeed();
         router.push("/calendar");
       } else {
+        fail();
         setRetryError(
           result.errors?.[0]?.message ?? "Solver still returned an error after removal."
         );
         setRetryStatus("error");
       }
     } catch (err) {
+      fail();
       setRetryError(err instanceof Error ? err.message : "Network error");
       setRetryStatus("error");
     }
