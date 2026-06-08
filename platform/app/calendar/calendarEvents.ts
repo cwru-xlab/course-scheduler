@@ -71,7 +71,7 @@ export function mergeCrosslistCalendarEvents(
   }
 
   const merged: CalendarEvent[] = [...standalone];
-  for (const bucketEvents of buckets.values()) {
+  for (const bucketEvents of Array.from(buckets.values())) {
     if (bucketEvents.length >= 2) {
       const members = bucketEvents
         .map((event) => event.section)
