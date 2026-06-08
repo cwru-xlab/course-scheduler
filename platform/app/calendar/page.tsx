@@ -27,7 +27,8 @@ import {
   Play,
   CloudBackup,
   Pencil,
-  FolderClock
+  FolderClock,
+  X,
 } from "lucide-react";
 import { CrosslistCalendarEventCard, CrosslistLegendSwatch } from "./CrosslistCalendarEventCard";
 import {
@@ -642,6 +643,33 @@ function timeslotDurationMinutes(slot: Pick<TimeslotDto, "start_time" | "end_tim
   return Math.max(0, parseMinutes(slot.end_time) - parseMinutes(slot.start_time));
 }
 
+function meetingPatternSlotDurationsForDay(
+  pattern: { compatible_timeslot_sets?: string[][] } | undefined,
+  day: Day,
+  timeslotById: Map<string, TimeslotDto>,
+): number[] {
+  if (!pattern) return [];
+  const durations = new Set<number>();
+  for (const set of pattern.compatible_timeslot_sets ?? []) {
+    for (const slotId of set ?? []) {
+      const slot = timeslotById.get(String(slotId));
+      if (!slot || !timeslotMatchesDay(slot, day)) continue;
+      durations.add(timeslotDurationMinutes(slot));
+    }
+  }
+  return Array.from(durations);
+}
+
+function slotDurationMatchesAllowedLengths(
+  durationMin: number,
+  allowedDurations: number[],
+): boolean {
+  if (allowedDurations.length === 0) return true;
+  return allowedDurations.some(
+    (allowed) => Math.abs(durationMin - allowed) <= TIMESLOT_DURATION_MATCH_TOLERANCE_MIN,
+  );
+}
+
 /**
  * Calendar background bands: hue encodes meeting length so 50-min, 75-min, and 2h blocks read at a glance.
  * `emphasis` raises alpha while dragging.
@@ -668,14 +696,6 @@ function rgbaBorderForTimeslotDuration(durationMin: number): string {
   if (d <= 150) return "rgba(185, 28, 28, 0.5)";
   return "rgba(109, 40, 217, 0.5)";
 }
-
-const TIMESLOT_DURATION_LEGEND: { label: string; sampleMin: number }[] = [
-  { label: "≤ 60 min", sampleMin: 50 },
-  { label: "61–90 min", sampleMin: 75 },
-  { label: "91–120 min", sampleMin: 105 },
-  { label: "121–150 min", sampleMin: 135 },
-  { label: "> 150 min", sampleMin: 170 },
-];
 
 function selectSlotNearMinutes(
   timeslots: TimeslotDto[],
@@ -719,6 +739,9 @@ const EVENT_HEIGHT_PX = 70;
 const EVENT_GAP_PX = 8;
 const EVENT_TOP_PADDING_PX = 12;
 const MIN_TRACK_HEIGHT_PX = 240;
+/** Pixels of movement before drag mode (timeslot highlights) activates. */
+const CALENDAR_DRAG_MOVE_THRESHOLD_PX = 14;
+const TIMESLOT_DURATION_MATCH_TOLERANCE_MIN = 5;
 type DepartmentPalette = {
   cardBg: string;
   cardBorder: string;
@@ -888,10 +911,12 @@ function CalendarDragFeedbackToastPortal({
   mountedOn,
   dragFeedback,
   dragError,
+  onDismiss,
 }: {
   mountedOn: HTMLElement | null;
   dragFeedback: CalendarDragFeedbackState;
   dragError: string | null;
+  onDismiss: () => void;
 }) {
   if (!mountedOn) return null;
   const line = dragFeedback.message ?? dragError;
@@ -914,7 +939,7 @@ function CalendarDragFeedbackToastPortal({
         >
           <div
             className={clsx(
-              "pointer-events-auto w-full max-w-3xl rounded-xl border px-4 py-3 text-sm font-medium shadow-lg backdrop-blur-md",
+              "pointer-events-auto flex w-full max-w-3xl items-start gap-2 rounded-xl border px-4 py-3 text-sm font-medium shadow-lg backdrop-blur-md",
               isError &&
                 "border-red-200 bg-red-50/95 text-red-800 dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-200",
               isValid &&
@@ -924,7 +949,24 @@ function CalendarDragFeedbackToastPortal({
                 "border-slate-200 bg-white/95 text-slate-800 dark:border-default-200 dark:bg-default-100/95 dark:text-foreground",
             )}
           >
-            {line}
+            <span className="min-w-0 flex-1 leading-snug">{line}</span>
+            <button
+              type="button"
+              className={clsx(
+                "shrink-0 rounded-md p-0.5",
+                isError &&
+                  "text-red-700/80 hover:bg-red-100/80 hover:text-red-900 dark:text-red-200 dark:hover:bg-red-500/20",
+                isValid &&
+                  "text-emerald-700/80 hover:bg-emerald-100/80 hover:text-emerald-900 dark:text-emerald-200 dark:hover:bg-emerald-500/20",
+                !isError &&
+                  !isValid &&
+                  "text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-default-400 dark:hover:bg-default-200/40",
+              )}
+              onClick={onDismiss}
+              aria-label="Dismiss message"
+            >
+              <X className="size-4" aria-hidden />
+            </button>
           </div>
         </motion.div>
       ) : null}
@@ -2342,17 +2384,42 @@ type MeetingPatternPlacementOption = {
       .sort((a, b) => a - b);
   }, [data, selectedDay, axisStart, axisEnd]);
 
-  /** When dragging starts, show ALL timeslots for the selected day. */
+  /** Timeslots on the selected day that match the dragged section's assigned meeting pattern length. */
   const dragPossibleTimeslots = useMemo(() => {
     if (!data || !calendarDrag?.sectionId) return [];
+    const sectionId = calendarDrag.sectionId;
+    const section = data.sections.find((entry) => entry.id === sectionId);
+    const patternId =
+      assignmentsBySection[sectionId]?.meeting_pattern_id?.trim() ||
+      section?.previous_meeting_pattern?.trim() ||
+      "";
+    const pattern = solverInput?.meeting_patterns?.find((entry) => entry.id === patternId);
+    let allowedDurations = meetingPatternSlotDurationsForDay(pattern, selectedDay, timeslotById);
+    if (allowedDurations.length === 0) {
+      const dragged = findCalendarEventBySectionId(allDayEvents, sectionId);
+      if (dragged) {
+        allowedDurations = [Math.max(0, dragged.end - dragged.start)];
+      }
+    }
     return data.timeslots
       .filter((slot) => timeslotMatchesDay(slot, selectedDay))
       .map((slot) => ({
         ...slot,
         start: parseMinutes(slot.start_time),
         end: parseMinutes(slot.end_time),
-      }));
-  }, [calendarDrag?.sectionId, data, selectedDay]);
+      }))
+      .filter((slot) =>
+        slotDurationMatchesAllowedLengths(Math.max(0, slot.end - slot.start), allowedDurations),
+      );
+  }, [
+    allDayEvents,
+    assignmentsBySection,
+    calendarDrag?.sectionId,
+    data,
+    selectedDay,
+    solverInput,
+    timeslotById,
+  ]);
 
   const dragPossibleTimeslotBoundaries = useMemo(() => {
     if (!dragPossibleTimeslots.length) return [];
@@ -3177,6 +3244,10 @@ type MeetingPatternPlacementOption = {
         mountedOn={dragFeedbackToastMount}
         dragFeedback={dragFeedback}
         dragError={dragError}
+        onDismiss={() => {
+          setDragFeedback({ status: "neutral", message: null });
+          setDragError(null);
+        }}
       />
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex flex-col">
@@ -3495,31 +3566,6 @@ type MeetingPatternPlacementOption = {
         </div>
       )}
 
-      {calendarDrag?.sectionId && dragPossibleTimeslots.length > 0 && (
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest w-full sm:w-auto">
-              Timeslot length (while dragging)
-            </span>
-            {TIMESLOT_DURATION_LEGEND.map((item) => (
-              <div key={item.label} className="flex items-center gap-2">
-                <span
-                  className="h-3.5 w-6 shrink-0 rounded border border-slate-200/80"
-                  style={{ backgroundColor: rgbaFillForTimeslotDuration(item.sampleMin, "strong") }}
-                  aria-hidden
-                />
-                <span className="text-xs font-semibold text-slate-700">{item.label}</span>
-              </div>
-            ))}
-          </div>
-          <p className="mt-2 text-[10px] text-slate-500 leading-relaxed">
-            Shaded columns appear only while you drag; colors match slot duration on{" "}
-            <span className="font-semibold">{selectedDay}</span>. Red hatched columns are blocked for
-            the course currently being dragged.
-          </p>
-        </div>
-      )}
-
       {/* Day selector + quick add section */}
       <div className="flex items-center justify-between gap-3">
         <div className="inline-flex items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
@@ -3650,7 +3696,7 @@ type MeetingPatternPlacementOption = {
                     });
                   }}
                 >
-                  {calendarDrag?.sectionId &&
+                  {calendarDrag?.hasMoved &&
                     dragPossibleTimeslots
                       .filter((slot) => slot.end > axisStart && slot.start < axisEnd)
                       .map((slot) => {
@@ -3700,7 +3746,7 @@ type MeetingPatternPlacementOption = {
                   />
                 ))}
               </div>
-                  {calendarDrag?.sectionId &&
+                  {calendarDrag?.hasMoved &&
                     dragPossibleTimeslotBoundaries.map((minute) => {
                       const leftPct = ((minute - axisStart) / axisRange) * 100;
                       return (
@@ -3901,7 +3947,8 @@ type MeetingPatternPlacementOption = {
                         setCalendarDrag((prev) => {
                           if (!prev || e.pointerId !== prev.pointerId) return prev;
                           const dist = Math.hypot(e.clientX - prev.startX, e.clientY - prev.startY);
-                          const hasMoved = prev.hasMoved || dist > 8;
+                          const hasMoved =
+                            prev.hasMoved || dist > CALENDAR_DRAG_MOVE_THRESHOLD_PX;
                           if (!data) return { ...prev, hasMoved };
                           const draggedE = findCalendarEventBySectionId(allDayEvents, prev.sectionId);
                           if (!draggedE) return { ...prev, hasMoved };
@@ -3942,7 +3989,8 @@ type MeetingPatternPlacementOption = {
                           }
                           const moved =
                             prev.hasMoved ||
-                            Math.hypot(e.clientX - prev.startX, e.clientY - prev.startY) > 8;
+                            Math.hypot(e.clientX - prev.startX, e.clientY - prev.startY) >
+                              CALENDAR_DRAG_MOVE_THRESHOLD_PX;
                           if (!moved) {
                             suppressCardClickRef.current = false;
                           } else {

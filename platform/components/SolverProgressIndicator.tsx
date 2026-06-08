@@ -35,7 +35,7 @@ export function SolverProgressPercent() {
 
   return (
     <span
-      className={`pointer-events-none fixed top-16 z-40 mt-0.5 text-[10px] font-semibold tabular-nums text-emerald-600 ${pageHorizontalInsetRightClassName}`}
+      className={`pointer-events-none fixed top-16 z-40 mt-0.5 text-sm font-semibold tabular-nums text-emerald-600 ${pageHorizontalInsetRightClassName}`}
       aria-live="polite"
     >
       {progress}%
