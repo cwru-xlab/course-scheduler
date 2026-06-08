@@ -24,6 +24,7 @@ import { ImportSpreadsheetWarningModal } from "@/components/scheduler/ImportSpre
 import { collectRowNotesForExport } from "@/lib/notes/storage";
 import { importSpreadsheetFile } from "@/lib/spreadsheet-import-client";
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
+import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
 import type { ScheduleSolution, SchedulingInput, ValidationError } from "@/lib/scheduling/types";
 
 type ApiSuccess = ScheduleSolution & { status: "ok" };
@@ -44,6 +45,7 @@ const LAST_SOLVER_RUN_STORAGE_KEY = "wsom-last-solver-run";
 
 export const SchedulerDemo = () => {
   const router = useRouter();
+  const { begin, succeed, fail } = useSolverProgress();
   const {
     data,
     isLoading,
@@ -168,6 +170,7 @@ export const SchedulerDemo = () => {
     setErrors([]);
     setSolution(null);
     setDiagnostics(undefined);
+    begin();
 
     try {
       const response = await fetch("/api/schedule", {
@@ -181,6 +184,7 @@ export const SchedulerDemo = () => {
       const result = (await response.json()) as ApiSuccess | ApiError;
 
       if (!response.ok || result.status === "error") {
+        fail();
         setErrors(
           result.status === "error"
             ? result.errors
@@ -201,9 +205,11 @@ export const SchedulerDemo = () => {
             }),
           );
         }
+        succeed();
         router.push("/calendar");
       }
     } catch (err) {
+      fail();
       const message = err instanceof Error ? err.message : "Failed to reach solver API.";
       setErrors([{ code: "network_error", message }]);
     } finally {
