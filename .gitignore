@@ -1,7 +1,6 @@
 .DS_Store
 .venv
 test_importer.py
-*.xlsx
 instance/
 start.sh
 .env.local
