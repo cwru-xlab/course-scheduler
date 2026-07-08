@@ -18,7 +18,7 @@ import {
 import { sortDefsFromFilterDefs } from "./editorSort";
 import { TIMESLOT_COLUMN_SPECS } from "./editorColumnSpecs";
 import { useEditorActions } from "./EditorActionProvider";
-import { editorRowKey, recentlyAddedRowClass } from "./editorRowHighlight";
+import { editorRowKey } from "./editorRowHighlight";
 import { TimeslotEditModal } from "./modals/TimeslotEditModal";
 import {
   TIMESLOT_BLOCK_TYPE_OPTIONS,
@@ -55,7 +55,7 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<Timeslot | null>(null);
-  const { confirmRowAdded, isRowRecentlyAdded } = useEditorActions();
+  const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
   const updateTimeslot = (index: number, field: keyof Timeslot, value: unknown) => {
     const newTimeslots = [...timeslots];
@@ -225,9 +225,10 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
         getRowKey={({ slot, index }) => `${slot.id}-${index}`}
         getRowId={({ slot }) => `note-timeslots-${encodeURIComponent(String(slot.id))}`}
         getRowClassName={({ slot }) =>
-          recentlyAddedRowClass(
+          getRowHighlightClass(
             "border-t border-default-200",
-            isRowRecentlyAdded(editorRowKey("timeslots", String(slot.id))),
+            "timeslots",
+            String(slot.id),
           )
         }
         renderCell={renderCell}

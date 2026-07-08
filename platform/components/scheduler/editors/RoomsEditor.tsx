@@ -14,7 +14,7 @@ import {
 import { sortDefsFromFilterDefs } from "./editorSort";
 import { ROOM_COLUMN_SPECS } from "./editorColumnSpecs";
 import { useEditorActions } from "./EditorActionProvider";
-import { editorRowKey, recentlyAddedRowClass } from "./editorRowHighlight";
+import { editorRowKey } from "./editorRowHighlight";
 import { RoomEditModal } from "./modals/RoomEditModal";
 
 import { EditableCell } from "../EditableCell";
@@ -45,7 +45,7 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<Room | null>(null);
-  const { confirmRowAdded, isRowRecentlyAdded } = useEditorActions();
+  const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
   const updateRoom = (index: number, field: keyof Room, value: unknown) => {
     const newRooms = [...rooms];
@@ -198,9 +198,10 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
         getRowKey={({ room, index }) => `${room.id}-${index}`}
         getRowId={({ room }) => `note-rooms-${encodeURIComponent(String(room.id))}`}
         getRowClassName={({ room }) =>
-          recentlyAddedRowClass(
+          getRowHighlightClass(
             "border-t border-default-200",
-            isRowRecentlyAdded(editorRowKey("rooms", String(room.id))),
+            "rooms",
+            String(room.id),
           )
         }
         renderCell={renderCell}

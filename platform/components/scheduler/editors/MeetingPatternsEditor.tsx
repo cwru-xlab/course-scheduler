@@ -9,7 +9,7 @@ import { EditableCell } from "../EditableCell";
 import { MultiSelect } from "../MultiSelect";
 import { RowNotesButton } from "../RowNotesButton";
 import { useEditorActions } from "./EditorActionProvider";
-import { editorRowKey, RECENTLY_ADDED_ROW_CLASS } from "./editorRowHighlight";
+import { editorRowKey } from "./editorRowHighlight";
 import { MeetingPatternEditModal } from "./modals/MeetingPatternEditModal";
 
 import type { MeetingPattern } from "@/lib/scheduling/types";
@@ -44,7 +44,8 @@ export const MeetingPatternsEditor = ({
   timeslotOptions,
   onUpdate,
 }: MeetingPatternsEditorProps) => {
-  const { requestDelete, showSuccess, confirmRowAdded, isRowRecentlyAdded } = useEditorActions();
+  const { requestDelete, showSuccess, confirmRowAdded, getRowHighlightClass } =
+    useEditorActions();
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<MeetingPattern | null>(null);
 
@@ -101,11 +102,11 @@ export const MeetingPatternsEditor = ({
           <div
             key={`${pattern.id}-${idx}`}
             id={`note-meeting-patterns-${encodeURIComponent(String(pattern.id))}`}
-            className={`border border-default-200 rounded-lg p-3${
-              isRowRecentlyAdded(editorRowKey("meeting-patterns", String(pattern.id)))
-                ? ` ${RECENTLY_ADDED_ROW_CLASS}`
-                : ""
-            }`}
+            className={getRowHighlightClass(
+              "border border-default-200 rounded-lg p-3",
+              "meeting-patterns",
+              String(pattern.id),
+            )}
           >
             <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
               <div className="flex items-center gap-4 flex-wrap min-w-0 flex-1">

@@ -2909,8 +2909,8 @@ type MeetingPatternPlacementOption = {
               type: "success",
               text:
                 linkedSectionIds.length > 1
-                  ? "Cross-listed group placed on the calendar. Click Update Backend to persist this placement."
-                  : "Section placed on the calendar. Click Update Backend to persist this placement.",
+                  ? "Cross-listed group placed on the calendar. Click Save to persist this placement."
+                  : "Section placed on the calendar. Click Save to persist this placement.",
             },
       );
     },
@@ -2975,7 +2975,7 @@ type MeetingPatternPlacementOption = {
       if (!silent) {
         setBackendSaveMessage({
           type: "success",
-          text: "Backend updated. Sections will appear in the Sections editor and be used by Run Solver.",
+          text: "Saved. Sections will appear in the Sections editor and be used by Run Solver.",
         });
       }
       if (typeof window !== "undefined") {
@@ -2984,7 +2984,7 @@ type MeetingPatternPlacementOption = {
     } catch (err) {
       setBackendSaveMessage({
         type: "error",
-        text: err instanceof Error ? err.message : "Failed to update backend.",
+        text: err instanceof Error ? err.message : "Failed to save.",
       });
     } finally {
       setIsSavingBackend(false);
@@ -2995,7 +2995,7 @@ type MeetingPatternPlacementOption = {
   updateBackendRef.current = handleUpdateBackend;
 
   // Autosave: when enabled and there's a valid unsaved edit, silently persist
-  // after a short debounce so users don't have to click Update Backend.
+  // after a short debounce so users don't have to click Save.
   useEffect(() => {
     if (!autosaveEnabled) return;
     if (!hasValidUnsavedEdit) return;
@@ -3410,7 +3410,7 @@ type MeetingPatternPlacementOption = {
                       ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
                       : "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100",
                   )}
-                  title="Persist valid calendar edits to backend"
+                  title="Save valid calendar edits"
                   aria-label="Save"
                 >
                   <CloudBackup className="size-4 mr-1" />

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from "@heroui/dropdown";
 
+import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
+
 type EditorPageTitleDropdownProps = {
   current: "sections" | "instructors" | "rooms" | "timeslots" | "meeting-patterns" | "constraints";
   title: string;
@@ -19,6 +21,8 @@ const EDITOR_PAGES: Array<{ key: EditorPageTitleDropdownProps["current"]; label:
 ];
 
 export function EditorPageTitleDropdown({ current, title }: EditorPageTitleDropdownProps) {
+  const { confirmLeaveIfUnsaved } = useSchedulingData();
+
   return (
     <Dropdown placement="bottom-start">
       <DropdownTrigger>
@@ -36,6 +40,12 @@ export function EditorPageTitleDropdown({ current, title }: EditorPageTitleDropd
           <DropdownItem key={page.key} textValue={page.label}>
             <Link
               href={page.href}
+              onClick={(event) => {
+                if (page.key === current) return;
+                if (!confirmLeaveIfUnsaved()) {
+                  event.preventDefault();
+                }
+              }}
               className={`block w-full ${
                 page.key === current ? "font-bold text-weatherhead-primary" : "text-slate-700"
               }`}

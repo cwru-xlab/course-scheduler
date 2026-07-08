@@ -14,7 +14,7 @@ import {
 import { sortDefsFromFilterDefs, type EditorColumnSortDef } from "./editorSort";
 import { SECTION_COLUMN_SPECS } from "./editorColumnSpecs";
 import { useEditorActions } from "./EditorActionProvider";
-import { editorRowKey, recentlyAddedRowClass } from "./editorRowHighlight";
+import { editorRowKey } from "./editorRowHighlight";
 import { SectionEditModal } from "./modals/SectionEditModal";
 
 import { EditableCell } from "../EditableCell";
@@ -80,7 +80,7 @@ export const SectionsEditor = ({
   const [hideArchived, setHideArchived] = useHideArchivedSections();
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<Section | null>(null);
-  const { confirmRowAdded, isRowRecentlyAdded } = useEditorActions();
+  const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
   const updateSection = (index: number, field: keyof Section, value: unknown) => {
     const newSections = [...sections];
@@ -391,9 +391,8 @@ export const SectionsEditor = ({
         }
         getRowClassName={({ section }) => {
           const base = "border-t border-default-200";
-          if (isRowRecentlyAdded(editorRowKey("sections", String(section.id)))) {
-            return recentlyAddedRowClass(base, true);
-          }
+          const highlighted = getRowHighlightClass(base, "sections", String(section.id));
+          if (highlighted !== base) return highlighted;
           if (isSectionArchived(section)) return `${base} opacity-60`;
           if (isSectionNew(section)) return `${base} bg-primary-50/40`;
           return base;

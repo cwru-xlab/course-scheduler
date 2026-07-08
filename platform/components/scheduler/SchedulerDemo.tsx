@@ -38,9 +38,6 @@ type ApiError = {
   };
 };
 
-type UpdateSectionsApiSuccess = { status: "ok" };
-type UpdateSectionsApiError = { status: "error"; errors: ValidationError[] };
-type UpdateSectionsApiResponse = UpdateSectionsApiSuccess | UpdateSectionsApiError;
 const LAST_SOLVER_RUN_STORAGE_KEY = "wsom-last-solver-run";
 
 export const SchedulerDemo = () => {
@@ -55,6 +52,8 @@ export const SchedulerDemo = () => {
     updateField,
     resetToMockData,
     hasUnsavedChanges,
+    saveToBackend,
+    isSaving,
   } = useSchedulingData();
 
   const [solution, setSolution] = useState<ScheduleSolution | null>(null);
@@ -62,7 +61,6 @@ export const SchedulerDemo = () => {
   const [diagnostics, setDiagnostics] = useState<ApiError["diagnostics"]>();
   const [solverStatus, setSolverStatus] = useState<"idle" | "loading">("idle");
   const [updateStatus, setUpdateStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [hasChangesSinceLastUpdate, setHasChangesSinceLastUpdate] = useState(false);
   const [spreadsheetStatus, setSpreadsheetStatus] = useState<
     "idle" | "importing" | "import-success" | "import-error" | "exporting" | "export-error"
   >("idle");
@@ -116,52 +114,27 @@ export const SchedulerDemo = () => {
   const markDirtyAndUpdateField = useCallback(
     <K extends keyof SchedulingInput>(field: K, value: SchedulingInput[K]) => {
       updateField(field, value);
-      setHasChangesSinceLastUpdate(true);
     },
     [updateField],
   );
 
-  const updateAllOnServer = async () => {
-    if (!data) return;
+  const saveAll = async () => {
     setUpdateStatus("loading");
     setErrors([]);
     setDiagnostics(undefined);
-    try {
-      const response = await fetch("/api/update-all", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      const result = (await response.json()) as
-        | UpdateSectionsApiResponse
-        | { status?: string; errors?: ValidationError[] };
-
-      if (!response.ok || result.status === "error") {
-        const updateErrors =
-          "errors" in result && Array.isArray(result.errors) ? result.errors : [];
-
-        setErrors(
-          updateErrors.length > 0
-            ? updateErrors
-            : [
-                {
-                  code: "update_failed",
-                  message: "Backend failed to update sections.",
-                },
-              ]
-        );
-        setUpdateStatus("error");
-      } else {
-        setUpdateStatus("success");
-        setHasChangesSinceLastUpdate(false);
-      }
-    } catch {
-      setErrors([{ code: "network_error", message: "Failed to reach solver service." }]);
-      setDiagnostics(undefined);
+    const ok = await saveToBackend();
+    if (ok) {
+      setUpdateStatus("success");
+    } else {
+      setErrors([
+        {
+          code: "save_failed",
+          message: "Failed to save changes.",
+        },
+      ]);
       setUpdateStatus("error");
-    } finally {
-      setTimeout(() => setUpdateStatus("idle"), 3000);
     }
+    setTimeout(() => setUpdateStatus("idle"), 3000);
   };
 
   const runSolver = async (removeInstructors?: string[]) => {
@@ -246,7 +219,6 @@ export const SchedulerDemo = () => {
       updateData(result.scheduling_input);
       setSolution(null);
       setDiagnostics(undefined);
-      setHasChangesSinceLastUpdate(true);
       setSpreadsheetStatus("import-success");
       setSpreadsheetMessage(result.message);
     } catch (err) {
@@ -347,7 +319,7 @@ export const SchedulerDemo = () => {
               </span>
               {hasUnsavedChanges && (
                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
-                  Saving…
+                  Unsaved changes
                 </span>
               )}
             </div>
@@ -357,7 +329,6 @@ export const SchedulerDemo = () => {
             className="bg-slate-100 dark:bg-default-100 text-slate-700 dark:text-foreground font-bold border border-slate-200 dark:border-default-200"
             onPress={async () => {
               await resetToMockData();
-              setHasChangesSinceLastUpdate(true);
             }}
           >
             Reset to Mock Data
@@ -441,24 +412,24 @@ export const SchedulerDemo = () => {
         <Button
           className={clsx(
             "font-bold shadow-lg transition-all",
-            hasChangesSinceLastUpdate && updateStatus !== "loading"
+            hasUnsavedChanges && updateStatus !== "loading"
               ? "bg-weatherhead-primary text-white shadow-weatherhead-primary/20 hover:opacity-90"
               : "bg-slate-100 dark:bg-default-100 text-slate-500 dark:text-default-500 cursor-not-allowed"
           )}
-          onPress={updateAllOnServer}
-          isLoading={updateStatus === "loading"}
-          isDisabled={!hasChangesSinceLastUpdate || updateStatus === "loading"}
+          onPress={saveAll}
+          isLoading={updateStatus === "loading" || isSaving}
+          isDisabled={!hasUnsavedChanges || updateStatus === "loading" || isSaving}
         >
-          Update Backend
+          Save
         </Button>
         {updateStatus === "success" && (
-          <span className="text-sm text-emerald-600 dark:text-emerald-400 font-semibold">All data synced to solver.</span>
+          <span className="text-sm text-emerald-600 dark:text-emerald-400 font-semibold">All changes saved.</span>
         )}
         {updateStatus === "error" && (
-          <span className="text-sm text-red-600 dark:text-red-400 font-semibold">Failed to update backend. Please try again.</span>
+          <span className="text-sm text-red-600 dark:text-red-400 font-semibold">Failed to save. Please try again.</span>
         )}
-        {!hasChangesSinceLastUpdate && updateStatus === "idle" && (
-          <span className="text-xs text-slate-400 dark:text-default-400">No edits since last update.</span>
+        {!hasUnsavedChanges && updateStatus === "idle" && (
+          <span className="text-xs text-slate-400 dark:text-default-400">All changes saved.</span>
         )}
       </div>
 

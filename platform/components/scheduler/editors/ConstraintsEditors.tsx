@@ -15,7 +15,7 @@ import { sortDefsFromFilterDefs } from "./editorSort";
 import { TIMESLOT_TIME_OPTIONS } from "./timeslotEditorConstants";
 import { EditorRowActions } from "./EditorRowActions";
 import { useEditorActions } from "./EditorActionProvider";
-import { editorRowKey, recentlyAddedRowClass } from "./editorRowHighlight";
+import { editorRowKey } from "./editorRowHighlight";
 import {
   BLOCKED_TIME_COLUMN_SPECS,
   CROSSLIST_GROUP_COLUMN_SPECS,
@@ -61,7 +61,7 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<CrossListGroup | null>(null);
-  const { confirmRowAdded, isRowRecentlyAdded } = useEditorActions();
+  const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
   const updateGroup = (index: number, field: keyof CrossListGroup, value: unknown) => {
     const newGroups = [...groups];
@@ -176,9 +176,10 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
             `note-constraints-crosslist-groups-${encodeURIComponent(String(group.id))}`
           }
           getRowClassName={({ group }) =>
-            recentlyAddedRowClass(
+            getRowHighlightClass(
               "border-t border-default-200",
-              isRowRecentlyAdded(editorRowKey("constraints-crosslist-groups", String(group.id))),
+              "constraints-crosslist-groups",
+              String(group.id),
             )
           }
           renderCell={renderCrossListCell}
@@ -256,7 +257,7 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<NoOverlapGroup | null>(null);
-  const { confirmRowAdded, isRowRecentlyAdded } = useEditorActions();
+  const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
   const updateGroup = (index: number, field: keyof NoOverlapGroup, value: unknown) => {
     const newGroups = [...groups];
@@ -385,9 +386,10 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
             `note-constraints-no-overlap-groups-${encodeURIComponent(String(group.id))}`
           }
           getRowClassName={({ group }) =>
-            recentlyAddedRowClass(
+            getRowHighlightClass(
               "border-t border-default-200",
-              isRowRecentlyAdded(editorRowKey("constraints-no-overlap-groups", String(group.id))),
+              "constraints-no-overlap-groups",
+              String(group.id),
             )
           }
           renderCell={renderNoOverlapCell}
@@ -514,7 +516,7 @@ export const BlockedTimesEditor = ({
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<BlockedTime | null>(null);
-  const { confirmRowAdded, isRowRecentlyAdded } = useEditorActions();
+  const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
   const updateBlockedTime = (index: number, field: keyof BlockedTime, value: unknown) => {
     const newBlockedTimes = [...blockedTimes];
@@ -767,9 +769,10 @@ export const BlockedTimesEditor = ({
             `note-constraints-blocked-times-${encodeURIComponent(`${blocked.scope}-${blocked.reason || "row"}-${idx}`)}`
           }
           getRowClassName={({ index: rowIndex }) =>
-            recentlyAddedRowClass(
+            getRowHighlightClass(
               "border-t border-default-200",
-              isRowRecentlyAdded(editorRowKey("constraints-blocked-times", String(rowIndex))),
+              "constraints-blocked-times",
+              String(rowIndex),
             )
           }
           renderCell={renderBlockedTimeCell}
@@ -858,7 +861,7 @@ export const LockedAssignmentsEditor = ({
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<LockedAssignment | null>(null);
-  const { confirmRowAdded, isRowRecentlyAdded } = useEditorActions();
+  const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
   const updateLock = (index: number, field: keyof LockedAssignment, value: unknown) => {
     const newLocks = [...lockedAssignments];
@@ -994,10 +997,11 @@ export const LockedAssignmentsEditor = ({
           getRowId={({ lock }, idx) =>
             `note-constraints-locked-assignments-${encodeURIComponent(`${lock.section_id || "row"}-${idx}`)}`
           }
-          getRowClassName={({ index: rowIndex }) =>
-            recentlyAddedRowClass(
+          getRowClassName={({ lock, index: rowIndex }) =>
+            getRowHighlightClass(
               "border-t border-default-200",
-              isRowRecentlyAdded(editorRowKey("constraints-locked-assignments", String(rowIndex))),
+              "constraints-locked-assignments",
+              lock.section_id || String(rowIndex),
             )
           }
           renderCell={renderLockedCell}
@@ -1089,7 +1093,7 @@ export const SoftLocksEditor = ({
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<SoftLock | null>(null);
-  const { confirmRowAdded, isRowRecentlyAdded } = useEditorActions();
+  const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
   const updateLock = (index: number, field: keyof SoftLock, value: unknown) => {
     const newLocks = [...softLocks];
@@ -1240,10 +1244,11 @@ export const SoftLocksEditor = ({
           getRowId={({ lock }, idx) =>
             `note-constraints-soft-locks-${encodeURIComponent(`${lock.section_id || "row"}-${idx}`)}`
           }
-          getRowClassName={({ index: rowIndex }) =>
-            recentlyAddedRowClass(
+          getRowClassName={({ lock, index: rowIndex }) =>
+            getRowHighlightClass(
               "border-t border-default-200",
-              isRowRecentlyAdded(editorRowKey("constraints-soft-locks", String(rowIndex))),
+              "constraints-soft-locks",
+              lock.section_id || String(rowIndex),
             )
           }
           renderCell={renderSoftLockCell}

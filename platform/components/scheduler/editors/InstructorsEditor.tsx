@@ -14,7 +14,7 @@ import {
 import { sortDefsFromFilterDefs } from "./editorSort";
 import { INSTRUCTOR_COLUMN_SPECS } from "./editorColumnSpecs";
 import { useEditorActions } from "./EditorActionProvider";
-import { editorRowKey, recentlyAddedRowClass } from "./editorRowHighlight";
+import { editorRowKey } from "./editorRowHighlight";
 import { InstructorEditModal } from "./modals/InstructorEditModal";
 
 import { EditableCell } from "../EditableCell";
@@ -71,7 +71,7 @@ export const InstructorsEditor = ({
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<Instructor | null>(null);
-  const { confirmRowAdded, isRowRecentlyAdded } = useEditorActions();
+  const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
   const updateInstructor = (index: number, field: string, value: unknown) => {
     const newInstructors = [...instructors];
@@ -273,9 +273,10 @@ export const InstructorsEditor = ({
         getRowKey={({ inst, index }) => `${inst.id}-${index}`}
         getRowId={({ inst }) => `note-instructors-${encodeURIComponent(String(inst.id))}`}
         getRowClassName={({ inst }) =>
-          recentlyAddedRowClass(
+          getRowHighlightClass(
             "border-t border-default-200",
-            isRowRecentlyAdded(editorRowKey("instructors", String(inst.id))),
+            "instructors",
+            String(inst.id),
           )
         }
         renderCell={renderCell}
