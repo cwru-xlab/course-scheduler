@@ -12,6 +12,8 @@ import {
   type EditorFiltersState,
 } from "./editorFilters";
 import { SECTION_COLUMN_SPECS } from "./editorColumnSpecs";
+import { useEditorActions } from "./EditorActionProvider";
+import { editorRowKey, recentlyAddedRowClass } from "./editorRowHighlight";
 import { SectionEditModal } from "./modals/SectionEditModal";
 
 import { EditableCell } from "../EditableCell";
@@ -21,6 +23,8 @@ import { MultiSelect } from "../MultiSelect";
 import { RowNotesButton } from "../RowNotesButton";
 
 import type { Section, SectionState } from "@/lib/scheduling/types";
+import { useHideArchivedSections } from "@/lib/editor-ui-preferences";
+import { insertAtSortedIdPosition } from "@/lib/scheduling/insertAtSortedIdPosition";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
 import {
   isSectionArchived,
@@ -44,11 +48,14 @@ type SectionsEditorProps = {
 
 type SectionRow = { section: Section; index: number };
 
+const SECTION_COURSE_PLACEHOLDER = "Introduction to Accounting";
+const SECTION_CODE_PLACEHOLDER = "101";
+
 const createEmptySection = (existing: Section[]): Section => ({
   id: nextIntegerId(existing.map((s) => s.id)),
   course_id: "",
   department: "",
-  section_code: "A",
+  section_code: "",
   instructor_id: "",
   expected_enrollment: 20,
   enrollment_cap: 30,
@@ -69,8 +76,10 @@ export const SectionsEditor = ({
 }: SectionsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
-  const [hideArchived, setHideArchived] = useState(false);
+  const [hideArchived, setHideArchived] = useHideArchivedSections();
   const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [addDraft, setAddDraft] = useState<Section | null>(null);
+  const { confirmRowAdded, isRowRecentlyAdded } = useEditorActions();
 
   const updateSection = (index: number, field: keyof Section, value: unknown) => {
     const newSections = [...sections];
@@ -79,7 +88,7 @@ export const SectionsEditor = ({
   };
 
   const addSection = () => {
-    onUpdate([...sections, createEmptySection(sections)]);
+    setAddDraft(createEmptySection(sections));
   };
 
   const deleteSection = (index: number) => {
@@ -204,7 +213,7 @@ export const SectionsEditor = ({
           <EditableCell
             value={section.course_id}
             onChange={(v) => updateSection(idx, "course_id", v)}
-            placeholder="COURSE-XXX"
+            placeholder={SECTION_COURSE_PLACEHOLDER}
           />
         );
       case "code":
@@ -212,6 +221,7 @@ export const SectionsEditor = ({
           <EditableCell
             value={section.section_code}
             onChange={(v) => updateSection(idx, "section_code", v)}
+            placeholder={SECTION_CODE_PLACEHOLDER}
           />
         );
       case "state":
@@ -343,6 +353,9 @@ export const SectionsEditor = ({
         }
         getRowClassName={({ section }) => {
           const base = "border-t border-default-200";
+          if (isRowRecentlyAdded(editorRowKey("sections", String(section.id)))) {
+            return recentlyAddedRowClass(base, true);
+          }
           if (isSectionArchived(section)) return `${base} opacity-60`;
           if (isSectionNew(section)) return `${base} bg-primary-50/40`;
           return base;
@@ -375,6 +388,25 @@ export const SectionsEditor = ({
             const next = [...sections];
             next[editIndex] = updated;
             onUpdate(next);
+          }}
+        />
+      ) : null}
+      {addDraft ? (
+        <SectionEditModal
+          isOpen
+          mode="create"
+          section={addDraft}
+          instructorOptions={instructorOptions}
+          meetingPatternOptions={meetingPatternOptions}
+          crosslistGroupOptions={crosslistGroupOptions}
+          onClose={() => setAddDraft(null)}
+          onSave={(created) => {
+            onUpdate(insertAtSortedIdPosition(sections, created));
+            setAddDraft(null);
+            confirmRowAdded({
+              rowKey: editorRowKey("sections", String(created.id)),
+              message: `Successfully added section ${created.id}.`,
+            });
           }}
         />
       ) : null}

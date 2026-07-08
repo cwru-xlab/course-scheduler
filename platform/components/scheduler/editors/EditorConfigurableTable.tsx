@@ -52,7 +52,12 @@ export function EditorConfigurableTable<TRow>({
 
   return (
     <>
-      <EditorColumnPicker specs={specs} visibleIds={visibleIds} onToggle={toggleColumn} />
+      <EditorColumnPicker
+        editorKey={editorKey}
+        specs={specs}
+        visibleIds={visibleIds}
+        onToggle={toggleColumn}
+      />
       <div ref={containerRef} className="w-full min-w-0 overflow-hidden">
         <table
           ref={tableRef}

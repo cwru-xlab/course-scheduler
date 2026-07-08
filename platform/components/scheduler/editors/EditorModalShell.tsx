@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { type ReactNode } from "react";
+
+import { ViewportModal } from "../ViewportModal";
 
 const MODAL_Z = 1050;
 
@@ -22,27 +23,8 @@ export function EditorModalShell({
   footer,
   maxWidthClass = "max-w-2xl",
 }: EditorModalShellProps) {
-  useEffect(() => {
-    if (!isOpen) return;
-    const prevBodyOverflow = document.body.style.overflow;
-    const prevHtmlOverflow = document.documentElement.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prevBodyOverflow;
-      document.documentElement.style.overflow = prevHtmlOverflow;
-    };
-  }, [isOpen]);
-
-  if (!isOpen || typeof document === "undefined") return null;
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[1050] flex items-center justify-center bg-black/40 p-4 backdrop-blur-[1px] overscroll-none"
-      style={{ zIndex: MODAL_Z }}
-      role="presentation"
-      onClick={onClose}
-    >
+  return (
+    <ViewportModal isOpen={isOpen} onClose={onClose} zIndex={MODAL_Z}>
       <div
         className={`flex max-h-[min(85vh,720px)] w-full ${maxWidthClass} flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl`}
         role="dialog"
@@ -69,7 +51,6 @@ export function EditorModalShell({
           </div>
         ) : null}
       </div>
-    </div>,
-    document.body,
+    </ViewportModal>
   );
 }

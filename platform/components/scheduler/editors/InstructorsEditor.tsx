@@ -12,6 +12,8 @@ import {
   type EditorFiltersState,
 } from "./editorFilters";
 import { INSTRUCTOR_COLUMN_SPECS } from "./editorColumnSpecs";
+import { useEditorActions } from "./EditorActionProvider";
+import { editorRowKey, recentlyAddedRowClass } from "./editorRowHighlight";
 import { InstructorEditModal } from "./modals/InstructorEditModal";
 
 import { EditableCell } from "../EditableCell";
@@ -20,6 +22,7 @@ import { MultiSelect } from "../MultiSelect";
 import { RowNotesButton } from "../RowNotesButton";
 
 import type { Instructor } from "@/lib/scheduling/types";
+import { insertAtSortedIdPosition } from "@/lib/scheduling/insertAtSortedIdPosition";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
 
 type InstructorRow = { inst: Instructor; index: number };
@@ -66,6 +69,8 @@ export const InstructorsEditor = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [addDraft, setAddDraft] = useState<Instructor | null>(null);
+  const { confirmRowAdded, isRowRecentlyAdded } = useEditorActions();
 
   const updateInstructor = (index: number, field: string, value: unknown) => {
     const newInstructors = [...instructors];
@@ -82,7 +87,7 @@ export const InstructorsEditor = ({
   };
 
   const addInstructor = () => {
-    onUpdate([...instructors, createEmptyInstructor(instructors)]);
+    setAddDraft(createEmptyInstructor(instructors));
   };
 
   const deleteInstructor = (index: number) => {
@@ -253,6 +258,12 @@ export const InstructorsEditor = ({
         rows={filteredInstructors}
         getRowKey={({ inst, index }) => `${inst.id}-${index}`}
         getRowId={({ inst }) => `note-instructors-${encodeURIComponent(String(inst.id))}`}
+        getRowClassName={({ inst }) =>
+          recentlyAddedRowClass(
+            "border-t border-default-200",
+            isRowRecentlyAdded(editorRowKey("instructors", String(inst.id))),
+          )
+        }
         renderCell={renderCell}
         renderActions={({ inst, index: idx }) => (
           <EditorRowActions
@@ -280,6 +291,24 @@ export const InstructorsEditor = ({
             const next = [...instructors];
             next[editIndex] = updated;
             onUpdate(next);
+          }}
+        />
+      ) : null}
+      {addDraft ? (
+        <InstructorEditModal
+          isOpen
+          mode="create"
+          instructor={addDraft}
+          meetingPatternOptions={meetingPatternOptions}
+          timeslotOptions={timeslotOptions}
+          onClose={() => setAddDraft(null)}
+          onSave={(created) => {
+            onUpdate(insertAtSortedIdPosition(instructors, created));
+            setAddDraft(null);
+            confirmRowAdded({
+              rowKey: editorRowKey("instructors", String(created.id)),
+              message: `Successfully added instructor ${created.name || created.id}.`,
+            });
           }}
         />
       ) : null}

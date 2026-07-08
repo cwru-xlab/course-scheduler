@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { MessageSquare, Reply } from "lucide-react";
+import { EditorModalShell } from "@/components/scheduler/editors/EditorModalShell";
 import type { RowNote as StoredRowNote } from "@/lib/notes/types";
 import { NOTES_STORAGE_PREFIX } from "@/lib/notes/types";
 import type { SchedulingInput } from "@/lib/scheduling/types";
@@ -520,74 +521,64 @@ export default function NotesFeedPage() {
         )}
       </div>
 
-      {selectedItem && (
-        <div
-          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px] flex items-center justify-center p-4"
-          onClick={() => setSelectedItem(null)}
-        >
-          <div
-            className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-              <h3 className="text-lg font-black text-slate-900">Linked Row Details</h3>
-              <button
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
-                onClick={() => setSelectedItem(null)}
-              >
-                Close
-              </button>
-            </div>
-            <div className="space-y-4 px-6 py-5 text-sm">
-              <div>
-                <div className="text-xs font-black uppercase tracking-wider text-slate-400">
-                  Feed item
-                </div>
-                <div className="mt-2 text-slate-800">{selectedItem.text}</div>
-                <div className="mt-1 text-xs text-slate-500">
-                  {scopeToLabel[selectedItem.scope] ?? selectedItem.scope} -{" "}
-                  {new Date(selectedItem.createdAt).toLocaleString()} - {selectedItem.author}
-                </div>
+      <EditorModalShell
+        isOpen={Boolean(selectedItem)}
+        title="Linked Row Details"
+        onClose={() => setSelectedItem(null)}
+        maxWidthClass="max-w-2xl"
+        footer={
+          selectedItem ? (
+            <Link
+              href={editorHrefWithNotesModal(selectedItem)}
+              className="rounded-lg bg-[#137fec] px-4 py-2 text-white text-sm font-bold hover:opacity-90"
+            >
+              Open notes for this row
+            </Link>
+          ) : null
+        }
+      >
+        {selectedItem ? (
+          <>
+            <div>
+              <div className="text-xs font-black uppercase tracking-wider text-slate-400">
+                Feed item
               </div>
-              <div>
-                <div className="text-xs font-black uppercase tracking-wider text-slate-400">
-                  Referenced row
-                </div>
-                {(() => {
-                  const preview = buildRowPreview(selectedItem, scheduleData);
-                  if (!preview) {
-                    return (
-                      <div className="mt-2 text-slate-500">
-                        Row details unavailable. You can still open the linked row directly.
-                      </div>
-                    );
-                  }
+              <div className="mt-2 text-slate-800">{selectedItem.text}</div>
+              <div className="mt-1 text-xs text-slate-500">
+                {scopeToLabel[selectedItem.scope] ?? selectedItem.scope} -{" "}
+                {new Date(selectedItem.createdAt).toLocaleString()} - {selectedItem.author}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs font-black uppercase tracking-wider text-slate-400">
+                Referenced row
+              </div>
+              {(() => {
+                const preview = buildRowPreview(selectedItem, scheduleData);
+                if (!preview) {
                   return (
-                    <div className="mt-2 rounded-lg border border-slate-200 p-3">
-                      <div className="font-semibold text-slate-900">{preview.title}</div>
-                      <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {preview.fields.map((f) => (
-                          <div key={f.label} className="text-slate-700">
-                            <span className="font-semibold">{f.label}:</span> {f.value}
-                          </div>
-                        ))}
-                      </div>
+                    <div className="mt-2 text-slate-500">
+                      Row details unavailable. You can still open the linked row directly.
                     </div>
                   );
-                })()}
-              </div>
-              <div className="flex justify-end">
-                <Link
-                  href={editorHrefWithNotesModal(selectedItem)}
-                  className="rounded-lg bg-[#137fec] px-4 py-2 text-white text-sm font-bold hover:opacity-90"
-                >
-                  Open notes for this row
-                </Link>
-              </div>
+                }
+                return (
+                  <div className="mt-2 rounded-lg border border-slate-200 p-3">
+                    <div className="font-semibold text-slate-900">{preview.title}</div>
+                    <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {preview.fields.map((f) => (
+                        <div key={f.label} className="text-slate-700">
+                          <span className="font-semibold">{f.label}:</span> {f.value}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        ) : null}
+      </EditorModalShell>
     </div>
   );
 }

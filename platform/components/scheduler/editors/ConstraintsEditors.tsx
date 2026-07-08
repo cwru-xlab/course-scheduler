@@ -13,6 +13,8 @@ import {
 } from "./editorFilters";
 import { TIMESLOT_TIME_OPTIONS } from "./timeslotEditorConstants";
 import { EditorRowActions } from "./EditorRowActions";
+import { useEditorActions } from "./EditorActionProvider";
+import { editorRowKey, recentlyAddedRowClass } from "./editorRowHighlight";
 import {
   BLOCKED_TIME_COLUMN_SPECS,
   CROSSLIST_GROUP_COLUMN_SPECS,
@@ -34,6 +36,7 @@ import { MultiSelect } from "../MultiSelect";
 import { RowNotesButton } from "../RowNotesButton";
 
 import type { CrossListGroup, NoOverlapGroup, BlockedTime, LockedAssignment, SoftLock } from "@/lib/scheduling/types";
+import { insertAtSortedIdPosition } from "@/lib/scheduling/insertAtSortedIdPosition";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
 import {
   SCHEDULING_WINDOW_END_HOUR,
@@ -56,6 +59,8 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [addDraft, setAddDraft] = useState<CrossListGroup | null>(null);
+  const { confirmRowAdded, isRowRecentlyAdded } = useEditorActions();
 
   const updateGroup = (index: number, field: keyof CrossListGroup, value: unknown) => {
     const newGroups = [...groups];
@@ -63,7 +68,7 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
     onUpdate(newGroups);
   };
 
-  const addGroup = () => onUpdate([...groups, createEmptyCrossListGroup(groups)]);
+  const addGroup = () => setAddDraft(createEmptyCrossListGroup(groups));
   const deleteGroup = (index: number) => onUpdate(groups.filter((_, i) => i !== index));
 
   type CrossListRow = { group: CrossListGroup; index: number };
@@ -156,6 +161,12 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
           getRowId={({ group }) =>
             `note-constraints-crosslist-groups-${encodeURIComponent(String(group.id))}`
           }
+          getRowClassName={({ group }) =>
+            recentlyAddedRowClass(
+              "border-t border-default-200",
+              isRowRecentlyAdded(editorRowKey("constraints-crosslist-groups", String(group.id))),
+            )
+          }
           renderCell={renderCrossListCell}
           renderActions={({ group, index: idx }) => (
             <EditorRowActions
@@ -192,6 +203,23 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
           }}
         />
       ) : null}
+      {addDraft ? (
+        <CrossListGroupEditModal
+          isOpen
+          mode="create"
+          group={addDraft}
+          sectionOptions={sectionOptions}
+          onClose={() => setAddDraft(null)}
+          onSave={(created) => {
+            onUpdate(insertAtSortedIdPosition(groups, created));
+            setAddDraft(null);
+            confirmRowAdded({
+              rowKey: editorRowKey("constraints-crosslist-groups", String(created.id)),
+              message: `Successfully added cross-list group ${created.id}.`,
+            });
+          }}
+        />
+      ) : null}
     </Card>
   );
 };
@@ -213,6 +241,8 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [addDraft, setAddDraft] = useState<NoOverlapGroup | null>(null);
+  const { confirmRowAdded, isRowRecentlyAdded } = useEditorActions();
 
   const updateGroup = (index: number, field: keyof NoOverlapGroup, value: unknown) => {
     const newGroups = [...groups];
@@ -220,7 +250,7 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
     onUpdate(newGroups);
   };
 
-  const addGroup = () => onUpdate([...groups, createEmptyNoOverlapGroup(groups)]);
+  const addGroup = () => setAddDraft(createEmptyNoOverlapGroup(groups));
   const deleteGroup = (index: number) => onUpdate(groups.filter((_, i) => i !== index));
 
   type NoOverlapRow = { group: NoOverlapGroup; index: number };
@@ -327,6 +357,12 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
           getRowId={({ group }) =>
             `note-constraints-no-overlap-groups-${encodeURIComponent(String(group.id))}`
           }
+          getRowClassName={({ group }) =>
+            recentlyAddedRowClass(
+              "border-t border-default-200",
+              isRowRecentlyAdded(editorRowKey("constraints-no-overlap-groups", String(group.id))),
+            )
+          }
           renderCell={renderNoOverlapCell}
           renderActions={({ group, index: idx }) => (
             <EditorRowActions
@@ -360,6 +396,23 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
             const next = [...groups];
             next[editIndex] = updated;
             onUpdate(next);
+          }}
+        />
+      ) : null}
+      {addDraft ? (
+        <NoOverlapGroupEditModal
+          isOpen
+          mode="create"
+          group={addDraft}
+          sectionOptions={sectionOptions}
+          onClose={() => setAddDraft(null)}
+          onSave={(created) => {
+            onUpdate(insertAtSortedIdPosition(groups, created));
+            setAddDraft(null);
+            confirmRowAdded({
+              rowKey: editorRowKey("constraints-no-overlap-groups", String(created.id)),
+              message: `Successfully added no-overlap group ${created.id}.`,
+            });
           }}
         />
       ) : null}
@@ -433,6 +486,8 @@ export const BlockedTimesEditor = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [addDraft, setAddDraft] = useState<BlockedTime | null>(null);
+  const { confirmRowAdded, isRowRecentlyAdded } = useEditorActions();
 
   const updateBlockedTime = (index: number, field: keyof BlockedTime, value: unknown) => {
     const newBlockedTimes = [...blockedTimes];
@@ -440,7 +495,7 @@ export const BlockedTimesEditor = ({
     onUpdate(newBlockedTimes);
   };
 
-  const addBlockedTime = () => onUpdate([...blockedTimes, createEmptyBlockedTime()]);
+  const addBlockedTime = () => setAddDraft(createEmptyBlockedTime());
   const deleteBlockedTime = (index: number) => onUpdate(blockedTimes.filter((_, i) => i !== index));
   const instructorOptionsWithNone = [{ key: "__none__", label: "(Any instructor)" }, ...instructorOptions];
   const roomOptionsWithNone = [{ key: "__none__", label: "(Any room)" }, ...roomOptions];
@@ -678,6 +733,12 @@ export const BlockedTimesEditor = ({
           getRowId={({ blocked }, idx) =>
             `note-constraints-blocked-times-${encodeURIComponent(`${blocked.scope}-${blocked.reason || "row"}-${idx}`)}`
           }
+          getRowClassName={({ index: rowIndex }) =>
+            recentlyAddedRowClass(
+              "border-t border-default-200",
+              isRowRecentlyAdded(editorRowKey("constraints-blocked-times", String(rowIndex))),
+            )
+          }
           renderCell={renderBlockedTimeCell}
           renderActions={({ blocked }, idx) => (
             <EditorRowActions
@@ -715,6 +776,25 @@ export const BlockedTimesEditor = ({
           }}
         />
       ) : null}
+      {addDraft ? (
+        <BlockedTimeEditModal
+          isOpen
+          mode="create"
+          blocked={addDraft}
+          instructorOptions={instructorOptions}
+          roomOptions={roomOptions}
+          onClose={() => setAddDraft(null)}
+          onSave={(created) => {
+            const newIndex = blockedTimes.length;
+            onUpdate([...blockedTimes, created]);
+            setAddDraft(null);
+            confirmRowAdded({
+              rowKey: editorRowKey("constraints-blocked-times", String(newIndex)),
+              message: "Successfully added blocked time.",
+            });
+          }}
+        />
+      ) : null}
     </Card>
   );
 };
@@ -744,6 +824,8 @@ export const LockedAssignmentsEditor = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [addDraft, setAddDraft] = useState<LockedAssignment | null>(null);
+  const { confirmRowAdded, isRowRecentlyAdded } = useEditorActions();
 
   const updateLock = (index: number, field: keyof LockedAssignment, value: unknown) => {
     const newLocks = [...lockedAssignments];
@@ -751,7 +833,7 @@ export const LockedAssignmentsEditor = ({
     onUpdate(newLocks);
   };
 
-  const addLock = () => onUpdate([...lockedAssignments, createEmptyLockedAssignment()]);
+  const addLock = () => setAddDraft(createEmptyLockedAssignment());
   const deleteLock = (index: number) => onUpdate(lockedAssignments.filter((_, i) => i !== index));
 
   const roomOptionsWithNone = [
@@ -873,6 +955,12 @@ export const LockedAssignmentsEditor = ({
           getRowId={({ lock }, idx) =>
             `note-constraints-locked-assignments-${encodeURIComponent(`${lock.section_id || "row"}-${idx}`)}`
           }
+          getRowClassName={({ index: rowIndex }) =>
+            recentlyAddedRowClass(
+              "border-t border-default-200",
+              isRowRecentlyAdded(editorRowKey("constraints-locked-assignments", String(rowIndex))),
+            )
+          }
           renderCell={renderLockedCell}
           renderActions={({ lock }, idx) => (
             <EditorRowActions
@@ -911,6 +999,26 @@ export const LockedAssignmentsEditor = ({
           }}
         />
       ) : null}
+      {addDraft ? (
+        <LockedAssignmentEditModal
+          isOpen
+          mode="create"
+          lock={addDraft}
+          sectionOptions={sectionOptions}
+          timeslotOptions={timeslotOptions}
+          roomOptions={roomOptions}
+          onClose={() => setAddDraft(null)}
+          onSave={(created) => {
+            const newIndex = lockedAssignments.length;
+            onUpdate([...lockedAssignments, created]);
+            setAddDraft(null);
+            confirmRowAdded({
+              rowKey: editorRowKey("constraints-locked-assignments", String(newIndex)),
+              message: `Successfully added locked assignment${created.section_id ? ` for section ${created.section_id}` : ""}.`,
+            });
+          }}
+        />
+      ) : null}
     </Card>
   );
 };
@@ -941,6 +1049,8 @@ export const SoftLocksEditor = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [addDraft, setAddDraft] = useState<SoftLock | null>(null);
+  const { confirmRowAdded, isRowRecentlyAdded } = useEditorActions();
 
   const updateLock = (index: number, field: keyof SoftLock, value: unknown) => {
     const newLocks = [...softLocks];
@@ -948,7 +1058,7 @@ export const SoftLocksEditor = ({
     onUpdate(newLocks);
   };
 
-  const addLock = () => onUpdate([...softLocks, createEmptySoftLock()]);
+  const addLock = () => setAddDraft(createEmptySoftLock());
   const deleteLock = (index: number) => onUpdate(softLocks.filter((_, i) => i !== index));
 
   const roomOptionsWithNone = [
@@ -1085,6 +1195,12 @@ export const SoftLocksEditor = ({
           getRowId={({ lock }, idx) =>
             `note-constraints-soft-locks-${encodeURIComponent(`${lock.section_id || "row"}-${idx}`)}`
           }
+          getRowClassName={({ index: rowIndex }) =>
+            recentlyAddedRowClass(
+              "border-t border-default-200",
+              isRowRecentlyAdded(editorRowKey("constraints-soft-locks", String(rowIndex))),
+            )
+          }
           renderCell={renderSoftLockCell}
           renderActions={({ lock }, idx) => (
             <EditorRowActions
@@ -1120,6 +1236,26 @@ export const SoftLocksEditor = ({
             const next = [...softLocks];
             next[editIndex] = updated;
             onUpdate(next);
+          }}
+        />
+      ) : null}
+      {addDraft ? (
+        <SoftLockEditModal
+          isOpen
+          mode="create"
+          lock={addDraft}
+          sectionOptions={sectionOptions}
+          timeslotOptions={timeslotOptions}
+          roomOptions={roomOptions}
+          onClose={() => setAddDraft(null)}
+          onSave={(created) => {
+            const newIndex = softLocks.length;
+            onUpdate([...softLocks, created]);
+            setAddDraft(null);
+            confirmRowAdded({
+              rowKey: editorRowKey("constraints-soft-locks", String(newIndex)),
+              message: `Successfully added soft lock${created.section_id ? ` for section ${created.section_id}` : ""}.`,
+            });
           }}
         />
       ) : null}

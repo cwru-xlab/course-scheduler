@@ -51,6 +51,7 @@ import type {
   SchedulingInput,
 } from "@/lib/scheduling/types";
 import { MultiSelect } from "@/components/scheduler/MultiSelect";
+import { ViewportModal } from "@/components/scheduler/ViewportModal";
 import {
   LAST_SOLVER_ERROR_STORAGE_KEY,
   LAST_SOLVER_RUN_STORAGE_KEY,
@@ -1131,20 +1132,6 @@ type MeetingPatternPlacementOption = {
   useLayoutEffect(() => {
     setDragFeedbackToastMount(document.body);
   }, []);
-
-  useEffect(() => {
-    if (!crosslistPickerModal && !sectionModal && !meetingPatternSelectionModal) {
-      return;
-    }
-    const prevBodyOverflow = document.body.style.overflow;
-    const prevHtmlOverflow = document.documentElement.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prevBodyOverflow;
-      document.documentElement.style.overflow = prevHtmlOverflow;
-    };
-  }, [crosslistPickerModal, sectionModal, meetingPatternSelectionModal]);
 
   useEffect(() => {
     let mounted = true;
@@ -4355,14 +4342,15 @@ type MeetingPatternPlacementOption = {
           dragFeedbackToastMount,
         )}
 
-      {saveScheduleModal.isOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px] flex items-center justify-center p-4"
-          onClick={() => {
-            if (saveScheduleModal.isSaving) return;
-            closeSaveScheduleModal();
-          }}
-        >
+      <ViewportModal
+        isOpen={saveScheduleModal.isOpen}
+        onClose={() => {
+          if (saveScheduleModal.isSaving) return;
+          closeSaveScheduleModal();
+        }}
+        zIndex={1000}
+      >
+        {saveScheduleModal.isOpen ? (
           <div
             className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
@@ -4429,406 +4417,397 @@ type MeetingPatternPlacementOption = {
               </div>
             </div>
           </div>
-        </div>
-      )}
+        ) : null}
+      </ViewportModal>
 
-      {crosslistPickerModal &&
-        dragFeedbackToastMount &&
-        createPortal(
+      <ViewportModal
+        isOpen={Boolean(crosslistPickerModal)}
+        onClose={() => setCrosslistPickerModal(null)}
+        zIndex={1000}
+      >
+        {crosslistPickerModal ? (
           <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-[1px] overscroll-none"
-            role="presentation"
-            onClick={() => setCrosslistPickerModal(null)}
+            className="flex max-h-[min(85vh,640px)] w-full max-w-lg flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="crosslist-picker-modal-title"
+            onClick={(e) => e.stopPropagation()}
           >
-            <div
-              className="flex max-h-[min(85vh,640px)] w-full max-w-lg flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="crosslist-picker-modal-title"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">
-                <div>
-                  <h3
-                    id="crosslist-picker-modal-title"
-                    className="text-lg font-black text-slate-900"
-                  >
-                    Cross-list {crosslistPickerModal.crosslistGroupId}
-                  </h3>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {crosslistPickerModal.memberSections.length} courses linked. Select a section to
-                    view or edit its details.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
-                  onClick={() => setCrosslistPickerModal(null)}
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <h3
+                  id="crosslist-picker-modal-title"
+                  className="text-lg font-black text-slate-900"
                 >
-                  Close
-                </button>
-              </div>
-              {data && (
-                <CrosslistScheduleBanner
-                  members={crosslistPickerModal.memberSections}
-                  assignmentsBySection={assignmentsBySection}
-                  solverTimeslotIdsBySection={solverTimeslotIdsBySection}
-                  timeslotById={timeslotById}
-                  rooms={data.rooms}
-                />
-              )}
-              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 space-y-2">
-                {crosslistPickerModal.memberSections.map((member) => {
-                  const professor =
-                    instructorById.get(member.instructor_id)?.name?.trim() ||
-                    member.instructor_id ||
-                    "—";
-                  const courseLine = [
-                    (member.department ?? "").toString().trim(),
-                    String(member.course_id),
-                  ]
-                    .filter(Boolean)
-                    .join(" ");
-                  return (
-                    <button
-                      key={member.id}
-                      type="button"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left hover:border-violet-300 hover:bg-violet-50/60 transition-colors"
-                      onClick={() =>
-                        openSectionEditorFromCrosslist(
-                          member,
-                          crosslistPickerModal.crosslistGroupId,
-                        )
-                      }
-                    >
-                      <div className="font-bold text-sm text-slate-900">{courseLine}</div>
-                      <div className="text-xs text-slate-600 mt-0.5">
-                        Section {member.section_code} · {member.id}
-                      </div>
-                      <div className="text-xs text-slate-500 mt-0.5">{professor}</div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>,
-          dragFeedbackToastMount,
-        )}
-
-      {sectionModal &&
-        dragFeedbackToastMount &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-[1px] overscroll-none"
-            role="presentation"
-            onClick={() => {
-              if (isSavingSection) return;
-              setSectionModal(null);
-              setSectionModalError(null);
-            }}
-          >
-            <div
-              className="flex max-h-[min(85vh,720px)] w-full max-w-2xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="section-modal-title"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">
-                <div className="flex min-w-0 items-center gap-3">
-                  {sectionModal.returnToCrosslistGroupId && (
-                    <button
-                      type="button"
-                      disabled={isSavingSection}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
-                      onClick={returnToCrosslistPickerFromSectionModal}
-                    >
-                      <ArrowLeft className="size-4" />
-                      Back
-                    </button>
-                  )}
-                  <h3 id="section-modal-title" className="truncate text-lg font-black text-slate-900">
-                    {sectionModal.mode === "create" ? "Add Section" : "Edit Section"}
-                  </h3>
-                </div>
-                <button
-                  type="button"
-                  disabled={isSavingSection}
-                  className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
-                  onClick={() => {
-                    setSectionModal(null);
-                    setSectionModalError(null);
-                  }}
-                >
-                  Close
-                </button>
-              </div>
-              <div className="min-h-0 flex-1 overflow-y-auto space-y-4 px-6 py-5 text-sm">
-                {sectionModal.mode === "create" && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                    Rooms and timeslots are assigned directly on the calendar. After creating this
-                    section, hover over an available room/time space and click to place it.
-                  </div>
-                )}
-                {sectionModal.mode === "edit" && (
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                    Assigned meeting pattern:{" "}
-                    <span className="font-semibold">
-                      {(() => {
-                        const sectionId = sectionModal.initialSectionId ?? "";
-                        const assignmentPattern = assignmentsBySection[sectionId]?.meeting_pattern_id;
-                        const persistedPattern = data.sections.find((s) => s.id === sectionId)?.previous_meeting_pattern;
-                        return assignmentPattern || persistedPattern || "None";
-                      })()}
-                    </span>
-                  </div>
-                )}
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <label className="flex flex-col gap-1">
-                    <span className="text-xs font-semibold text-slate-600">Section ID *</span>
-                    <input
-                      className="rounded-lg border border-slate-200 px-3 py-2"
-                      value={sectionModal.draft.id}
-                      onChange={(e) => updateSectionModalDraft("id", e.target.value)}
-                      disabled={sectionModal.mode === "edit" || isSavingSection}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <span className="text-xs font-semibold text-slate-600">Department</span>
-                    <input
-                      className="rounded-lg border border-slate-200 px-3 py-2"
-                      value={sectionModal.draft.department}
-                      onChange={(e) => updateSectionModalDraft("department", e.target.value)}
-                      disabled={isSavingSection}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <span className="text-xs font-semibold text-slate-600">Course ID *</span>
-                    <input
-                      className="rounded-lg border border-slate-200 px-3 py-2"
-                      value={sectionModal.draft.course_id}
-                      onChange={(e) => updateSectionModalDraft("course_id", e.target.value)}
-                      disabled={isSavingSection}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <span className="text-xs font-semibold text-slate-600">Section Code *</span>
-                    <input
-                      className="rounded-lg border border-slate-200 px-3 py-2"
-                      value={sectionModal.draft.section_code}
-                      onChange={(e) => updateSectionModalDraft("section_code", e.target.value)}
-                      disabled={isSavingSection}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <span className="text-xs font-semibold text-slate-600">Instructor *</span>
-                    <select
-                      className="rounded-lg border border-slate-200 bg-white px-3 py-2"
-                      value={sectionModal.draft.instructor_id}
-                      onChange={(e) => updateSectionModalDraft("instructor_id", e.target.value)}
-                      disabled={isSavingSection}
-                    >
-                      <option value="">Select instructor</option>
-                      {data.instructors.map((inst) => (
-                        <option key={inst.id} value={inst.id}>
-                          {inst.name?.trim() || inst.id}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <span className="text-xs font-semibold text-slate-600">Expected Enrollment *</span>
-                    <input
-                      type="number"
-                      min={0}
-                      className="rounded-lg border border-slate-200 px-3 py-2"
-                      value={sectionModal.draft.expected_enrollment}
-                      onChange={(e) =>
-                        updateSectionModalDraft("expected_enrollment", Number(e.target.value))
-                      }
-                      disabled={isSavingSection}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <span className="text-xs font-semibold text-slate-600">Enrollment Cap *</span>
-                    <input
-                      type="number"
-                      min={0}
-                      className="rounded-lg border border-slate-200 px-3 py-2"
-                      value={sectionModal.draft.enrollment_cap}
-                      onChange={(e) => updateSectionModalDraft("enrollment_cap", Number(e.target.value))}
-                      disabled={isSavingSection}
-                    />
-                  </label>
-                  {sectionModal.mode === "edit" ? (
-                    <label className="flex flex-col gap-1 sm:col-span-2">
-                      <span className="text-xs font-semibold text-slate-600">
-                        Allowed Meeting Patterns (comma-separated)
-                      </span>
-                      <input
-                        className="rounded-lg border border-slate-200 px-3 py-2"
-                        value={sectionModal.draft.allowed_meeting_patterns}
-                        onChange={(e) => updateSectionModalDraft("allowed_meeting_patterns", e.target.value)}
-                        disabled={isSavingSection}
-                      />
-                    </label>
-                  ) : (
-                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 sm:col-span-2">
-                      Meeting pattern selection happens after you place the new section on the calendar.
-                    </div>
-                  )}
-                  <label className="flex flex-col gap-1 sm:col-span-2">
-                    <span className="text-xs font-semibold text-slate-600">Room Requirements (comma-separated)</span>
-                    <input
-                      className="rounded-lg border border-slate-200 px-3 py-2"
-                      value={sectionModal.draft.room_requirements}
-                      onChange={(e) => updateSectionModalDraft("room_requirements", e.target.value)}
-                      disabled={isSavingSection}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <span className="text-xs font-semibold text-slate-600">Crosslist Group ID</span>
-                    <input
-                      className="rounded-lg border border-slate-200 px-3 py-2"
-                      value={sectionModal.draft.crosslist_group_id}
-                      onChange={(e) => updateSectionModalDraft("crosslist_group_id", e.target.value)}
-                      disabled={isSavingSection}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <span className="text-xs font-semibold text-slate-600">Tags (comma-separated)</span>
-                    <input
-                      className="rounded-lg border border-slate-200 px-3 py-2"
-                      value={sectionModal.draft.tags}
-                      onChange={(e) => updateSectionModalDraft("tags", e.target.value)}
-                      disabled={isSavingSection}
-                    />
-                  </label>
-                </div>
-                {sectionModalError && (
-                  <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                    {sectionModalError}
-                  </div>
-                )}
-              </div>
-              <div className="flex shrink-0 justify-end gap-2 border-t border-slate-200 px-6 py-4">
-                <button
-                  type="button"
-                  disabled={isSavingSection}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
-                  onClick={() => {
-                    setSectionModal(null);
-                    setSectionModalError(null);
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={isSavingSection}
-                  className={clsx(
-                    "rounded-lg px-3 py-2 text-sm font-bold text-white",
-                    isSavingSection ? "bg-slate-400" : "bg-[#137fec] hover:bg-[#0f6dca]",
-                  )}
-                  onClick={handleSaveSectionModal}
-                >
-                  {isSavingSection ? "Saving..." : "Confirm & Save"}
-                </button>
-              </div>
-            </div>
-          </div>,
-          dragFeedbackToastMount,
-        )}
-
-      {meetingPatternSelectionModal &&
-        dragFeedbackToastMount &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-[1px] overscroll-none"
-            role="presentation"
-            onClick={() => {
-              setMeetingPatternSelectionModal(null);
-              setMeetingPatternSelectionError(null);
-            }}
-          >
-            <div
-              className="flex max-h-[min(85vh,640px)] w-full max-w-2xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="meeting-pattern-modal-title"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">
-                <h3 id="meeting-pattern-modal-title" className="text-lg font-black text-slate-900">
-                  Select Meeting Pattern
+                  Cross-list {crosslistPickerModal.crosslistGroupId}
                 </h3>
-                <button
-                  type="button"
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
-                  onClick={() => {
-                    setMeetingPatternSelectionModal(null);
-                    setMeetingPatternSelectionError(null);
-                  }}
-                >
-                  Close
-                </button>
+                <p className="mt-1 text-xs text-slate-500">
+                  {crosslistPickerModal.memberSections.length} courses linked. Select a section to
+                  view or edit its details.
+                </p>
               </div>
-              <div className="min-h-0 flex-1 overflow-y-auto space-y-4 px-6 py-5 text-sm">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                  Section is placed at room{" "}
-                  <span className="font-semibold">{meetingPatternSelectionModal.roomId}</span>. Choose a
-                  meeting pattern that includes this placed timeslot and maps the section to its
-                  additional days.
-                </div>
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-slate-600">
-                    Compatible Meeting Pattern Options
-                  </span>
-                  <select
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-2"
-                    value={meetingPatternSelectionModal.selectedOptionKey}
-                    onChange={(e) =>
-                      setMeetingPatternSelectionModal((prev) =>
-                        prev ? { ...prev, selectedOptionKey: e.target.value } : prev,
+              <button
+                type="button"
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                onClick={() => setCrosslistPickerModal(null)}
+              >
+                Close
+              </button>
+            </div>
+            {data && (
+              <CrosslistScheduleBanner
+                members={crosslistPickerModal.memberSections}
+                assignmentsBySection={assignmentsBySection}
+                solverTimeslotIdsBySection={solverTimeslotIdsBySection}
+                timeslotById={timeslotById}
+                rooms={data.rooms}
+              />
+            )}
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 space-y-2">
+              {crosslistPickerModal.memberSections.map((member) => {
+                const professor =
+                  instructorById.get(member.instructor_id)?.name?.trim() ||
+                  member.instructor_id ||
+                  "—";
+                const courseLine = [
+                  (member.department ?? "").toString().trim(),
+                  String(member.course_id),
+                ]
+                  .filter(Boolean)
+                  .join(" ");
+                return (
+                  <button
+                    key={member.id}
+                    type="button"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left hover:border-violet-300 hover:bg-violet-50/60 transition-colors"
+                    onClick={() =>
+                      openSectionEditorFromCrosslist(
+                        member,
+                        crosslistPickerModal.crosslistGroupId,
                       )
                     }
                   >
-                    {meetingPatternSelectionModal.options.map((option) => (
-                      <option key={option.key} value={option.key}>
-                        {option.label}
+                    <div className="font-bold text-sm text-slate-900">{courseLine}</div>
+                    <div className="text-xs text-slate-600 mt-0.5">
+                      Section {member.section_code} · {member.id}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5">{professor}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+      </ViewportModal>
+
+      <ViewportModal
+        isOpen={Boolean(sectionModal)}
+        onClose={() => {
+          if (isSavingSection) return;
+          setSectionModal(null);
+          setSectionModalError(null);
+        }}
+        zIndex={1000}
+      >
+        {sectionModal ? (
+          <div
+            className="flex max-h-[min(85vh,720px)] w-full max-w-2xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="section-modal-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div className="flex min-w-0 items-center gap-3">
+                {sectionModal.returnToCrosslistGroupId && (
+                  <button
+                    type="button"
+                    disabled={isSavingSection}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                    onClick={returnToCrosslistPickerFromSectionModal}
+                  >
+                    <ArrowLeft className="size-4" />
+                    Back
+                  </button>
+                )}
+                <h3 id="section-modal-title" className="truncate text-lg font-black text-slate-900">
+                  {sectionModal.mode === "create" ? "Add Section" : "Edit Section"}
+                </h3>
+              </div>
+              <button
+                type="button"
+                disabled={isSavingSection}
+                className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                onClick={() => {
+                  setSectionModal(null);
+                  setSectionModalError(null);
+                }}
+              >
+                Close
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto space-y-4 px-6 py-5 text-sm">
+              {sectionModal.mode === "create" && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Rooms and timeslots are assigned directly on the calendar. After creating this
+                  section, hover over an available room/time space and click to place it.
+                </div>
+              )}
+              {sectionModal.mode === "edit" && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                  Assigned meeting pattern:{" "}
+                  <span className="font-semibold">
+                    {(() => {
+                      const sectionId = sectionModal.initialSectionId ?? "";
+                      const assignmentPattern = assignmentsBySection[sectionId]?.meeting_pattern_id;
+                      const persistedPattern = data.sections.find((s) => s.id === sectionId)?.previous_meeting_pattern;
+                      return assignmentPattern || persistedPattern || "None";
+                    })()}
+                  </span>
+                </div>
+              )}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-slate-600">Section ID *</span>
+                  <input
+                    className="rounded-lg border border-slate-200 px-3 py-2"
+                    value={sectionModal.draft.id}
+                    onChange={(e) => updateSectionModalDraft("id", e.target.value)}
+                    disabled={sectionModal.mode === "edit" || isSavingSection}
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-slate-600">Department</span>
+                  <input
+                    className="rounded-lg border border-slate-200 px-3 py-2"
+                    value={sectionModal.draft.department}
+                    onChange={(e) => updateSectionModalDraft("department", e.target.value)}
+                    disabled={isSavingSection}
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-slate-600">Course ID *</span>
+                  <input
+                    className="rounded-lg border border-slate-200 px-3 py-2"
+                    value={sectionModal.draft.course_id}
+                    onChange={(e) => updateSectionModalDraft("course_id", e.target.value)}
+                    disabled={isSavingSection}
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-slate-600">Section Code *</span>
+                  <input
+                    className="rounded-lg border border-slate-200 px-3 py-2"
+                    value={sectionModal.draft.section_code}
+                    onChange={(e) => updateSectionModalDraft("section_code", e.target.value)}
+                    disabled={isSavingSection}
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-slate-600">Instructor *</span>
+                  <select
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-2"
+                    value={sectionModal.draft.instructor_id}
+                    onChange={(e) => updateSectionModalDraft("instructor_id", e.target.value)}
+                    disabled={isSavingSection}
+                  >
+                    <option value="">Select instructor</option>
+                    {data.instructors.map((inst) => (
+                      <option key={inst.id} value={inst.id}>
+                        {inst.name?.trim() || inst.id}
                       </option>
                     ))}
                   </select>
                 </label>
-                {meetingPatternSelectionError && (
-                  <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                    {meetingPatternSelectionError}
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-slate-600">Expected Enrollment *</span>
+                  <input
+                    type="number"
+                    min={0}
+                    className="rounded-lg border border-slate-200 px-3 py-2"
+                    value={sectionModal.draft.expected_enrollment}
+                    onChange={(e) =>
+                      updateSectionModalDraft("expected_enrollment", Number(e.target.value))
+                    }
+                    disabled={isSavingSection}
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-slate-600">Enrollment Cap *</span>
+                  <input
+                    type="number"
+                    min={0}
+                    className="rounded-lg border border-slate-200 px-3 py-2"
+                    value={sectionModal.draft.enrollment_cap}
+                    onChange={(e) => updateSectionModalDraft("enrollment_cap", Number(e.target.value))}
+                    disabled={isSavingSection}
+                  />
+                </label>
+                {sectionModal.mode === "edit" ? (
+                  <label className="flex flex-col gap-1 sm:col-span-2">
+                    <span className="text-xs font-semibold text-slate-600">
+                      Allowed Meeting Patterns (comma-separated)
+                    </span>
+                    <input
+                      className="rounded-lg border border-slate-200 px-3 py-2"
+                      value={sectionModal.draft.allowed_meeting_patterns}
+                      onChange={(e) => updateSectionModalDraft("allowed_meeting_patterns", e.target.value)}
+                      disabled={isSavingSection}
+                    />
+                  </label>
+                ) : (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 sm:col-span-2">
+                    Meeting pattern selection happens after you place the new section on the calendar.
                   </div>
                 )}
+                <label className="flex flex-col gap-1 sm:col-span-2">
+                  <span className="text-xs font-semibold text-slate-600">Room Requirements (comma-separated)</span>
+                  <input
+                    className="rounded-lg border border-slate-200 px-3 py-2"
+                    value={sectionModal.draft.room_requirements}
+                    onChange={(e) => updateSectionModalDraft("room_requirements", e.target.value)}
+                    disabled={isSavingSection}
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-slate-600">Crosslist Group ID</span>
+                  <input
+                    className="rounded-lg border border-slate-200 px-3 py-2"
+                    value={sectionModal.draft.crosslist_group_id}
+                    onChange={(e) => updateSectionModalDraft("crosslist_group_id", e.target.value)}
+                    disabled={isSavingSection}
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-slate-600">Tags (comma-separated)</span>
+                  <input
+                    className="rounded-lg border border-slate-200 px-3 py-2"
+                    value={sectionModal.draft.tags}
+                    onChange={(e) => updateSectionModalDraft("tags", e.target.value)}
+                    disabled={isSavingSection}
+                  />
+                </label>
               </div>
-              <div className="flex shrink-0 justify-end gap-2 border-t border-slate-200 px-6 py-4">
-                <button
-                  type="button"
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
-                  onClick={() => {
-                    setMeetingPatternSelectionModal(null);
-                    setMeetingPatternSelectionError(null);
-                  }}
-                >
-                  Later
-                </button>
-                <button
-                  type="button"
-                  className="rounded-lg bg-[#137fec] px-3 py-2 text-sm font-bold text-white hover:bg-[#0f6dca]"
-                  onClick={applyMeetingPatternSelection}
-                >
-                  Apply Pattern
-                </button>
-              </div>
+              {sectionModalError && (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                  {sectionModalError}
+                </div>
+              )}
             </div>
-          </div>,
-          dragFeedbackToastMount,
-        )}
+            <div className="flex shrink-0 justify-end gap-2 border-t border-slate-200 px-6 py-4">
+              <button
+                type="button"
+                disabled={isSavingSection}
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                onClick={() => {
+                  setSectionModal(null);
+                  setSectionModalError(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isSavingSection}
+                className={clsx(
+                  "rounded-lg px-3 py-2 text-sm font-bold text-white",
+                  isSavingSection ? "bg-slate-400" : "bg-[#137fec] hover:bg-[#0f6dca]",
+                )}
+                onClick={handleSaveSectionModal}
+              >
+                {isSavingSection ? "Saving..." : "Confirm & Save"}
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </ViewportModal>
+
+      <ViewportModal
+        isOpen={Boolean(meetingPatternSelectionModal)}
+        onClose={() => {
+          setMeetingPatternSelectionModal(null);
+          setMeetingPatternSelectionError(null);
+        }}
+        zIndex={1000}
+      >
+        {meetingPatternSelectionModal ? (
+          <div
+            className="flex max-h-[min(85vh,640px)] w-full max-w-2xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="meeting-pattern-modal-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">
+              <h3 id="meeting-pattern-modal-title" className="text-lg font-black text-slate-900">
+                Select Meeting Pattern
+              </h3>
+              <button
+                type="button"
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                onClick={() => {
+                  setMeetingPatternSelectionModal(null);
+                  setMeetingPatternSelectionError(null);
+                }}
+              >
+                Close
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto space-y-4 px-6 py-5 text-sm">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                Section is placed at room{" "}
+                <span className="font-semibold">{meetingPatternSelectionModal.roomId}</span>. Choose a
+                meeting pattern that includes this placed timeslot and maps the section to its
+                additional days.
+              </div>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-600">
+                  Compatible Meeting Pattern Options
+                </span>
+                <select
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2"
+                  value={meetingPatternSelectionModal.selectedOptionKey}
+                  onChange={(e) =>
+                    setMeetingPatternSelectionModal((prev) =>
+                      prev ? { ...prev, selectedOptionKey: e.target.value } : prev,
+                    )
+                  }
+                >
+                  {meetingPatternSelectionModal.options.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {meetingPatternSelectionError && (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                  {meetingPatternSelectionError}
+                </div>
+              )}
+            </div>
+            <div className="flex shrink-0 justify-end gap-2 border-t border-slate-200 px-6 py-4">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                onClick={() => {
+                  setMeetingPatternSelectionModal(null);
+                  setMeetingPatternSelectionError(null);
+                }}
+              >
+                Later
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-[#137fec] px-3 py-2 text-sm font-bold text-white hover:bg-[#0f6dca]"
+                onClick={applyMeetingPatternSelection}
+              >
+                Apply Pattern
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </ViewportModal>
 
       <div className="hidden print:block print-calendar">
         {DAYS.map((day) => {

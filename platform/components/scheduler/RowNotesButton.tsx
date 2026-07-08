@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { Button } from "@heroui/button";
 import { Checkbox } from "@heroui/checkbox";
 import { MessageSquare } from "lucide-react";
 
+import { ViewportModal } from "@/components/scheduler/ViewportModal";
 import { useAuth } from "@/lib/auth-client";
 import { formatNoteAuthor } from "@/lib/note-author";
 import type { RowNote, RowReply } from "@/lib/notes/types";
@@ -227,22 +227,15 @@ export const RowNotesButton = ({ scope, rowId, title }: RowNotesButtonProps) => 
         </Button>
       </span>
 
-      {isOpen &&
-        typeof document !== "undefined" &&
-        createPortal(
+      <ViewportModal isOpen={isOpen} onClose={() => setIsOpen(false)} zIndex={NOTES_MODAL_Z}>
+        {isOpen ? (
           <div
-            className="fixed inset-0 flex items-center justify-center bg-black/40 p-4 backdrop-blur-[1px]"
-            style={{ zIndex: NOTES_MODAL_Z }}
-            role="presentation"
-            onClick={() => setIsOpen(false)}
+            className="relative w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="row-notes-modal-title"
+            onClick={(e) => e.stopPropagation()}
           >
-            <div
-              className="relative w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-2xl"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="row-notes-modal-title"
-              onClick={(e) => e.stopPropagation()}
-            >
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <h3 id="row-notes-modal-title" className="text-lg font-black text-slate-900">
                 {title}
@@ -384,19 +377,15 @@ export const RowNotesButton = ({ scope, rowId, title }: RowNotesButtonProps) => 
               </div>
             </div>
           </div>
-        </div>,
-          document.body,
-        )}
+        ) : null}
+      </ViewportModal>
 
-      {pendingDeleteNote &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            className="fixed inset-0 flex items-center justify-center bg-black/40 p-4 backdrop-blur-[1px]"
-            style={{ zIndex: NOTES_DELETE_MODAL_Z }}
-            role="presentation"
-            onClick={() => setPendingDeleteNote(null)}
-          >
+      <ViewportModal
+        isOpen={Boolean(pendingDeleteNote)}
+        onClose={() => setPendingDeleteNote(null)}
+        zIndex={NOTES_DELETE_MODAL_Z}
+      >
+        {pendingDeleteNote ? (
           <div
             className="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl"
             role="alertdialog"
@@ -425,9 +414,8 @@ export const RowNotesButton = ({ scope, rowId, title }: RowNotesButtonProps) => 
               </Button>
             </div>
           </div>
-        </div>,
-          document.body,
-        )}
+        ) : null}
+      </ViewportModal>
     </>
   );
 };

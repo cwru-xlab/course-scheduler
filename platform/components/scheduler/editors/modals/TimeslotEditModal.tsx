@@ -19,6 +19,7 @@ import type { Timeslot } from "@/lib/scheduling/types";
 type TimeslotEditModalProps = {
   isOpen: boolean;
   timeslot: Timeslot;
+  mode?: "create" | "edit";
   onClose: () => void;
   onSave: (timeslot: Timeslot) => void;
 };
@@ -26,6 +27,7 @@ type TimeslotEditModalProps = {
 export function TimeslotEditModal({
   isOpen,
   timeslot,
+  mode = "edit",
   onClose,
   onSave,
 }: TimeslotEditModalProps) {
@@ -57,7 +59,7 @@ export function TimeslotEditModal({
   return (
     <EditorModalShell
       isOpen={isOpen}
-      title={`Edit timeslot — ${timeslot.id}`}
+      title={mode === "create" ? "Add timeslot" : `Edit timeslot — ${timeslot.id}`}
       onClose={onClose}
       footer={
         <>
@@ -65,7 +67,7 @@ export function TimeslotEditModal({
             Cancel
           </Button>
           <Button color="primary" className="font-bold" onPress={handleSave}>
-            Save changes
+            {mode === "create" ? "Add" : "Save changes"}
           </Button>
         </>
       }

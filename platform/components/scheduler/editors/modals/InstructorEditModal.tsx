@@ -25,6 +25,7 @@ const DAY_OPTIONS = [
 type InstructorEditModalProps = {
   isOpen: boolean;
   instructor: Instructor;
+  mode?: "create" | "edit";
   meetingPatternOptions: { key: string; label: string }[];
   timeslotOptions: { key: string; label: string }[];
   onClose: () => void;
@@ -34,6 +35,7 @@ type InstructorEditModalProps = {
 export function InstructorEditModal({
   isOpen,
   instructor,
+  mode = "edit",
   meetingPatternOptions,
   timeslotOptions,
   onClose,
@@ -65,7 +67,7 @@ export function InstructorEditModal({
   return (
     <EditorModalShell
       isOpen={isOpen}
-      title={`Edit instructor — ${instructor.id}`}
+      title={mode === "create" ? "Add instructor" : `Edit instructor — ${instructor.id}`}
       onClose={onClose}
       footer={
         <>
@@ -73,7 +75,7 @@ export function InstructorEditModal({
             Cancel
           </Button>
           <Button color="primary" className="font-bold" onPress={handleSave}>
-            Save changes
+            {mode === "create" ? "Add" : "Save changes"}
           </Button>
         </>
       }

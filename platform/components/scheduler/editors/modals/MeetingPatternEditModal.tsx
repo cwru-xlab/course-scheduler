@@ -20,6 +20,7 @@ const DAY_OPTIONS = [
 type MeetingPatternEditModalProps = {
   isOpen: boolean;
   pattern: MeetingPattern;
+  mode?: "create" | "edit";
   timeslotOptions: { key: string; label: string }[];
   onClose: () => void;
   onSave: (pattern: MeetingPattern) => void;
@@ -28,6 +29,7 @@ type MeetingPatternEditModalProps = {
 export function MeetingPatternEditModal({
   isOpen,
   pattern,
+  mode = "edit",
   timeslotOptions,
   onClose,
   onSave,
@@ -74,7 +76,9 @@ export function MeetingPatternEditModal({
   return (
     <EditorModalShell
       isOpen={isOpen}
-      title={`Edit meeting pattern — ${pattern.id}`}
+      title={
+        mode === "create" ? "Add meeting pattern" : `Edit meeting pattern — ${pattern.id}`
+      }
       onClose={onClose}
       maxWidthClass="max-w-3xl"
       footer={
@@ -83,7 +87,7 @@ export function MeetingPatternEditModal({
             Cancel
           </Button>
           <Button color="primary" className="font-bold" onPress={handleSave}>
-            Save changes
+            {mode === "create" ? "Add" : "Save changes"}
           </Button>
         </>
       }
