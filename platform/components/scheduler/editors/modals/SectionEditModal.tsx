@@ -106,7 +106,7 @@ export function SectionEditModal({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Department</span>
+          <span className="text-xs font-semibold text-slate-600">SUBJ</span>
           <input
             className="rounded-lg border border-slate-200 px-3 py-2"
             value={draft.department ?? ""}

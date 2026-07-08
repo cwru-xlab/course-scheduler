@@ -11,6 +11,7 @@ import {
   type EditorColumnFilterDef,
   type EditorFiltersState,
 } from "./editorFilters";
+import { sortDefsFromFilterDefs, type EditorColumnSortDef } from "./editorSort";
 import { SECTION_COLUMN_SPECS } from "./editorColumnSpecs";
 import { useEditorActions } from "./EditorActionProvider";
 import { editorRowKey, recentlyAddedRowClass } from "./editorRowHighlight";
@@ -114,7 +115,7 @@ export const SectionsEditor = ({
     },
     {
       columnId: "dept",
-      label: "Dept",
+      label: "SUBJ",
       control: { kind: "multiSelect", showSearch: true },
       getValue: ({ section }) => section.department ?? "",
     },
@@ -165,6 +166,34 @@ export const SectionsEditor = ({
       getValue: ({ section }) => section.allowed_meeting_patterns,
     },
   ], [instructorOptions, meetingPatternOptions]);
+
+  const sectionSortDefs = useMemo((): EditorColumnSortDef<SectionRow>[] => {
+    const defs = sortDefsFromFilterDefs(sectionFilterDefs);
+    const instructorIdx = defs.findIndex((d) => d.columnId === "instructor");
+    if (instructorIdx >= 0) {
+      defs[instructorIdx] = {
+        columnId: "instructor",
+        getSortValue: ({ section }) =>
+          instructorLabelById.get(section.instructor_id) ?? section.instructor_id ?? "",
+      };
+    }
+    return [
+      ...defs,
+      {
+        columnId: "assigned",
+        getSortValue: ({ section }) => section.previous_meeting_pattern ?? "",
+      },
+      {
+        columnId: "room_req",
+        getSortValue: ({ section }) => section.room_requirements.join(", "),
+      },
+      {
+        columnId: "crosslist",
+        getSortValue: ({ section }) => section.crosslist_group_id ?? "",
+      },
+      { columnId: "tags", getSortValue: ({ section }) => section.tags.join(", ") },
+    ];
+  }, [sectionFilterDefs, instructorLabelById]);
 
   const sectionRows = useMemo(
     (): SectionRow[] => sections.map((section, index) => ({ section, index })),
@@ -240,6 +269,7 @@ export const SectionsEditor = ({
             options={instructorOptions}
             onChange={(v) => updateSection(idx, "instructor_id", v)}
             placeholder="Select instructor"
+            isSearchable
           />
         );
       case "enroll":
@@ -347,6 +377,7 @@ export const SectionsEditor = ({
         editorKey="sections"
         columnSpecs={SECTION_COLUMN_SPECS}
         rows={filteredSections}
+        sortDefs={sectionSortDefs}
         getRowKey={({ section, index }) => `${section.id}-${index}`}
         getRowId={({ section }) =>
           `note-sections-${encodeURIComponent(String(section.id))}`

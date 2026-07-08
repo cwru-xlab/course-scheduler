@@ -11,6 +11,7 @@ import {
   type EditorColumnFilterDef,
   type EditorFiltersState,
 } from "./editorFilters";
+import { sortDefsFromFilterDefs } from "./editorSort";
 import { INSTRUCTOR_COLUMN_SPECS } from "./editorColumnSpecs";
 import { useEditorActions } from "./EditorActionProvider";
 import { editorRowKey, recentlyAddedRowClass } from "./editorRowHighlight";
@@ -149,6 +150,11 @@ export const InstructorsEditor = ({
     [meetingPatternOptions, timeslotOptions],
   );
 
+  const instructorSortDefs = useMemo(
+    () => sortDefsFromFilterDefs(instructorFilterDefs),
+    [instructorFilterDefs],
+  );
+
   const instructorRows = useMemo(
     (): InstructorRow[] => instructors.map((inst, index) => ({ inst, index })),
     [instructors],
@@ -256,6 +262,7 @@ export const InstructorsEditor = ({
         editorKey="instructors"
         columnSpecs={INSTRUCTOR_COLUMN_SPECS}
         rows={filteredInstructors}
+        sortDefs={instructorSortDefs}
         getRowKey={({ inst, index }) => `${inst.id}-${index}`}
         getRowId={({ inst }) => `note-instructors-${encodeURIComponent(String(inst.id))}`}
         getRowClassName={({ inst }) =>

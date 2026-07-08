@@ -15,6 +15,7 @@ import {
   type EditorColumnFilterDef,
   type EditorFiltersState,
 } from "./editorFilters";
+import { sortDefsFromFilterDefs } from "./editorSort";
 import { TIMESLOT_COLUMN_SPECS } from "./editorColumnSpecs";
 import { useEditorActions } from "./EditorActionProvider";
 import { editorRowKey, recentlyAddedRowClass } from "./editorRowHighlight";
@@ -109,6 +110,11 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
       },
     ],
     [],
+  );
+
+  const timeslotSortDefs = useMemo(
+    () => sortDefsFromFilterDefs(timeslotFilterDefs),
+    [timeslotFilterDefs],
   );
 
   const timeslotRows = useMemo(
@@ -208,6 +214,7 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
         editorKey="timeslots"
         columnSpecs={TIMESLOT_COLUMN_SPECS}
         rows={filteredTimeslots}
+        sortDefs={timeslotSortDefs}
         getRowKey={({ slot, index }) => `${slot.id}-${index}`}
         getRowId={({ slot }) => `note-timeslots-${encodeURIComponent(String(slot.id))}`}
         getRowClassName={({ slot }) =>

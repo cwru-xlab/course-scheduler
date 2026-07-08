@@ -11,6 +11,7 @@ import {
   type EditorColumnFilterDef,
   type EditorFiltersState,
 } from "./editorFilters";
+import { sortDefsFromFilterDefs } from "./editorSort";
 import { ROOM_COLUMN_SPECS } from "./editorColumnSpecs";
 import { useEditorActions } from "./EditorActionProvider";
 import { editorRowKey, recentlyAddedRowClass } from "./editorRowHighlight";
@@ -96,6 +97,8 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
     ],
     [],
   );
+
+  const roomSortDefs = useMemo(() => sortDefsFromFilterDefs(roomFilterDefs), [roomFilterDefs]);
 
   const roomRows = useMemo(
     (): RoomRow[] => rooms.map((room, index) => ({ room, index })),
@@ -184,6 +187,7 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
         editorKey="rooms"
         columnSpecs={ROOM_COLUMN_SPECS}
         rows={filteredRooms}
+        sortDefs={roomSortDefs}
         getRowKey={({ room, index }) => `${room.id}-${index}`}
         getRowId={({ room }) => `note-rooms-${encodeURIComponent(String(room.id))}`}
         getRowClassName={({ room }) =>

@@ -1,12 +1,18 @@
 "use client";
 
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+
 import { editorTh } from "./EditorTableShell";
+import type { SortDirection } from "./editorSort";
 
 type EditorResizableThProps = {
   label: string;
   widthPx: number;
   onResizeStart: (clientX: number) => void;
   resizable?: boolean;
+  sortable?: boolean;
+  sortDirection?: SortDirection | null;
+  onSortToggle?: () => void;
 };
 
 function ColumnRightEdge({
@@ -47,13 +53,45 @@ export function EditorResizableTh({
   widthPx,
   onResizeStart,
   resizable = true,
+  sortable = false,
+  sortDirection = null,
+  onSortToggle,
 }: EditorResizableThProps) {
+  const sortTitle = sortable
+    ? sortDirection === "asc"
+      ? `Sorted A→Z. Click for Z→A.`
+      : sortDirection === "desc"
+        ? `Sorted Z→A. Click to clear sort.`
+        : `Click to sort A→Z`
+    : undefined;
+
   return (
     <th
       className={`${editorTh} relative overflow-hidden`}
       style={{ width: widthPx, minWidth: widthPx, maxWidth: widthPx }}
     >
-      <span className="block truncate pl-2.5 pr-3">{label}</span>
+      {sortable ? (
+        <button
+          type="button"
+          className="flex w-full min-w-0 items-center gap-1 pl-2.5 pr-3 text-left hover:text-slate-900"
+          onClick={onSortToggle}
+          title={sortTitle}
+          aria-label={`${label}${sortDirection ? `, sorted ${sortDirection === "asc" ? "A to Z" : "Z to A"}` : ""}`}
+        >
+          <span className="min-w-0 truncate">{label}</span>
+          <span className="shrink-0 text-slate-400" aria-hidden>
+            {sortDirection === "asc" ? (
+              <ArrowUp className="size-3.5" />
+            ) : sortDirection === "desc" ? (
+              <ArrowDown className="size-3.5" />
+            ) : (
+              <ArrowUpDown className="size-3.5 opacity-40" />
+            )}
+          </span>
+        </button>
+      ) : (
+        <span className="block truncate pl-2.5 pr-3">{label}</span>
+      )}
       <ColumnRightEdge
         resizable={resizable}
         label={label}

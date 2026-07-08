@@ -1,18 +1,21 @@
 "use client";
 
-import { useRef, type ReactNode } from "react";
+import { useMemo, useRef, type ReactNode } from "react";
 
 import { EditorColumnPicker } from "./EditorColumnPicker";
 import { EditorActionsTh, EditorResizableTh } from "./EditorResizableTh";
 import { editorTd } from "./EditorTableShell";
+import { applyEditorColumnSort, type EditorColumnSortDef } from "./editorSort";
 import type { EditorColumnSpec } from "./useEditorColumnVisibility";
 import { useEditorColumnVisibility } from "./useEditorColumnVisibility";
 import { useEditorColumnWidths } from "./useEditorColumnWidths";
+import { useEditorColumnSort } from "./useEditorColumnSort";
 
 type EditorConfigurableTableProps<TRow> = {
   editorKey: string;
   columnSpecs: EditorColumnSpec[];
   rows: TRow[];
+  sortDefs?: EditorColumnSortDef<TRow>[];
   getRowKey: (row: TRow, index: number) => string;
   getRowId?: (row: TRow, index: number) => string;
   getRowClassName?: (row: TRow, index: number) => string | undefined;
@@ -24,6 +27,7 @@ export function EditorConfigurableTable<TRow>({
   editorKey,
   columnSpecs,
   rows,
+  sortDefs,
   getRowKey,
   getRowId,
   getRowClassName,
@@ -40,6 +44,17 @@ export function EditorConfigurableTable<TRow>({
     actionsWidthPx,
     startResize,
   } = useEditorColumnWidths(editorKey, visibleSpecs);
+  const { sort, toggleSort } = useEditorColumnSort(editorKey);
+
+  const sortableColumnIds = useMemo(
+    () => new Set((sortDefs ?? []).map((d) => d.columnId)),
+    [sortDefs],
+  );
+
+  const displayRows = useMemo(() => {
+    if (!sortDefs?.length) return rows;
+    return applyEditorColumnSort(rows, sort, sortDefs);
+  }, [rows, sort, sortDefs]);
 
   const tableStyle =
     containerWidth > 0
@@ -76,21 +91,28 @@ export function EditorConfigurableTable<TRow>({
           </colgroup>
           <thead>
             <tr>
-              {visibleSpecs.map((spec) => (
-                <EditorResizableTh
-                  key={spec.id}
-                  label={spec.label}
-                  widthPx={getWidthPx(spec.id)}
-                  onResizeStart={(clientX) =>
-                    startResize(spec.id, clientX, tableRef.current)
-                  }
-                />
-              ))}
+              {visibleSpecs.map((spec) => {
+                const sortable = sortableColumnIds.has(spec.id);
+                const isActive = sort?.columnId === spec.id;
+                return (
+                  <EditorResizableTh
+                    key={spec.id}
+                    label={spec.label}
+                    widthPx={getWidthPx(spec.id)}
+                    onResizeStart={(clientX) =>
+                      startResize(spec.id, clientX, tableRef.current)
+                    }
+                    sortable={sortable}
+                    sortDirection={isActive ? sort!.direction : null}
+                    onSortToggle={sortable ? () => toggleSort(spec.id) : undefined}
+                  />
+                );
+              })}
               <EditorActionsTh widthPx={actionsWidthPx} />
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, index) => (
+            {displayRows.map((row, index) => (
               <tr
                 key={getRowKey(row, index)}
                 id={getRowId?.(row, index)}

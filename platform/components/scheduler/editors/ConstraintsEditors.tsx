@@ -11,6 +11,7 @@ import {
   type EditorColumnFilterDef,
   type EditorFiltersState,
 } from "./editorFilters";
+import { sortDefsFromFilterDefs } from "./editorSort";
 import { TIMESLOT_TIME_OPTIONS } from "./timeslotEditorConstants";
 import { EditorRowActions } from "./EditorRowActions";
 import { useEditorActions } from "./EditorActionProvider";
@@ -93,6 +94,11 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
     [sectionOptions],
   );
 
+  const crossListSortDefs = useMemo(
+    () => sortDefsFromFilterDefs(crossListFilterDefs),
+    [crossListFilterDefs],
+  );
+
   const crossListRows = useMemo(
     (): CrossListRow[] => groups.map((group, index) => ({ group, index })),
     [groups],
@@ -157,6 +163,7 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
           editorKey="constraints-crosslist-groups"
           columnSpecs={CROSSLIST_GROUP_COLUMN_SPECS}
           rows={filteredGroups}
+          sortDefs={crossListSortDefs}
           getRowKey={({ group, index }) => `${group.id}-${index}`}
           getRowId={({ group }) =>
             `note-constraints-crosslist-groups-${encodeURIComponent(String(group.id))}`
@@ -281,6 +288,11 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
     [sectionOptions],
   );
 
+  const noOverlapSortDefs = useMemo(
+    () => sortDefsFromFilterDefs(noOverlapFilterDefs),
+    [noOverlapFilterDefs],
+  );
+
   const noOverlapRows = useMemo(
     (): NoOverlapRow[] => groups.map((group, index) => ({ group, index })),
     [groups],
@@ -353,6 +365,7 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
           editorKey="constraints-no-overlap-groups"
           columnSpecs={NO_OVERLAP_GROUP_COLUMN_SPECS}
           rows={filteredGroups}
+          sortDefs={noOverlapSortDefs}
           getRowKey={({ group, index }) => `${group.id}-${index}`}
           getRowId={({ group }) =>
             `note-constraints-no-overlap-groups-${encodeURIComponent(String(group.id))}`
@@ -576,6 +589,11 @@ export const BlockedTimesEditor = ({
     [instructorOptions, roomOptions],
   );
 
+  const blockedTimeSortDefs = useMemo(
+    () => sortDefsFromFilterDefs(blockedTimeFilterDefs),
+    [blockedTimeFilterDefs],
+  );
+
   const blockedTimeRows = useMemo(
     (): BlockedTimeRow[] => blockedTimes.map((blocked, index) => ({ blocked, index })),
     [blockedTimes],
@@ -729,6 +747,7 @@ export const BlockedTimesEditor = ({
           editorKey="constraints-blocked-times"
           columnSpecs={BLOCKED_TIME_COLUMN_SPECS}
           rows={filteredBlockedTimes}
+          sortDefs={blockedTimeSortDefs}
           getRowKey={(_, index) => String(index)}
           getRowId={({ blocked }, idx) =>
             `note-constraints-blocked-times-${encodeURIComponent(`${blocked.scope}-${blocked.reason || "row"}-${idx}`)}`
@@ -871,6 +890,11 @@ export const LockedAssignmentsEditor = ({
     [roomOptions, sectionOptions, timeslotOptions],
   );
 
+  const lockedSortDefs = useMemo(
+    () => sortDefsFromFilterDefs(lockedFilterDefs),
+    [lockedFilterDefs],
+  );
+
   const lockedRows = useMemo(
     (): LockedRow[] => lockedAssignments.map((lock, index) => ({ lock, index })),
     [lockedAssignments],
@@ -951,6 +975,7 @@ export const LockedAssignmentsEditor = ({
           editorKey="constraints-locked-assignments"
           columnSpecs={LOCKED_ASSIGNMENT_COLUMN_SPECS}
           rows={filteredLocks}
+          sortDefs={lockedSortDefs}
           getRowKey={(_, index) => String(index)}
           getRowId={({ lock }, idx) =>
             `note-constraints-locked-assignments-${encodeURIComponent(`${lock.section_id || "row"}-${idx}`)}`
@@ -1102,6 +1127,11 @@ export const SoftLocksEditor = ({
     [roomOptions, sectionOptions, timeslotOptions],
   );
 
+  const softLockSortDefs = useMemo(
+    () => sortDefsFromFilterDefs(softLockFilterDefs),
+    [softLockFilterDefs],
+  );
+
   const softLockRows = useMemo(
     (): SoftLockRow[] => softLocks.map((lock, index) => ({ lock, index })),
     [softLocks],
@@ -1191,6 +1221,7 @@ export const SoftLocksEditor = ({
           editorKey="constraints-soft-locks"
           columnSpecs={SOFT_LOCK_COLUMN_SPECS}
           rows={filteredLocks}
+          sortDefs={softLockSortDefs}
           getRowKey={(_, index) => String(index)}
           getRowId={({ lock }, idx) =>
             `note-constraints-soft-locks-${encodeURIComponent(`${lock.section_id || "row"}-${idx}`)}`
