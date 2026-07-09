@@ -17,9 +17,13 @@ const STATE_OPTIONS: { key: SectionState; label: string }[] = [
   { key: "archived", label: "Archived" },
 ];
 
+const SECTION_COURSE_PLACEHOLDER = "Introduction to Accounting";
+const SECTION_CODE_PLACEHOLDER = "101";
+
 type SectionEditModalProps = {
   isOpen: boolean;
   section: Section;
+  mode?: "create" | "edit";
   instructorOptions: { key: string; label: string }[];
   meetingPatternOptions: { key: string; label: string }[];
   crosslistGroupOptions: { key: string; label: string }[];
@@ -30,6 +34,7 @@ type SectionEditModalProps = {
 export function SectionEditModal({
   isOpen,
   section,
+  mode = "edit",
   instructorOptions,
   meetingPatternOptions,
   crosslistGroupOptions,
@@ -52,15 +57,20 @@ export function SectionEditModal({
   ];
 
   const handleSave = () => {
-    if (!draft.id.trim() || !draft.course_id.trim() || !draft.instructor_id.trim()) {
-      setError("Section ID, course ID, and instructor are required.");
+    if (
+      !draft.id.trim() ||
+      !draft.course_id.trim() ||
+      !draft.section_code.trim() ||
+      !draft.instructor_id.trim()
+    ) {
+      setError("Section ID, course, code, and instructor are required.");
       return;
     }
     onSave({
       ...draft,
       id: draft.id.trim(),
       course_id: draft.course_id.trim(),
-      section_code: draft.section_code.trim() || "A",
+      section_code: draft.section_code.trim(),
       instructor_id: draft.instructor_id.trim(),
       department: (draft.department ?? "").trim(),
       state: normalizeSectionState(draft.state),
@@ -74,7 +84,7 @@ export function SectionEditModal({
         Cancel
       </Button>
       <Button color="primary" className="font-bold" onPress={handleSave}>
-        Save changes
+        {mode === "create" ? "Add" : "Save changes"}
       </Button>
     </>
   );
@@ -82,7 +92,7 @@ export function SectionEditModal({
   return (
     <EditorModalShell
       isOpen={isOpen}
-      title={`Edit section — ${section.id}`}
+      title={mode === "create" ? "Add section" : `Edit section — ${section.id}`}
       onClose={onClose}
       footer={footer}
     >
@@ -96,7 +106,7 @@ export function SectionEditModal({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Department</span>
+          <span className="text-xs font-semibold text-slate-600">SUBJ</span>
           <input
             className="rounded-lg border border-slate-200 px-3 py-2"
             value={draft.department ?? ""}
@@ -104,17 +114,19 @@ export function SectionEditModal({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Course ID</span>
+          <span className="text-xs font-semibold text-slate-600">Course</span>
           <input
             className="rounded-lg border border-slate-200 px-3 py-2"
+            placeholder={SECTION_COURSE_PLACEHOLDER}
             value={draft.course_id}
             onChange={(e) => setDraft((d) => ({ ...d, course_id: e.target.value }))}
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Section code</span>
+          <span className="text-xs font-semibold text-slate-600">Code</span>
           <input
             className="rounded-lg border border-slate-200 px-3 py-2"
+            placeholder={SECTION_CODE_PLACEHOLDER}
             value={draft.section_code}
             onChange={(e) => setDraft((d) => ({ ...d, section_code: e.target.value }))}
           />

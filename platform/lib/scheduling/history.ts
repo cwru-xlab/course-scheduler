@@ -84,28 +84,46 @@ export const loadSavedScheduleToCurrentView = (entry: SavedScheduleEntry): void 
   );
 };
 
-export const exportSavedSchedule = (entry: SavedScheduleEntry): void => {
+export const exportSavedSchedule = async (entry: SavedScheduleEntry): Promise<void> => {
   if (typeof window === "undefined") return;
-  const payload = {
-    meta: {
-      name: entry.name,
-      scheduleDate: entry.scheduleDate,
-      savedAt: entry.savedAt,
-      exportedAt: new Date().toISOString(),
-    },
-    snapshot: entry.snapshot,
-  };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], {
-    type: "application/json",
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
+
   const safeDate = entry.scheduleDate.replace(/[^0-9-]/g, "") || "schedule";
   const safeName = entry.name.replace(/[^a-z0-9-_]+/gi, "_").replace(/^_+|_+$/g, "");
-  a.href = url;
-  a.download = `${safeDate}-${safeName || "saved-schedule"}.json`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+
+  try {
+    const response = await fetch("/api/export-scheduling-spreadsheet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ input: entry.snapshot.input, notes: [] }),
+    });
+
+    if (!response.ok) {
+      let message = "Failed to export spreadsheet.";
+      try {
+        const payload = (await response.json()) as {
+          errors?: Array<{ message?: string }>;
+        };
+        message = payload.errors?.[0]?.message ?? message;
+      } catch {
+        // Keep fallback message.
+      }
+      console.error(message);
+      alert(message);
+      return;
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${safeDate}-${safeName || "saved-schedule"}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to reach export service.";
+    console.error(message);
+    alert(message);
+  }
 };

@@ -20,15 +20,29 @@ export const EDITOR_AUTOCOMPLETE_ITEM_CLASS_NAMES = {
 };
 
 export const EDITOR_AUTOCOMPLETE_CLASS_NAMES = {
-  base: "min-w-0 max-w-full overflow-hidden",
+  base: "w-full min-w-0 max-w-full overflow-hidden",
+  listboxWrapper: "max-h-[min(320px,50vh)]",
+  endContentWrapper: "items-center",
+  selectorButton: "self-center",
+};
+
+/** Input field styling for searchable Autocomplete cells in editor tables. */
+export const EDITOR_AUTOCOMPLETE_INPUT_PROPS = {
+  classNames: {
+    inputWrapper: "min-h-unit-8 h-unit-8 py-0 shadow-none bg-transparent data-[hover=true]:bg-default-100",
+    innerWrapper: "items-center",
+    input: "text-left text-sm",
+  },
 };
 
 /** Closed select trigger: clip chips/labels instead of horizontal scroll. */
 export const EDITOR_SELECT_TRIGGER_CLASS_NAMES = {
-  trigger: "min-h-unit-8 h-auto min-w-0 max-w-full overflow-hidden py-1",
+  base: "w-full min-w-0 max-w-full",
+  trigger:
+    "min-h-unit-8 h-unit-8 w-full min-w-0 max-w-full overflow-hidden py-0 flex items-center data-[hover=true]:bg-default-100",
   mainWrapper: "min-w-0 max-w-full overflow-hidden",
-  innerWrapper: "min-w-0 max-w-full flex-wrap gap-1 overflow-hidden",
-  value: "min-w-0 max-w-full truncate",
+  innerWrapper: "min-w-0 max-w-full flex-nowrap gap-1 overflow-hidden",
+  value: "min-w-0 max-w-full truncate text-left",
   selectorIcon: "shrink-0",
 };
 
@@ -51,6 +65,9 @@ export function menuMinWidthForOptions(
 export function editorSelectPopoverProps(menuMinWidth: number) {
   const width = Math.min(menuMinWidth, EDITOR_DROPDOWN_MAX_WIDTH_PX);
   return {
+    // Anchor to trigger start so wide menus stay under the column (not shifted left).
+    placement: "bottom-start" as const,
+    offset: 4,
     style: {
       minWidth: width,
       maxWidth: EDITOR_DROPDOWN_MAX_WIDTH_PX,

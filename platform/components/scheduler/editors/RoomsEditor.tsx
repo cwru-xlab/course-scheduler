@@ -11,7 +11,10 @@ import {
   type EditorColumnFilterDef,
   type EditorFiltersState,
 } from "./editorFilters";
+import { sortDefsFromFilterDefs } from "./editorSort";
 import { ROOM_COLUMN_SPECS } from "./editorColumnSpecs";
+import { useEditorActions } from "./EditorActionProvider";
+import { editorRowKey, recentlyAddedRowClass } from "./editorRowHighlight";
 import { RoomEditModal } from "./modals/RoomEditModal";
 
 import { EditableCell } from "../EditableCell";
@@ -19,6 +22,7 @@ import { EditableArrayCell } from "../EditableArrayCell";
 import { RowNotesButton } from "../RowNotesButton";
 
 import type { Room } from "@/lib/scheduling/types";
+import { insertAtSortedIdPosition } from "@/lib/scheduling/insertAtSortedIdPosition";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
 
 type RoomRow = { room: Room; index: number };
@@ -40,6 +44,8 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [addDraft, setAddDraft] = useState<Room | null>(null);
+  const { confirmRowAdded, isRowRecentlyAdded } = useEditorActions();
 
   const updateRoom = (index: number, field: keyof Room, value: unknown) => {
     const newRooms = [...rooms];
@@ -48,7 +54,7 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
   };
 
   const addRoom = () => {
-    onUpdate([...rooms, createEmptyRoom(rooms)]);
+    setAddDraft(createEmptyRoom(rooms));
   };
 
   const deleteRoom = (index: number) => {
@@ -91,6 +97,8 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
     ],
     [],
   );
+
+  const roomSortDefs = useMemo(() => sortDefsFromFilterDefs(roomFilterDefs), [roomFilterDefs]);
 
   const roomRows = useMemo(
     (): RoomRow[] => rooms.map((room, index) => ({ room, index })),
@@ -179,8 +187,15 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
         editorKey="rooms"
         columnSpecs={ROOM_COLUMN_SPECS}
         rows={filteredRooms}
+        sortDefs={roomSortDefs}
         getRowKey={({ room, index }) => `${room.id}-${index}`}
         getRowId={({ room }) => `note-rooms-${encodeURIComponent(String(room.id))}`}
+        getRowClassName={({ room }) =>
+          recentlyAddedRowClass(
+            "border-t border-default-200",
+            isRowRecentlyAdded(editorRowKey("rooms", String(room.id))),
+          )
+        }
         renderCell={renderCell}
         renderActions={({ room, index: idx }) => (
           <EditorRowActions
@@ -206,6 +221,22 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
             const next = [...rooms];
             next[editIndex] = updated;
             onUpdate(next);
+          }}
+        />
+      ) : null}
+      {addDraft ? (
+        <RoomEditModal
+          isOpen
+          mode="create"
+          room={addDraft}
+          onClose={() => setAddDraft(null)}
+          onSave={(created) => {
+            onUpdate(insertAtSortedIdPosition(rooms, created));
+            setAddDraft(null);
+            confirmRowAdded({
+              rowKey: editorRowKey("rooms", String(created.id)),
+              message: `Successfully added room ${created.building} ${created.room_number}.`,
+            });
           }}
         />
       ) : null}

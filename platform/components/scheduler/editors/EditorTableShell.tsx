@@ -10,7 +10,7 @@ export const editorTh =
   "pb-2 pr-1.5 text-xs font-semibold uppercase tracking-wide text-default-500 truncate";
 
 /** Table body cell: allows flex children to shrink inside fixed columns. */
-export const editorTd = "py-2 pr-1.5 align-top min-w-0 overflow-hidden";
+export const editorTd = "py-2 pl-2.5 pr-1.5 align-middle min-w-0 overflow-hidden";
 
 type EditorTableShellProps = {
   title: string;

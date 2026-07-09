@@ -9,9 +9,11 @@ import { EditableCell } from "../EditableCell";
 import { MultiSelect } from "../MultiSelect";
 import { RowNotesButton } from "../RowNotesButton";
 import { useEditorActions } from "./EditorActionProvider";
+import { editorRowKey, RECENTLY_ADDED_ROW_CLASS } from "./editorRowHighlight";
 import { MeetingPatternEditModal } from "./modals/MeetingPatternEditModal";
 
 import type { MeetingPattern } from "@/lib/scheduling/types";
+import { insertAtSortedIdPosition } from "@/lib/scheduling/insertAtSortedIdPosition";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
 
 type MeetingPatternsEditorProps = {
@@ -42,8 +44,9 @@ export const MeetingPatternsEditor = ({
   timeslotOptions,
   onUpdate,
 }: MeetingPatternsEditorProps) => {
-  const { requestDelete, showSuccess } = useEditorActions();
+  const { requestDelete, showSuccess, confirmRowAdded, isRowRecentlyAdded } = useEditorActions();
   const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [addDraft, setAddDraft] = useState<MeetingPattern | null>(null);
 
   const updatePattern = (index: number, field: keyof MeetingPattern, value: unknown) => {
     const newPatterns = [...meetingPatterns];
@@ -52,7 +55,7 @@ export const MeetingPatternsEditor = ({
   };
 
   const addPattern = () => {
-    onUpdate([...meetingPatterns, createEmptyMeetingPattern(meetingPatterns)]);
+    setAddDraft(createEmptyMeetingPattern(meetingPatterns));
   };
 
   const deletePattern = (index: number) => {
@@ -98,7 +101,11 @@ export const MeetingPatternsEditor = ({
           <div
             key={`${pattern.id}-${idx}`}
             id={`note-meeting-patterns-${encodeURIComponent(String(pattern.id))}`}
-            className="border border-default-200 rounded-lg p-3"
+            className={`border border-default-200 rounded-lg p-3${
+              isRowRecentlyAdded(editorRowKey("meeting-patterns", String(pattern.id)))
+                ? ` ${RECENTLY_ADDED_ROW_CLASS}`
+                : ""
+            }`}
           >
             <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
               <div className="flex items-center gap-4 flex-wrap min-w-0 flex-1">
@@ -215,6 +222,23 @@ export const MeetingPatternsEditor = ({
             const next = [...meetingPatterns];
             next[editIndex] = updated;
             onUpdate(next);
+          }}
+        />
+      ) : null}
+      {addDraft ? (
+        <MeetingPatternEditModal
+          isOpen
+          mode="create"
+          pattern={addDraft}
+          timeslotOptions={timeslotOptions}
+          onClose={() => setAddDraft(null)}
+          onSave={(created) => {
+            onUpdate(insertAtSortedIdPosition(meetingPatterns, created));
+            setAddDraft(null);
+            confirmRowAdded({
+              rowKey: editorRowKey("meeting-patterns", String(created.id)),
+              message: `Successfully added meeting pattern ${created.id}.`,
+            });
           }}
         />
       ) : null}
