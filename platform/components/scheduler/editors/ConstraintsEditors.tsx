@@ -124,7 +124,14 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
   ) => {
     switch (columnId) {
       case "id":
-        return <EditableCell value={group.id} onChange={(v) => updateGroup(idx, "id", v)} />;
+        return (
+          <span
+            className="block truncate px-2 py-1 text-slate-600 font-mono text-xs select-text"
+            title={String(group.id)}
+          >
+            {group.id}
+          </span>
+        );
       case "members":
         return (
           <MultiSelect
@@ -318,7 +325,14 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
   ) => {
     switch (columnId) {
       case "id":
-        return <EditableCell value={group.id} onChange={(v) => updateGroup(idx, "id", v)} />;
+        return (
+          <span
+            className="block truncate px-2 py-1 text-slate-600 font-mono text-xs select-text"
+            title={String(group.id)}
+          >
+            {group.id}
+          </span>
+        );
       case "members":
         return (
           <MultiSelect

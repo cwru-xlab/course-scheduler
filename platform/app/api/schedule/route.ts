@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { siteConfig } from "@/config/site";
+import { verifyToken } from "@/lib/auth";
 import { mockSchedulingInput } from "@/lib/scheduling/mockData";
 import type { SchedulingInput } from "@/lib/scheduling/types";
+import {
+  acquireSolverLock,
+  readSolverLock,
+  releaseSolverLock,
+} from "@/lib/solver-lock";
 
 const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:5001";
 const SOLVER_FALLBACK_URLS = ["http://localhost:5001", "http://localhost:8000"];
@@ -19,6 +26,37 @@ const parseResponseBody = async (response: Response) => {
 };
 
 export async function POST(request: NextRequest) {
+  // Serialize solver runs across users: the Flask solver is single-worker
+  // and CP-SAT is CPU/memory heavy — two concurrent runs have been observed
+  // to fail with generic "fetch failed" (solver crash / timeout). Reject
+  // overlapping requests with 409 so the client can present a clear message.
+  let userLabel: string | null = null;
+  try {
+    const token = request.cookies.get(siteConfig.auth.cookie.name)?.value;
+    if (token) {
+      const user = await verifyToken(token);
+      userLabel = user?.name ?? user?.email ?? null;
+    }
+  } catch {
+    // best-effort attribution
+  }
+  if (!acquireSolverLock(userLabel)) {
+    const state = readSolverLock();
+    return NextResponse.json(
+      {
+        status: "error",
+        errors: [
+          {
+            code: "solver_busy",
+            message: state.startedBy
+              ? `The solver is currently running (started by ${state.startedBy}). Please wait for it to finish.`
+              : "The solver is currently running. Please wait for it to finish.",
+          },
+        ],
+      },
+      { status: 409 },
+    );
+  }
   try {
     // Use request body if provided, otherwise fall back to mock data
     let input: SchedulingInput;
@@ -107,5 +145,7 @@ export async function POST(request: NextRequest) {
       { status: "error", errors: [{ code: "network_error", message }] },
       { status: 502 }
     );
+  } finally {
+    releaseSolverLock();
   }
 }

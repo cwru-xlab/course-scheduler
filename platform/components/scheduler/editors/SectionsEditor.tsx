@@ -228,7 +228,14 @@ export const SectionsEditor = ({
   const renderCell = (columnId: string, { section, index: idx }: SectionRow) => {
     switch (columnId) {
       case "id":
-        return <EditableCell value={section.id} onChange={(v) => updateSection(idx, "id", v)} />;
+        return (
+          <span
+            className="block truncate px-2 py-1 text-slate-600 font-mono text-xs select-text"
+            title={String(section.id)}
+          >
+            {section.id}
+          </span>
+        );
       case "dept":
         return (
           <EditableCell

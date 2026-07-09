@@ -145,7 +145,14 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
   const renderCell = (columnId: string, { slot, index: idx }: TimeslotRow) => {
     switch (columnId) {
       case "id":
-        return <EditableCell value={slot.id} onChange={(v) => updateTimeslot(idx, "id", v)} />;
+        return (
+          <span
+            className="block truncate px-2 py-1 text-slate-600 font-mono text-xs select-text"
+            title={String(slot.id)}
+          >
+            {slot.id}
+          </span>
+        );
       case "days":
         return (
           <MultiSelect

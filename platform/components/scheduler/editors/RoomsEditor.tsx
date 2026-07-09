@@ -128,7 +128,14 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
   const renderCell = (columnId: string, { room, index: idx }: RoomRow) => {
     switch (columnId) {
       case "id":
-        return <EditableCell value={room.id} onChange={(v) => updateRoom(idx, "id", v)} />;
+        return (
+          <span
+            className="block truncate px-2 py-1 text-slate-600 font-mono text-xs select-text"
+            title={String(room.id)}
+          >
+            {room.id}
+          </span>
+        );
       case "building":
         return (
           <EditableCell

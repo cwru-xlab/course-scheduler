@@ -59,6 +59,7 @@ import {
   type LastSolverRunSnapshot,
 } from "@/lib/scheduling/history";
 import { SCHEDULING_DATA_REFRESH_EVENT } from "@/lib/scheduling/useSchedulingData";
+import { useSolverLock } from "@/lib/solver-lock-client";
 import {
   SCHEDULING_WINDOW_END_HOUR,
   SCHEDULING_WINDOW_START_HOUR,
@@ -984,6 +985,8 @@ export default function CalendarPage() {
     useSolverProgress();
   const [lockedSectionIds, setLockedSectionIds] = useState<string[]>([]);
   const [solverRunStatus, setSolverRunStatus] = useState<"idle" | "loading">("idle");
+  const solverLock = useSolverLock();
+  const solverBusyRemote = solverLock.active && solverRunStatus !== "loading";
   const [solverRunError, setSolverRunError] = useState<string | null>(null);
   const [calendarContextMenu, setCalendarContextMenu] = useState<{
     clientX: number;
@@ -1096,6 +1099,20 @@ type MeetingPatternPlacementOption = {
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const AUTOSAVE_STORAGE_KEY = "wsom-calendar-autosave-enabled";
+  const [autosaveEnabled, setAutosaveEnabled] = useState<boolean>(true);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(AUTOSAVE_STORAGE_KEY);
+    if (stored === "false") setAutosaveEnabled(false);
+  }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      AUTOSAVE_STORAGE_KEY,
+      autosaveEnabled ? "true" : "false",
+    );
+  }, [autosaveEnabled]);
   const [selectedDepartmentKeys, setSelectedDepartmentKeys] = useState<string[]>([]);
   const [selectedInstructorIds, setSelectedInstructorIds] = useState<string[]>([]);
   const [hoveredDepartmentKey, setHoveredDepartmentKey] = useState<string | null>(null);
@@ -2237,6 +2254,24 @@ type MeetingPatternPlacementOption = {
   }, [calendarContextMenu]);
 
   const handleRunSolverFromCalendar = useCallback(async () => {
+    if (solverBusyRemote) {
+      setSolverRunError(
+        solverLock.startedBy
+          ? `The solver is currently running (started by ${solverLock.startedBy}). Please wait for it to finish.`
+          : "The solver is currently running. Please wait for it to finish.",
+      );
+      return;
+    }
+    if (hasValidUnsavedEdit && !autosaveEnabled) {
+      if (typeof window !== "undefined") {
+        const choice = window.confirm(
+          "You have unsaved calendar edits. Save them to the backend before running the solver?\n\nOK = save first, Cancel = run without saving.",
+        );
+        if (choice) {
+          await updateBackendRef.current(true);
+        }
+      }
+    }
     setSolverRunError(null);
     setSolverRunStatus("loading");
     beginSolverProgress();
@@ -2284,6 +2319,16 @@ type MeetingPatternPlacementOption = {
         errors?: { message?: string }[];
         diagnostics?: unknown;
       };
+      if (response.status === 409) {
+        const busyMsg =
+          Array.isArray(result.errors) && result.errors[0]?.message
+            ? String(result.errors[0].message)
+            : "The solver is currently running. Please wait for it to finish.";
+        failSolverProgress();
+        setSolverRunError(busyMsg);
+        setSolverRunStatus("idle");
+        return;
+      }
       if (!response.ok || result.status === "error") {
         if (typeof window !== "undefined") {
           localStorage.setItem(
@@ -2347,11 +2392,15 @@ type MeetingPatternPlacementOption = {
     }
   }, [
     assignmentsBySection,
+    autosaveEnabled,
     beginSolverProgress,
     data,
     failSolverProgress,
+    hasValidUnsavedEdit,
     lockedSectionIds,
     router,
+    solverBusyRemote,
+    solverLock.startedBy,
     succeedSolverProgress,
     solverInput,
     updateLastRunStorage,
@@ -2875,7 +2924,7 @@ type MeetingPatternPlacementOption = {
     ],
   );
 
-  const handleUpdateBackend = async () => {
+  const handleUpdateBackend = async (silent = false) => {
     if (!data || !hasValidUnsavedEdit) return;
     setIsSavingBackend(true);
     setBackendSaveMessage(null);
@@ -2923,10 +2972,12 @@ type MeetingPatternPlacementOption = {
         setSolverInput(nextInput);
         updateLastRunStorage(nextInput, assignmentsBySection);
       }
-      setBackendSaveMessage({
-        type: "success",
-        text: "Backend updated. Sections will appear in the Sections editor and be used by Run Solver.",
-      });
+      if (!silent) {
+        setBackendSaveMessage({
+          type: "success",
+          text: "Backend updated. Sections will appear in the Sections editor and be used by Run Solver.",
+        });
+      }
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event(SCHEDULING_DATA_REFRESH_EVENT));
       }
@@ -2939,6 +2990,21 @@ type MeetingPatternPlacementOption = {
       setIsSavingBackend(false);
     }
   };
+
+  const updateBackendRef = useRef(handleUpdateBackend);
+  updateBackendRef.current = handleUpdateBackend;
+
+  // Autosave: when enabled and there's a valid unsaved edit, silently persist
+  // after a short debounce so users don't have to click Update Backend.
+  useEffect(() => {
+    if (!autosaveEnabled) return;
+    if (!hasValidUnsavedEdit) return;
+    if (isSavingBackend) return;
+    const timer = window.setTimeout(() => {
+      void updateBackendRef.current(true);
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [autosaveEnabled, hasValidUnsavedEdit, isSavingBackend, assignmentsBySection]);
 
   const handleSaveSectionModal = useCallback(async () => {
     if (!data || !sectionModal) return;
@@ -3248,54 +3314,109 @@ type MeetingPatternPlacementOption = {
         <div className="flex flex-col items-stretch gap-2 w-full md:w-auto">
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2">
             <div
-              onMouseEnter={() => setToolbarActionHint("Run solver using current backend data and placement locks.")}
+              onMouseEnter={() =>
+                setToolbarActionHint(
+                  solverBusyRemote
+                    ? solverLock.startedBy
+                      ? `Solver is running (started by ${solverLock.startedBy}). Please wait.`
+                      : "Solver is running. Please wait."
+                    : "Run solver using current backend data and placement locks.",
+                )
+              }
               onMouseLeave={() => setToolbarActionHint(null)}
-              onFocus={() => setToolbarActionHint("Run solver using current backend data and placement locks.")}
+              onFocus={() =>
+                setToolbarActionHint(
+                  solverBusyRemote
+                    ? solverLock.startedBy
+                      ? `Solver is running (started by ${solverLock.startedBy}). Please wait.`
+                      : "Solver is running. Please wait."
+                    : "Run solver using current backend data and placement locks.",
+                )
+              }
               onBlur={() => setToolbarActionHint(null)}
               className="contents"
             >
               <button
                 type="button"
-                disabled={solverRunStatus === "loading" || !data}
+                disabled={
+                  solverRunStatus === "loading" || !data || solverBusyRemote
+                }
                 onClick={() => void handleRunSolverFromCalendar()}
                 className={clsx(
                   "flex items-center justify-center rounded-lg size-10 font-bold border transition-colors",
-                  solverRunStatus !== "loading" && data
+                  solverRunStatus !== "loading" && data && !solverBusyRemote
                     ? "bg-[#137fec] text-white border-[#137fec] shadow-lg shadow-[#137fec]/20 hover:bg-[#0f6dca]"
                     : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
                 )}
-                title="Run the solver using backend scheduling data and locks from this page"
+                title={
+                  solverBusyRemote
+                    ? solverLock.startedBy
+                      ? `Solver is running (started by ${solverLock.startedBy})`
+                      : "Solver is running"
+                    : "Run the solver using backend scheduling data and locks from this page"
+                }
                 aria-label="Run solver"
               >
                 <Play className="size-4" />
               </button>
             </div>
             <div
-              onMouseEnter={() => setToolbarActionHint("Persist valid calendar edits to backend tables.")}
+              onMouseEnter={() =>
+                setToolbarActionHint(
+                  autosaveEnabled
+                    ? "Autosave is on — calendar edits persist automatically."
+                    : "Autosave is off — click Save to persist calendar edits.",
+                )
+              }
               onMouseLeave={() => setToolbarActionHint(null)}
-              onFocus={() => setToolbarActionHint("Persist valid calendar edits to backend tables.")}
-              onBlur={() => setToolbarActionHint(null)}
-              className="contents"
+              className="flex items-center gap-2 pl-1 pr-2"
             >
               <button
                 type="button"
-                disabled={!hasValidUnsavedEdit || isSavingBackend}
-                onClick={handleUpdateBackend}
+                role="switch"
+                aria-checked={autosaveEnabled}
+                onClick={() => setAutosaveEnabled((v) => !v)}
                 className={clsx(
-                  "flex items-center justify-center rounded-lg size-10 font-bold border transition-colors",
-                  hasValidUnsavedEdit && !isSavingBackend
-                    ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
-                    : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
+                  "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors",
+                  autosaveEnabled
+                    ? "bg-emerald-500 border-emerald-500"
+                    : "bg-slate-200 border-slate-300",
                 )}
                 title={
-                  hasValidUnsavedEdit
-                    ? "Persist valid calendar edits to backend"
-                    : "Make a valid edit first to enable backend update"
+                  autosaveEnabled
+                    ? "Autosave on — click to disable"
+                    : "Autosave off — click to enable"
                 }
-                aria-label="Update backend"
+                aria-label="Toggle autosave"
               >
-                <CloudBackup className="size-4" />
+                <span
+                  className={clsx(
+                    "inline-block size-4 rounded-full bg-white shadow transition-transform",
+                    autosaveEnabled ? "translate-x-4" : "translate-x-0.5",
+                  )}
+                />
               </button>
+              <span className="text-xs font-semibold text-slate-600 select-none">
+                Autosave
+              </span>
+              {!autosaveEnabled && hasValidUnsavedEdit && (
+                <button
+                  type="button"
+                  disabled={isSavingBackend}
+                  onClick={() => void handleUpdateBackend(false)}
+                  className={clsx(
+                    "ml-1 flex items-center justify-center rounded-lg h-8 px-3 text-xs font-bold border transition-colors",
+                    isSavingBackend
+                      ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                      : "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100",
+                  )}
+                  title="Persist valid calendar edits to backend"
+                  aria-label="Save"
+                >
+                  <CloudBackup className="size-4 mr-1" />
+                  Save
+                </button>
+              )}
             </div>
             <div className="hidden lg:block h-7 w-px bg-slate-200 mx-1" />
             <Link
