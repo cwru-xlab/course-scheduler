@@ -64,16 +64,20 @@ const normalizeBlockedTimeValue = (value: string | null | undefined): string => 
   return `${String(Number(match[1])).padStart(2, "0")}:${match[2]}`;
 };
 
-type ModalFooterProps = { onClose: () => void; onSave: () => void };
+type ModalFooterProps = {
+  mode?: "create" | "edit";
+  onClose: () => void;
+  onSave: () => void;
+};
 
-function ModalFooter({ onClose, onSave }: ModalFooterProps) {
+function ModalFooter({ mode = "edit", onClose, onSave }: ModalFooterProps) {
   return (
     <>
       <Button variant="flat" onPress={onClose}>
         Cancel
       </Button>
       <Button color="primary" className="font-bold" onPress={onSave}>
-        Save changes
+        {mode === "create" ? "Add" : "Save changes"}
       </Button>
     </>
   );
@@ -82,6 +86,7 @@ function ModalFooter({ onClose, onSave }: ModalFooterProps) {
 type CrossListGroupEditModalProps = {
   isOpen: boolean;
   group: CrossListGroup;
+  mode?: "create" | "edit";
   sectionOptions: { key: string; label: string }[];
   onClose: () => void;
   onSave: (group: CrossListGroup) => void;
@@ -90,6 +95,7 @@ type CrossListGroupEditModalProps = {
 export function CrossListGroupEditModal({
   isOpen,
   group,
+  mode = "edit",
   sectionOptions,
   onClose,
   onSave,
@@ -102,9 +108,20 @@ export function CrossListGroupEditModal({
   return (
     <EditorModalShell
       isOpen={isOpen}
-      title={`Edit cross-list group — ${group.id}`}
+      title={
+        mode === "create" ? "Add cross-list group" : `Edit cross-list group — ${group.id}`
+      }
       onClose={onClose}
-      footer={<ModalFooter onClose={onClose} onSave={() => { onSave(draft); onClose(); }} />}
+      footer={
+        <ModalFooter
+          mode={mode}
+          onClose={onClose}
+          onSave={() => {
+            onSave(draft);
+            onClose();
+          }}
+        />
+      }
     >
       <label className="flex flex-col gap-1">
         <span className="text-xs font-semibold text-slate-600">Group ID</span>
@@ -131,6 +148,7 @@ export function CrossListGroupEditModal({
 type NoOverlapGroupEditModalProps = {
   isOpen: boolean;
   group: NoOverlapGroup;
+  mode?: "create" | "edit";
   sectionOptions: { key: string; label: string }[];
   onClose: () => void;
   onSave: (group: NoOverlapGroup) => void;
@@ -139,6 +157,7 @@ type NoOverlapGroupEditModalProps = {
 export function NoOverlapGroupEditModal({
   isOpen,
   group,
+  mode = "edit",
   sectionOptions,
   onClose,
   onSave,
@@ -151,9 +170,20 @@ export function NoOverlapGroupEditModal({
   return (
     <EditorModalShell
       isOpen={isOpen}
-      title={`Edit no-overlap group — ${group.id}`}
+      title={
+        mode === "create" ? "Add no-overlap group" : `Edit no-overlap group — ${group.id}`
+      }
       onClose={onClose}
-      footer={<ModalFooter onClose={onClose} onSave={() => { onSave(draft); onClose(); }} />}
+      footer={
+        <ModalFooter
+          mode={mode}
+          onClose={onClose}
+          onSave={() => {
+            onSave(draft);
+            onClose();
+          }}
+        />
+      }
     >
       <label className="flex flex-col gap-1">
         <span className="text-xs font-semibold text-slate-600">Group ID</span>
@@ -188,6 +218,7 @@ export function NoOverlapGroupEditModal({
 type BlockedTimeEditModalProps = {
   isOpen: boolean;
   blocked: BlockedTime;
+  mode?: "create" | "edit";
   instructorOptions: { key: string; label: string }[];
   roomOptions: { key: string; label: string }[];
   onClose: () => void;
@@ -197,6 +228,7 @@ type BlockedTimeEditModalProps = {
 export function BlockedTimeEditModal({
   isOpen,
   blocked,
+  mode = "edit",
   instructorOptions,
   roomOptions,
   onClose,
@@ -216,9 +248,18 @@ export function BlockedTimeEditModal({
   return (
     <EditorModalShell
       isOpen={isOpen}
-      title="Edit blocked time"
+      title={mode === "create" ? "Add blocked time" : "Edit blocked time"}
       onClose={onClose}
-      footer={<ModalFooter onClose={onClose} onSave={() => { onSave(draft); onClose(); }} />}
+      footer={
+        <ModalFooter
+          mode={mode}
+          onClose={onClose}
+          onSave={() => {
+            onSave(draft);
+            onClose();
+          }}
+        />
+      }
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1">
@@ -338,6 +379,7 @@ export function BlockedTimeEditModal({
 type LockedAssignmentEditModalProps = {
   isOpen: boolean;
   lock: LockedAssignment;
+  mode?: "create" | "edit";
   sectionOptions: { key: string; label: string }[];
   timeslotOptions: { key: string; label: string }[];
   roomOptions: { key: string; label: string }[];
@@ -348,6 +390,7 @@ type LockedAssignmentEditModalProps = {
 export function LockedAssignmentEditModal({
   isOpen,
   lock,
+  mode = "edit",
   sectionOptions,
   timeslotOptions,
   roomOptions,
@@ -364,9 +407,22 @@ export function LockedAssignmentEditModal({
   return (
     <EditorModalShell
       isOpen={isOpen}
-      title={`Edit locked assignment — ${lock.section_id || "row"}`}
+      title={
+        mode === "create"
+          ? "Add locked assignment"
+          : `Edit locked assignment — ${lock.section_id || "row"}`
+      }
       onClose={onClose}
-      footer={<ModalFooter onClose={onClose} onSave={() => { onSave(draft); onClose(); }} />}
+      footer={
+        <ModalFooter
+          mode={mode}
+          onClose={onClose}
+          onSave={() => {
+            onSave(draft);
+            onClose();
+          }}
+        />
+      }
     >
       <label className="flex flex-col gap-1">
         <span className="text-xs font-semibold text-slate-600">Section</span>
@@ -424,6 +480,7 @@ export function LockedAssignmentEditModal({
 type SoftLockEditModalProps = {
   isOpen: boolean;
   lock: SoftLock;
+  mode?: "create" | "edit";
   sectionOptions: { key: string; label: string }[];
   timeslotOptions: { key: string; label: string }[];
   roomOptions: { key: string; label: string }[];
@@ -434,6 +491,7 @@ type SoftLockEditModalProps = {
 export function SoftLockEditModal({
   isOpen,
   lock,
+  mode = "edit",
   sectionOptions,
   timeslotOptions,
   roomOptions,
@@ -450,9 +508,20 @@ export function SoftLockEditModal({
   return (
     <EditorModalShell
       isOpen={isOpen}
-      title={`Edit soft lock — ${lock.section_id || "row"}`}
+      title={
+        mode === "create" ? "Add soft lock" : `Edit soft lock — ${lock.section_id || "row"}`
+      }
       onClose={onClose}
-      footer={<ModalFooter onClose={onClose} onSave={() => { onSave(draft); onClose(); }} />}
+      footer={
+        <ModalFooter
+          mode={mode}
+          onClose={onClose}
+          onSave={() => {
+            onSave(draft);
+            onClose();
+          }}
+        />
+      }
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1 sm:col-span-2">

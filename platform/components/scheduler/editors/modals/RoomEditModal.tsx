@@ -10,11 +10,18 @@ import type { Room } from "@/lib/scheduling/types";
 type RoomEditModalProps = {
   isOpen: boolean;
   room: Room;
+  mode?: "create" | "edit";
   onClose: () => void;
   onSave: (room: Room) => void;
 };
 
-export function RoomEditModal({ isOpen, room, onClose, onSave }: RoomEditModalProps) {
+export function RoomEditModal({
+  isOpen,
+  room,
+  mode = "edit",
+  onClose,
+  onSave,
+}: RoomEditModalProps) {
   const [draft, setDraft] = useState(room);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,7 +49,7 @@ export function RoomEditModal({ isOpen, room, onClose, onSave }: RoomEditModalPr
   return (
     <EditorModalShell
       isOpen={isOpen}
-      title={`Edit room — ${room.id}`}
+      title={mode === "create" ? "Add room" : `Edit room — ${room.id}`}
       onClose={onClose}
       footer={
         <>
@@ -50,7 +57,7 @@ export function RoomEditModal({ isOpen, room, onClose, onSave }: RoomEditModalPr
             Cancel
           </Button>
           <Button color="primary" className="font-bold" onPress={handleSave}>
-            Save changes
+            {mode === "create" ? "Add" : "Save changes"}
           </Button>
         </>
       }

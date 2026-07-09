@@ -1,29 +1,31 @@
 "use client";
 
-import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
+import { useShowColumnsInlineExpanded } from "@/lib/editor-ui-preferences";
 import type { EditorColumnSpec } from "./useEditorColumnVisibility";
 
 type EditorColumnPickerProps = {
+  editorKey: string;
   specs: EditorColumnSpec[];
   visibleIds: Set<string>;
   onToggle: (id: string, checked: boolean) => void;
 };
 
 export function EditorColumnPicker({
+  editorKey,
   specs,
   visibleIds,
   onToggle,
 }: EditorColumnPickerProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useShowColumnsInlineExpanded(editorKey);
 
   return (
     <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50/80">
       <button
         type="button"
         className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-slate-100/60"
-        onClick={() => setIsExpanded((expanded) => !expanded)}
+        onClick={() => setIsExpanded(!isExpanded)}
         aria-expanded={isExpanded}
       >
         <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">

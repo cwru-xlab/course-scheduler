@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Button } from "@heroui/button";
 import { Rocket } from "lucide-react";
 
+import { ViewportModal } from "@/components/scheduler/ViewportModal";
 import type {
   ScheduleSolution,
   SchedulingInput,
@@ -138,67 +138,59 @@ export const SolverActionButton = ({ data }: { data: SchedulingInput | null }) =
         <p className="text-xs text-red-600 max-w-md text-right">{solverError}</p>
       )}
 
-      {isConfirmOpen &&
-        typeof document !== "undefined" &&
-        createPortal(
+      <ViewportModal isOpen={isConfirmOpen} onClose={() => setIsConfirmOpen(false)} zIndex={1000}>
+        {isConfirmOpen ? (
           <div
-            className="fixed inset-0 flex items-center justify-center bg-black/40 p-4 backdrop-blur-[1px]"
-            style={{ zIndex: 1000 }}
-            role="presentation"
-            onClick={() => setIsConfirmOpen(false)}
+            className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="solver-confirm-title"
+            onClick={(e) => e.stopPropagation()}
           >
-            <div
-              className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white shadow-2xl"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="solver-confirm-title"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-                <h3 id="solver-confirm-title" className="text-lg font-black text-slate-900">
-                  Are you sure?
-                </h3>
-                <button
-                  type="button"
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
-                  onClick={() => setIsConfirmOpen(false)}
-                >
-                  Close
-                </button>
-              </div>
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <h3 id="solver-confirm-title" className="text-lg font-black text-slate-900">
+                Are you sure?
+              </h3>
+              <button
+                type="button"
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                onClick={() => setIsConfirmOpen(false)}
+              >
+                Close
+              </button>
+            </div>
 
-              <div className="px-6 py-5 text-sm text-slate-700 space-y-4">
-                <p>
-                  Running the solver will update the calendar for any changes that you may have made in the editor.
-                  However, it will also re-optimize the schedule alignment, and will overwrite any manual adjustments
-                  you may have made on the calendar page.
+            <div className="px-6 py-5 text-sm text-slate-700 space-y-4">
+              <p>
+                Running the solver will update the calendar for any changes that you may have made in the editor.
+                However, it will also re-optimize the schedule alignment, and will overwrite any manual adjustments
+                you may have made on the calendar page.
+              </p>
+              {archivedSectionCount > 0 && (
+                <p className="text-amber-800">
+                  {archivedSectionCount} archived section
+                  {archivedSectionCount === 1 ? "" : "s"} will not be scheduled.
                 </p>
-                {archivedSectionCount > 0 && (
-                  <p className="text-amber-800">
-                    {archivedSectionCount} archived section
-                    {archivedSectionCount === 1 ? "" : "s"} will not be scheduled.
-                  </p>
-                )}
+              )}
 
-                <div className="flex justify-end gap-2">
-                  <Button variant="light" onPress={() => setIsConfirmOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    color="primary"
-                    className="font-bold"
-                    onPress={runSolverConfirmed}
-                    isDisabled={solverStatus === "loading"}
-                    isLoading={solverStatus === "loading"}
-                  >
-                    Run Solver
-                  </Button>
-                </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="light" onPress={() => setIsConfirmOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  color="primary"
+                  className="font-bold"
+                  onPress={runSolverConfirmed}
+                  isDisabled={solverStatus === "loading"}
+                  isLoading={solverStatus === "loading"}
+                >
+                  Run Solver
+                </Button>
               </div>
             </div>
-          </div>,
-          document.body,
-        )}
+          </div>
+        ) : null}
+      </ViewportModal>
     </div>
   );
 };

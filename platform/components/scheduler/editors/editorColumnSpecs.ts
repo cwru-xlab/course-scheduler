@@ -5,7 +5,7 @@ const allVisible = (specs: Omit<EditorColumnSpec, "defaultVisible">[]): EditorCo
 
 export const SECTION_COLUMN_SPECS: EditorColumnSpec[] = [
   { id: "id", label: "ID", defaultVisible: true, weight: 4 },
-  { id: "dept", label: "Dept", defaultVisible: true, weight: 6 },
+  { id: "dept", label: "SUBJ", defaultVisible: true, weight: 6 },
   { id: "course", label: "Course", defaultVisible: true, weight: 8 },
   { id: "code", label: "Code", defaultVisible: true, weight: 4 },
   { id: "state", label: "State", defaultVisible: true, weight: 5 },

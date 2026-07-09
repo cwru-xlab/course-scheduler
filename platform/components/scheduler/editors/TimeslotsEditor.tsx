@@ -15,7 +15,10 @@ import {
   type EditorColumnFilterDef,
   type EditorFiltersState,
 } from "./editorFilters";
+import { sortDefsFromFilterDefs } from "./editorSort";
 import { TIMESLOT_COLUMN_SPECS } from "./editorColumnSpecs";
+import { useEditorActions } from "./EditorActionProvider";
+import { editorRowKey, recentlyAddedRowClass } from "./editorRowHighlight";
 import { TimeslotEditModal } from "./modals/TimeslotEditModal";
 import {
   TIMESLOT_BLOCK_TYPE_OPTIONS,
@@ -28,6 +31,7 @@ import {
 } from "./timeslotEditorConstants";
 
 import type { Timeslot } from "@/lib/scheduling/types";
+import { insertAtSortedIdPosition } from "@/lib/scheduling/insertAtSortedIdPosition";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
 import { SCHEDULING_WINDOW_START_TIME } from "@/lib/scheduling/timeWindow";
 
@@ -50,6 +54,8 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [addDraft, setAddDraft] = useState<Timeslot | null>(null);
+  const { confirmRowAdded, isRowRecentlyAdded } = useEditorActions();
 
   const updateTimeslot = (index: number, field: keyof Timeslot, value: unknown) => {
     const newTimeslots = [...timeslots];
@@ -58,7 +64,7 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
   };
 
   const addTimeslot = () => {
-    onUpdate([...timeslots, createEmptyTimeslot(timeslots)]);
+    setAddDraft(createEmptyTimeslot(timeslots));
   };
 
   const deleteTimeslot = (index: number) => {
@@ -104,6 +110,11 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
       },
     ],
     [],
+  );
+
+  const timeslotSortDefs = useMemo(
+    () => sortDefsFromFilterDefs(timeslotFilterDefs),
+    [timeslotFilterDefs],
   );
 
   const timeslotRows = useMemo(
@@ -203,8 +214,15 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
         editorKey="timeslots"
         columnSpecs={TIMESLOT_COLUMN_SPECS}
         rows={filteredTimeslots}
+        sortDefs={timeslotSortDefs}
         getRowKey={({ slot, index }) => `${slot.id}-${index}`}
         getRowId={({ slot }) => `note-timeslots-${encodeURIComponent(String(slot.id))}`}
+        getRowClassName={({ slot }) =>
+          recentlyAddedRowClass(
+            "border-t border-default-200",
+            isRowRecentlyAdded(editorRowKey("timeslots", String(slot.id))),
+          )
+        }
         renderCell={renderCell}
         renderActions={({ slot, index: idx }) => (
           <EditorRowActions
@@ -230,6 +248,22 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
             const next = [...timeslots];
             next[editIndex] = updated;
             onUpdate(next);
+          }}
+        />
+      ) : null}
+      {addDraft ? (
+        <TimeslotEditModal
+          isOpen
+          mode="create"
+          timeslot={addDraft}
+          onClose={() => setAddDraft(null)}
+          onSave={(created) => {
+            onUpdate(insertAtSortedIdPosition(timeslots, created));
+            setAddDraft(null);
+            confirmRowAdded({
+              rowKey: editorRowKey("timeslots", String(created.id)),
+              message: `Successfully added timeslot ${created.id}.`,
+            });
           }}
         />
       ) : null}

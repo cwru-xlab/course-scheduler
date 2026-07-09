@@ -6,6 +6,7 @@ import { Autocomplete, AutocompleteItem } from "@heroui/autocomplete";
 
 import {
   EDITOR_AUTOCOMPLETE_CLASS_NAMES,
+  EDITOR_AUTOCOMPLETE_INPUT_PROPS,
   EDITOR_AUTOCOMPLETE_ITEM_CLASS_NAMES,
   EDITOR_SELECT_ITEM_CLASS_NAMES,
   EDITOR_SELECT_TRIGGER_CLASS_NAMES,
@@ -57,6 +58,7 @@ export const EditableSelectCell = ({
         isDisabled={isDisabled}
         popoverProps={popoverProps}
         listboxProps={editorSelectListboxProps(menuMinWidth)}
+        inputProps={EDITOR_AUTOCOMPLETE_INPUT_PROPS}
         classNames={EDITOR_AUTOCOMPLETE_CLASS_NAMES}
       >
         {(option) => (
