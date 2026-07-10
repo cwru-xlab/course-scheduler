@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import { ReadOnlyIdCell } from "./ReadOnlyIdCell";
 import { EditableCell } from "../EditableCell";
 import { EditableSelectCell } from "../EditableSelectCell";
 import { MultiSelect } from "../MultiSelect";
@@ -145,14 +146,7 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
   const renderCell = (columnId: string, { slot, index: idx }: TimeslotRow) => {
     switch (columnId) {
       case "id":
-        return (
-          <span
-            className="block truncate px-2 py-1 text-slate-600 font-mono text-xs select-text"
-            title={String(slot.id)}
-          >
-            {slot.id}
-          </span>
-        );
+        return <ReadOnlyIdCell value={slot.id} />;
       case "days":
         return (
           <MultiSelect

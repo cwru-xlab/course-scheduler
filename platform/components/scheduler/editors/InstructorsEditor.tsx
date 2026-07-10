@@ -17,6 +17,7 @@ import { useEditorActions } from "./EditorActionProvider";
 import { editorRowKey } from "./editorRowHighlight";
 import { InstructorEditModal } from "./modals/InstructorEditModal";
 
+import { ReadOnlyIdCell } from "./ReadOnlyIdCell";
 import { EditableCell } from "../EditableCell";
 import { EditableSelectCell } from "../EditableSelectCell";
 import { MultiSelect } from "../MultiSelect";
@@ -185,14 +186,7 @@ export const InstructorsEditor = ({
   const renderCell = (columnId: string, { inst, index: idx }: InstructorRow) => {
     switch (columnId) {
       case "id":
-        return (
-          <span
-            className="block truncate px-2 py-1 text-slate-600 font-mono text-xs select-text"
-            title={String(inst.id)}
-          >
-            {inst.id}
-          </span>
-        );
+        return <ReadOnlyIdCell value={inst.id} />;
       case "name":
         return <EditableCell value={inst.name} onChange={(v) => updateInstructor(idx, "name", v)} />;
       case "rank":

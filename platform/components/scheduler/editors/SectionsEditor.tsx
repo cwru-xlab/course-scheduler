@@ -17,6 +17,7 @@ import { useEditorActions } from "./EditorActionProvider";
 import { editorRowKey } from "./editorRowHighlight";
 import { SectionEditModal } from "./modals/SectionEditModal";
 
+import { ReadOnlyIdCell } from "./ReadOnlyIdCell";
 import { EditableCell } from "../EditableCell";
 import { EditableArrayCell } from "../EditableArrayCell";
 import { EditableSelectCell } from "../EditableSelectCell";
@@ -258,14 +259,7 @@ export const SectionsEditor = ({
   const renderCell = (columnId: string, { section, index: idx }: SectionRow) => {
     switch (columnId) {
       case "id":
-        return (
-          <span
-            className="block truncate px-2 py-1 text-slate-600 font-mono text-xs select-text"
-            title={String(section.id)}
-          >
-            {section.id}
-          </span>
-        );
+        return <ReadOnlyIdCell value={section.id} />;
       case "dept":
         return (
           <EditableCell

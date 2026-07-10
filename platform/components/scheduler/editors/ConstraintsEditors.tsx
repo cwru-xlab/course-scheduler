@@ -31,6 +31,7 @@ import {
   SoftLockEditModal,
 } from "./modals/ConstraintEditModals";
 
+import { ReadOnlyIdCell } from "./ReadOnlyIdCell";
 import { EditableCell } from "../EditableCell";
 import { EditableSelectCell } from "../EditableSelectCell";
 import { MultiSelect } from "../MultiSelect";
@@ -124,14 +125,7 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
   ) => {
     switch (columnId) {
       case "id":
-        return (
-          <span
-            className="block truncate px-2 py-1 text-slate-600 font-mono text-xs select-text"
-            title={String(group.id)}
-          >
-            {group.id}
-          </span>
-        );
+        return <ReadOnlyIdCell value={group.id} />;
       case "members":
         return (
           <MultiSelect
@@ -326,14 +320,7 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
   ) => {
     switch (columnId) {
       case "id":
-        return (
-          <span
-            className="block truncate px-2 py-1 text-slate-600 font-mono text-xs select-text"
-            title={String(group.id)}
-          >
-            {group.id}
-          </span>
-        );
+        return <ReadOnlyIdCell value={group.id} />;
       case "members":
         return (
           <MultiSelect

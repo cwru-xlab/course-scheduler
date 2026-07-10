@@ -17,6 +17,7 @@ import { useEditorActions } from "./EditorActionProvider";
 import { editorRowKey } from "./editorRowHighlight";
 import { RoomEditModal } from "./modals/RoomEditModal";
 
+import { ReadOnlyIdCell } from "./ReadOnlyIdCell";
 import { EditableCell } from "../EditableCell";
 import { EditableArrayCell } from "../EditableArrayCell";
 import { RowNotesButton } from "../RowNotesButton";
@@ -128,14 +129,7 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
   const renderCell = (columnId: string, { room, index: idx }: RoomRow) => {
     switch (columnId) {
       case "id":
-        return (
-          <span
-            className="block truncate px-2 py-1 text-slate-600 font-mono text-xs select-text"
-            title={String(room.id)}
-          >
-            {room.id}
-          </span>
-        );
+        return <ReadOnlyIdCell value={room.id} />;
       case "building":
         return (
           <EditableCell
