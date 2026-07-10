@@ -19,6 +19,13 @@ import {
   fingerprintSchedulingInput,
   type RecentChangeKind,
 } from "./schedulingDataFingerprint";
+import {
+  DEFAULT_USER_SYNC_PREFERENCES,
+  readUserSyncPreferences,
+  writeUserSyncPreferences,
+  type UserSyncPreferences,
+} from "./syncPreferences";
+import { useAuth } from "@/lib/auth-client";
 
 const STORAGE_KEY = "wsom-scheduling-data";
 export const SCHEDULING_DATA_REFRESH_EVENT = "wsom-scheduling-data-refresh";
@@ -26,6 +33,8 @@ export const SCHEDULING_DATA_REFRESH_EVENT = "wsom-scheduling-data-refresh";
 const AUTO_SAVE_DELAY_MS = 2000;
 const REMOTE_POLL_INTERVAL_MS = 60_000;
 const RECENT_HIGHLIGHT_MS = 90_000;
+/** After we write to the server, ignore fingerprint drift briefly (propagation lag). */
+const OWN_WRITE_GRACE_MS = 5_000;
 
 export type SaveFeedback = {
   type: "success" | "error";
@@ -55,6 +64,13 @@ type UseSchedulingDataReturn = {
   applyRemoteChanges: () => Promise<void>;
   dismissRemoteChanges: () => void;
   getRowChangeKind: (rowKey: string) => RecentChangeKind | null;
+  autoSaveEnabled: boolean;
+  setAutoSaveEnabled: (enabled: boolean) => void;
+  autoRefreshEnabled: boolean;
+  setAutoRefreshEnabled: (enabled: boolean) => void;
+  isApplyingRemoteChanges: boolean;
+  /** Call after this client writes to the server (e.g. calendar save) so auto-refresh ignores it. */
+  recordOwnServerWrite: () => Promise<void>;
 };
 
 const SchedulingDataContext = createContext<UseSchedulingDataReturn | null>(
@@ -62,6 +78,7 @@ const SchedulingDataContext = createContext<UseSchedulingDataReturn | null>(
 );
 
 const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
+  const { user, loading: authLoading } = useAuth();
   const [data, setData] = useState<SchedulingInput | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +87,9 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<SaveFeedback | null>(null);
   const [remoteChangesAvailable, setRemoteChangesAvailable] = useState(false);
+  const [isApplyingRemoteChanges, setIsApplyingRemoteChanges] = useState(false);
+  const [autoSaveEnabled, setAutoSaveEnabledState] = useState(false);
+  const [autoRefreshEnabled, setAutoRefreshEnabledState] = useState(false);
   const [recentChanges, setRecentChanges] = useState<
     Map<string, RecentChangeKind>
   >(() => new Map());
@@ -84,8 +104,156 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
   const recentHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dismissedRemoteFingerprintRef = useRef<string | null>(null);
   const savedBaselineRef = useRef<SchedulingInput | null>(null);
+  const autoSaveEnabledRef = useRef(false);
+  const autoRefreshEnabledRef = useRef(false);
+  const hasUnsavedChangesRef = useRef(false);
+  const ownWriteGraceUntilRef = useRef(0);
+  const prefsUserIdRef = useRef<string | null>(null);
+  const prefsLoadedForUserRef = useRef<string | null>(null);
 
   dataRef.current = data;
+  autoSaveEnabledRef.current = autoSaveEnabled;
+  autoRefreshEnabledRef.current = autoRefreshEnabled;
+  hasUnsavedChangesRef.current = hasUnsavedChanges;
+
+  const persistUserSyncPreferences = useCallback(
+    (preferences: UserSyncPreferences) => {
+      const networkId = user?.networkId;
+      if (!networkId) return;
+      writeUserSyncPreferences(networkId, preferences);
+      void fetch("/api/user-sync-preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(preferences),
+      }).catch(() => {
+        /* local copy remains */
+      });
+    },
+    [user?.networkId],
+  );
+
+  useEffect(() => {
+    if (authLoading) return;
+
+    const networkId = user?.networkId ?? null;
+    if (networkId === prefsUserIdRef.current && prefsLoadedForUserRef.current === networkId) {
+      return;
+    }
+    prefsUserIdRef.current = networkId;
+
+    if (!networkId) {
+      prefsLoadedForUserRef.current = null;
+      setAutoSaveEnabledState(DEFAULT_USER_SYNC_PREFERENCES.autoSaveEnabled);
+      setAutoRefreshEnabledState(DEFAULT_USER_SYNC_PREFERENCES.autoRefreshEnabled);
+      return;
+    }
+
+    let cancelled = false;
+    const localPrefs = readUserSyncPreferences(networkId);
+    setAutoSaveEnabledState(localPrefs.autoSaveEnabled);
+    setAutoRefreshEnabledState(localPrefs.autoRefreshEnabled);
+
+    void (async () => {
+      try {
+        const response = await fetch("/api/user-sync-preferences", {
+          cache: "no-store",
+        });
+        if (!response.ok || cancelled) return;
+        const payload = (await response.json()) as {
+          preferences?: Partial<UserSyncPreferences> | null;
+          hasSavedPreferences?: boolean;
+        };
+        if (cancelled || prefsUserIdRef.current !== networkId) return;
+
+        if (payload.hasSavedPreferences && payload.preferences) {
+          const merged: UserSyncPreferences = {
+            autoSaveEnabled:
+              typeof payload.preferences.autoSaveEnabled === "boolean"
+                ? payload.preferences.autoSaveEnabled
+                : localPrefs.autoSaveEnabled,
+            autoRefreshEnabled:
+              typeof payload.preferences.autoRefreshEnabled === "boolean"
+                ? payload.preferences.autoRefreshEnabled
+                : localPrefs.autoRefreshEnabled,
+          };
+          setAutoSaveEnabledState(merged.autoSaveEnabled);
+          setAutoRefreshEnabledState(merged.autoRefreshEnabled);
+          writeUserSyncPreferences(networkId, merged);
+        } else {
+          persistUserSyncPreferences(localPrefs);
+        }
+
+        prefsLoadedForUserRef.current = networkId;
+      } catch {
+        if (!cancelled) prefsLoadedForUserRef.current = networkId;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, persistUserSyncPreferences, user?.networkId]);
+
+  const setAutoSaveEnabled = useCallback(
+    (enabled: boolean) => {
+      setAutoSaveEnabledState(enabled);
+      const preferences: UserSyncPreferences = {
+        autoSaveEnabled: enabled,
+        autoRefreshEnabled: autoRefreshEnabledRef.current,
+      };
+      persistUserSyncPreferences(preferences);
+    },
+    [persistUserSyncPreferences],
+  );
+
+  const setAutoRefreshEnabled = useCallback(
+    (enabled: boolean) => {
+      setAutoRefreshEnabledState(enabled);
+      const preferences: UserSyncPreferences = {
+        autoSaveEnabled: autoSaveEnabledRef.current,
+        autoRefreshEnabled: enabled,
+      };
+      persistUserSyncPreferences(preferences);
+    },
+    [persistUserSyncPreferences],
+  );
+
+  const markOwnServerWrite = useCallback(() => {
+    ownWriteGraceUntilRef.current = Date.now() + OWN_WRITE_GRACE_MS;
+  }, []);
+
+  const syncServerBaselineFromRemote = useCallback(
+    (remote: SchedulingInput) => {
+      const normalized = normalizeCrosslistData(remote);
+      serverFingerprintRef.current = fingerprintSchedulingInput(normalized);
+      pendingRemoteDataRef.current = null;
+      setRemoteChangesAvailable(false);
+      dismissedRemoteFingerprintRef.current = null;
+    },
+    [],
+  );
+
+  const isForeignServerChange = useCallback(
+    (remote: SchedulingInput, remoteFingerprint: string): boolean => {
+      const baseline = serverFingerprintRef.current;
+      if (!baseline || remoteFingerprint === baseline) return false;
+
+      if (saveInFlightRef.current || Date.now() < ownWriteGraceUntilRef.current) {
+        return false;
+      }
+
+      const inMemory = dataRef.current;
+      if (inMemory && !hasUnsavedChangesRef.current) {
+        const inMemoryFingerprint = fingerprintSchedulingInput(inMemory);
+        if (inMemoryFingerprint === remoteFingerprint) {
+          return false;
+        }
+      }
+
+      return true;
+    },
+    [],
+  );
 
   const markRecentChanges = useCallback(
     (keys: string[], kind: RecentChangeKind) => {
@@ -150,6 +318,16 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
     return normalizeCrosslistData(result.data);
   }, []);
 
+  const recordOwnServerWrite = useCallback(async () => {
+    markOwnServerWrite();
+    try {
+      const remote = await fetchRemoteSnapshot();
+      if (remote) syncServerBaselineFromRemote(remote);
+    } catch {
+      /* baseline will catch up on next poll */
+    }
+  }, [fetchRemoteSnapshot, markOwnServerWrite, syncServerBaselineFromRemote]);
+
   const loadData = useCallback(
     async (options?: { silent?: boolean; highlightKind?: RecentChangeKind }) => {
       const silent = options?.silent ?? false;
@@ -187,16 +365,34 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
       if (!remote) return;
 
       const remoteFingerprint = fingerprintSchedulingInput(remote);
-      const localFingerprint = serverFingerprintRef.current;
+      const baseline = serverFingerprintRef.current;
 
-      if (!localFingerprint) {
-        serverFingerprintRef.current = remoteFingerprint;
+      if (!baseline) {
+        syncServerBaselineFromRemote(remote);
         return;
       }
 
-      if (remoteFingerprint === localFingerprint) {
+      if (remoteFingerprint === baseline) {
         pendingRemoteDataRef.current = null;
         setRemoteChangesAvailable(false);
+        return;
+      }
+
+      if (!isForeignServerChange(remote, remoteFingerprint)) {
+        syncServerBaselineFromRemote(remote);
+        return;
+      }
+
+      if (autoRefreshEnabledRef.current && !hasUnsavedChangesRef.current) {
+        setIsApplyingRemoteChanges(true);
+        try {
+          applyServerSnapshot(remote, {
+            changeKind: "remote",
+            compareWith: dataRef.current,
+          });
+        } finally {
+          setIsApplyingRemoteChanges(false);
+        }
         return;
       }
 
@@ -209,7 +405,13 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
     } catch {
       /* ignore background poll errors */
     }
-  }, [fetchRemoteSnapshot, isSaving]);
+  }, [
+    applyServerSnapshot,
+    fetchRemoteSnapshot,
+    isForeignServerChange,
+    isSaving,
+    syncServerBaselineFromRemote,
+  ]);
 
   const applyRemoteChanges = useCallback(async () => {
     const pending = pendingRemoteDataRef.current;
@@ -239,17 +441,13 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
     if (typeof window === "undefined") return;
     const handleRefresh = () => {
       if (isSaving) return;
-      if (hasUnsavedChanges) {
-        void checkForRemoteChanges();
-        return;
-      }
-      void applyRemoteChanges();
+      void checkForRemoteChanges();
     };
     window.addEventListener(SCHEDULING_DATA_REFRESH_EVENT, handleRefresh);
     return () => {
       window.removeEventListener(SCHEDULING_DATA_REFRESH_EVENT, handleRefresh);
     };
-  }, [applyRemoteChanges, checkForRemoteChanges, hasUnsavedChanges, isSaving]);
+  }, [checkForRemoteChanges, isSaving]);
 
   useEffect(() => {
     const poll = () => {
@@ -298,6 +496,7 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
       setHasUnsavedChanges(false);
       savedBaselineRef.current = beforeSave;
       serverFingerprintRef.current = fingerprintSchedulingInput(beforeSave);
+      markOwnServerWrite();
       pendingRemoteDataRef.current = null;
       setRemoteChangesAvailable(false);
       dismissedRemoteFingerprintRef.current = null;
@@ -324,10 +523,10 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
         void saveToBackend();
       }
     }
-  }, [clearSaveFeedbackSoon, markRecentChanges]);
+  }, [clearSaveFeedbackSoon, markOwnServerWrite, markRecentChanges]);
 
   useEffect(() => {
-    if (!hasUnsavedChanges || isSaving) return;
+    if (!autoSaveEnabled || !hasUnsavedChanges || isSaving) return;
 
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
@@ -337,7 +536,7 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [data, hasUnsavedChanges, isSaving, saveToBackend]);
+  }, [autoSaveEnabled, data, hasUnsavedChanges, isSaving, saveToBackend]);
 
   const saveToLocalStorage = useCallback(() => {}, []);
 
@@ -395,6 +594,12 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
     applyRemoteChanges,
     dismissRemoteChanges,
     getRowChangeKind,
+    autoSaveEnabled,
+    setAutoSaveEnabled,
+    autoRefreshEnabled,
+    setAutoRefreshEnabled,
+    isApplyingRemoteChanges,
+    recordOwnServerWrite,
   };
 };
 

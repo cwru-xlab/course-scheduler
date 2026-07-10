@@ -55,7 +55,7 @@ export default function ConstraintsPage() {
       <EditorPageHeader
         current="constraints"
         title="Constraints"
-        subtitle="Cross-lists, no-overlap groups, blocked times, and locks. Changes auto-save after you stop editing."
+        subtitle="Cross-lists, no-overlap groups, blocked times, and locks."
         data={data}
       />
 

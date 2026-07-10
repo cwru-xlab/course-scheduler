@@ -16,7 +16,7 @@ export default function TimeslotsPage() {
       <EditorPageHeader
         current="timeslots"
         title="Timeslots"
-        subtitle="Define days and time ranges. Changes auto-save after you stop editing."
+        subtitle="Define days and time ranges."
         data={data}
       />
 

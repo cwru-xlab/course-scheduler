@@ -35,7 +35,7 @@ export default function InstructorsPage() {
       <EditorPageHeader
         current="instructors"
         title="Instructors"
-        subtitle="Add/edit instructors and preferences. Changes auto-save after you stop editing."
+        subtitle="Add/edit instructors and preferences."
         data={data}
       />
 

@@ -13,6 +13,8 @@ import { Calendar as CalendarIcon, ChevronDown, History, MessageSquare } from "l
 import NextLink from "next/link";
 import { usePathname } from "next/navigation";
 
+import { LiveUsersIndicator } from "@/components/LiveUsersIndicator";
+import { NavbarSettingsMenu } from "@/components/NavbarSettingsMenu";
 import { UserMenu } from "@/components/user-menu";
 import { SolverProgressIndicator } from "@/components/SolverProgressIndicator";
 import { isFullBleedRoute, pageHorizontalGutterClassName } from "@/lib/layout/pageGutters";
@@ -106,12 +108,19 @@ export const Navbar = () => {
               <History className="size-4" />
               History
             </NextLink>
+
+            <NavbarSettingsMenu />
           </nav>
 
-          {/* Calendar page portals the Undo control here so it stays in the sticky header */}
-          <div className="flex flex-1 items-center justify-end gap-2 md:flex-none md:justify-end">
+          <div className="flex flex-1 items-center justify-end gap-1 md:flex-none md:justify-end">
             <div id="calendar-navbar-slot" className="flex items-center gap-2" />
-            <UserMenu />
+            <div className="md:hidden">
+              <NavbarSettingsMenu variant="compact" />
+            </div>
+            <LiveUsersIndicator />
+            <div className="ml-2">
+              <UserMenu />
+            </div>
           </div>
         </div>
       </div>

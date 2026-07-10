@@ -16,7 +16,7 @@ export default function RoomsPage() {
       <EditorPageHeader
         current="rooms"
         title="Rooms"
-        subtitle="Add/edit rooms and features. Changes auto-save after you stop editing."
+        subtitle="Add/edit rooms and features."
         data={data}
       />
 

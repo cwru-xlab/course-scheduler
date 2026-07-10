@@ -27,7 +27,7 @@ export default function MeetingPatternsPage() {
       <EditorPageHeader
         current="meeting-patterns"
         title="Meeting Patterns"
-        subtitle="Define allowed days and compatible timeslot sets. Changes auto-save after you stop editing."
+        subtitle="Define allowed days and compatible timeslot sets."
         data={data}
       />
 

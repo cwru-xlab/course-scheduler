@@ -24,15 +24,41 @@ type EditorPageHeaderProps = {
 };
 
 export function EditorPageHeader({ current, title, subtitle, data }: EditorPageHeaderProps) {
-  const { saveToBackend, isSaving, saveFeedback } = useSchedulingData();
+  const { saveToBackend, isSaving, saveFeedback, autoSaveEnabled, autoRefreshEnabled } =
+    useSchedulingData();
 
   return (
     <div className="flex items-end justify-between gap-4 flex-wrap">
-      <div>
+      <div className="min-w-0 flex-1">
         <EditorPageTitleDropdown current={current} title={title} />
         <p className="text-slate-500 mt-1">{subtitle}</p>
         <p className="text-xs text-slate-400 mt-1">
-          Highlighted rows: green = your recent saves, blue = updates from the server.
+          Highlighted rows: <strong className="text-green-600">green</strong> = your recent saves, <strong className="text-blue-600">blue</strong> = updates from the server.
+        </p>
+        <p className="text-xs text-slate-400 mt-1">
+          {autoSaveEnabled ? (
+            <>
+              <span className="font-semibold text-slate-500">Auto-save</span> is on — edits
+              publish automatically after you stop typing.
+            </>
+          ) : (
+            <>
+              <span className="font-semibold text-slate-500">Auto-save</span> is off — click Save
+              to publish edits.
+            </>
+          )}{" "}
+          {autoRefreshEnabled ? (
+            <>
+              <span className="font-semibold text-slate-500">Auto-refresh</span> is on — others’
+              updates load when you have no unsaved edits.
+            </>
+          ) : (
+            <>
+              <span className="font-semibold text-slate-500">Auto-refresh</span> is off — you will
+              be prompted when another user saves.
+            </>
+          )}{" "}
+          Change sync options in <span className="font-semibold">Settings</span> on the top bar.
         </p>
       </div>
       <div className="flex items-center gap-2 flex-wrap justify-end">

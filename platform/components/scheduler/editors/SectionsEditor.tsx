@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useState } from "react";
 
 import { EditorColumnFilters } from "./EditorColumnFilters";
 import { EditorConfigurableTable } from "./EditorConfigurableTable";
@@ -52,6 +52,9 @@ type SectionRow = { section: Section; index: number };
 const SECTION_COURSE_PLACEHOLDER = "Introduction to Accounting";
 const SECTION_CODE_PLACEHOLDER = "101";
 
+/** Notes feed adds this when linking to an archived section row. */
+const REVEAL_ARCHIVED_QUERY = "revealArchived";
+
 const createEmptySection = (existing: Section[]): Section => ({
   id: nextIntegerId(existing.map((s) => s.id)),
   course_id: "",
@@ -81,6 +84,33 @@ export const SectionsEditor = ({
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<Section | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
+
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    const deepLinkToSections =
+      sp.get("openRowNotes") === "1" && sp.get("noteScope") === "sections";
+    const noteRowId = sp.get("noteRow");
+    const targetsArchivedSection =
+      Boolean(noteRowId) &&
+      sections.some((s) => String(s.id) === noteRowId && isSectionArchived(s));
+    const shouldReveal =
+      sp.get(REVEAL_ARCHIVED_QUERY) === "1" ||
+      (deepLinkToSections && targetsArchivedSection);
+    if (!shouldReveal) return;
+
+    if (hideArchived) setHideArchived(false);
+
+    if (sp.has(REVEAL_ARCHIVED_QUERY)) {
+      sp.delete(REVEAL_ARCHIVED_QUERY);
+      const q = sp.toString();
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${q ? `?${q}` : ""}${window.location.hash}`,
+      );
+    }
+  }, [sections, hideArchived, setHideArchived]);
 
   const updateSection = (index: number, field: keyof Section, value: unknown) => {
     const newSections = [...sections];

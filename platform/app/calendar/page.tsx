@@ -58,7 +58,7 @@ import {
   saveScheduleToHistory,
   type LastSolverRunSnapshot,
 } from "@/lib/scheduling/history";
-import { SCHEDULING_DATA_REFRESH_EVENT } from "@/lib/scheduling/useSchedulingData";
+import { SCHEDULING_DATA_REFRESH_EVENT, useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 import { useSolverLock } from "@/lib/solver-lock-client";
 import {
   SCHEDULING_WINDOW_END_HOUR,
@@ -987,6 +987,7 @@ export default function CalendarPage() {
   const [solverRunStatus, setSolverRunStatus] = useState<"idle" | "loading">("idle");
   const solverLock = useSolverLock();
   const solverBusyRemote = solverLock.active && solverRunStatus !== "loading";
+  const { autoSaveEnabled, recordOwnServerWrite } = useSchedulingData();
   const [solverRunError, setSolverRunError] = useState<string | null>(null);
   const [calendarContextMenu, setCalendarContextMenu] = useState<{
     clientX: number;
@@ -1099,20 +1100,6 @@ type MeetingPatternPlacementOption = {
     type: "success" | "error";
     text: string;
   } | null>(null);
-  const AUTOSAVE_STORAGE_KEY = "wsom-calendar-autosave-enabled";
-  const [autosaveEnabled, setAutosaveEnabled] = useState<boolean>(true);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem(AUTOSAVE_STORAGE_KEY);
-    if (stored === "false") setAutosaveEnabled(false);
-  }, []);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(
-      AUTOSAVE_STORAGE_KEY,
-      autosaveEnabled ? "true" : "false",
-    );
-  }, [autosaveEnabled]);
   const [selectedDepartmentKeys, setSelectedDepartmentKeys] = useState<string[]>([]);
   const [selectedInstructorIds, setSelectedInstructorIds] = useState<string[]>([]);
   const [hoveredDepartmentKey, setHoveredDepartmentKey] = useState<string | null>(null);
@@ -1695,6 +1682,7 @@ type MeetingPatternPlacementOption = {
           setSolverInput(nextInput);
         }
         if (typeof window !== "undefined") {
+          await recordOwnServerWrite();
           window.dispatchEvent(new Event(SCHEDULING_DATA_REFRESH_EVENT));
         }
       } catch (err) {
@@ -1707,7 +1695,7 @@ type MeetingPatternPlacementOption = {
         });
       }
     },
-    [data, mergeSectionsWithAssignments, persistSections, solverInput, toSchedulingSections],
+    [data, mergeSectionsWithAssignments, persistSections, recordOwnServerWrite, solverInput, toSchedulingSections],
   );
 
   const applyMeetingPatternSelection = useCallback(() => {
@@ -2262,7 +2250,7 @@ type MeetingPatternPlacementOption = {
       );
       return;
     }
-    if (hasValidUnsavedEdit && !autosaveEnabled) {
+    if (hasValidUnsavedEdit && !autoSaveEnabled) {
       if (typeof window !== "undefined") {
         const choice = window.confirm(
           "You have unsaved calendar edits. Save them to the backend before running the solver?\n\nOK = save first, Cancel = run without saving.",
@@ -2392,7 +2380,7 @@ type MeetingPatternPlacementOption = {
     }
   }, [
     assignmentsBySection,
-    autosaveEnabled,
+    autoSaveEnabled,
     beginSolverProgress,
     data,
     failSolverProgress,
@@ -2979,6 +2967,7 @@ type MeetingPatternPlacementOption = {
         });
       }
       if (typeof window !== "undefined") {
+        await recordOwnServerWrite();
         window.dispatchEvent(new Event(SCHEDULING_DATA_REFRESH_EVENT));
       }
     } catch (err) {
@@ -2997,14 +2986,14 @@ type MeetingPatternPlacementOption = {
   // Autosave: when enabled and there's a valid unsaved edit, silently persist
   // after a short debounce so users don't have to click Save.
   useEffect(() => {
-    if (!autosaveEnabled) return;
+    if (!autoSaveEnabled) return;
     if (!hasValidUnsavedEdit) return;
     if (isSavingBackend) return;
     const timer = window.setTimeout(() => {
       void updateBackendRef.current(true);
     }, 800);
     return () => window.clearTimeout(timer);
-  }, [autosaveEnabled, hasValidUnsavedEdit, isSavingBackend, assignmentsBySection]);
+  }, [autoSaveEnabled, hasValidUnsavedEdit, isSavingBackend, assignmentsBySection]);
 
   const handleSaveSectionModal = useCallback(async () => {
     if (!data || !sectionModal) return;
@@ -3119,6 +3108,7 @@ type MeetingPatternPlacementOption = {
             : "Section updates saved to backend.",
       });
       if (typeof window !== "undefined") {
+        await recordOwnServerWrite();
         window.dispatchEvent(new Event(SCHEDULING_DATA_REFRESH_EVENT));
       }
       if (sectionModal.mode === "create") {
@@ -3139,6 +3129,7 @@ type MeetingPatternPlacementOption = {
     assignmentsBySection,
     data,
     persistSections,
+    recordOwnServerWrite,
     sectionModal,
     solverInput,
     solverTimeslotIdsBySection,
@@ -3360,64 +3351,24 @@ type MeetingPatternPlacementOption = {
                 <Play className="size-4" />
               </button>
             </div>
-            <div
-              onMouseEnter={() =>
-                setToolbarActionHint(
-                  autosaveEnabled
-                    ? "Autosave is on — calendar edits persist automatically."
-                    : "Autosave is off — click Save to persist calendar edits.",
-                )
-              }
-              onMouseLeave={() => setToolbarActionHint(null)}
-              className="flex items-center gap-2 pl-1 pr-2"
-            >
+            {!autoSaveEnabled && hasValidUnsavedEdit ? (
               <button
                 type="button"
-                role="switch"
-                aria-checked={autosaveEnabled}
-                onClick={() => setAutosaveEnabled((v) => !v)}
+                disabled={isSavingBackend}
+                onClick={() => void handleUpdateBackend(false)}
                 className={clsx(
-                  "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors",
-                  autosaveEnabled
-                    ? "bg-emerald-500 border-emerald-500"
-                    : "bg-slate-200 border-slate-300",
+                  "flex items-center justify-center rounded-lg h-8 px-3 text-xs font-bold border transition-colors",
+                  isSavingBackend
+                    ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                    : "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100",
                 )}
-                title={
-                  autosaveEnabled
-                    ? "Autosave on — click to disable"
-                    : "Autosave off — click to enable"
-                }
-                aria-label="Toggle autosave"
+                title="Save valid calendar edits"
+                aria-label="Save"
               >
-                <span
-                  className={clsx(
-                    "inline-block size-4 rounded-full bg-white shadow transition-transform",
-                    autosaveEnabled ? "translate-x-4" : "translate-x-0.5",
-                  )}
-                />
+                <CloudBackup className="size-4 mr-1" />
+                Save
               </button>
-              <span className="text-xs font-semibold text-slate-600 select-none">
-                Autosave
-              </span>
-              {!autosaveEnabled && hasValidUnsavedEdit && (
-                <button
-                  type="button"
-                  disabled={isSavingBackend}
-                  onClick={() => void handleUpdateBackend(false)}
-                  className={clsx(
-                    "ml-1 flex items-center justify-center rounded-lg h-8 px-3 text-xs font-bold border transition-colors",
-                    isSavingBackend
-                      ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                      : "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100",
-                  )}
-                  title="Save valid calendar edits"
-                  aria-label="Save"
-                >
-                  <CloudBackup className="size-4 mr-1" />
-                  Save
-                </button>
-              )}
-            </div>
+            ) : null}
             <div className="hidden lg:block h-7 w-px bg-slate-200 mx-1" />
             <Link
               href="/editor/sections"

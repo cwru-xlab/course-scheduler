@@ -39,7 +39,7 @@ export default function SectionsPage() {
       <EditorPageHeader
         current="sections"
         title="Sections"
-        subtitle="Add/edit sections. Changes auto-save after you stop editing."
+        subtitle="Add/edit sections."
         data={data}
       />
 
