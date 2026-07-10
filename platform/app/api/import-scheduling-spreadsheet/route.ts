@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { siteConfig } from "@/config/site";
 import { parseNotesFromWorkbook } from "@/lib/spreadsheet-notes";
+import { tryRecordActivity } from "@/lib/record-activity";
 import type { NotesRowPatch } from "@/lib/notes/types";
 import type { SchedulingInput, ValidationError } from "@/lib/scheduling/types";
 
@@ -69,6 +70,8 @@ export async function POST(request: NextRequest) {
     const token = request.cookies.get(siteConfig.auth.cookie.name)?.value;
     const user = token ? await verifyToken(token) : null;
     const notesResult = parseNotesFromWorkbook(fileBytes, user);
+
+    await tryRecordActivity(request, "spreadsheet_import");
 
     return NextResponse.json(
       {

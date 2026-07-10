@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import type { SchedulingInput } from "@/lib/scheduling/types";
 import { normalizeCrosslistData } from "@/lib/scheduling/crosslist";
+import { tryRecordActivity } from "@/lib/record-activity";
 
 const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:5001";
 const SOLVER_FALLBACK_URLS = ["http://localhost:5001", "http://localhost:8000"];
@@ -285,6 +286,10 @@ export async function POST(request: NextRequest) {
           { status: result.status },
         );
       }
+    }
+
+    if (request.headers.get("X-Activity-Source") === "manual") {
+      await tryRecordActivity(request, "editor_save");
     }
 
     return NextResponse.json(

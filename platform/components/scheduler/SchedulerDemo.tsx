@@ -122,7 +122,7 @@ export const SchedulerDemo = () => {
     setUpdateStatus("loading");
     setErrors([]);
     setDiagnostics(undefined);
-    const ok = await saveToBackend();
+    const ok = await saveToBackend({ manual: true });
     if (ok) {
       setUpdateStatus("success");
     } else {

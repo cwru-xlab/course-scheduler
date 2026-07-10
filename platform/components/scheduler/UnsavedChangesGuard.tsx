@@ -67,7 +67,7 @@ export function UnsavedChangesGuard() {
             size="sm"
             color="warning"
             className="font-semibold"
-            onPress={() => void saveToBackend()}
+            onPress={() => void saveToBackend({ manual: true })}
           >
             Save now
           </Button>

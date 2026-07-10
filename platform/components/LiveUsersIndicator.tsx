@@ -13,6 +13,14 @@ type LiveUser = {
   status: "active" | "idle";
 };
 
+type ActivityEvent = {
+  id: string;
+  networkId: string;
+  actorName: string;
+  message: string;
+  createdAt: string;
+};
+
 const HEARTBEAT_MS = 20_000;
 const POLL_MS = 15_000;
 
@@ -28,9 +36,34 @@ function StatusDot({ status }: { status: LiveUser["status"] }) {
   );
 }
 
+function formatActivityTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const now = new Date();
+  const sameDay = date.toDateString() === now.toDateString();
+  if (sameDay) {
+    return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  }
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function displayActivityMessage(event: ActivityEvent, currentNetworkId: string): string {
+  if (event.networkId !== currentNetworkId) return event.message;
+  const suffix = event.message.startsWith(event.actorName)
+    ? event.message.slice(event.actorName.length)
+    : event.message;
+  return `You${suffix}`;
+}
+
 export function LiveUsersIndicator() {
   const { user, loading } = useAuth();
   const [users, setUsers] = useState<LiveUser[]>([]);
+  const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [open, setOpen] = useState(false);
   const lastActivityAtRef = useRef(Date.now());
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -75,9 +108,24 @@ export function LiveUsersIndicator() {
     }
   }, [user]);
 
+  const fetchActivity = useCallback(async () => {
+    if (!user) return;
+    try {
+      const response = await fetch("/api/activity", { cache: "no-store" });
+      if (!response.ok) return;
+      const payload = (await response.json()) as { events?: ActivityEvent[] };
+      if (Array.isArray(payload.events)) {
+        setActivity(payload.events);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [user]);
+
   useEffect(() => {
     if (!user) {
       setUsers([]);
+      setActivity([]);
       return;
     }
 
@@ -98,11 +146,13 @@ export function LiveUsersIndicator() {
     document.addEventListener("visibilitychange", onVisibility);
 
     void sendHeartbeat();
+    void fetchActivity();
     const heartbeatId = window.setInterval(() => {
       void sendHeartbeat();
     }, HEARTBEAT_MS);
     const pollId = window.setInterval(() => {
       void fetchUsers();
+      void fetchActivity();
     }, POLL_MS);
 
     const onLeave = () => {
@@ -125,7 +175,7 @@ export function LiveUsersIndicator() {
       window.clearInterval(pollId);
       void sendHeartbeat({ leaving: true });
     };
-  }, [fetchUsers, sendHeartbeat, touchActivity, user]);
+  }, [fetchActivity, fetchUsers, sendHeartbeat, touchActivity, user]);
 
   const keepOpen = () => {
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
@@ -158,39 +208,63 @@ export function LiveUsersIndicator() {
             ) : null}
           </button>
         </PopoverTrigger>
-        <PopoverContent className="w-64 p-0" onMouseEnter={keepOpen} onMouseLeave={scheduleClose}>
-        <div className="border-b border-slate-100 px-4 py-3">
-          <p className="text-sm font-bold text-slate-900">Live now</p>
-          <p className="text-xs text-slate-500 mt-0.5">
-            <span className="inline-flex items-center gap-1">
-              <StatusDot status="active" /> Active
-            </span>
-            <span className="mx-1.5">·</span>
-            <span className="inline-flex items-center gap-1">
-              <StatusDot status="idle" /> Idle / tab in background
-            </span>
-          </p>
-        </div>
-        <ul className="max-h-56 overflow-y-auto py-2">
-          {count === 0 ? (
-            <li className="px-4 py-2 text-xs text-slate-500">No other sessions detected.</li>
-          ) : (
-            users.map((entry) => (
-              <li
-                key={entry.networkId}
-                className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-800"
-              >
-                <StatusDot status={entry.status} />
-                <span className="truncate font-medium">
-                  {entry.name}
-                  {entry.networkId === user.networkId ? (
-                    <span className="text-slate-400 font-normal"> (you)</span>
-                  ) : null}
-                </span>
-              </li>
-            ))
-          )}
-        </ul>
+        <PopoverContent
+          className="w-72 p-0"
+          onMouseEnter={keepOpen}
+          onMouseLeave={scheduleClose}
+        >
+          <div className="border-b border-slate-100 px-4 py-3">
+            <p className="text-sm font-bold text-slate-900">Live now</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              <span className="inline-flex items-center gap-1">
+                <StatusDot status="active" /> Active
+              </span>
+              <span className="mx-1.5">·</span>
+              <span className="inline-flex items-center gap-1">
+                <StatusDot status="idle" /> Idle / tab in background
+              </span>
+            </p>
+          </div>
+          <ul className="max-h-40 overflow-y-auto py-2 border-b border-slate-100">
+            {count === 0 ? (
+              <li className="px-4 py-2 text-xs text-slate-500">No other sessions detected.</li>
+            ) : (
+              users.map((entry) => (
+                <li
+                  key={entry.networkId}
+                  className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-800"
+                >
+                  <StatusDot status={entry.status} />
+                  <span className="truncate font-medium">
+                    {entry.name}
+                    {entry.networkId === user.networkId ? (
+                      <span className="text-slate-400 font-normal"> (you)</span>
+                    ) : null}
+                  </span>
+                </li>
+              ))
+            )}
+          </ul>
+          <div className="px-4 py-3">
+            <p className="text-sm font-bold text-slate-900">Recent activity</p>
+            <p className="text-xs text-slate-500 mt-0.5">Last 24 hours</p>
+          </div>
+          <ul className="max-h-48 overflow-y-auto pb-2">
+            {activity.length === 0 ? (
+              <li className="px-4 py-2 text-xs text-slate-500">No recent edits yet.</li>
+            ) : (
+              activity.map((entry) => (
+                <li key={entry.id} className="px-4 py-2 text-xs text-slate-700">
+                  <span className="block leading-snug">
+                    {displayActivityMessage(entry, user.networkId)}
+                  </span>
+                  <span className="mt-0.5 block text-[11px] text-slate-400">
+                    {formatActivityTime(entry.createdAt)}
+                  </span>
+                </li>
+              ))
+            )}
+          </ul>
         </PopoverContent>
       </Popover>
     </div>

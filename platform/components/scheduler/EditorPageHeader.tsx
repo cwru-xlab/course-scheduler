@@ -64,7 +64,7 @@ export function EditorPageHeader({ current, title, subtitle, data }: EditorPageH
       <div className="flex items-center gap-2 flex-wrap justify-end">
         <Button
           className="bg-weatherhead-primary text-white font-bold shadow-lg shadow-weatherhead-primary/20 hover:opacity-90"
-          onPress={() => void saveToBackend()}
+            onPress={() => void saveToBackend({ manual: true })}
           isLoading={isSaving}
         >
           Save

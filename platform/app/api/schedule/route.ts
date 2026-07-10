@@ -9,6 +9,7 @@ import {
   readSolverLock,
   releaseSolverLock,
 } from "@/lib/solver-lock";
+import { tryRecordActivity } from "@/lib/record-activity";
 
 const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:5001";
 const SOLVER_FALLBACK_URLS = ["http://localhost:5001", "http://localhost:8000"];
@@ -136,6 +137,8 @@ export async function POST(request: NextRequest) {
         diagnostics: data.diagnostics,
       });
     }
+
+    await tryRecordActivity(request, "solver_run");
 
     return NextResponse.json(data);
   } catch (error) {

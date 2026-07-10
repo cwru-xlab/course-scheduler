@@ -58,7 +58,7 @@ type UseSchedulingDataReturn = {
   hasUnsavedChanges: boolean;
   isSaving: boolean;
   saveFeedback: SaveFeedback | null;
-  saveToBackend: () => Promise<boolean>;
+  saveToBackend: (options?: { manual?: boolean }) => Promise<boolean>;
   confirmLeaveIfUnsaved: () => boolean;
   reloadFromBackend: () => Promise<void>;
   remoteChangesAvailable: boolean;
@@ -100,6 +100,7 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
   const pendingRemoteDataRef = useRef<SchedulingInput | null>(null);
   const saveInFlightRef = useRef(false);
   const pendingSaveRef = useRef(false);
+  const pendingSaveManualRef = useRef(false);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recentHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -476,12 +477,13 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
     saveFeedbackTimerRef.current = setTimeout(() => setSaveFeedback(null), delayMs);
   }, []);
 
-  const saveToBackend = useCallback(async (): Promise<boolean> => {
+  const saveToBackend = useCallback(async (options?: { manual?: boolean }): Promise<boolean> => {
     const current = dataRef.current;
     if (!current) return false;
 
     if (saveInFlightRef.current) {
       pendingSaveRef.current = true;
+      if (options?.manual) pendingSaveManualRef.current = true;
       return false;
     }
 
@@ -492,7 +494,9 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
     setSaveFeedback(null);
 
     try {
-      const result = await persistSchedulingInput(beforeSave);
+      const result = await persistSchedulingInput(beforeSave, {
+        manualActivity: options?.manual,
+      });
       if (!result.ok) {
         setSaveFeedback({ type: "error", message: result.message });
         return false;
@@ -526,7 +530,9 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
       saveInFlightRef.current = false;
       if (pendingSaveRef.current) {
         pendingSaveRef.current = false;
-        void saveToBackend();
+        const manual = pendingSaveManualRef.current;
+        pendingSaveManualRef.current = false;
+        void saveToBackend(manual ? { manual: true } : undefined);
       }
     }
   }, [clearSaveFeedbackSoon, markOwnServerWrite, markRecentChanges]);
