@@ -14,14 +14,19 @@ const secondaryClassName =
 
 type Props = {
   data: SchedulingInput;
+  onFeedbackChange?: (feedback: SpreadsheetFeedback | null) => void;
 };
 
-export function SpreadsheetImportExportButtons({ data }: Props) {
+export type SpreadsheetFeedback = {
+  type: "success" | "error";
+  message: string;
+};
+
+export function SpreadsheetImportExportButtons({ data, onFeedbackChange }: Props) {
   const { updateData } = useSchedulingData();
   const [spreadsheetStatus, setSpreadsheetStatus] = useState<
     "idle" | "importing" | "import-success" | "import-error" | "exporting" | "export-error"
   >("idle");
-  const [spreadsheetMessage, setSpreadsheetMessage] = useState("");
   const [importWarningOpen, setImportWarningOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -39,7 +44,7 @@ export function SpreadsheetImportExportButtons({ data }: Props) {
     if (!file) return;
 
     setSpreadsheetStatus("importing");
-    setSpreadsheetMessage("");
+    onFeedbackChange?.(null);
 
     try {
       const result = await importSpreadsheetFile(file, {
@@ -47,26 +52,29 @@ export function SpreadsheetImportExportButtons({ data }: Props) {
       });
       if (!result.ok) {
         setSpreadsheetStatus("import-error");
-        setSpreadsheetMessage(result.message);
+        onFeedbackChange?.({ type: "error", message: result.message });
         return;
       }
 
       updateData(result.scheduling_input);
       setSpreadsheetStatus("import-success");
-      setSpreadsheetMessage(result.message);
+      onFeedbackChange?.({ type: "success", message: result.message });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to import spreadsheet.";
       setSpreadsheetStatus("import-error");
-      setSpreadsheetMessage(message);
+      onFeedbackChange?.({ type: "error", message });
     } finally {
       event.target.value = "";
-      setTimeout(() => setSpreadsheetStatus("idle"), 3000);
+      setTimeout(() => {
+        setSpreadsheetStatus("idle");
+        onFeedbackChange?.(null);
+      }, 3000);
     }
   };
 
   const exportSpreadsheet = async () => {
     setSpreadsheetStatus("exporting");
-    setSpreadsheetMessage("");
+    onFeedbackChange?.(null);
     try {
       const response = await fetch("/api/export-scheduling-spreadsheet", {
         method: "POST",
@@ -82,7 +90,7 @@ export function SpreadsheetImportExportButtons({ data }: Props) {
           // Keep fallback message.
         }
         setSpreadsheetStatus("export-error");
-        setSpreadsheetMessage(message);
+        onFeedbackChange?.({ type: "error", message });
         return;
       }
 
@@ -99,11 +107,11 @@ export function SpreadsheetImportExportButtons({ data }: Props) {
       anchor.remove();
       window.URL.revokeObjectURL(url);
       setSpreadsheetStatus("idle");
-      setSpreadsheetMessage("");
+      onFeedbackChange?.(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to export spreadsheet.";
       setSpreadsheetStatus("export-error");
-      setSpreadsheetMessage(message);
+      onFeedbackChange?.({ type: "error", message });
     }
   };
 
@@ -137,16 +145,6 @@ export function SpreadsheetImportExportButtons({ data }: Props) {
       >
         Export Spreadsheet
       </Button>
-      {spreadsheetStatus === "import-success" && (
-        <span className="text-sm text-emerald-600 dark:text-emerald-400 font-semibold">
-          {spreadsheetMessage}
-        </span>
-      )}
-      {(spreadsheetStatus === "import-error" || spreadsheetStatus === "export-error") && (
-        <span className="text-sm text-red-600 dark:text-red-400 font-semibold">
-          {spreadsheetMessage}
-        </span>
-      )}
     </>
   );
 }
