@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { getSchedulingDataRevision } from "@/lib/scheduling-data-revision";
+
 const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:5001";
 
 export async function GET() {
@@ -22,10 +24,18 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json(data, {
+    return NextResponse.json(
+      {
+        ...data,
+        meta: {
+          revision: getSchedulingDataRevision(),
+        },
+      },
+      {
       status: 200,
       headers: { "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate" },
-    });
+    },
+    );
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to reach solver service.";

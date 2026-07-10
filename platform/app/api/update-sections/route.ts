@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import type { SchedulingInput, ValidationError } from "@/lib/scheduling/types";
 import { tryRecordActivity } from "@/lib/record-activity";
+import { tryRecordSchedulingDataRevision } from "@/lib/scheduling-data-revision";
 
 const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:5001";
 const SOLVER_FALLBACK_URLS = ["http://localhost:5001", "http://localhost:8000"];
@@ -79,6 +80,7 @@ export async function POST(request: NextRequest) {
         }
 
         await tryRecordActivity(request, "calendar_save");
+        await tryRecordSchedulingDataRevision(request);
 
         return NextResponse.json({ status: "ok" }, { status: 200 });
       } catch (err) {

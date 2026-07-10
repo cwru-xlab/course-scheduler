@@ -6,6 +6,7 @@ import clsx from "clsx";
 import { Users } from "lucide-react";
 
 import { useAuth } from "@/lib/auth-client";
+import { navbarPopoverProps } from "@/lib/ui/navbarPopoverProps";
 
 type LiveUser = {
   networkId: string;
@@ -66,7 +67,6 @@ export function LiveUsersIndicator() {
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [open, setOpen] = useState(false);
   const lastActivityAtRef = useRef(Date.now());
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const touchActivity = useCallback(() => {
     lastActivityAtRef.current = Date.now();
@@ -177,96 +177,86 @@ export function LiveUsersIndicator() {
     };
   }, [fetchActivity, fetchUsers, sendHeartbeat, touchActivity, user]);
 
-  const keepOpen = () => {
-    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-    setOpen(true);
-  };
-
-  const scheduleClose = () => {
-    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-    closeTimerRef.current = setTimeout(() => setOpen(false), 120);
-  };
-
   if (loading || !user) return null;
 
   const count = users.length;
 
   return (
-    <div onMouseEnter={keepOpen} onMouseLeave={scheduleClose}>
-      <Popover isOpen={open} onOpenChange={setOpen} placement="bottom-end" showArrow offset={8}>
-        <PopoverTrigger>
-          <button
-            type="button"
-            className="relative flex items-center justify-center rounded-lg size-10 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
-            aria-label={`${count} user${count === 1 ? "" : "s"} online`}
-          >
-            <Users className="size-5" aria-hidden />
-            {count > 0 ? (
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-weatherhead-primary px-1 text-[10px] font-bold text-white">
-                {count}
-              </span>
-            ) : null}
-          </button>
-        </PopoverTrigger>
-        <PopoverContent
-          className="w-72 p-0"
-          onMouseEnter={keepOpen}
-          onMouseLeave={scheduleClose}
+    <Popover
+      isOpen={open}
+      onOpenChange={setOpen}
+      placement="bottom-end"
+      {...navbarPopoverProps}
+    >
+      <PopoverTrigger>
+        <button
+          type="button"
+          className="relative flex items-center justify-center rounded-lg size-10 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+          aria-label={`${count} user${count === 1 ? "" : "s"} online`}
+          aria-expanded={open}
         >
-          <div className="border-b border-slate-100 px-4 py-3">
-            <p className="text-sm font-bold text-slate-900">Live now</p>
-            <p className="text-xs text-slate-500 mt-0.5">
-              <span className="inline-flex items-center gap-1">
-                <StatusDot status="active" /> Active
-              </span>
-              <span className="mx-1.5">·</span>
-              <span className="inline-flex items-center gap-1">
-                <StatusDot status="idle" /> Idle / tab in background
-              </span>
-            </p>
-          </div>
-          <ul className="max-h-40 overflow-y-auto py-2 border-b border-slate-100">
-            {count === 0 ? (
-              <li className="px-4 py-2 text-xs text-slate-500">No other sessions detected.</li>
-            ) : (
-              users.map((entry) => (
-                <li
-                  key={entry.networkId}
-                  className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-800"
-                >
-                  <StatusDot status={entry.status} />
-                  <span className="truncate font-medium">
-                    {entry.name}
-                    {entry.networkId === user.networkId ? (
-                      <span className="text-slate-400 font-normal"> (you)</span>
-                    ) : null}
-                  </span>
-                </li>
-              ))
-            )}
-          </ul>
-          <div className="px-4 py-3">
-            <p className="text-sm font-bold text-slate-900">Recent activity</p>
-            <p className="text-xs text-slate-500 mt-0.5">Last 24 hours</p>
-          </div>
-          <ul className="max-h-48 overflow-y-auto pb-2">
-            {activity.length === 0 ? (
-              <li className="px-4 py-2 text-xs text-slate-500">No recent edits yet.</li>
-            ) : (
-              activity.map((entry) => (
-                <li key={entry.id} className="px-4 py-2 text-xs text-slate-700">
-                  <span className="block leading-snug">
-                    {displayActivityMessage(entry, user.networkId)}
-                  </span>
-                  <span className="mt-0.5 block text-[11px] text-slate-400">
-                    {formatActivityTime(entry.createdAt)}
-                  </span>
-                </li>
-              ))
-            )}
-          </ul>
-        </PopoverContent>
-      </Popover>
-    </div>
+          <Users className="size-5" aria-hidden />
+          {count > 0 ? (
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-weatherhead-primary px-1 text-[10px] font-bold text-white">
+              {count}
+            </span>
+          ) : null}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-0">
+        <div className="border-b border-slate-100 px-4 py-3">
+          <p className="text-sm font-bold text-slate-900">Live now</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            <span className="inline-flex items-center gap-1">
+              <StatusDot status="active" /> Active
+            </span>
+            <span className="mx-1.5">·</span>
+            <span className="inline-flex items-center gap-1">
+              <StatusDot status="idle" /> Idle / tab in background
+            </span>
+          </p>
+        </div>
+        <ul className="max-h-40 overflow-y-auto overscroll-contain py-2 border-b border-slate-100">
+          {count === 0 ? (
+            <li className="px-4 py-2 text-xs text-slate-500">No other sessions detected.</li>
+          ) : (
+            users.map((entry) => (
+              <li
+                key={entry.networkId}
+                className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-800"
+              >
+                <StatusDot status={entry.status} />
+                <span className="truncate font-medium">
+                  {entry.name}
+                  {entry.networkId === user.networkId ? (
+                    <span className="text-slate-400 font-normal"> (you)</span>
+                  ) : null}
+                </span>
+              </li>
+            ))
+          )}
+        </ul>
+        <div className="px-4 py-3">
+          <p className="text-sm font-bold text-slate-900">Recent activity</p>
+          <p className="text-xs text-slate-500 mt-0.5">Last 24 hours</p>
+        </div>
+        <ul className="max-h-48 overflow-y-auto overscroll-contain pb-2">
+          {activity.length === 0 ? (
+            <li className="px-4 py-2 text-xs text-slate-500">No recent edits yet.</li>
+          ) : (
+            activity.map((entry) => (
+              <li key={entry.id} className="px-4 py-2 text-xs text-slate-700">
+                <span className="block leading-snug">
+                  {displayActivityMessage(entry, user.networkId)}
+                </span>
+                <span className="mt-0.5 block text-[11px] text-slate-400">
+                  {formatActivityTime(entry.createdAt)}
+                </span>
+              </li>
+            ))
+          )}
+        </ul>
+      </PopoverContent>
+    </Popover>
   );
 }

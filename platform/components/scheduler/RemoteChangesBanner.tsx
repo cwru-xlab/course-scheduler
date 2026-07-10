@@ -9,6 +9,7 @@ import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 export function RemoteChangesBanner() {
   const {
     remoteChangesAvailable,
+    remoteChangeAuthor,
     hasUnsavedChanges,
     applyRemoteChanges,
     dismissRemoteChanges,
@@ -46,7 +47,11 @@ export function RemoteChangesBanner() {
     >
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-sky-950">
-          <span className="font-semibold">Updates from another user are available.</span>{" "}
+          <span className="font-semibold">
+            {remoteChangeAuthor
+              ? `Updates from ${remoteChangeAuthor} are available.`
+              : "Updates from another user are available."}
+          </span>{" "}
           {hasUnsavedChanges ? (
             autoRefreshEnabled ? (
               "Save or discard your edits first — auto-refresh will apply them afterward."

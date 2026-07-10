@@ -4,6 +4,7 @@ import { verifyToken } from "@/lib/auth";
 import { siteConfig } from "@/config/site";
 import { parseNotesFromWorkbook } from "@/lib/spreadsheet-notes";
 import { tryRecordActivity } from "@/lib/record-activity";
+import { tryRecordSchedulingDataRevision } from "@/lib/scheduling-data-revision";
 import type { NotesRowPatch } from "@/lib/notes/types";
 import type { SchedulingInput, ValidationError } from "@/lib/scheduling/types";
 
@@ -72,6 +73,7 @@ export async function POST(request: NextRequest) {
     const notesResult = parseNotesFromWorkbook(fileBytes, user);
 
     await tryRecordActivity(request, "spreadsheet_import");
+    await tryRecordSchedulingDataRevision(request);
 
     return NextResponse.json(
       {
