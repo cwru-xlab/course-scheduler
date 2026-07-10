@@ -26,7 +26,7 @@ import {
   type UserSyncPreferences,
 } from "./syncPreferences";
 import { useAuth } from "@/lib/auth-client";
-import type { SchedulingDataRevision } from "@/lib/scheduling-data-revision";
+import type { SchedulingDataRevision } from "@/lib/scheduling/dataRevision";
 
 const STORAGE_KEY = "wsom-scheduling-data";
 export const SCHEDULING_DATA_REFRESH_EVENT = "wsom-scheduling-data-refresh";

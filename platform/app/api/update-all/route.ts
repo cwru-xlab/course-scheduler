@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { SchedulingInput } from "@/lib/scheduling/types";
 import { normalizeCrosslistData } from "@/lib/scheduling/crosslist";
 import { tryRecordActivity } from "@/lib/record-activity";
-import { tryRecordSchedulingDataRevision } from "@/lib/scheduling-data-revision";
+import { tryRecordSchedulingDataRevision } from "@/lib/scheduling/dataRevisionStore";
 
 const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:5001";
 const SOLVER_FALLBACK_URLS = ["http://localhost:5001", "http://localhost:8000"];

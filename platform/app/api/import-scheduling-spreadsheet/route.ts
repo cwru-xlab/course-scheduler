@@ -4,7 +4,7 @@ import { verifyToken } from "@/lib/auth";
 import { siteConfig } from "@/config/site";
 import { parseNotesFromWorkbook } from "@/lib/spreadsheet-notes";
 import { tryRecordActivity } from "@/lib/record-activity";
-import { tryRecordSchedulingDataRevision } from "@/lib/scheduling-data-revision";
+import { tryRecordSchedulingDataRevision } from "@/lib/scheduling/dataRevisionStore";
 import type { NotesRowPatch } from "@/lib/notes/types";
 import type { SchedulingInput, ValidationError } from "@/lib/scheduling/types";
 

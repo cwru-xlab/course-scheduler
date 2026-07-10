@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getSchedulingDataRevision } from "@/lib/scheduling-data-revision";
+import { getSchedulingDataRevision } from "@/lib/scheduling/dataRevisionStore";
 
 const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:5001";
 
@@ -32,9 +32,9 @@ export async function GET() {
         },
       },
       {
-      status: 200,
-      headers: { "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate" },
-    },
+        status: 200,
+        headers: { "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate" },
+      },
     );
   } catch (error) {
     const message =

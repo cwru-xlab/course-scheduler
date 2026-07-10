@@ -5,11 +5,9 @@ import type { NextRequest } from "next/server";
 
 import { getRequestAuthUser } from "@/lib/record-activity";
 
-export type SchedulingDataRevision = {
-  lastModifiedByNetworkId: string;
-  lastModifiedByName: string;
-  lastModifiedAt: string;
-};
+import type { SchedulingDataRevision } from "./dataRevision";
+
+export type { SchedulingDataRevision } from "./dataRevision";
 
 const globalRef = globalThis as unknown as {
   __schedulingDataRevision?: SchedulingDataRevision | null;
