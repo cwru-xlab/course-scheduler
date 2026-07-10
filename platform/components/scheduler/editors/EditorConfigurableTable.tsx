@@ -35,7 +35,7 @@ export function EditorConfigurableTable<TRow>({
   renderActions,
 }: EditorConfigurableTableProps<TRow>) {
   const tableRef = useRef<HTMLTableElement>(null);
-  const { specs, visibleSpecs, visibleIds, toggleColumn } =
+  const { specs, visibleSpecs, visibleIds, toggleColumn, showAllColumns, hideAllColumns } =
     useEditorColumnVisibility(editorKey, columnSpecs);
   const {
     containerRef,
@@ -72,6 +72,8 @@ export function EditorConfigurableTable<TRow>({
         specs={specs}
         visibleIds={visibleIds}
         onToggle={toggleColumn}
+        onShowAll={showAllColumns}
+        onHideAll={hideAllColumns}
       />
       <div ref={containerRef} className="w-full min-w-0 overflow-hidden">
         <table

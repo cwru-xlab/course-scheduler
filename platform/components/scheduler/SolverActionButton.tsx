@@ -6,6 +6,7 @@ import { Button } from "@heroui/button";
 import { Rocket } from "lucide-react";
 
 import { ViewportModal } from "@/components/scheduler/ViewportModal";
+import { editorToolbarBtnAccent } from "@/components/scheduler/editors/editorToolbarStyles";
 import type {
   ScheduleSolution,
   SchedulingInput,
@@ -28,11 +29,16 @@ type ApiError = {
 const LAST_SOLVER_RUN_STORAGE_KEY = "wsom-last-solver-run";
 const LAST_SOLVER_ERROR_STORAGE_KEY = "wsom-last-solver-error";
 
-export const SolverActionButton = ({ data }: { data: SchedulingInput | null }) => {
+export const SolverActionButton = ({
+  data,
+  onErrorChange,
+}: {
+  data: SchedulingInput | null;
+  onErrorChange?: (message: string | null) => void;
+}) => {
   const router = useRouter();
   const { begin, succeed, fail } = useSolverProgress();
   const [solverStatus, setSolverStatus] = useState<"idle" | "loading">("idle");
-  const [solverError, setSolverError] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const archivedSectionCount =
     data?.sections.filter((section) => isSectionArchived(section)).length ?? 0;
@@ -45,7 +51,7 @@ export const SolverActionButton = ({ data }: { data: SchedulingInput | null }) =
   const runSolver = async () => {
     if (!data) return;
     setSolverStatus("loading");
-    setSolverError(null);
+    onErrorChange?.(null);
     begin();
 
     try {
@@ -64,9 +70,8 @@ export const SolverActionButton = ({ data }: { data: SchedulingInput | null }) =
         result = JSON.parse(raw) as ApiSuccess | ApiError;
       } catch {
         fail();
-        setSolverError(
-          `Schedule API returned non-JSON response (status ${response.status}).`,
-        );
+        const msg = `Schedule API returned non-JSON response (status ${response.status}).`;
+        onErrorChange?.(msg);
         return;
       }
 
@@ -92,7 +97,7 @@ export const SolverActionButton = ({ data }: { data: SchedulingInput | null }) =
           return;
         }
         fail();
-        setSolverError(nextError);
+        onErrorChange?.(nextError);
         return;
       }
 
@@ -116,27 +121,26 @@ export const SolverActionButton = ({ data }: { data: SchedulingInput | null }) =
           : error instanceof Error
             ? error.message
             : "Failed to reach solver API.";
-      setSolverError(message);
+      onErrorChange?.(message);
     } finally {
       setSolverStatus("idle");
     }
   };
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <>
       <Button
-        variant="flat"
-        className="font-bold border border-weatherhead-primary/25 bg-weatherhead-primary/15 text-weatherhead-primary shadow-sm hover:bg-weatherhead-primary/25"
-        startContent={solverStatus === "idle" ? <Rocket className="size-4" /> : undefined}
+        size="sm"
+        radius="md"
+        variant="light"
+        className={editorToolbarBtnAccent}
+        startContent={solverStatus === "idle" ? <Rocket className="size-3.5" aria-hidden /> : undefined}
         isLoading={solverStatus === "loading"}
         onPress={() => setIsConfirmOpen(true)}
         isDisabled={!data || solverStatus === "loading"}
       >
         Run Solver
       </Button>
-      {solverError && (
-        <p className="text-xs text-red-600 max-w-md text-right">{solverError}</p>
-      )}
 
       <ViewportModal isOpen={isConfirmOpen} onClose={() => setIsConfirmOpen(false)} zIndex={1000}>
         {isConfirmOpen ? (
@@ -191,6 +195,6 @@ export const SolverActionButton = ({ data }: { data: SchedulingInput | null }) =
           </div>
         ) : null}
       </ViewportModal>
-    </div>
+    </>
   );
 };

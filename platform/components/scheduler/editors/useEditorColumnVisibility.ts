@@ -65,6 +65,16 @@ export function useEditorColumnVisibility(editorKey: string, specs: EditorColumn
     [visibleIds, persist],
   );
 
+  const showAllColumns = useCallback(() => {
+    persist(new Set(specs.map((s) => s.id)));
+  }, [persist, specs]);
+
+  const hideAllColumns = useCallback(() => {
+    const keep = specs.find((s) => s.id === "id") ?? specs[0];
+    if (!keep) return;
+    persist(new Set([keep.id]));
+  }, [persist, specs]);
+
   const visibleSpecs = useMemo(
     () => specs.filter((s) => visibleIds.has(s.id)),
     [specs, visibleIds],
@@ -84,6 +94,8 @@ export function useEditorColumnVisibility(editorKey: string, specs: EditorColumn
     visibleSpecs,
     visibleIds,
     toggleColumn,
+    showAllColumns,
+    hideAllColumns,
     widthFor,
     isVisible: (id: string) => visibleIds.has(id),
   };

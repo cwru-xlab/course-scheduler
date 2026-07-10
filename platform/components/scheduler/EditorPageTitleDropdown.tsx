@@ -31,7 +31,7 @@ export function EditorPageTitleDropdown({ current, title }: EditorPageTitleDropd
           className="inline-flex items-center gap-2 rounded-lg transition-colors hover:text-weatherhead-primary"
           aria-label="Open editor page selector"
         >
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">{title}</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">{title}</h1>
           <ChevronDown className="size-5 text-slate-500" />
         </button>
       </DropdownTrigger>

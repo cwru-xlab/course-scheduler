@@ -26,6 +26,10 @@ import {
   type NumberCompareOp,
   type TimeCompareOp,
 } from "./editorFilters";
+import {
+  editorFilterBtnClass,
+  editorFilterClearBtnClass,
+} from "./editorToolbarStyles";
 
 const controlClass =
   "h-8 max-w-full rounded-lg border border-default-200 bg-white px-2 text-xs text-slate-800 outline-none focus:border-primary dark:bg-default-100";
@@ -242,21 +246,22 @@ export function EditorColumnFilters<TRow>({
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         <Button
           size="sm"
-          color="primary"
-          variant="flat"
-          className="font-semibold"
+          radius="md"
+          variant="bordered"
+          className={editorFilterBtnClass}
           onPress={() => setIsOpen(true)}
         >
-          Filters ({appliedCount})
+          Filters{appliedCount > 0 ? ` · ${appliedCount}` : ""}
         </Button>
         {hasAnyFilter ? (
           <Button
             size="sm"
-            variant="flat"
-            className="font-semibold"
+            radius="md"
+            variant="light"
+            className={editorFilterClearBtnClass}
             onPress={() => onChange({})}
           >
-            Clear all filters
+            Clear all
           </Button>
         ) : null}
       </div>

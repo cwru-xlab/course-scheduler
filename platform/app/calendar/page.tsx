@@ -3693,7 +3693,7 @@ type MeetingPatternPlacementOption = {
           onClick={openCreateSectionModal}
           className="flex items-center justify-center rounded-lg h-10 px-4 bg-indigo-50 text-indigo-800 font-bold border border-indigo-200 hover:bg-indigo-100 transition-colors shrink-0"
         >
-          + Add Section
+          Add Section
         </button>
       </div>
 

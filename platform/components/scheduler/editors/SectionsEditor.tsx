@@ -380,7 +380,7 @@ export const SectionsEditor = ({
   return (
     <EditorTableShell
       title={`Sections (${filteredSections.length})`}
-      addLabel="+ Add Section"
+      addLabel="Add Section"
       onAdd={addSection}
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}

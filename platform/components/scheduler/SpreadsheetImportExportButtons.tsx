@@ -2,15 +2,16 @@
 
 import { useRef, useState, type ChangeEvent } from "react";
 import { Button } from "@heroui/button";
+import { FileDown, FileUp } from "lucide-react";
 
 import { ImportSpreadsheetWarningModal } from "@/components/scheduler/ImportSpreadsheetWarningModal";
+import {
+  editorToolbarBtnSecondary,
+} from "@/components/scheduler/editors/editorToolbarStyles";
 import { collectRowNotesForExport } from "@/lib/notes/storage";
 import { importSpreadsheetFile } from "@/lib/spreadsheet-import-client";
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 import type { SchedulingInput, ValidationError } from "@/lib/scheduling/types";
-
-const secondaryClassName =
-  "bg-slate-100 dark:bg-default-100 text-slate-700 dark:text-foreground font-bold border border-slate-200 dark:border-default-200";
 
 type Props = {
   data: SchedulingInput;
@@ -132,18 +133,24 @@ export function SpreadsheetImportExportButtons({ data, onFeedbackChange }: Props
         }}
       />
       <Button
-        className={secondaryClassName}
+        size="sm"
+        radius="md"
+        className={editorToolbarBtnSecondary}
+        startContent={<FileUp className="size-3.5" aria-hidden />}
         onPress={handleImportButtonPress}
         isLoading={spreadsheetStatus === "importing"}
       >
-        Import Spreadsheet
+        Import
       </Button>
       <Button
-        className={secondaryClassName}
+        size="sm"
+        radius="md"
+        className={editorToolbarBtnSecondary}
+        startContent={<FileDown className="size-3.5" aria-hidden />}
         onPress={exportSpreadsheet}
         isLoading={spreadsheetStatus === "exporting"}
       >
-        Export Spreadsheet
+        Export
       </Button>
     </>
   );

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@heroui/button";
+import { CloudUpload } from "lucide-react";
 
 import { EditorPageTitleDropdown } from "./EditorPageTitleDropdown";
 import {
@@ -9,6 +10,16 @@ import {
   type SpreadsheetFeedback,
 } from "./SpreadsheetImportExportButtons";
 import { SolverActionButton } from "./SolverActionButton";
+import {
+  editorFeedbackErrorClass,
+  editorFeedbackSuccessClass,
+  editorInfoLegendClass,
+  editorInfoMetaClass,
+  editorInfoStripClass,
+  editorToolbarBtnPrimary,
+  editorToolbarDivider,
+  editorToolbarShellClass,
+} from "./editors/editorToolbarStyles";
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 import type { SchedulingInput } from "@/lib/scheduling/types";
 
@@ -27,99 +38,94 @@ type EditorPageHeaderProps = {
   data: SchedulingInput;
 };
 
+function LegendDot({ className }: { className: string }) {
+  return <span className={`inline-block size-2 shrink-0 rounded-full ${className}`} aria-hidden />;
+}
+
 export function EditorPageHeader({ current, title, subtitle, data }: EditorPageHeaderProps) {
   const { saveToBackend, isSaving, saveFeedback, autoSaveEnabled, autoRefreshEnabled } =
     useSchedulingData();
   const [spreadsheetFeedback, setSpreadsheetFeedback] = useState<SpreadsheetFeedback | null>(
     null,
   );
+  const [solverError, setSolverError] = useState<string | null>(null);
 
   return (
     <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
       <div className="min-w-0">
         <EditorPageTitleDropdown current={current} title={title} />
-        <p className="mt-1 text-slate-500">{subtitle}</p>
+        <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+      <div className={editorToolbarShellClass}>
         <Button
-          className="bg-weatherhead-primary text-white font-bold shadow-lg shadow-weatherhead-primary/20 hover:opacity-90"
+          size="sm"
+          radius="md"
+          className={editorToolbarBtnPrimary}
+          startContent={<CloudUpload className="size-3.5" aria-hidden />}
           onPress={() => void saveToBackend({ manual: true })}
           isLoading={isSaving}
         >
           Save
         </Button>
+        <span className={editorToolbarDivider} aria-hidden />
         <SpreadsheetImportExportButtons
           data={data}
           onFeedbackChange={setSpreadsheetFeedback}
         />
-        <SolverActionButton data={data} />
+        <span className={editorToolbarDivider} aria-hidden />
+        <SolverActionButton data={data} onErrorChange={setSolverError} />
       </div>
 
-      <div className="lg:col-span-2 rounded-lg border border-slate-200/80 bg-slate-50/60 px-3 py-2.5 text-xs leading-relaxed text-slate-500">
-        <p className="text-pretty">
-          Highlighted rows: <strong className="text-green-600">green</strong> = your recent saves,{" "}
-          <strong className="text-blue-600">blue</strong> = updates from the server.
-        </p>
-        <p className="mt-1.5 text-pretty">
-          {autoSaveEnabled ? (
-            <>
-              <span className="font-semibold text-slate-600">Auto-save</span> is on — edits publish
-              automatically after you stop typing.
-            </>
-          ) : (
-            <>
-              <span className="font-semibold text-slate-600">Auto-save</span> is off — click Save to
-              publish edits.
-            </>
-          )}{" "}
-          {autoRefreshEnabled ? (
-            <>
-              <span className="font-semibold text-slate-600">Auto-refresh</span> is on — others&apos;
-              updates load when you have no unsaved edits.
-            </>
-          ) : (
-            <>
-              <span className="font-semibold text-slate-600">Auto-refresh</span> is off — you will be
-              prompted when another user saves.
-            </>
-          )}{" "}
-          Change sync options in <span className="font-semibold text-slate-600">Settings</span> on the
-          top bar.
+      {solverError ? (
+        <p className={editorFeedbackErrorClass}>{solverError}</p>
+      ) : null}
+
+      <div className={editorInfoStripClass}>
+        <div className={editorInfoLegendClass}>
+          <span className="inline-flex items-center gap-1.5">
+            <LegendDot className="bg-emerald-500" />
+            Your recent saves
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <LegendDot className="bg-blue-500" />
+            Server updates
+          </span>
+        </div>
+        <p className={editorInfoMetaClass}>
+          <span className="font-medium text-slate-600">Auto-save</span>{" "}
+          {autoSaveEnabled ? "on" : "off"}
+          <span className="mx-2 text-slate-300">·</span>
+          <span className="font-medium text-slate-600">Auto-refresh</span>{" "}
+          {autoRefreshEnabled ? "on" : "off"}
+          <span className="mx-2 text-slate-300">·</span>
+          Sync options in <span className="font-medium text-slate-600">Settings</span>
         </p>
       </div>
 
       {spreadsheetFeedback?.type === "success" && (
-        <div
-          className="lg:col-span-2 rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2.5 text-sm font-semibold leading-snug text-emerald-700"
-          role="status"
-        >
+        <div className={editorFeedbackSuccessClass} role="status">
           {spreadsheetFeedback.message}
         </div>
       )}
       {spreadsheetFeedback?.type === "error" && (
-        <div
-          className="lg:col-span-2 rounded-lg border border-red-200 bg-red-50/80 px-3 py-2.5 text-sm font-semibold leading-snug text-red-700"
-          role="alert"
-        >
+        <div className={editorFeedbackErrorClass} role="alert">
           {spreadsheetFeedback.message}
         </div>
       )}
 
       {saveFeedback?.type === "success" && (
-        <div className="lg:col-span-2 space-y-2 rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2.5">
-          <p className="text-sm font-semibold text-emerald-700">{saveFeedback.message}</p>
+        <div className={`${editorFeedbackSuccessClass} space-y-1`}>
+          <p>{saveFeedback.message}</p>
           {saveFeedback.warnings?.map((warning) => (
-            <p key={warning} className="text-sm font-semibold text-amber-800">
+            <p key={warning} className="text-amber-800">
               Warning: {warning}
             </p>
           ))}
         </div>
       )}
       {saveFeedback?.type === "error" && (
-        <p className="lg:col-span-2 rounded-lg border border-red-200 bg-red-50/80 px-3 py-2.5 text-sm font-semibold text-red-700">
-          Save failed. {saveFeedback.message}
-        </p>
+        <p className={editorFeedbackErrorClass}>Save failed. {saveFeedback.message}</p>
       )}
     </div>
   );
