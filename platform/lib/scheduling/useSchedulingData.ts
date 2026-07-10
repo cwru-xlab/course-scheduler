@@ -31,7 +31,8 @@ const STORAGE_KEY = "wsom-scheduling-data";
 export const SCHEDULING_DATA_REFRESH_EVENT = "wsom-scheduling-data-refresh";
 
 const AUTO_SAVE_DELAY_MS = 2000;
-const REMOTE_POLL_INTERVAL_MS = 60_000;
+const REMOTE_POLL_INTERVAL_FAST_MS = 4_000;
+const REMOTE_POLL_INTERVAL_SLOW_MS = 60_000;
 const RECENT_HIGHLIGHT_MS = 90_000;
 /** After we write to the server, ignore fingerprint drift briefly (propagation lag). */
 const OWN_WRITE_GRACE_MS = 5_000;
@@ -455,7 +456,12 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
       void checkForRemoteChanges();
     };
 
-    const intervalId = window.setInterval(poll, REMOTE_POLL_INTERVAL_MS);
+    const intervalMs = autoRefreshEnabled
+      ? REMOTE_POLL_INTERVAL_FAST_MS
+      : REMOTE_POLL_INTERVAL_SLOW_MS;
+
+    void poll();
+    const intervalId = window.setInterval(poll, intervalMs);
     const onVisible = () => poll();
     document.addEventListener("visibilitychange", onVisible);
 
@@ -463,7 +469,7 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [checkForRemoteChanges]);
+  }, [autoRefreshEnabled, checkForRemoteChanges]);
 
   const clearSaveFeedbackSoon = useCallback((delayMs = 5000) => {
     if (saveFeedbackTimerRef.current) clearTimeout(saveFeedbackTimerRef.current);

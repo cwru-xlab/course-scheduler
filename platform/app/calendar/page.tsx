@@ -987,7 +987,7 @@ export default function CalendarPage() {
   const [solverRunStatus, setSolverRunStatus] = useState<"idle" | "loading">("idle");
   const solverLock = useSolverLock();
   const solverBusyRemote = solverLock.active && solverRunStatus !== "loading";
-  const { autoSaveEnabled, recordOwnServerWrite } = useSchedulingData();
+  const { autoSaveEnabled, setAutoSaveEnabled, recordOwnServerWrite } = useSchedulingData();
   const [solverRunError, setSolverRunError] = useState<string | null>(null);
   const [calendarContextMenu, setCalendarContextMenu] = useState<{
     clientX: number;
@@ -3351,24 +3351,64 @@ type MeetingPatternPlacementOption = {
                 <Play className="size-4" />
               </button>
             </div>
-            {!autoSaveEnabled && hasValidUnsavedEdit ? (
+            <div
+              onMouseEnter={() =>
+                setToolbarActionHint(
+                  autoSaveEnabled
+                    ? "Autosave is on — calendar edits persist automatically."
+                    : "Autosave is off — click Save to persist calendar edits.",
+                )
+              }
+              onMouseLeave={() => setToolbarActionHint(null)}
+              className="flex items-center gap-2 pl-1 pr-2"
+            >
               <button
                 type="button"
-                disabled={isSavingBackend}
-                onClick={() => void handleUpdateBackend(false)}
+                role="switch"
+                aria-checked={autoSaveEnabled}
+                onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}
                 className={clsx(
-                  "flex items-center justify-center rounded-lg h-8 px-3 text-xs font-bold border transition-colors",
-                  isSavingBackend
-                    ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                    : "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100",
+                  "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors",
+                  autoSaveEnabled
+                    ? "bg-emerald-500 border-emerald-500"
+                    : "bg-slate-200 border-slate-300",
                 )}
-                title="Save valid calendar edits"
-                aria-label="Save"
+                title={
+                  autoSaveEnabled
+                    ? "Autosave on — click to disable"
+                    : "Autosave off — click to enable"
+                }
+                aria-label="Toggle autosave"
               >
-                <CloudBackup className="size-4 mr-1" />
-                Save
+                <span
+                  className={clsx(
+                    "inline-block size-4 rounded-full bg-white shadow transition-transform",
+                    autoSaveEnabled ? "translate-x-4" : "translate-x-0.5",
+                  )}
+                />
               </button>
-            ) : null}
+              <span className="text-xs font-semibold text-slate-600 select-none">
+                Autosave
+              </span>
+              {!autoSaveEnabled && hasValidUnsavedEdit && (
+                <button
+                  type="button"
+                  disabled={isSavingBackend}
+                  onClick={() => void handleUpdateBackend(false)}
+                  className={clsx(
+                    "ml-1 flex items-center justify-center rounded-lg h-8 px-3 text-xs font-bold border transition-colors",
+                    isSavingBackend
+                      ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                      : "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100",
+                  )}
+                  title="Save valid calendar edits"
+                  aria-label="Save"
+                >
+                  <CloudBackup className="size-4 mr-1" />
+                  Save
+                </button>
+              )}
+            </div>
             <div className="hidden lg:block h-7 w-px bg-slate-200 mx-1" />
             <Link
               href="/editor/sections"
