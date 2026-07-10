@@ -1,3 +1,4 @@
+import time
 from datetime import datetime
 import json
 import os
@@ -28,13 +29,19 @@ except ModuleNotFoundError:
     build_parsed_data_from_excel = None
     build_scheduling_input_from_parsed = None
 
-from spreadsheet_io.export_to_spreadsheet import scheduling_input_to_excel_bytes
+from spreadsheet_io.format_errors import format_import_parse_error
+from spreadsheet_io.validate_scheduling_input import validate_scheduling_input
 from spreadsheet_io.import_from_spreadsheet import parse_scheduling_input_from_excel_bytes
 from spreadsheet_io.spreadsheet_utils import (
     build_template_bytes,
     normalize_section_state,
     parse_nested_list_cell,
 )
+
+# Cap infeasibility diagnosis so /solve returns before API proxies time out.
+DIAGNOSE_MAX_INSTRUCTOR_STEPS = 20
+DIAGNOSE_MAX_SECONDS = 60.0
+DIAGNOSE_RELAX_BUDGET_SECONDS = 15.0
 
 from model import (
     BlockedTime,
@@ -1357,7 +1364,14 @@ def _diagnose_infeasibility(input_data: SchedulingInput) -> Dict[str, List[str]]
         ("department_conflicts", "Departmental within-department collision rules"),
     ]
     feasible_if_relax: List[str] = []
+    diagnose_start = time.monotonic()
+    relax_deadline = diagnose_start + DIAGNOSE_RELAX_BUDGET_SECONDS
+    deadline = diagnose_start + DIAGNOSE_MAX_SECONDS
+    diagnosis_truncated = False
     for relax_key, label in relax_candidates:
+        if time.monotonic() > relax_deadline:
+            diagnosis_truncated = True
+            break
         print(f"[diagnose] Testing relaxation: {label}...", flush=True)
         if _check_feasible(input_data, {relax_key}):
             feasible_if_relax.append(label)
@@ -1375,6 +1389,12 @@ def _diagnose_infeasibility(input_data: SchedulingInput) -> Dict[str, List[str]]
     current_data = input_data
     removed_sections = 0
     for instructor_id, count in sorted_instructors:
+        if len(feasible_if_remove_instructor) >= DIAGNOSE_MAX_INSTRUCTOR_STEPS:
+            diagnosis_truncated = True
+            break
+        if time.monotonic() > deadline:
+            diagnosis_truncated = True
+            break
         current_data = _strip_instructor(current_data, instructor_id)
         removed_sections += count
         feasible_if_remove_instructor.append({
@@ -1400,6 +1420,7 @@ def _diagnose_infeasibility(input_data: SchedulingInput) -> Dict[str, List[str]]
     return {
         "feasible_if_relax": feasible_if_relax,
         "feasible_if_remove_instructor": feasible_if_remove_instructor,
+        "diagnosis_truncated": diagnosis_truncated,
     }
 
 
@@ -1578,6 +1599,52 @@ def _solve_schedule(input_data: SchedulingInput):
     input_data = _filter_archived_for_solve(input_data)
     input_data = _split_placeholder_instructors(input_data)
     errors: List[dict] = []
+
+    structural_errors = validate_scheduling_input(
+        {
+            "sections": [_section_to_dict(s) for s in input_data.sections],
+            "instructors": [
+                i.to_dict() if hasattr(i, "to_dict") else i for i in input_data.instructors
+            ],
+            "rooms": [r.to_dict() if hasattr(r, "to_dict") else r for r in input_data.rooms],
+            "timeslots": [
+                t.to_dict() if hasattr(t, "to_dict") else t for t in input_data.timeslots
+            ],
+            "meeting_patterns": [
+                m.to_dict() if hasattr(m, "to_dict") else m for m in input_data.meeting_patterns
+            ],
+            "crosslist_groups": [
+                g.to_dict() if hasattr(g, "to_dict") else g for g in input_data.crosslist_groups
+            ],
+            "no_overlap_groups": [
+                g.to_dict() if hasattr(g, "to_dict") else g for g in input_data.no_overlap_groups
+            ],
+            "blocked_times": [
+                b.to_dict() if hasattr(b, "to_dict") else b for b in input_data.blocked_times
+            ],
+            "locked_assignments": [
+                l.to_dict() if hasattr(l, "to_dict") else l for l in input_data.locked_assignments
+            ],
+            "soft_locks": [
+                l.to_dict() if hasattr(l, "to_dict") else l for l in input_data.soft_locks
+            ],
+        }
+    )
+    if structural_errors:
+        return {
+            "status": "error",
+            "errors": structural_errors[:50],
+            "diagnostics": {
+                "error_codes": sorted({str(e.get("code", "unknown")) for e in structural_errors}),
+                "validation_issue_count": len(structural_errors),
+                "referenced_sections": [
+                    e.get("row_id")
+                    for e in structural_errors
+                    if e.get("sheet") == "Sections" and e.get("row_id")
+                ][:40],
+            },
+        }
+
     errors.extend(
         _validate_crosslist_capacity(
             input_data.crosslist_groups, input_data.sections, input_data.rooms
@@ -2534,6 +2601,18 @@ def import_scheduling_spreadsheet():
     try:
         file_bytes = file.read()
         scheduling_input = parse_scheduling_input_from_excel_bytes(file_bytes)
+        validation_issues = validate_scheduling_input(scheduling_input)
+        if validation_issues:
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "errors": validation_issues[:50],
+                        "validation_issue_count": len(validation_issues),
+                    }
+                ),
+                400,
+            )
     except Exception as exc:  # pylint: disable=broad-except
         return (
             jsonify(
@@ -2542,7 +2621,7 @@ def import_scheduling_spreadsheet():
                     "errors": [
                         {
                             "code": "parse_failed",
-                            "message": f"Failed to parse scheduling spreadsheet: {exc}",
+                            "message": format_import_parse_error(exc),
                         }
                     ],
                 }
@@ -2551,6 +2630,69 @@ def import_scheduling_spreadsheet():
         )
 
     return jsonify({"status": "ok", "scheduling_input": scheduling_input}), 200
+
+
+@app.route("/validate-scheduling-input", methods=["POST"])
+def validate_scheduling_input_route():
+    data = request.get_json() or {}
+    payload = data.get("input") if isinstance(data, dict) and "input" in data else data
+    if not isinstance(payload, dict):
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "invalid_request",
+                            "message": "Request body must be a scheduling input object or { input }.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    issues = validate_scheduling_input(payload)
+    if not issues:
+        # Also run option-building checks for sections with zero feasible placements.
+        try:
+            input_data = SchedulingInput(payload)
+            input_data = _filter_archived_for_solve(input_data)
+            input_data = _split_placeholder_instructors(input_data)
+            issues.extend(
+                _validate_crosslist_capacity(
+                    input_data.crosslist_groups, input_data.sections, input_data.rooms
+                )
+            )
+            _, option_errors = _build_options(input_data)
+            for item in option_errors:
+                enriched = dict(item)
+                message = str(enriched.get("message", ""))
+                section_id = None
+                if message.startswith("Section ") and " has no feasible" in message:
+                    section_id = (
+                        message.split("Section ", 1)[1].split(" has no feasible", 1)[0].strip()
+                    )
+                enriched.setdefault("sheet", "Sections")
+                if section_id:
+                    enriched.setdefault("row_id", section_id)
+                enriched.setdefault("field", "allowed_meeting_patterns")
+                issues.append(enriched)
+        except Exception as exc:  # pylint: disable=broad-except
+            issues.append(
+                {
+                    "code": "validation_failed",
+                    "message": f"Could not complete feasibility preview: {exc}",
+                }
+            )
+
+    return jsonify(
+        {
+            "status": "ok" if not issues else "error",
+            "issues": issues,
+            "issue_count": len(issues),
+        }
+    ), (200 if not issues else 422)
 
 
 @app.route("/export-scheduling-spreadsheet", methods=["POST"])

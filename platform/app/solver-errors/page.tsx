@@ -5,13 +5,18 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 
+import { SpreadsheetFormatHelp } from "@/components/scheduler/SpreadsheetFormatHelp";
+import { ValidationIssuesTable } from "@/components/scheduler/ValidationIssuesTable";
 import type { SchedulingInput, ValidationError } from "@/lib/scheduling/types";
+import { hasLocatedIssues } from "@/lib/spreadsheet/validateClient";
 import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
 
 type SolverDiagnostics = {
   feasible_if_relax?: string[];
   feasible_if_remove_section?: string[];
   feasible_if_remove_instructor?: { instructor_id: string; section_count: number }[];
+  diagnosis_truncated?: boolean;
+  validation_issue_count?: number;
   error_codes?: string[];
   referenced_sections?: string[];
   busiest_instructors?: { instructor_id: string; section_count: number }[];
@@ -37,7 +42,9 @@ type StoredSolverError = {
   createdAt: string;
 };
 
-const LAST_SOLVER_ERROR_STORAGE_KEY = "wsom-last-solver-error";
+import {
+  LAST_SOLVER_ERROR_STORAGE_KEY,
+} from "@/lib/solver/solverErrorStorage";
 
 function readStoredError(): StoredSolverError | null {
   if (typeof window === "undefined") return null;
@@ -108,11 +115,20 @@ export default function SolverErrorsPage() {
     const ids = new Set<string>();
     const sectionIds = stored.input.sections.map((s) => s.id);
     stored.errors.forEach((err) => {
+      if (err.sheet === "Sections" && err.row_id) {
+        ids.add(err.row_id);
+      }
       sectionIds.forEach((id) => {
         if (err.message.includes(id)) ids.add(id);
       });
     });
+    (stored.diagnostics?.referenced_sections ?? []).forEach((id) => ids.add(id));
     return Array.from(ids);
+  }, [stored]);
+
+  const locatedIssues = useMemo(() => {
+    if (!stored) return [];
+    return stored.errors.filter((err) => err.sheet || err.row_id || err.field);
   }, [stored]);
 
   const problematicSections = useMemo(() => {
@@ -180,14 +196,29 @@ export default function SolverErrorsPage() {
 
       <div className="rounded-xl border border-slate-200 bg-white p-6">
         <h2 className="text-lg font-bold text-slate-900">Returned Errors</h2>
-        <ul className="mt-3 space-y-2 text-sm">
-          {stored.errors.map((err) => (
-            <li key={`${err.code}-${err.message}`} className="rounded-lg bg-slate-50 p-3">
-              <span className="font-mono text-xs font-bold text-red-600">{err.code}</span>
-              <div className="mt-1 text-slate-700">{err.message}</div>
-            </li>
-          ))}
-        </ul>
+        {locatedIssues.length > 0 || hasLocatedIssues(stored.errors) ? (
+          <div className="mt-3">
+            <p className="text-sm text-slate-600">
+              Pinpointed issues — fix these rows in your spreadsheet or editor, then run Check Data
+              again.
+            </p>
+            <div className="mt-3">
+              <ValidationIssuesTable issues={stored.errors} />
+            </div>
+          </div>
+        ) : (
+          <ul className="mt-3 space-y-2 text-sm">
+            {stored.errors.map((err) => (
+              <li key={`${err.code}-${err.message}`} className="rounded-lg bg-slate-50 p-3">
+                <span className="font-mono text-xs font-bold text-red-600">{err.code}</span>
+                <div className="mt-1 whitespace-pre-wrap text-slate-700">{err.message}</div>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="mt-4">
+          <SpreadsheetFormatHelp />
+        </div>
       </div>
 
       {stored.diagnostics && (
@@ -239,6 +270,12 @@ export default function SolverErrorsPage() {
               <span className="font-semibold">Error codes:</span>{" "}
               {(stored.diagnostics.error_codes ?? []).join(", ") || "None"}
             </div>
+            {stored.diagnostics.diagnosis_truncated ? (
+              <p className="text-xs text-amber-700">
+                Infeasibility diagnosis was truncated to avoid a long wait. Use Check Data for
+                row-level issues, or retry the solver.
+              </p>
+            ) : null}
             <div>
               <span className="font-semibold">Referenced sections:</span>{" "}
               {(stored.diagnostics.referenced_sections ?? []).length

@@ -4,12 +4,16 @@ import { useState } from "react";
 import { Button } from "@heroui/button";
 import { CloudUpload } from "lucide-react";
 
+import { SpreadsheetFormatHelp } from "@/components/scheduler/SpreadsheetFormatHelp";
+import { ValidationIssuesTable } from "@/components/scheduler/ValidationIssuesTable";
+import { hasLocatedIssues } from "@/lib/spreadsheet/validateClient";
 import { EditorPageTitleDropdown } from "./EditorPageTitleDropdown";
 import {
   SpreadsheetImportExportButtons,
   type SpreadsheetFeedback,
 } from "./SpreadsheetImportExportButtons";
 import { SolverActionButton } from "./SolverActionButton";
+import { CheckDataButton } from "./CheckDataButton";
 import {
   editorFeedbackErrorClass,
   editorFeedbackSuccessClass,
@@ -74,6 +78,7 @@ export function EditorPageHeader({ current, title, subtitle, data }: EditorPageH
           onFeedbackChange={setSpreadsheetFeedback}
         />
         <span className={editorToolbarDivider} aria-hidden />
+        <CheckDataButton data={data} onErrorChange={setSolverError} />
         <SolverActionButton data={data} onErrorChange={setSolverError} />
       </div>
 
@@ -110,7 +115,25 @@ export function EditorPageHeader({ current, title, subtitle, data }: EditorPageH
       )}
       {spreadsheetFeedback?.type === "error" && (
         <div className={editorFeedbackErrorClass} role="alert">
-          {spreadsheetFeedback.message}
+          <p className="font-medium">{spreadsheetFeedback.message}</p>
+          {spreadsheetFeedback.errors &&
+          spreadsheetFeedback.errors.length > 0 &&
+          hasLocatedIssues(spreadsheetFeedback.errors) ? (
+            <div className="mt-3">
+              <ValidationIssuesTable issues={spreadsheetFeedback.errors} maxRows={12} />
+            </div>
+          ) : spreadsheetFeedback.errors && spreadsheetFeedback.errors.length > 1 ? (
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm font-normal">
+              {spreadsheetFeedback.errors.map((error) => (
+                <li key={`${error.code}-${error.message}`}>{error.message}</li>
+              ))}
+            </ul>
+          ) : spreadsheetFeedback.detail ? (
+            <p className="mt-2 whitespace-pre-wrap text-sm font-normal">{spreadsheetFeedback.detail}</p>
+          ) : null}
+          <div className="mt-3">
+            <SpreadsheetFormatHelp compact />
+          </div>
         </div>
       )}
 

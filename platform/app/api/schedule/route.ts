@@ -10,21 +10,11 @@ import {
   releaseSolverLock,
 } from "@/lib/solver-lock";
 import { tryRecordActivity } from "@/lib/record-activity";
-
-const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:5001";
-const SOLVER_FALLBACK_URLS = ["http://localhost:5001", "http://localhost:8000"];
+import { fetchSolver, solverErrorsFromBody } from "@/lib/api/solverFetch";
+import { enrichSolverErrors, normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
 
 // The CP-SAT solver may take up to 120s; give extra headroom.
 export const maxDuration = 180;
-
-const parseResponseBody = async (response: Response) => {
-  const raw = await response.text();
-  try {
-    return JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    return { raw };
-  }
-};
 
 export async function POST(request: NextRequest) {
   // Serialize solver runs across users: the Flask solver is single-worker
@@ -75,65 +65,46 @@ export async function POST(request: NextRequest) {
       input = mockSchedulingInput;
     }
 
-    const candidateUrls = [SOLVER_URL, ...SOLVER_FALLBACK_URLS].filter(
-      (url, idx, arr) => arr.indexOf(url) === idx,
+    const { response, data } = await fetchSolver(
+      "/solve",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          input,
+          ...(removeInstructors?.length ? { remove_instructors: removeInstructors } : {}),
+        }),
+      },
+      { timeoutMs: 150_000 },
     );
-    let response: Response | null = null;
-    let data: Record<string, unknown> = {};
-    let lastError: unknown = null;
-
-    for (const baseUrl of candidateUrls) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 150_000);
-        response = await fetch(`${baseUrl}/solve`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ input, ...(removeInstructors?.length ? { remove_instructors: removeInstructors } : {}) }),
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-        data = await parseResponseBody(response);
-        break;
-      } catch (err) {
-        lastError = err;
-      }
-    }
-
-    if (!response) {
-      throw lastError ?? new Error("Failed to reach solver service.");
-    }
 
     if (!response.ok) {
-      const rawBody = typeof data.raw === "string" ? data.raw.slice(0, 240) : undefined;
+      const errors = enrichSolverErrors(
+        solverErrorsFromBody(data, "solver_error", "Solver returned an error.") as Array<{
+          code: string;
+          message: string;
+        }>,
+      );
       return NextResponse.json(
         {
           status: "error",
-          errors: Array.isArray(data.errors) ? data.errors : [
-            { code: "solver_error", message: "Solver returned an error." },
-          ],
+          errors,
           diagnostics: data.diagnostics,
-          ...(rawBody
-            ? {
-                errors: [
-                  {
-                    code: "solver_response_invalid",
-                    message: `Solver returned non-JSON response. ${rawBody}`,
-                  },
-                ],
-              }
-            : {}),
         },
-        { status: 422 }
+        { status: 422 },
       );
     }
 
     if (data.status === "error") {
+      const errors = enrichSolverErrors(
+        solverErrorsFromBody(data, "infeasible", "No feasible schedule found.") as Array<{
+          code: string;
+          message: string;
+        }>,
+      );
       return NextResponse.json({
         status: "error",
-        errors: Array.isArray(data.errors)
-          ? data.errors
-          : [{ code: "infeasible", message: "No feasible schedule found." }],
+        errors,
         diagnostics: data.diagnostics,
       });
     }
@@ -142,11 +113,21 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(data);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to reach solver service.";
+    const isTimeout = error instanceof DOMException && error.name === "AbortError";
+    const rawMessage = isTimeout
+      ? "Solver request timed out. Use Check Data in the editor to find row-level issues, or try again after relaxing constraints."
+      : error instanceof Error
+        ? error.message
+        : "Failed to reach scheduling service.";
+    const message = isTimeout ? rawMessage : normalizeNetworkError(rawMessage, "solver");
     return NextResponse.json(
-      { status: "error", errors: [{ code: "network_error", message }] },
-      { status: 502 }
+      {
+        status: "error",
+        errors: enrichSolverErrors([
+          { code: isTimeout ? "solver_timeout" : "network_error", message },
+        ]),
+      },
+      { status: 502 },
     );
   } finally {
     releaseSolverLock();

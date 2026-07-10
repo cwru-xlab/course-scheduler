@@ -11,6 +11,12 @@ import {
 import { collectRowNotesForExport } from "@/lib/notes/storage";
 import { importSpreadsheetFile } from "@/lib/spreadsheet-import-client";
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
+import {
+  enrichSpreadsheetErrors,
+  formatErrorsDetail,
+  formatErrorsSummary,
+  normalizeNetworkError,
+} from "@/lib/spreadsheet/formatGuide";
 import type { SchedulingInput, ValidationError } from "@/lib/scheduling/types";
 
 type Props = {
@@ -21,6 +27,8 @@ type Props = {
 export type SpreadsheetFeedback = {
   type: "success" | "error";
   message: string;
+  errors?: ValidationError[];
+  detail?: string;
 };
 
 export function SpreadsheetImportExportButtons({ data, onFeedbackChange }: Props) {
@@ -53,7 +61,12 @@ export function SpreadsheetImportExportButtons({ data, onFeedbackChange }: Props
       });
       if (!result.ok) {
         setSpreadsheetStatus("import-error");
-        onFeedbackChange?.({ type: "error", message: result.message });
+        onFeedbackChange?.({
+          type: "error",
+          message: result.message,
+          errors: result.errors,
+          detail: result.detail,
+        });
         return;
       }
 
@@ -61,15 +74,18 @@ export function SpreadsheetImportExportButtons({ data, onFeedbackChange }: Props
       setSpreadsheetStatus("import-success");
       onFeedbackChange?.({ type: "success", message: result.message });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to import spreadsheet.";
+      const raw = err instanceof Error ? err.message : "Failed to import spreadsheet.";
+      const errors = enrichSpreadsheetErrors(
+        [{ code: "import_failed", message: normalizeNetworkError(raw, "import") }],
+        "import",
+      );
       setSpreadsheetStatus("import-error");
-      onFeedbackChange?.({ type: "error", message });
-    } finally {
-      event.target.value = "";
-      setTimeout(() => {
-        setSpreadsheetStatus("idle");
-        onFeedbackChange?.(null);
-      }, 3000);
+      onFeedbackChange?.({
+        type: "error",
+        message: formatErrorsSummary(errors),
+        errors,
+        detail: formatErrorsDetail(errors),
+      });
     }
   };
 
@@ -83,15 +99,32 @@ export function SpreadsheetImportExportButtons({ data, onFeedbackChange }: Props
         body: JSON.stringify({ input: data, notes: collectRowNotesForExport() }),
       });
       if (!response.ok) {
-        let message = "Failed to export spreadsheet.";
+        let errors: ValidationError[] = [
+          { code: "export_failed", message: "Failed to export spreadsheet." },
+        ];
         try {
           const payload = (await response.json()) as { errors?: ValidationError[] };
-          message = payload.errors?.[0]?.message ?? message;
+          if (Array.isArray(payload.errors) && payload.errors.length > 0) {
+            errors = enrichSpreadsheetErrors(payload.errors, "export");
+          }
         } catch {
-          // Keep fallback message.
+          errors = enrichSpreadsheetErrors(
+            [
+              {
+                code: "export_failed",
+                message: `Export failed with status ${response.status}.`,
+              },
+            ],
+            "export",
+          );
         }
         setSpreadsheetStatus("export-error");
-        onFeedbackChange?.({ type: "error", message });
+        onFeedbackChange?.({
+          type: "error",
+          message: formatErrorsSummary(errors),
+          errors,
+          detail: formatErrorsDetail(errors),
+        });
         return;
       }
 
@@ -110,9 +143,18 @@ export function SpreadsheetImportExportButtons({ data, onFeedbackChange }: Props
       setSpreadsheetStatus("idle");
       onFeedbackChange?.(null);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to export spreadsheet.";
+      const raw = err instanceof Error ? err.message : "Failed to export spreadsheet.";
+      const errors = enrichSpreadsheetErrors(
+        [{ code: "network_error", message: normalizeNetworkError(raw, "export") }],
+        "export",
+      );
       setSpreadsheetStatus("export-error");
-      onFeedbackChange?.({ type: "error", message });
+      onFeedbackChange?.({
+        type: "error",
+        message: formatErrorsSummary(errors),
+        errors,
+        detail: formatErrorsDetail(errors),
+      });
     }
   };
 

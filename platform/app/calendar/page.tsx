@@ -53,7 +53,6 @@ import type {
 import { MultiSelect } from "@/components/scheduler/MultiSelect";
 import { ViewportModal } from "@/components/scheduler/ViewportModal";
 import {
-  LAST_SOLVER_ERROR_STORAGE_KEY,
   LAST_SOLVER_RUN_STORAGE_KEY,
   saveScheduleToHistory,
   type LastSolverRunSnapshot,
@@ -66,6 +65,12 @@ import {
 } from "@/lib/scheduling/timeWindow";
 import { isSectionArchived, normalizeSectionState } from "@/lib/scheduling/sectionState";
 import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
+import {
+  storeSolverErrorSnapshot,
+  storeSolverNetworkError,
+} from "@/lib/solver/solverErrorStorage";
+import { normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
+import type { ValidationError } from "@/lib/scheduling/types";
 
 type TimeslotDto = {
   id: string;
@@ -2318,17 +2323,8 @@ type MeetingPatternPlacementOption = {
         return;
       }
       if (!response.ok || result.status === "error") {
-        if (typeof window !== "undefined") {
-          localStorage.setItem(
-            LAST_SOLVER_ERROR_STORAGE_KEY,
-            JSON.stringify({
-              input: nextInput,
-              errors: result.errors ?? [],
-              diagnostics: result.diagnostics,
-              createdAt: new Date().toISOString(),
-            }),
-          );
-        }
+        const errors = (result.errors ?? []) as ValidationError[];
+        storeSolverErrorSnapshot(nextInput, errors, result.diagnostics);
         failSolverProgress();
         router.push("/solver-errors");
         return;
@@ -2374,7 +2370,13 @@ type MeetingPatternPlacementOption = {
       succeedSolverProgress();
     } catch (e) {
       failSolverProgress();
-      setSolverRunError(e instanceof Error ? e.message : "Failed to run solver.");
+      const raw = e instanceof Error ? e.message : "Failed to run solver.";
+      if (solverInput) {
+        const errors = storeSolverNetworkError(solverInput, raw);
+        setSolverRunError(errors.map((err) => err.message).join(" "));
+      } else {
+        setSolverRunError(normalizeNetworkError(raw, "solver"));
+      }
     } finally {
       setSolverRunStatus("idle");
     }

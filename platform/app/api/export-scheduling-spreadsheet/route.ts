@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { fetchSolver, solverErrorsFromBody } from "@/lib/api/solverFetch";
+import {
+  enrichSpreadsheetErrors,
+  normalizeNetworkError,
+} from "@/lib/spreadsheet/formatGuide";
 import type { NotesRowEntry } from "@/lib/notes/types";
-
-const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:5001";
+import type { ValidationError } from "@/lib/scheduling/types";
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,7 +14,8 @@ export async function POST(request: NextRequest) {
       input?: unknown;
       notes?: NotesRowEntry[];
     };
-    const response = await fetch(`${SOLVER_URL}/export-scheduling-spreadsheet`, {
+
+    const { response } = await fetchSolver("/export-scheduling-spreadsheet", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -20,26 +25,33 @@ export async function POST(request: NextRequest) {
     });
 
     if (!response.ok) {
-      let solverError = "Backend failed to export spreadsheet.";
+      let errors: ValidationError[] = [
+        { code: "export_failed", message: "Backend failed to export spreadsheet." },
+      ];
       try {
         const errorPayload = (await response.json()) as {
-          errors?: Array<{ message?: string }>;
+          errors?: ValidationError[];
+          status?: string;
         };
-        solverError = errorPayload.errors?.[0]?.message ?? solverError;
+        errors = solverErrorsFromBody(
+          errorPayload,
+          "export_failed",
+          "Backend failed to export spreadsheet.",
+        ) as ValidationError[];
       } catch {
-        // Keep default message if backend did not return JSON.
+        // Non-JSON error body — keep default message.
       }
+
       return NextResponse.json(
         {
           status: "error",
-          errors: [{ code: "export_failed", message: solverError }],
+          errors: enrichSpreadsheetErrors(errors, "export"),
         },
         { status: response.status || 500 },
       );
     }
 
     const solverBytes = await response.arrayBuffer();
-
     return new NextResponse(solverBytes, {
       status: 200,
       headers: {
@@ -51,11 +63,14 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to reach solver service.";
+    const message = normalizeNetworkError(
+      error instanceof Error ? error.message : "Failed to reach scheduling service.",
+      "export",
+    );
     return NextResponse.json(
       {
         status: "error",
-        errors: [{ code: "network_error", message }],
+        errors: enrichSpreadsheetErrors([{ code: "network_error", message }], "export"),
       },
       { status: 502 },
     );

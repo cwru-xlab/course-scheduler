@@ -12,6 +12,8 @@ import type {
   SchedulingInput,
   ValidationError,
 } from "@/lib/scheduling/types";
+import { enrichSolverErrors, normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
+import { validateSchedulingInput } from "@/lib/spreadsheet/validateClient";
 import { isSectionArchived } from "@/lib/scheduling/sectionState";
 import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
 
@@ -27,7 +29,9 @@ type ApiError = {
 };
 
 const LAST_SOLVER_RUN_STORAGE_KEY = "wsom-last-solver-run";
-const LAST_SOLVER_ERROR_STORAGE_KEY = "wsom-last-solver-error";
+import {
+  storeSolverErrorSnapshot,
+} from "@/lib/solver/solverErrorStorage";
 
 export const SolverActionButton = ({
   data,
@@ -55,6 +59,24 @@ export const SolverActionButton = ({
     begin();
 
     try {
+      const validation = await validateSchedulingInput(data);
+      if (!validation.ok) {
+        const summary =
+          validation.issueCount === 1
+            ? "Found 1 data issue before running the solver."
+            : `Found ${validation.issueCount} data issues before running the solver.`;
+        if (typeof window !== "undefined") {
+          storeSolverErrorSnapshot(data, validation.issues, {
+            validation_issue_count: validation.issueCount,
+            error_codes: Array.from(new Set(validation.issues.map((issue) => issue.code))),
+          });
+        }
+        fail();
+        onErrorChange?.(summary);
+        router.push("/solver-errors");
+        return;
+      }
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 180_000);
       const response = await fetch("/api/schedule", {
@@ -76,28 +98,20 @@ export const SolverActionButton = ({
       }
 
       if (!response.ok || result.status === "error") {
-        const nextError =
-          result.status === "error" && result.errors.length > 0
-            ? result.errors.map((err) => err.message).join(" ")
-            : "Solver failed for this input.";
-        if (result?.status === "error") {
-          if (typeof window !== "undefined") {
-            localStorage.setItem(
-              LAST_SOLVER_ERROR_STORAGE_KEY,
-              JSON.stringify({
-                input: data,
-                errors: result.errors,
-                diagnostics: result.diagnostics,
-                createdAt: new Date().toISOString(),
-              }),
-            );
-          }
-          fail();
-          router.push("/solver-errors");
-          return;
+        const enrichedErrors =
+          result.status === "error"
+            ? enrichSolverErrors(result.errors)
+            : enrichSolverErrors([
+                { code: "solver_error", message: "Solver failed for this input." },
+              ]);
+        const nextError = enrichedErrors.map((err) => err.message).join(" ");
+
+        if (typeof window !== "undefined") {
+          storeSolverErrorSnapshot(data, enrichedErrors, result?.status === "error" ? result.diagnostics : undefined);
         }
         fail();
         onErrorChange?.(nextError);
+        router.push("/solver-errors");
         return;
       }
 
@@ -115,13 +129,20 @@ export const SolverActionButton = ({
       router.push("/calendar");
     } catch (error) {
       fail();
-      const message =
-        error instanceof DOMException && error.name === "AbortError"
-          ? "Solver request timed out. The schedule may be too complex — try relaxing constraints."
-          : error instanceof Error
-            ? error.message
-            : "Failed to reach solver API.";
-      onErrorChange?.(message);
+      const isTimeout = error instanceof DOMException && error.name === "AbortError";
+      const rawMessage = isTimeout
+        ? "Solver request timed out. Use Check Data to find row-level issues, or try again after relaxing constraints."
+        : error instanceof Error
+          ? error.message
+          : "Failed to reach solver API.";
+      const message = isTimeout ? rawMessage : normalizeNetworkError(rawMessage, "solver");
+      const enrichedErrors = enrichSolverErrors([
+        { code: isTimeout ? "solver_timeout" : "network_error", message },
+      ]);
+      if (typeof window !== "undefined" && data) {
+        storeSolverErrorSnapshot(data, enrichedErrors);
+      }
+      onErrorChange?.(enrichedErrors.map((err) => err.message).join(" "));
     } finally {
       setSolverStatus("idle");
     }
