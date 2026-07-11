@@ -64,6 +64,7 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const columnVisibility = useEditorColumnVisibility("constraints-crosslist-groups", CROSSLIST_GROUP_COLUMN_SPECS);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<CrossListGroup | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
@@ -206,6 +207,7 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
                 />
               }
               rowLabel={`cross-list group ${group.id}`}
+              onEdit={() => setEditIndex(idx)}
               onDelete={() => deleteGroup(idx)}
             />
           )}
@@ -217,6 +219,19 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
           </div>
         )}
       </CardBody>
+      {editIndex !== null && groups[editIndex] ? (
+        <CrossListGroupEditModal
+          isOpen
+          group={groups[editIndex]}
+          sectionOptions={sectionOptions}
+          onClose={() => setEditIndex(null)}
+          onSave={(updated) => {
+            const next = [...groups];
+            next[editIndex] = updated;
+            onUpdate(next);
+          }}
+        />
+      ) : null}
       {addDraft ? (
         <CrossListGroupEditModal
           isOpen
@@ -255,6 +270,7 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const columnVisibility = useEditorColumnVisibility("constraints-no-overlap-groups", NO_OVERLAP_GROUP_COLUMN_SPECS);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<NoOverlapGroup | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
@@ -411,6 +427,7 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
                 />
               }
               rowLabel={`no-overlap group ${group.id}`}
+              onEdit={() => setEditIndex(idx)}
               onDelete={() => deleteGroup(idx)}
             />
           )}
@@ -422,6 +439,19 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
           </div>
         )}
       </CardBody>
+      {editIndex !== null && groups[editIndex] ? (
+        <NoOverlapGroupEditModal
+          isOpen
+          group={groups[editIndex]}
+          sectionOptions={sectionOptions}
+          onClose={() => setEditIndex(null)}
+          onSave={(updated) => {
+            const next = [...groups];
+            next[editIndex] = updated;
+            onUpdate(next);
+          }}
+        />
+      ) : null}
       {addDraft ? (
         <NoOverlapGroupEditModal
           isOpen
@@ -509,6 +539,7 @@ export const BlockedTimesEditor = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const columnVisibility = useEditorColumnVisibility("constraints-blocked-times", BLOCKED_TIME_COLUMN_SPECS);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<BlockedTime | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
@@ -796,6 +827,7 @@ export const BlockedTimesEditor = ({
                 />
               }
               rowLabel={`blocked time row ${idx + 1} (${blocked.scope})`}
+              onEdit={() => setEditIndex(idx)}
               onDelete={() => deleteBlockedTime(idx)}
             />
           )}
@@ -807,6 +839,20 @@ export const BlockedTimesEditor = ({
           </div>
         )}
       </CardBody>
+      {editIndex !== null && blockedTimes[editIndex] ? (
+        <BlockedTimeEditModal
+          isOpen
+          blocked={blockedTimes[editIndex]}
+          instructorOptions={instructorOptions}
+          roomOptions={roomOptions}
+          onClose={() => setEditIndex(null)}
+          onSave={(updated) => {
+            const next = [...blockedTimes];
+            next[editIndex] = updated;
+            onUpdate(next);
+          }}
+        />
+      ) : null}
       {addDraft ? (
         <BlockedTimeEditModal
           isOpen
@@ -855,6 +901,7 @@ export const LockedAssignmentsEditor = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const columnVisibility = useEditorColumnVisibility("constraints-locked-assignments", LOCKED_ASSIGNMENT_COLUMN_SPECS);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<LockedAssignment | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
@@ -1026,6 +1073,7 @@ export const LockedAssignmentsEditor = ({
                 />
               }
               rowLabel={`locked assignment for section ${lock.section_id || `row ${idx + 1}`}`}
+              onEdit={() => setEditIndex(idx)}
               onDelete={() => deleteLock(idx)}
             />
           )}
@@ -1037,6 +1085,21 @@ export const LockedAssignmentsEditor = ({
           </div>
         )}
       </CardBody>
+      {editIndex !== null && lockedAssignments[editIndex] ? (
+        <LockedAssignmentEditModal
+          isOpen
+          lock={lockedAssignments[editIndex]}
+          sectionOptions={sectionOptions}
+          timeslotOptions={timeslotOptions}
+          roomOptions={roomOptions}
+          onClose={() => setEditIndex(null)}
+          onSave={(updated) => {
+            const next = [...lockedAssignments];
+            next[editIndex] = updated;
+            onUpdate(next);
+          }}
+        />
+      ) : null}
       {addDraft ? (
         <LockedAssignmentEditModal
           isOpen
@@ -1087,6 +1150,7 @@ export const SoftLocksEditor = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const columnVisibility = useEditorColumnVisibility("constraints-soft-locks", SOFT_LOCK_COLUMN_SPECS);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<SoftLock | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
@@ -1273,6 +1337,7 @@ export const SoftLocksEditor = ({
                 />
               }
               rowLabel={`soft lock for section ${lock.section_id || `row ${idx + 1}`}`}
+              onEdit={() => setEditIndex(idx)}
               onDelete={() => deleteLock(idx)}
             />
           )}
@@ -1284,6 +1349,21 @@ export const SoftLocksEditor = ({
           </div>
         )}
       </CardBody>
+      {editIndex !== null && softLocks[editIndex] ? (
+        <SoftLockEditModal
+          isOpen
+          lock={softLocks[editIndex]}
+          sectionOptions={sectionOptions}
+          timeslotOptions={timeslotOptions}
+          roomOptions={roomOptions}
+          onClose={() => setEditIndex(null)}
+          onSave={(updated) => {
+            const next = [...softLocks];
+            next[editIndex] = updated;
+            onUpdate(next);
+          }}
+        />
+      ) : null}
       {addDraft ? (
         <SoftLockEditModal
           isOpen

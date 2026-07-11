@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 
 import { EditableCell } from "../EditableCell";
 import { MultiSelect } from "../MultiSelect";
@@ -46,6 +46,7 @@ export const MeetingPatternsEditor = ({
 }: MeetingPatternsEditorProps) => {
   const { requestDelete, showSuccess, confirmRowAdded, getRowHighlightClass } =
     useEditorActions();
+  const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<MeetingPattern | null>(null);
 
   const updatePattern = (index: number, field: keyof MeetingPattern, value: unknown) => {
@@ -135,6 +136,15 @@ export const MeetingPatternsEditor = ({
                 />
                 <Button
                   size="sm"
+                  variant="light"
+                  isIconOnly
+                  aria-label={`Edit pattern ${pattern.id}`}
+                  onPress={() => setEditIndex(idx)}
+                >
+                  <Pencil className="size-4 text-slate-600" />
+                </Button>
+                <Button
+                  size="sm"
                   color="danger"
                   variant="light"
                   isIconOnly
@@ -203,6 +213,19 @@ export const MeetingPatternsEditor = ({
           <div className="py-4 text-center text-default-400">No meeting patterns. Click "Add Pattern" to create one.</div>
         )}
       </CardBody>
+      {editIndex !== null && meetingPatterns[editIndex] ? (
+        <MeetingPatternEditModal
+          isOpen
+          pattern={meetingPatterns[editIndex]}
+          timeslotOptions={timeslotOptions}
+          onClose={() => setEditIndex(null)}
+          onSave={(updated) => {
+            const next = [...meetingPatterns];
+            next[editIndex] = updated;
+            onUpdate(next);
+          }}
+        />
+      ) : null}
       {addDraft ? (
         <MeetingPatternEditModal
           isOpen

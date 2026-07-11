@@ -48,6 +48,7 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const columnVisibility = useEditorColumnVisibility("rooms", ROOM_COLUMN_SPECS);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<Room | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
@@ -224,10 +225,23 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
               />
             }
             rowLabel={`room ${room.building} ${room.room_number} (${room.id})`}
+            onEdit={() => setEditIndex(idx)}
             onDelete={() => deleteRoom(idx)}
           />
         )}
       />
+      {editIndex !== null && rooms[editIndex] ? (
+        <RoomEditModal
+          isOpen
+          room={rooms[editIndex]}
+          onClose={() => setEditIndex(null)}
+          onSave={(updated) => {
+            const next = [...rooms];
+            next[editIndex] = updated;
+            onUpdate(next);
+          }}
+        />
+      ) : null}
       {addDraft ? (
         <RoomEditModal
           isOpen

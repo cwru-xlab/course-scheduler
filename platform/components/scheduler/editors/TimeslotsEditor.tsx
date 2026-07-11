@@ -58,6 +58,7 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const columnVisibility = useEditorColumnVisibility("timeslots", TIMESLOT_COLUMN_SPECS);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<Timeslot | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
@@ -255,10 +256,23 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
               />
             }
             rowLabel={`timeslot ${slot.id}`}
+            onEdit={() => setEditIndex(idx)}
             onDelete={() => deleteTimeslot(idx)}
           />
         )}
       />
+      {editIndex !== null && timeslots[editIndex] ? (
+        <TimeslotEditModal
+          isOpen
+          timeslot={timeslots[editIndex]}
+          onClose={() => setEditIndex(null)}
+          onSave={(updated) => {
+            const next = [...timeslots];
+            next[editIndex] = updated;
+            onUpdate(next);
+          }}
+        />
+      ) : null}
       {addDraft ? (
         <TimeslotEditModal
           isOpen

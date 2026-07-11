@@ -86,6 +86,7 @@ export const SectionsEditor = ({
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [hideArchived, setHideArchived] = useHideArchivedSections();
   const columnVisibility = useEditorColumnVisibility("sections", SECTION_COLUMN_SPECS);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<Section | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
@@ -452,10 +453,26 @@ export const SectionsEditor = ({
               />
             }
             rowLabel={`section ${section.id} (${section.course_id} ${section.section_code})`}
+            onEdit={() => setEditIndex(idx)}
             onDelete={() => deleteSection(idx)}
           />
         )}
       />
+      {editIndex !== null && sections[editIndex] ? (
+        <SectionEditModal
+          isOpen
+          section={sections[editIndex]}
+          instructorOptions={instructorOptions}
+          meetingPatternOptions={meetingPatternOptions}
+          crosslistGroupOptions={crosslistGroupOptions}
+          onClose={() => setEditIndex(null)}
+          onSave={(updated) => {
+            const next = [...sections];
+            next[editIndex] = updated;
+            onUpdate(next);
+          }}
+        />
+      ) : null}
       {addDraft ? (
         <SectionEditModal
           isOpen

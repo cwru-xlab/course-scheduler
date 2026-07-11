@@ -74,6 +74,7 @@ export const InstructorsEditor = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const columnVisibility = useEditorColumnVisibility("instructors", INSTRUCTOR_COLUMN_SPECS);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<Instructor | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
@@ -303,10 +304,25 @@ export const InstructorsEditor = ({
               />
             }
             rowLabel={`instructor ${inst.name || inst.id} (${inst.id})`}
+            onEdit={() => setEditIndex(idx)}
             onDelete={() => deleteInstructor(idx)}
           />
         )}
       />
+      {editIndex !== null && instructors[editIndex] ? (
+        <InstructorEditModal
+          isOpen
+          instructor={instructors[editIndex]}
+          meetingPatternOptions={meetingPatternOptions}
+          timeslotOptions={timeslotOptions}
+          onClose={() => setEditIndex(null)}
+          onSave={(updated) => {
+            const next = [...instructors];
+            next[editIndex] = updated;
+            onUpdate(next);
+          }}
+        />
+      ) : null}
       {addDraft ? (
         <InstructorEditModal
           isOpen
