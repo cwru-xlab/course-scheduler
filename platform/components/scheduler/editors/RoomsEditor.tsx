@@ -1,9 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { EditorColumnFilters } from "./EditorColumnFilters";
+import { EditorColumnPicker } from "./EditorColumnPicker";
 import { EditorConfigurableTable } from "./EditorConfigurableTable";
+import { useEditorColumnVisibility } from "./useEditorColumnVisibility";
+import { useStableRowWrappers } from "./useStableRowWrappers";
 import { EditorRowActions } from "./EditorRowActions";
 import { EditorTableShell } from "./EditorTableShell";
 import {
@@ -44,7 +47,7 @@ const createEmptyRoom = (existing: Room[]): Room => ({
 export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
-  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const columnVisibility = useEditorColumnVisibility("rooms", ROOM_COLUMN_SPECS);
   const [addDraft, setAddDraft] = useState<Room | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
@@ -101,10 +104,12 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
 
   const roomSortDefs = useMemo(() => sortDefsFromFilterDefs(roomFilterDefs), [roomFilterDefs]);
 
-  const roomRows = useMemo(
-    (): RoomRow[] => rooms.map((room, index) => ({ room, index })),
-    [rooms],
+  const buildRoomRow = useCallback(
+    (room: Room, index: number): RoomRow => ({ room, index }),
+    [],
   );
+  const pickRoomBase = useCallback((row: RoomRow) => row.room, []);
+  const roomRows = useStableRowWrappers(rooms, buildRoomRow, pickRoomBase);
 
   const filteredRooms = useMemo((): RoomRow[] => {
     const query = searchQuery.trim().toLowerCase();
@@ -166,18 +171,27 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
   return (
     <EditorTableShell
       title={`Rooms (${filteredRooms.length})`}
-      addLabel="+ Add Room"
+      addLabel="Add Room"
       onAdd={addRoom}
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
       searchPlaceholder="Search rooms..."
       filterBar={
-        <EditorColumnFilters
-          defs={roomFilterDefs}
-          rows={roomRows}
-          filters={columnFilters}
-          onChange={setColumnFilters}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <EditorColumnFilters
+            defs={roomFilterDefs}
+            rows={roomRows}
+            filters={columnFilters}
+            onChange={setColumnFilters}
+          />
+          <EditorColumnPicker
+            specs={columnVisibility.specs}
+            visibleIds={columnVisibility.visibleIds}
+            onToggle={columnVisibility.toggleColumn}
+            onShowAll={columnVisibility.showAllColumns}
+            onHideAll={columnVisibility.hideAllColumns}
+          />
+        </div>
       }
       emptyMessage='No rooms. Click "Add Room" to create one.'
       noMatchMessage="No rooms match your search or filters."
@@ -187,6 +201,7 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
       <EditorConfigurableTable
         editorKey="rooms"
         columnSpecs={ROOM_COLUMN_SPECS}
+        visibility={columnVisibility}
         rows={filteredRooms}
         sortDefs={roomSortDefs}
         getRowKey={({ room, index }) => `${room.id}-${index}`}
@@ -209,23 +224,10 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
               />
             }
             rowLabel={`room ${room.building} ${room.room_number} (${room.id})`}
-            onEdit={() => setEditIndex(idx)}
             onDelete={() => deleteRoom(idx)}
           />
         )}
       />
-      {editIndex !== null && rooms[editIndex] ? (
-        <RoomEditModal
-          isOpen
-          room={rooms[editIndex]}
-          onClose={() => setEditIndex(null)}
-          onSave={(updated) => {
-            const next = [...rooms];
-            next[editIndex] = updated;
-            onUpdate(next);
-          }}
-        />
-      ) : null}
       {addDraft ? (
         <RoomEditModal
           isOpen

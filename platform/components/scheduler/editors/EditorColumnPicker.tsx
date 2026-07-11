@@ -1,13 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import clsx from "clsx";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 
-import { useShowColumnsInlineExpanded } from "@/lib/editor-ui-preferences";
 import type { EditorColumnSpec } from "./useEditorColumnVisibility";
 
 type EditorColumnPickerProps = {
-  editorKey: string;
   specs: EditorColumnSpec[];
   visibleIds: Set<string>;
   onToggle: (id: string, checked: boolean) => void;
@@ -16,43 +15,40 @@ type EditorColumnPickerProps = {
 };
 
 export function EditorColumnPicker({
-  editorKey,
   specs,
   visibleIds,
   onToggle,
   onShowAll,
   onHideAll,
 }: EditorColumnPickerProps) {
-  const [isExpanded, setIsExpanded] = useShowColumnsInlineExpanded(editorKey);
+  const [isOpen, setIsOpen] = useState(false);
   const visibleCount = specs.filter((spec) => visibleIds.has(spec.id)).length;
 
   return (
-    <div className="mb-3 rounded-lg border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+    <div className="inline-flex flex-wrap items-center gap-1">
       <button
         type="button"
-        className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left transition-colors hover:bg-slate-50"
-        onClick={() => setIsExpanded(!isExpanded)}
-        aria-expanded={isExpanded}
+        onClick={() => setIsOpen((v) => !v)}
+        aria-expanded={isOpen}
+        className="inline-flex items-center gap-1.5 h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
       >
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-            Columns
-          </span>
-          <span className="text-[11px] font-medium text-slate-400">
-            {visibleCount}/{specs.length}
-          </span>
+        <span className="uppercase tracking-wider text-[10px] text-slate-500">Columns</span>
+        <span className="text-slate-400">
+          {visibleCount}/{specs.length}
         </span>
-        {isExpanded ? (
-          <ChevronDown className="size-3.5 shrink-0 text-slate-400" aria-hidden />
-        ) : (
-          <ChevronRight className="size-3.5 shrink-0 text-slate-400" aria-hidden />
-        )}
+        <ChevronDown
+          className={clsx(
+            "size-3.5 text-slate-400 transition-transform",
+            isOpen && "rotate-180",
+          )}
+          aria-hidden
+        />
       </button>
-      {isExpanded && (
-        <div className="flex flex-wrap items-center gap-1 border-t border-slate-100 px-2.5 py-2">
+      {isOpen && (
+        <>
           <button
             type="button"
-            className="h-6 shrink-0 rounded-md px-1.5 text-[10px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-weatherhead-primary"
+            className="h-6 shrink-0 rounded-md px-2 text-[10px] font-semibold text-slate-600 transition-colors hover:bg-slate-100"
             onClick={onShowAll}
           >
             All
@@ -60,7 +56,7 @@ export function EditorColumnPicker({
           <button
             type="button"
             title="Hide optional columns (keeps ID visible)"
-            className="h-6 shrink-0 rounded-md px-1.5 text-[10px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-weatherhead-primary"
+            className="h-6 shrink-0 rounded-md px-2 text-[10px] font-semibold text-slate-600 transition-colors hover:bg-slate-100"
             onClick={onHideAll}
           >
             None
@@ -87,7 +83,7 @@ export function EditorColumnPicker({
               </button>
             );
           })}
-        </div>
+        </>
       )}
     </div>
   );

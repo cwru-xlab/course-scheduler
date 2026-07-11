@@ -1,11 +1,14 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useState } from "react";
 
 import { EditorColumnFilters } from "./EditorColumnFilters";
+import { EditorColumnPicker } from "./EditorColumnPicker";
 import { EditorConfigurableTable } from "./EditorConfigurableTable";
 import { EditorRowActions } from "./EditorRowActions";
 import { EditorTableShell } from "./EditorTableShell";
+import { useEditorColumnVisibility } from "./useEditorColumnVisibility";
+import { useStableRowWrappers } from "./useStableRowWrappers";
 import {
   applyEditorColumnFilters,
   type EditorColumnFilterDef,
@@ -82,7 +85,7 @@ export const SectionsEditor = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [hideArchived, setHideArchived] = useHideArchivedSections();
-  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const columnVisibility = useEditorColumnVisibility("sections", SECTION_COLUMN_SPECS);
   const [addDraft, setAddDraft] = useState<Section | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
@@ -127,14 +130,19 @@ export const SectionsEditor = ({
     onUpdate(sections.filter((_, i) => i !== index));
   };
 
-  const crosslistOptionsWithNone = [
-    { key: "__none__", label: "(None)" },
-    ...crosslistGroupOptions,
-  ];
+  const crosslistOptionsWithNone = useMemo(
+    () => [{ key: "__none__", label: "(None)" }, ...crosslistGroupOptions],
+    [crosslistGroupOptions],
+  );
 
   const instructorLabelById = useMemo(
     () => new Map(instructorOptions.map((o) => [o.key, o.label])),
     [instructorOptions],
+  );
+
+  const previousPatternOptionsWithNone = useMemo(
+    () => [{ key: "__none__", label: "(None)" }, ...meetingPatternOptions],
+    [meetingPatternOptions],
   );
 
   const sectionFilterDefs = useMemo((): EditorColumnFilterDef<SectionRow>[] => [
@@ -226,10 +234,12 @@ export const SectionsEditor = ({
     ];
   }, [sectionFilterDefs, instructorLabelById]);
 
-  const sectionRows = useMemo(
-    (): SectionRow[] => sections.map((section, index) => ({ section, index })),
-    [sections],
+  const buildSectionRow = useCallback(
+    (section: Section, index: number): SectionRow => ({ section, index }),
+    [],
   );
+  const pickSectionBase = useCallback((row: SectionRow): Section => row.section, []);
+  const sectionRows = useStableRowWrappers(sections, buildSectionRow, pickSectionBase);
 
   const filteredSections = useMemo((): SectionRow[] => {
     const query = searchQuery.trim().toLowerCase();
@@ -332,7 +342,7 @@ export const SectionsEditor = ({
         return (
           <EditableSelectCell
             value={section.previous_meeting_pattern ?? "__none__"}
-            options={[{ key: "__none__", label: "(None)" }, ...meetingPatternOptions]}
+            options={previousPatternOptionsWithNone}
             onChange={(v) =>
               updateSection(idx, "previous_meeting_pattern", v === "__none__" ? undefined : v)
             }
@@ -381,22 +391,31 @@ export const SectionsEditor = ({
       searchPlaceholder="Search sections..."
       searchHint="Search by ID, department, course, code, or instructor."
       filterBar={
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <EditorColumnFilters
             defs={sectionFilterDefs}
             rows={sectionRows}
             filters={columnFilters}
             onChange={setColumnFilters}
+            extraContent={
+              <label className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  className="size-3.5 rounded border-slate-300 text-primary accent-[#137fec]"
+                  checked={hideArchived}
+                  onChange={(e) => setHideArchived(e.target.checked)}
+                />
+                <span>Hide archived sections</span>
+              </label>
+            }
           />
-          <label className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              className="size-3.5 rounded border-slate-300 text-primary accent-[#137fec]"
-              checked={hideArchived}
-              onChange={(e) => setHideArchived(e.target.checked)}
-            />
-            <span>Hide archived sections</span>
-          </label>
+          <EditorColumnPicker
+            specs={columnVisibility.specs}
+            visibleIds={columnVisibility.visibleIds}
+            onToggle={columnVisibility.toggleColumn}
+            onShowAll={columnVisibility.showAllColumns}
+            onHideAll={columnVisibility.hideAllColumns}
+          />
         </div>
       }
       emptyMessage='No sections. Click "Add Section" to create one.'
@@ -407,6 +426,7 @@ export const SectionsEditor = ({
       <EditorConfigurableTable
         editorKey="sections"
         columnSpecs={SECTION_COLUMN_SPECS}
+        visibility={columnVisibility}
         rows={filteredSections}
         sortDefs={sectionSortDefs}
         getRowKey={({ section, index }) => `${section.id}-${index}`}
@@ -432,26 +452,10 @@ export const SectionsEditor = ({
               />
             }
             rowLabel={`section ${section.id} (${section.course_id} ${section.section_code})`}
-            onEdit={() => setEditIndex(idx)}
             onDelete={() => deleteSection(idx)}
           />
         )}
       />
-      {editIndex !== null && sections[editIndex] ? (
-        <SectionEditModal
-          isOpen
-          section={sections[editIndex]}
-          instructorOptions={instructorOptions}
-          meetingPatternOptions={meetingPatternOptions}
-          crosslistGroupOptions={crosslistGroupOptions}
-          onClose={() => setEditIndex(null)}
-          onSave={(updated) => {
-            const next = [...sections];
-            next[editIndex] = updated;
-            onUpdate(next);
-          }}
-        />
-      ) : null}
       {addDraft ? (
         <SectionEditModal
           isOpen

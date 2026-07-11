@@ -1,11 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { EditorColumnFilters } from "./EditorColumnFilters";
+import { EditorColumnPicker } from "./EditorColumnPicker";
 import { EditorConfigurableTable } from "./EditorConfigurableTable";
 import { EditorSearchFilterBar } from "./EditorSearchFilterBar";
+import { useEditorColumnVisibility } from "./useEditorColumnVisibility";
+import { useStableRowWrappers } from "./useStableRowWrappers";
 import {
   applyEditorColumnFilters,
   type EditorColumnFilterDef,
@@ -60,7 +63,7 @@ const createEmptyCrossListGroup = (existing: CrossListGroup[]): CrossListGroup =
 export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: CrossListGroupsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
-  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const columnVisibility = useEditorColumnVisibility("constraints-crosslist-groups", CROSSLIST_GROUP_COLUMN_SPECS);
   const [addDraft, setAddDraft] = useState<CrossListGroup | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
@@ -100,9 +103,15 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
     [crossListFilterDefs],
   );
 
-  const crossListRows = useMemo(
-    (): CrossListRow[] => groups.map((group, index) => ({ group, index })),
-    [groups],
+  const buildCrossListRow = useCallback(
+    (group: CrossListGroup, index: number): CrossListRow => ({ group, index }),
+    [],
+  );
+  const pickCrossListBase = useCallback((row: CrossListRow) => row.group, []);
+  const crossListRows = useStableRowWrappers(
+    groups,
+    buildCrossListRow,
+    pickCrossListBase,
   );
 
   const filteredGroups = useMemo(() => {
@@ -152,17 +161,27 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
           onSearchChange={setSearchQuery}
           searchPlaceholder="Search cross-list groups..."
           filterBar={
-            <EditorColumnFilters
-              defs={crossListFilterDefs}
-              rows={crossListRows}
-              filters={columnFilters}
-              onChange={setColumnFilters}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <EditorColumnFilters
+                defs={crossListFilterDefs}
+                rows={crossListRows}
+                filters={columnFilters}
+                onChange={setColumnFilters}
+              />
+              <EditorColumnPicker
+                specs={columnVisibility.specs}
+                visibleIds={columnVisibility.visibleIds}
+                onToggle={columnVisibility.toggleColumn}
+                onShowAll={columnVisibility.showAllColumns}
+                onHideAll={columnVisibility.hideAllColumns}
+              />
+            </div>
           }
         />
         <EditorConfigurableTable
           editorKey="constraints-crosslist-groups"
           columnSpecs={CROSSLIST_GROUP_COLUMN_SPECS}
+          visibility={columnVisibility}
           rows={filteredGroups}
           sortDefs={crossListSortDefs}
           getRowKey={({ group, index }) => `${group.id}-${index}`}
@@ -187,7 +206,6 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
                 />
               }
               rowLabel={`cross-list group ${group.id}`}
-              onEdit={() => setEditIndex(idx)}
               onDelete={() => deleteGroup(idx)}
             />
           )}
@@ -199,19 +217,6 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
           </div>
         )}
       </CardBody>
-      {editIndex !== null && groups[editIndex] ? (
-        <CrossListGroupEditModal
-          isOpen
-          group={groups[editIndex]}
-          sectionOptions={sectionOptions}
-          onClose={() => setEditIndex(null)}
-          onSave={(updated) => {
-            const next = [...groups];
-            next[editIndex] = updated;
-            onUpdate(next);
-          }}
-        />
-      ) : null}
       {addDraft ? (
         <CrossListGroupEditModal
           isOpen
@@ -249,7 +254,7 @@ const createEmptyNoOverlapGroup = (existing: NoOverlapGroup[]): NoOverlapGroup =
 export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOverlapGroupsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
-  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const columnVisibility = useEditorColumnVisibility("constraints-no-overlap-groups", NO_OVERLAP_GROUP_COLUMN_SPECS);
   const [addDraft, setAddDraft] = useState<NoOverlapGroup | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
@@ -295,9 +300,15 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
     [noOverlapFilterDefs],
   );
 
-  const noOverlapRows = useMemo(
-    (): NoOverlapRow[] => groups.map((group, index) => ({ group, index })),
-    [groups],
+  const buildNoOverlapRow = useCallback(
+    (group: NoOverlapGroup, index: number): NoOverlapRow => ({ group, index }),
+    [],
+  );
+  const pickNoOverlapBase = useCallback((row: NoOverlapRow) => row.group, []);
+  const noOverlapRows = useStableRowWrappers(
+    groups,
+    buildNoOverlapRow,
+    pickNoOverlapBase,
   );
 
   const filteredGroups = useMemo(() => {
@@ -355,17 +366,27 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
           onSearchChange={setSearchQuery}
           searchPlaceholder="Search no-overlap groups..."
           filterBar={
-            <EditorColumnFilters
-              defs={noOverlapFilterDefs}
-              rows={noOverlapRows}
-              filters={columnFilters}
-              onChange={setColumnFilters}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <EditorColumnFilters
+                defs={noOverlapFilterDefs}
+                rows={noOverlapRows}
+                filters={columnFilters}
+                onChange={setColumnFilters}
+              />
+              <EditorColumnPicker
+                specs={columnVisibility.specs}
+                visibleIds={columnVisibility.visibleIds}
+                onToggle={columnVisibility.toggleColumn}
+                onShowAll={columnVisibility.showAllColumns}
+                onHideAll={columnVisibility.hideAllColumns}
+              />
+            </div>
           }
         />
         <EditorConfigurableTable
           editorKey="constraints-no-overlap-groups"
           columnSpecs={NO_OVERLAP_GROUP_COLUMN_SPECS}
+          visibility={columnVisibility}
           rows={filteredGroups}
           sortDefs={noOverlapSortDefs}
           getRowKey={({ group, index }) => `${group.id}-${index}`}
@@ -390,7 +411,6 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
                 />
               }
               rowLabel={`no-overlap group ${group.id}`}
-              onEdit={() => setEditIndex(idx)}
               onDelete={() => deleteGroup(idx)}
             />
           )}
@@ -402,19 +422,6 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
           </div>
         )}
       </CardBody>
-      {editIndex !== null && groups[editIndex] ? (
-        <NoOverlapGroupEditModal
-          isOpen
-          group={groups[editIndex]}
-          sectionOptions={sectionOptions}
-          onClose={() => setEditIndex(null)}
-          onSave={(updated) => {
-            const next = [...groups];
-            next[editIndex] = updated;
-            onUpdate(next);
-          }}
-        />
-      ) : null}
       {addDraft ? (
         <NoOverlapGroupEditModal
           isOpen
@@ -501,7 +508,7 @@ export const BlockedTimesEditor = ({
 }: BlockedTimesEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
-  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const columnVisibility = useEditorColumnVisibility("constraints-blocked-times", BLOCKED_TIME_COLUMN_SPECS);
   const [addDraft, setAddDraft] = useState<BlockedTime | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
@@ -597,9 +604,15 @@ export const BlockedTimesEditor = ({
     [blockedTimeFilterDefs],
   );
 
-  const blockedTimeRows = useMemo(
-    (): BlockedTimeRow[] => blockedTimes.map((blocked, index) => ({ blocked, index })),
-    [blockedTimes],
+  const buildBlockedTimeRow = useCallback(
+    (blocked: BlockedTime, index: number): BlockedTimeRow => ({ blocked, index }),
+    [],
+  );
+  const pickBlockedTimeBase = useCallback((row: BlockedTimeRow) => row.blocked, []);
+  const blockedTimeRows = useStableRowWrappers(
+    blockedTimes,
+    buildBlockedTimeRow,
+    pickBlockedTimeBase,
   );
 
   const filteredBlockedTimes = useMemo(() => {
@@ -738,17 +751,27 @@ export const BlockedTimesEditor = ({
           onSearchChange={setSearchQuery}
           searchPlaceholder="Search blocked times..."
           filterBar={
-            <EditorColumnFilters
-              defs={blockedTimeFilterDefs}
-              rows={blockedTimeRows}
-              filters={columnFilters}
-              onChange={setColumnFilters}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <EditorColumnFilters
+                defs={blockedTimeFilterDefs}
+                rows={blockedTimeRows}
+                filters={columnFilters}
+                onChange={setColumnFilters}
+              />
+              <EditorColumnPicker
+                specs={columnVisibility.specs}
+                visibleIds={columnVisibility.visibleIds}
+                onToggle={columnVisibility.toggleColumn}
+                onShowAll={columnVisibility.showAllColumns}
+                onHideAll={columnVisibility.hideAllColumns}
+              />
+            </div>
           }
         />
         <EditorConfigurableTable
           editorKey="constraints-blocked-times"
           columnSpecs={BLOCKED_TIME_COLUMN_SPECS}
+          visibility={columnVisibility}
           rows={filteredBlockedTimes}
           sortDefs={blockedTimeSortDefs}
           getRowKey={(_, index) => String(index)}
@@ -773,7 +796,6 @@ export const BlockedTimesEditor = ({
                 />
               }
               rowLabel={`blocked time row ${idx + 1} (${blocked.scope})`}
-              onEdit={() => setEditIndex(idx)}
               onDelete={() => deleteBlockedTime(idx)}
             />
           )}
@@ -785,20 +807,6 @@ export const BlockedTimesEditor = ({
           </div>
         )}
       </CardBody>
-      {editIndex !== null && blockedTimes[editIndex] ? (
-        <BlockedTimeEditModal
-          isOpen
-          blocked={blockedTimes[editIndex]}
-          instructorOptions={instructorOptions}
-          roomOptions={roomOptions}
-          onClose={() => setEditIndex(null)}
-          onSave={(updated) => {
-            const next = [...blockedTimes];
-            next[editIndex] = updated;
-            onUpdate(next);
-          }}
-        />
-      ) : null}
       {addDraft ? (
         <BlockedTimeEditModal
           isOpen
@@ -846,7 +854,7 @@ export const LockedAssignmentsEditor = ({
 }: LockedAssignmentsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
-  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const columnVisibility = useEditorColumnVisibility("constraints-locked-assignments", LOCKED_ASSIGNMENT_COLUMN_SPECS);
   const [addDraft, setAddDraft] = useState<LockedAssignment | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
@@ -899,9 +907,15 @@ export const LockedAssignmentsEditor = ({
     [lockedFilterDefs],
   );
 
-  const lockedRows = useMemo(
-    (): LockedRow[] => lockedAssignments.map((lock, index) => ({ lock, index })),
-    [lockedAssignments],
+  const buildLockedRow = useCallback(
+    (lock: LockedAssignment, index: number): LockedRow => ({ lock, index }),
+    [],
+  );
+  const pickLockedBase = useCallback((row: LockedRow) => row.lock, []);
+  const lockedRows = useStableRowWrappers(
+    lockedAssignments,
+    buildLockedRow,
+    pickLockedBase,
   );
 
   const filteredLocks = useMemo(() => {
@@ -967,17 +981,27 @@ export const LockedAssignmentsEditor = ({
           onSearchChange={setSearchQuery}
           searchPlaceholder="Search locked assignments..."
           filterBar={
-            <EditorColumnFilters
-              defs={lockedFilterDefs}
-              rows={lockedRows}
-              filters={columnFilters}
-              onChange={setColumnFilters}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <EditorColumnFilters
+                defs={lockedFilterDefs}
+                rows={lockedRows}
+                filters={columnFilters}
+                onChange={setColumnFilters}
+              />
+              <EditorColumnPicker
+                specs={columnVisibility.specs}
+                visibleIds={columnVisibility.visibleIds}
+                onToggle={columnVisibility.toggleColumn}
+                onShowAll={columnVisibility.showAllColumns}
+                onHideAll={columnVisibility.hideAllColumns}
+              />
+            </div>
           }
         />
         <EditorConfigurableTable
           editorKey="constraints-locked-assignments"
           columnSpecs={LOCKED_ASSIGNMENT_COLUMN_SPECS}
+          visibility={columnVisibility}
           rows={filteredLocks}
           sortDefs={lockedSortDefs}
           getRowKey={(_, index) => String(index)}
@@ -1002,7 +1026,6 @@ export const LockedAssignmentsEditor = ({
                 />
               }
               rowLabel={`locked assignment for section ${lock.section_id || `row ${idx + 1}`}`}
-              onEdit={() => setEditIndex(idx)}
               onDelete={() => deleteLock(idx)}
             />
           )}
@@ -1014,21 +1037,6 @@ export const LockedAssignmentsEditor = ({
           </div>
         )}
       </CardBody>
-      {editIndex !== null && lockedAssignments[editIndex] ? (
-        <LockedAssignmentEditModal
-          isOpen
-          lock={lockedAssignments[editIndex]}
-          sectionOptions={sectionOptions}
-          timeslotOptions={timeslotOptions}
-          roomOptions={roomOptions}
-          onClose={() => setEditIndex(null)}
-          onSave={(updated) => {
-            const next = [...lockedAssignments];
-            next[editIndex] = updated;
-            onUpdate(next);
-          }}
-        />
-      ) : null}
       {addDraft ? (
         <LockedAssignmentEditModal
           isOpen
@@ -1078,7 +1086,7 @@ export const SoftLocksEditor = ({
 }: SoftLocksEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
-  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const columnVisibility = useEditorColumnVisibility("constraints-soft-locks", SOFT_LOCK_COLUMN_SPECS);
   const [addDraft, setAddDraft] = useState<SoftLock | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
@@ -1137,9 +1145,15 @@ export const SoftLocksEditor = ({
     [softLockFilterDefs],
   );
 
-  const softLockRows = useMemo(
-    (): SoftLockRow[] => softLocks.map((lock, index) => ({ lock, index })),
-    [softLocks],
+  const buildSoftLockRow = useCallback(
+    (lock: SoftLock, index: number): SoftLockRow => ({ lock, index }),
+    [],
+  );
+  const pickSoftLockBase = useCallback((row: SoftLockRow) => row.lock, []);
+  const softLockRows = useStableRowWrappers(
+    softLocks,
+    buildSoftLockRow,
+    pickSoftLockBase,
   );
 
   const filteredLocks = useMemo(() => {
@@ -1214,17 +1228,27 @@ export const SoftLocksEditor = ({
           onSearchChange={setSearchQuery}
           searchPlaceholder="Search soft locks..."
           filterBar={
-            <EditorColumnFilters
-              defs={softLockFilterDefs}
-              rows={softLockRows}
-              filters={columnFilters}
-              onChange={setColumnFilters}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <EditorColumnFilters
+                defs={softLockFilterDefs}
+                rows={softLockRows}
+                filters={columnFilters}
+                onChange={setColumnFilters}
+              />
+              <EditorColumnPicker
+                specs={columnVisibility.specs}
+                visibleIds={columnVisibility.visibleIds}
+                onToggle={columnVisibility.toggleColumn}
+                onShowAll={columnVisibility.showAllColumns}
+                onHideAll={columnVisibility.hideAllColumns}
+              />
+            </div>
           }
         />
         <EditorConfigurableTable
           editorKey="constraints-soft-locks"
           columnSpecs={SOFT_LOCK_COLUMN_SPECS}
+          visibility={columnVisibility}
           rows={filteredLocks}
           sortDefs={softLockSortDefs}
           getRowKey={(_, index) => String(index)}
@@ -1249,7 +1273,6 @@ export const SoftLocksEditor = ({
                 />
               }
               rowLabel={`soft lock for section ${lock.section_id || `row ${idx + 1}`}`}
-              onEdit={() => setEditIndex(idx)}
               onDelete={() => deleteLock(idx)}
             />
           )}
@@ -1261,21 +1284,6 @@ export const SoftLocksEditor = ({
           </div>
         )}
       </CardBody>
-      {editIndex !== null && softLocks[editIndex] ? (
-        <SoftLockEditModal
-          isOpen
-          lock={softLocks[editIndex]}
-          sectionOptions={sectionOptions}
-          timeslotOptions={timeslotOptions}
-          roomOptions={roomOptions}
-          onClose={() => setEditIndex(null)}
-          onSave={(updated) => {
-            const next = [...softLocks];
-            next[editIndex] = updated;
-            onUpdate(next);
-          }}
-        />
-      ) : null}
       {addDraft ? (
         <SoftLockEditModal
           isOpen

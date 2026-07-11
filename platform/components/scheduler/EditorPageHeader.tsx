@@ -78,7 +78,11 @@ export function EditorPageHeader({ current, title, subtitle, data }: EditorPageH
           onFeedbackChange={setSpreadsheetFeedback}
         />
         <span className={editorToolbarDivider} aria-hidden />
-        <CheckDataButton data={data} onErrorChange={setSolverError} />
+        {/* Check Data merged into Run Solver (SolverActionButton validates before solving).
+            Hidden pending team discussion — reversible: remove `hidden` to restore. */}
+        <div hidden>
+          <CheckDataButton data={data} onErrorChange={setSolverError} />
+        </div>
         <SolverActionButton data={data} onErrorChange={setSolverError} />
       </div>
 
@@ -103,8 +107,6 @@ export function EditorPageHeader({ current, title, subtitle, data }: EditorPageH
           <span className="mx-2 text-slate-300">·</span>
           <span className="font-medium text-slate-600">Auto-refresh</span>{" "}
           {autoRefreshEnabled ? "on" : "off"}
-          <span className="mx-2 text-slate-300">·</span>
-          Sync options in <span className="font-medium text-slate-600">Settings</span>
         </p>
       </div>
 

@@ -1,9 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { EditorColumnFilters } from "./EditorColumnFilters";
+import { EditorColumnPicker } from "./EditorColumnPicker";
 import { EditorConfigurableTable } from "./EditorConfigurableTable";
+import { useEditorColumnVisibility } from "./useEditorColumnVisibility";
+import { useStableRowWrappers } from "./useStableRowWrappers";
 import { EditorRowActions } from "./EditorRowActions";
 import { EditorTableShell } from "./EditorTableShell";
 import {
@@ -70,7 +73,7 @@ export const InstructorsEditor = ({
 }: InstructorsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
-  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const columnVisibility = useEditorColumnVisibility("instructors", INSTRUCTOR_COLUMN_SPECS);
   const [addDraft, setAddDraft] = useState<Instructor | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
@@ -156,9 +159,15 @@ export const InstructorsEditor = ({
     [instructorFilterDefs],
   );
 
-  const instructorRows = useMemo(
-    (): InstructorRow[] => instructors.map((inst, index) => ({ inst, index })),
-    [instructors],
+  const buildInstructorRow = useCallback(
+    (inst: Instructor, index: number): InstructorRow => ({ inst, index }),
+    [],
+  );
+  const pickInstructorBase = useCallback((row: InstructorRow) => row.inst, []);
+  const instructorRows = useStableRowWrappers(
+    instructors,
+    buildInstructorRow,
+    pickInstructorBase,
   );
 
   const filteredInstructors = useMemo((): InstructorRow[] => {
@@ -241,18 +250,27 @@ export const InstructorsEditor = ({
   return (
     <EditorTableShell
       title={`Instructors (${filteredInstructors.length})`}
-      addLabel="+ Add Instructor"
+      addLabel="Add Instructor"
       onAdd={addInstructor}
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
       searchPlaceholder="Search instructors..."
       filterBar={
-        <EditorColumnFilters
-          defs={instructorFilterDefs}
-          rows={instructorRows}
-          filters={columnFilters}
-          onChange={setColumnFilters}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <EditorColumnFilters
+            defs={instructorFilterDefs}
+            rows={instructorRows}
+            filters={columnFilters}
+            onChange={setColumnFilters}
+          />
+          <EditorColumnPicker
+            specs={columnVisibility.specs}
+            visibleIds={columnVisibility.visibleIds}
+            onToggle={columnVisibility.toggleColumn}
+            onShowAll={columnVisibility.showAllColumns}
+            onHideAll={columnVisibility.hideAllColumns}
+          />
+        </div>
       }
       emptyMessage='No instructors. Click "Add Instructor" to create one.'
       noMatchMessage="No instructors match your search or filters."
@@ -262,6 +280,7 @@ export const InstructorsEditor = ({
       <EditorConfigurableTable
         editorKey="instructors"
         columnSpecs={INSTRUCTOR_COLUMN_SPECS}
+        visibility={columnVisibility}
         rows={filteredInstructors}
         sortDefs={instructorSortDefs}
         getRowKey={({ inst, index }) => `${inst.id}-${index}`}
@@ -284,25 +303,10 @@ export const InstructorsEditor = ({
               />
             }
             rowLabel={`instructor ${inst.name || inst.id} (${inst.id})`}
-            onEdit={() => setEditIndex(idx)}
             onDelete={() => deleteInstructor(idx)}
           />
         )}
       />
-      {editIndex !== null && instructors[editIndex] ? (
-        <InstructorEditModal
-          isOpen
-          instructor={instructors[editIndex]}
-          meetingPatternOptions={meetingPatternOptions}
-          timeslotOptions={timeslotOptions}
-          onClose={() => setEditIndex(null)}
-          onSave={(updated) => {
-            const next = [...instructors];
-            next[editIndex] = updated;
-            onUpdate(next);
-          }}
-        />
-      ) : null}
       {addDraft ? (
         <InstructorEditModal
           isOpen

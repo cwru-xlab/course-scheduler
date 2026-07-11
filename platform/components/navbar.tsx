@@ -1,15 +1,7 @@
 "use client";
 
-import { siteConfig } from "@/config/site";
-import { Button } from "@heroui/button";
-import {
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownTrigger,
-} from "@heroui/dropdown";
 import clsx from "clsx";
-import { Calendar as CalendarIcon, ChevronDown, History, MessageSquare } from "lucide-react";
+import { Calendar as CalendarIcon, History, MessageSquare } from "lucide-react";
 import NextLink from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -48,29 +40,17 @@ export const Navbar = () => {
           </NextLink>
 
           <nav className="hidden md:flex items-center gap-1">
-            <Dropdown>
-              <DropdownTrigger>
-                <Button
-                  variant="light"
-                  className={clsx(
-                    "px-4 py-2 text-sm font-semibold rounded-lg transition-colors",
-                    isEditorActive
-                      ? "bg-weatherhead-primary/10 text-weatherhead-primary dark:bg-weatherhead-primary/20"
-                      : "text-slate-600 dark:text-default-500 hover:text-weatherhead-primary hover:bg-slate-100 dark:hover:bg-default-50",
-                  )}
-                  endContent={<ChevronDown className="size-4" />}
-                >
-                  Editor
-                </Button>
-              </DropdownTrigger>
-              <DropdownMenu aria-label="Editor pages">
-                {siteConfig.editorItems.map((item) => (
-                  <DropdownItem key={item.href} href={item.href}>
-                    {item.label}
-                  </DropdownItem>
-                ))}
-              </DropdownMenu>
-            </Dropdown>
+            <NextLink
+              href="/editor/sections"
+              className={clsx(
+                "px-4 py-2 text-sm font-semibold rounded-lg transition-colors",
+                isEditorActive
+                  ? "bg-weatherhead-primary/10 text-weatherhead-primary dark:bg-weatherhead-primary/20"
+                  : "text-slate-600 dark:text-default-500 hover:text-weatherhead-primary hover:bg-slate-100 dark:hover:bg-default-50",
+              )}
+            >
+              Editor
+            </NextLink>
 
             <NextLink
               href="/calendar"

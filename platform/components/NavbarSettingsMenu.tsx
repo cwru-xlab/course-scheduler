@@ -39,12 +39,12 @@ export function NavbarSettingsMenu({
           )}
           startContent={<Settings className="size-4" />}
         >
-          {variant === "nav" ? "Settings" : null}
+          {variant === "nav" ? "Sync options" : null}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0">
         <div className="border-b border-slate-100 px-4 py-3">
-          <p className="text-sm font-bold text-slate-900">Settings</p>
+          <p className="text-sm font-bold text-slate-900">Sync options</p>
           <p className="text-xs text-slate-500 mt-0.5">
             Control how edits sync with the server and other users.
           </p>

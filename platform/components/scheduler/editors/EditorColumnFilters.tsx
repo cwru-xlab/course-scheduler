@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Button } from "@heroui/button";
 import { Select, SelectItem } from "@heroui/select";
 
@@ -39,6 +39,8 @@ type EditorColumnFiltersProps<TRow> = {
   rows: TRow[];
   filters: EditorFiltersState;
   onChange: (filters: EditorFiltersState) => void;
+  /** Extra controls rendered at the top of the filters modal (e.g. Hide archived toggle). */
+  extraContent?: ReactNode;
 };
 
 type FilterRowProps<TRow> = {
@@ -226,6 +228,7 @@ export function EditorColumnFilters<TRow>({
   rows,
   filters,
   onChange,
+  extraContent,
 }: EditorColumnFiltersProps<TRow>) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -239,7 +242,7 @@ export function EditorColumnFilters<TRow>({
     [defs, filters],
   );
 
-  if (defs.length === 0) return null;
+  if (defs.length === 0 && !extraContent) return null;
 
   return (
     <>
@@ -284,6 +287,11 @@ export function EditorColumnFilters<TRow>({
           ) : undefined
         }
       >
+        {extraContent ? (
+          <div className="mb-3 rounded-lg border border-default-200 bg-default-50/60 px-3 py-2">
+            {extraContent}
+          </div>
+        ) : null}
         <EditorFilterPanel defs={defs} rows={rows} filters={filters} onChange={onChange} />
       </EditorModalShell>
     </>
