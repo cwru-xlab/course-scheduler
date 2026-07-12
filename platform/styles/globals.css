@@ -8,6 +8,12 @@
   --weatherhead-surface: #f6f7f8;
 }
 
+/* Always reserve space for the page scrollbar so opening popovers / modals
+   that briefly lock body scroll don't visibly narrow the viewport. */
+html {
+  scrollbar-gutter: stable;
+}
+
 /* Highlight note-linked editor rows/cards when navigating from Notes Feed. */
 @keyframes note-target-pulse {
   0% {

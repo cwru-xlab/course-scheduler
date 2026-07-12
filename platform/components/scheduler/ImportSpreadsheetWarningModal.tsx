@@ -3,6 +3,7 @@
 import { Button } from "@heroui/button";
 
 import { ViewportModal } from "@/components/scheduler/ViewportModal";
+import { SpreadsheetFormatHelp } from "@/components/scheduler/SpreadsheetFormatHelp";
 
 const MODAL_Z = 1100;
 
@@ -51,6 +52,7 @@ export function ImportSpreadsheetWarningModal({ isOpen, onCancel, onConfirm }: P
               <strong className="font-semibold">Export Spreadsheet</strong> first, then import
               that file after editing.
             </p>
+            <SpreadsheetFormatHelp compact />
           </div>
           <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3 dark:border-default-200">
             <Button size="sm" variant="light" onPress={onCancel}>

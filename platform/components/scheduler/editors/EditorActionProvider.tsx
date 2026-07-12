@@ -14,6 +14,8 @@ import { Button } from "@heroui/button";
 
 import { ViewportModal } from "../ViewportModal";
 import { EditorFeedbackToast } from "./EditorFeedbackToast";
+import { editorRowKey, rowHighlightClass } from "./editorRowHighlight";
+import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 
 const MODAL_Z = 1060;
 const TOAST_AUTO_DISMISS_MS = 8000;
@@ -28,6 +30,7 @@ type EditorActionContextValue = {
   showSuccess: (message: string) => void;
   confirmRowAdded: (opts: { rowKey: string; message: string }) => void;
   isRowRecentlyAdded: (rowKey: string) => boolean;
+  getRowHighlightClass: (base: string, scope: string, rowId: string) => string;
 };
 
 const EditorActionContext = createContext<EditorActionContextValue | null>(null);
@@ -41,6 +44,7 @@ export function useEditorActions(): EditorActionContextValue {
 }
 
 export function EditorActionProvider({ children }: { children: ReactNode }) {
+  const { getRowChangeKind } = useSchedulingData();
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [highlightedRowKey, setHighlightedRowKey] = useState<string | null>(null);
@@ -71,6 +75,17 @@ export function EditorActionProvider({ children }: { children: ReactNode }) {
     [highlightedRowKey],
   );
 
+  const getRowHighlightClass = useCallback(
+    (base: string, scope: string, rowId: string) => {
+      const rowKey = editorRowKey(scope, rowId);
+      return rowHighlightClass(base, {
+        added: highlightedRowKey === rowKey,
+        changeKind: getRowChangeKind(rowKey),
+      });
+    },
+    [getRowChangeKind, highlightedRowKey],
+  );
+
   useEffect(() => {
     const clearOnNextAction = () => {
       if (!highlightedRowKeyRef.current) return;
@@ -98,8 +113,14 @@ export function EditorActionProvider({ children }: { children: ReactNode }) {
   }, [successMessage]);
 
   const value = useMemo(
-    () => ({ requestDelete, showSuccess, confirmRowAdded, isRowRecentlyAdded }),
-    [requestDelete, showSuccess, confirmRowAdded, isRowRecentlyAdded],
+    () => ({
+      requestDelete,
+      showSuccess,
+      confirmRowAdded,
+      isRowRecentlyAdded,
+      getRowHighlightClass,
+    }),
+    [requestDelete, showSuccess, confirmRowAdded, isRowRecentlyAdded, getRowHighlightClass],
   );
 
   const confirmDelete = () => {

@@ -1,11 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useState } from "react";
 
 import { EditorColumnFilters } from "./EditorColumnFilters";
+import { EditorColumnPicker } from "./EditorColumnPicker";
 import { EditorConfigurableTable } from "./EditorConfigurableTable";
 import { EditorRowActions } from "./EditorRowActions";
 import { EditorTableShell } from "./EditorTableShell";
+import { useEditorColumnVisibility } from "./useEditorColumnVisibility";
+import { useStableRowWrappers } from "./useStableRowWrappers";
 import {
   applyEditorColumnFilters,
   type EditorColumnFilterDef,
@@ -14,9 +17,10 @@ import {
 import { sortDefsFromFilterDefs, type EditorColumnSortDef } from "./editorSort";
 import { SECTION_COLUMN_SPECS } from "./editorColumnSpecs";
 import { useEditorActions } from "./EditorActionProvider";
-import { editorRowKey, recentlyAddedRowClass } from "./editorRowHighlight";
+import { editorRowKey } from "./editorRowHighlight";
 import { SectionEditModal } from "./modals/SectionEditModal";
 
+import { ReadOnlyIdCell } from "./ReadOnlyIdCell";
 import { EditableCell } from "../EditableCell";
 import { EditableArrayCell } from "../EditableArrayCell";
 import { EditableSelectCell } from "../EditableSelectCell";
@@ -52,6 +56,9 @@ type SectionRow = { section: Section; index: number };
 const SECTION_COURSE_PLACEHOLDER = "Introduction to Accounting";
 const SECTION_CODE_PLACEHOLDER = "101";
 
+/** Notes feed adds this when linking to an archived section row. */
+const REVEAL_ARCHIVED_QUERY = "revealArchived";
+
 const createEmptySection = (existing: Section[]): Section => ({
   id: nextIntegerId(existing.map((s) => s.id)),
   course_id: "",
@@ -78,9 +85,37 @@ export const SectionsEditor = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [hideArchived, setHideArchived] = useHideArchivedSections();
+  const columnVisibility = useEditorColumnVisibility("sections", SECTION_COLUMN_SPECS);
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<Section | null>(null);
-  const { confirmRowAdded, isRowRecentlyAdded } = useEditorActions();
+  const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
+
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    const deepLinkToSections =
+      sp.get("openRowNotes") === "1" && sp.get("noteScope") === "sections";
+    const noteRowId = sp.get("noteRow");
+    const targetsArchivedSection =
+      Boolean(noteRowId) &&
+      sections.some((s) => String(s.id) === noteRowId && isSectionArchived(s));
+    const shouldReveal =
+      sp.get(REVEAL_ARCHIVED_QUERY) === "1" ||
+      (deepLinkToSections && targetsArchivedSection);
+    if (!shouldReveal) return;
+
+    if (hideArchived) setHideArchived(false);
+
+    if (sp.has(REVEAL_ARCHIVED_QUERY)) {
+      sp.delete(REVEAL_ARCHIVED_QUERY);
+      const q = sp.toString();
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${q ? `?${q}` : ""}${window.location.hash}`,
+      );
+    }
+  }, [sections, hideArchived, setHideArchived]);
 
   const updateSection = (index: number, field: keyof Section, value: unknown) => {
     const newSections = [...sections];
@@ -96,14 +131,19 @@ export const SectionsEditor = ({
     onUpdate(sections.filter((_, i) => i !== index));
   };
 
-  const crosslistOptionsWithNone = [
-    { key: "__none__", label: "(None)" },
-    ...crosslistGroupOptions,
-  ];
+  const crosslistOptionsWithNone = useMemo(
+    () => [{ key: "__none__", label: "(None)" }, ...crosslistGroupOptions],
+    [crosslistGroupOptions],
+  );
 
   const instructorLabelById = useMemo(
     () => new Map(instructorOptions.map((o) => [o.key, o.label])),
     [instructorOptions],
+  );
+
+  const previousPatternOptionsWithNone = useMemo(
+    () => [{ key: "__none__", label: "(None)" }, ...meetingPatternOptions],
+    [meetingPatternOptions],
   );
 
   const sectionFilterDefs = useMemo((): EditorColumnFilterDef<SectionRow>[] => [
@@ -195,10 +235,12 @@ export const SectionsEditor = ({
     ];
   }, [sectionFilterDefs, instructorLabelById]);
 
-  const sectionRows = useMemo(
-    (): SectionRow[] => sections.map((section, index) => ({ section, index })),
-    [sections],
+  const buildSectionRow = useCallback(
+    (section: Section, index: number): SectionRow => ({ section, index }),
+    [],
   );
+  const pickSectionBase = useCallback((row: SectionRow): Section => row.section, []);
+  const sectionRows = useStableRowWrappers(sections, buildSectionRow, pickSectionBase);
 
   const filteredSections = useMemo((): SectionRow[] => {
     const query = searchQuery.trim().toLowerCase();
@@ -228,7 +270,7 @@ export const SectionsEditor = ({
   const renderCell = (columnId: string, { section, index: idx }: SectionRow) => {
     switch (columnId) {
       case "id":
-        return <EditableCell value={section.id} onChange={(v) => updateSection(idx, "id", v)} />;
+        return <ReadOnlyIdCell value={section.id} />;
       case "dept":
         return (
           <EditableCell
@@ -301,7 +343,7 @@ export const SectionsEditor = ({
         return (
           <EditableSelectCell
             value={section.previous_meeting_pattern ?? "__none__"}
-            options={[{ key: "__none__", label: "(None)" }, ...meetingPatternOptions]}
+            options={previousPatternOptionsWithNone}
             onChange={(v) =>
               updateSection(idx, "previous_meeting_pattern", v === "__none__" ? undefined : v)
             }
@@ -343,29 +385,38 @@ export const SectionsEditor = ({
   return (
     <EditorTableShell
       title={`Sections (${filteredSections.length})`}
-      addLabel="+ Add Section"
+      addLabel="Add Section"
       onAdd={addSection}
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
       searchPlaceholder="Search sections..."
       searchHint="Search by ID, department, course, code, or instructor."
       filterBar={
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <EditorColumnFilters
             defs={sectionFilterDefs}
             rows={sectionRows}
             filters={columnFilters}
             onChange={setColumnFilters}
+            extraContent={
+              <label className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  className="size-3.5 rounded border-slate-300 text-primary accent-[#137fec]"
+                  checked={hideArchived}
+                  onChange={(e) => setHideArchived(e.target.checked)}
+                />
+                <span>Hide archived sections</span>
+              </label>
+            }
           />
-          <label className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              className="size-3.5 rounded border-slate-300 text-primary accent-[#137fec]"
-              checked={hideArchived}
-              onChange={(e) => setHideArchived(e.target.checked)}
-            />
-            <span>Hide archived sections</span>
-          </label>
+          <EditorColumnPicker
+            specs={columnVisibility.specs}
+            visibleIds={columnVisibility.visibleIds}
+            onToggle={columnVisibility.toggleColumn}
+            onShowAll={columnVisibility.showAllColumns}
+            onHideAll={columnVisibility.hideAllColumns}
+          />
         </div>
       }
       emptyMessage='No sections. Click "Add Section" to create one.'
@@ -376,6 +427,7 @@ export const SectionsEditor = ({
       <EditorConfigurableTable
         editorKey="sections"
         columnSpecs={SECTION_COLUMN_SPECS}
+        visibility={columnVisibility}
         rows={filteredSections}
         sortDefs={sectionSortDefs}
         getRowKey={({ section, index }) => `${section.id}-${index}`}
@@ -384,9 +436,8 @@ export const SectionsEditor = ({
         }
         getRowClassName={({ section }) => {
           const base = "border-t border-default-200";
-          if (isRowRecentlyAdded(editorRowKey("sections", String(section.id)))) {
-            return recentlyAddedRowClass(base, true);
-          }
+          const highlighted = getRowHighlightClass(base, "sections", String(section.id));
+          if (highlighted !== base) return highlighted;
           if (isSectionArchived(section)) return `${base} opacity-60`;
           if (isSectionNew(section)) return `${base} bg-primary-50/40`;
           return base;

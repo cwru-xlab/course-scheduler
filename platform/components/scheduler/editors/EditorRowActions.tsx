@@ -8,7 +8,7 @@ import { useEditorActions } from "./EditorActionProvider";
 
 type EditorRowActionsProps = {
   rowLabel: string;
-  onEdit: () => void;
+  onEdit?: () => void;
   onDelete: () => void;
   notes?: ReactNode;
 };
@@ -19,15 +19,17 @@ export function EditorRowActions({ rowLabel, onEdit, onDelete, notes }: EditorRo
   return (
     <div className="flex shrink-0 items-center justify-end gap-0.5">
       {notes}
-      <Button
-        size="sm"
-        variant="light"
-        isIconOnly
-        aria-label={`Edit ${rowLabel}`}
-        onPress={onEdit}
-      >
-        <Pencil className="size-4 text-slate-600" />
-      </Button>
+      {onEdit ? (
+        <Button
+          size="sm"
+          variant="light"
+          isIconOnly
+          aria-label={`Edit ${rowLabel}`}
+          onPress={onEdit}
+        >
+          <Pencil className="size-4 text-slate-600" />
+        </Button>
+      ) : null}
       <Button
         size="sm"
         color="danger"

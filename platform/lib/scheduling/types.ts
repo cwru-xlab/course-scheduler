@@ -114,6 +114,9 @@ export type ScheduleSolution = {
 export type ValidationError = {
   code: string;
   message: string;
+  sheet?: string;
+  row_id?: string;
+  field?: string;
 };
 
 export type SchedulingInput = {

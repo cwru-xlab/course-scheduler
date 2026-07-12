@@ -1,59 +1,89 @@
 "use client";
 
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { useState } from "react";
+import clsx from "clsx";
+import { ChevronDown } from "lucide-react";
 
-import { useShowColumnsInlineExpanded } from "@/lib/editor-ui-preferences";
 import type { EditorColumnSpec } from "./useEditorColumnVisibility";
 
 type EditorColumnPickerProps = {
-  editorKey: string;
   specs: EditorColumnSpec[];
   visibleIds: Set<string>;
   onToggle: (id: string, checked: boolean) => void;
+  onShowAll: () => void;
+  onHideAll: () => void;
 };
 
 export function EditorColumnPicker({
-  editorKey,
   specs,
   visibleIds,
   onToggle,
+  onShowAll,
+  onHideAll,
 }: EditorColumnPickerProps) {
-  const [isExpanded, setIsExpanded] = useShowColumnsInlineExpanded(editorKey);
+  const [isOpen, setIsOpen] = useState(false);
+  const visibleCount = specs.filter((spec) => visibleIds.has(spec.id)).length;
 
   return (
-    <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50/80">
+    <div className="inline-flex flex-wrap items-center gap-1">
       <button
         type="button"
-        className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-slate-100/60"
-        onClick={() => setIsExpanded(!isExpanded)}
-        aria-expanded={isExpanded}
+        onClick={() => setIsOpen((v) => !v)}
+        aria-expanded={isOpen}
+        className="inline-flex items-center gap-1.5 h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
       >
-        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Show columns inline
+        <span className="uppercase tracking-wider text-[10px] text-slate-500">Columns</span>
+        <span className="text-slate-400">
+          {visibleCount}/{specs.length}
         </span>
-        {isExpanded ? (
-          <ChevronDown className="size-4 shrink-0 text-slate-400" aria-hidden />
-        ) : (
-          <ChevronRight className="size-4 shrink-0 text-slate-400" aria-hidden />
-        )}
+        <ChevronDown
+          className={clsx(
+            "size-3.5 text-slate-400 transition-transform",
+            isOpen && "rotate-180",
+          )}
+          aria-hidden
+        />
       </button>
-      {isExpanded && (
-        <div className="flex flex-wrap gap-x-4 gap-y-2 border-t border-slate-200/80 px-3 pb-2.5 pt-2">
-          {specs.map((spec) => (
-            <label
-              key={spec.id}
-              className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-slate-700"
-            >
-              <input
-                type="checkbox"
-                className="size-3.5 rounded border-slate-300 text-primary accent-[#137fec]"
-                checked={visibleIds.has(spec.id)}
-                onChange={(e) => onToggle(spec.id, e.target.checked)}
-              />
-              <span>{spec.label}</span>
-            </label>
-          ))}
-        </div>
+      {isOpen && (
+        <>
+          <button
+            type="button"
+            className="h-6 shrink-0 rounded-md px-2 text-[10px] font-semibold text-slate-600 transition-colors hover:bg-slate-100"
+            onClick={onShowAll}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            title="Hide optional columns (keeps ID visible)"
+            className="h-6 shrink-0 rounded-md px-2 text-[10px] font-semibold text-slate-600 transition-colors hover:bg-slate-100"
+            onClick={onHideAll}
+          >
+            None
+          </button>
+          <span className="mx-0.5 h-4 w-px shrink-0 bg-slate-200" aria-hidden />
+          {specs.map((spec) => {
+            const isVisible = visibleIds.has(spec.id);
+            return (
+              <button
+                key={spec.id}
+                type="button"
+                role="checkbox"
+                aria-checked={isVisible}
+                aria-label={`${isVisible ? "Hide" : "Show"} ${spec.label} column`}
+                onClick={() => onToggle(spec.id, !isVisible)}
+                className={clsx(
+                  "inline-flex h-6 shrink-0 items-center whitespace-nowrap rounded-md border px-2 text-[10px] font-medium leading-none transition-colors",
+                  isVisible
+                    ? "border-sky-200/90 bg-sky-50 text-weatherhead-primary"
+                    : "border-slate-200/80 bg-slate-50/40 text-slate-500 hover:border-slate-300 hover:bg-white",
+                )}
+              >
+                {spec.label}
+              </button>
+            );
+          })}
+        </>
       )}
     </div>
   );

@@ -1,46 +1,36 @@
+import { readFile } from "fs/promises";
+import { join } from "path";
+
 import { NextResponse } from "next/server";
 
-const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:8000";
+import { normalizeNetworkError, EXAMPLE_SPREADSHEET_FILENAME } from "@/lib/spreadsheet/formatGuide";
 
+const EXAMPLE_FILE = join(process.cwd(), "public", EXAMPLE_SPREADSHEET_FILENAME);
+
+/** Serves the canonical example spreadsheet format from /public. */
 export async function GET() {
   try {
-    const response = await fetch(`${SOLVER_URL}/scheduling-spreadsheet-template`, {
-      method: "GET",
-    });
-
-    if (!response.ok) {
-      return NextResponse.json(
-        {
-          status: "error",
-          errors: [{ code: "template_failed", message: "Backend failed to generate template." }],
-        },
-        { status: response.status || 500 }
-      );
-    }
-
-    const bytes = await response.arrayBuffer();
-    const contentType =
-      response.headers.get("content-type") ??
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-    const contentDisposition =
-      response.headers.get("content-disposition") ??
-      "attachment; filename=scheduling_template.xlsx";
-
+    const bytes = await readFile(EXAMPLE_FILE);
     return new NextResponse(bytes, {
       status: 200,
       headers: {
-        "Content-Type": contentType,
-        "Content-Disposition": contentDisposition,
+        "Content-Type":
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename=${EXAMPLE_SPREADSHEET_FILENAME}`,
+        "Cache-Control": "public, max-age=3600",
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to reach solver service.";
+    const message = normalizeNetworkError(
+      error instanceof Error ? error.message : "Example spreadsheet is unavailable.",
+      "export",
+    );
     return NextResponse.json(
       {
         status: "error",
-        errors: [{ code: "network_error", message }],
+        errors: [{ code: "template_failed", message }],
       },
-      { status: 502 }
+      { status: 500 },
     );
   }
 }
