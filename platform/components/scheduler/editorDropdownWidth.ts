@@ -68,6 +68,10 @@ export function editorSelectPopoverProps(menuMinWidth: number) {
     // Anchor to trigger start so wide menus stay under the column (not shifted left).
     placement: "bottom-start" as const,
     offset: 4,
+    // Keep the page scrollbar in place while the popover is open — otherwise
+    // React Aria applies `overflow:hidden` to <body>, the scrollbar disappears,
+    // and the viewport visibly widens by ~15px when the menu opens.
+    shouldBlockScroll: false,
     style: {
       minWidth: width,
       maxWidth: EDITOR_DROPDOWN_MAX_WIDTH_PX,

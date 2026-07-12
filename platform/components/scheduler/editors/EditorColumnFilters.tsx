@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Button } from "@heroui/button";
 import { Select, SelectItem } from "@heroui/select";
 
@@ -26,6 +26,10 @@ import {
   type NumberCompareOp,
   type TimeCompareOp,
 } from "./editorFilters";
+import {
+  editorFilterBtnClass,
+  editorFilterClearBtnClass,
+} from "./editorToolbarStyles";
 
 const controlClass =
   "h-8 max-w-full rounded-lg border border-default-200 bg-white px-2 text-xs text-slate-800 outline-none focus:border-primary dark:bg-default-100";
@@ -35,6 +39,8 @@ type EditorColumnFiltersProps<TRow> = {
   rows: TRow[];
   filters: EditorFiltersState;
   onChange: (filters: EditorFiltersState) => void;
+  /** Extra controls rendered at the top of the filters modal (e.g. Hide archived toggle). */
+  extraContent?: ReactNode;
 };
 
 type FilterRowProps<TRow> = {
@@ -222,6 +228,7 @@ export function EditorColumnFilters<TRow>({
   rows,
   filters,
   onChange,
+  extraContent,
 }: EditorColumnFiltersProps<TRow>) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -235,28 +242,29 @@ export function EditorColumnFilters<TRow>({
     [defs, filters],
   );
 
-  if (defs.length === 0) return null;
+  if (defs.length === 0 && !extraContent) return null;
 
   return (
     <>
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         <Button
           size="sm"
-          color="primary"
-          variant="flat"
-          className="font-semibold"
+          radius="md"
+          variant="bordered"
+          className={editorFilterBtnClass}
           onPress={() => setIsOpen(true)}
         >
-          Filters ({appliedCount})
+          Filters{appliedCount > 0 ? ` · ${appliedCount}` : ""}
         </Button>
         {hasAnyFilter ? (
           <Button
             size="sm"
-            variant="flat"
-            className="font-semibold"
+            radius="md"
+            variant="light"
+            className={editorFilterClearBtnClass}
             onPress={() => onChange({})}
           >
-            Clear all filters
+            Clear all
           </Button>
         ) : null}
       </div>
@@ -279,6 +287,11 @@ export function EditorColumnFilters<TRow>({
           ) : undefined
         }
       >
+        {extraContent ? (
+          <div className="mb-3 rounded-lg border border-default-200 bg-default-50/60 px-3 py-2">
+            {extraContent}
+          </div>
+        ) : null}
         <EditorFilterPanel defs={defs} rows={rows} filters={filters} onChange={onChange} />
       </EditorModalShell>
     </>

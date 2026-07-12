@@ -1,9 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { EditorColumnFilters } from "./EditorColumnFilters";
+import { EditorColumnPicker } from "./EditorColumnPicker";
 import { EditorConfigurableTable } from "./EditorConfigurableTable";
+import { useEditorColumnVisibility } from "./useEditorColumnVisibility";
+import { useStableRowWrappers } from "./useStableRowWrappers";
 import { EditorRowActions } from "./EditorRowActions";
 import { EditorTableShell } from "./EditorTableShell";
 import {
@@ -14,9 +17,10 @@ import {
 import { sortDefsFromFilterDefs } from "./editorSort";
 import { INSTRUCTOR_COLUMN_SPECS } from "./editorColumnSpecs";
 import { useEditorActions } from "./EditorActionProvider";
-import { editorRowKey, recentlyAddedRowClass } from "./editorRowHighlight";
+import { editorRowKey } from "./editorRowHighlight";
 import { InstructorEditModal } from "./modals/InstructorEditModal";
 
+import { ReadOnlyIdCell } from "./ReadOnlyIdCell";
 import { EditableCell } from "../EditableCell";
 import { EditableSelectCell } from "../EditableSelectCell";
 import { MultiSelect } from "../MultiSelect";
@@ -69,9 +73,10 @@ export const InstructorsEditor = ({
 }: InstructorsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
+  const columnVisibility = useEditorColumnVisibility("instructors", INSTRUCTOR_COLUMN_SPECS);
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<Instructor | null>(null);
-  const { confirmRowAdded, isRowRecentlyAdded } = useEditorActions();
+  const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
   const updateInstructor = (index: number, field: string, value: unknown) => {
     const newInstructors = [...instructors];
@@ -155,9 +160,15 @@ export const InstructorsEditor = ({
     [instructorFilterDefs],
   );
 
-  const instructorRows = useMemo(
-    (): InstructorRow[] => instructors.map((inst, index) => ({ inst, index })),
-    [instructors],
+  const buildInstructorRow = useCallback(
+    (inst: Instructor, index: number): InstructorRow => ({ inst, index }),
+    [],
+  );
+  const pickInstructorBase = useCallback((row: InstructorRow) => row.inst, []);
+  const instructorRows = useStableRowWrappers(
+    instructors,
+    buildInstructorRow,
+    pickInstructorBase,
   );
 
   const filteredInstructors = useMemo((): InstructorRow[] => {
@@ -185,7 +196,7 @@ export const InstructorsEditor = ({
   const renderCell = (columnId: string, { inst, index: idx }: InstructorRow) => {
     switch (columnId) {
       case "id":
-        return <EditableCell value={inst.id} onChange={(v) => updateInstructor(idx, "id", v)} />;
+        return <ReadOnlyIdCell value={inst.id} />;
       case "name":
         return <EditableCell value={inst.name} onChange={(v) => updateInstructor(idx, "name", v)} />;
       case "rank":
@@ -240,18 +251,27 @@ export const InstructorsEditor = ({
   return (
     <EditorTableShell
       title={`Instructors (${filteredInstructors.length})`}
-      addLabel="+ Add Instructor"
+      addLabel="Add Instructor"
       onAdd={addInstructor}
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
       searchPlaceholder="Search instructors..."
       filterBar={
-        <EditorColumnFilters
-          defs={instructorFilterDefs}
-          rows={instructorRows}
-          filters={columnFilters}
-          onChange={setColumnFilters}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <EditorColumnFilters
+            defs={instructorFilterDefs}
+            rows={instructorRows}
+            filters={columnFilters}
+            onChange={setColumnFilters}
+          />
+          <EditorColumnPicker
+            specs={columnVisibility.specs}
+            visibleIds={columnVisibility.visibleIds}
+            onToggle={columnVisibility.toggleColumn}
+            onShowAll={columnVisibility.showAllColumns}
+            onHideAll={columnVisibility.hideAllColumns}
+          />
+        </div>
       }
       emptyMessage='No instructors. Click "Add Instructor" to create one.'
       noMatchMessage="No instructors match your search or filters."
@@ -261,14 +281,16 @@ export const InstructorsEditor = ({
       <EditorConfigurableTable
         editorKey="instructors"
         columnSpecs={INSTRUCTOR_COLUMN_SPECS}
+        visibility={columnVisibility}
         rows={filteredInstructors}
         sortDefs={instructorSortDefs}
         getRowKey={({ inst, index }) => `${inst.id}-${index}`}
         getRowId={({ inst }) => `note-instructors-${encodeURIComponent(String(inst.id))}`}
         getRowClassName={({ inst }) =>
-          recentlyAddedRowClass(
+          getRowHighlightClass(
             "border-t border-default-200",
-            isRowRecentlyAdded(editorRowKey("instructors", String(inst.id))),
+            "instructors",
+            String(inst.id),
           )
         }
         renderCell={renderCell}

@@ -13,6 +13,8 @@ import {
 import { LogOut } from "lucide-react";
 
 import { useAuth } from "@/lib/auth-client";
+import { LOGOUT_UNSAVED_CONFIRM_MESSAGE } from "@/lib/scheduling/unsavedChanges";
+import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 
 function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -23,6 +25,7 @@ function initialsOf(name: string): string {
 
 export function UserMenu() {
   const { user, loading, logout } = useAuth();
+  const { hasUnsavedChanges } = useSchedulingData();
 
   if (loading) {
     return (
@@ -89,6 +92,12 @@ export function UserMenu() {
           color="danger"
           startContent={<LogOut className="size-4" />}
           onPress={() => {
+            if (
+              hasUnsavedChanges &&
+              !window.confirm(LOGOUT_UNSAVED_CONFIRM_MESSAGE)
+            ) {
+              return;
+            }
             void logout();
           }}
         >

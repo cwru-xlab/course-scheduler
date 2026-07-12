@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
@@ -10,8 +9,8 @@ import {
   AlertTriangle,
   Archive,
   ArrowLeft,
-  BarChart3,
   Filter,
+  Table2,
   Link2,
   Lock,
   Maximize2,
@@ -26,8 +25,6 @@ import {
   Undo2,
   Play,
   CloudBackup,
-  Pencil,
-  FolderClock,
   X,
 } from "lucide-react";
 import { CrosslistCalendarEventCard, CrosslistLegendSwatch } from "./CrosslistCalendarEventCard";
@@ -53,18 +50,24 @@ import type {
 import { MultiSelect } from "@/components/scheduler/MultiSelect";
 import { ViewportModal } from "@/components/scheduler/ViewportModal";
 import {
-  LAST_SOLVER_ERROR_STORAGE_KEY,
   LAST_SOLVER_RUN_STORAGE_KEY,
   saveScheduleToHistory,
   type LastSolverRunSnapshot,
 } from "@/lib/scheduling/history";
-import { SCHEDULING_DATA_REFRESH_EVENT } from "@/lib/scheduling/useSchedulingData";
+import { SCHEDULING_DATA_REFRESH_EVENT, useSchedulingData } from "@/lib/scheduling/useSchedulingData";
+import { useSolverLock } from "@/lib/solver-lock-client";
 import {
   SCHEDULING_WINDOW_END_HOUR,
   SCHEDULING_WINDOW_START_HOUR,
 } from "@/lib/scheduling/timeWindow";
 import { isSectionArchived, normalizeSectionState } from "@/lib/scheduling/sectionState";
 import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
+import {
+  storeSolverErrorSnapshot,
+  storeSolverNetworkError,
+} from "@/lib/solver/solverErrorStorage";
+import { normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
+import type { ValidationError } from "@/lib/scheduling/types";
 
 type TimeslotDto = {
   id: string;
@@ -984,6 +987,9 @@ export default function CalendarPage() {
     useSolverProgress();
   const [lockedSectionIds, setLockedSectionIds] = useState<string[]>([]);
   const [solverRunStatus, setSolverRunStatus] = useState<"idle" | "loading">("idle");
+  const solverLock = useSolverLock();
+  const solverBusyRemote = solverLock.active && solverRunStatus !== "loading";
+  const { autoSaveEnabled, recordOwnServerWrite } = useSchedulingData();
   const [solverRunError, setSolverRunError] = useState<string | null>(null);
   const [calendarContextMenu, setCalendarContextMenu] = useState<{
     clientX: number;
@@ -1045,6 +1051,7 @@ export default function CalendarPage() {
   const [redoStack, setRedoStack] = useState<UndoSnapshot[]>([]);
   const redoStackRef = useRef<UndoSnapshot[]>([]);
   const [dragError, setDragError] = useState<string | null>(null);
+  const [scheduleDrawerOpen, setScheduleDrawerOpen] = useState<boolean>(false);
   const [dragFeedback, setDragFeedback] = useState<{
     status: "neutral" | "valid" | "invalid";
     message: string | null;
@@ -1678,6 +1685,7 @@ type MeetingPatternPlacementOption = {
           setSolverInput(nextInput);
         }
         if (typeof window !== "undefined") {
+          await recordOwnServerWrite();
           window.dispatchEvent(new Event(SCHEDULING_DATA_REFRESH_EVENT));
         }
       } catch (err) {
@@ -1690,7 +1698,7 @@ type MeetingPatternPlacementOption = {
         });
       }
     },
-    [data, mergeSectionsWithAssignments, persistSections, solverInput, toSchedulingSections],
+    [data, mergeSectionsWithAssignments, persistSections, recordOwnServerWrite, solverInput, toSchedulingSections],
   );
 
   const applyMeetingPatternSelection = useCallback(() => {
@@ -2237,6 +2245,24 @@ type MeetingPatternPlacementOption = {
   }, [calendarContextMenu]);
 
   const handleRunSolverFromCalendar = useCallback(async () => {
+    if (solverBusyRemote) {
+      setSolverRunError(
+        solverLock.startedBy
+          ? `The solver is currently running (started by ${solverLock.startedBy}). Please wait for it to finish.`
+          : "The solver is currently running. Please wait for it to finish.",
+      );
+      return;
+    }
+    if (hasValidUnsavedEdit && !autoSaveEnabled) {
+      if (typeof window !== "undefined") {
+        const choice = window.confirm(
+          "You have unsaved calendar edits. Save them to the backend before running the solver?\n\nOK = save first, Cancel = run without saving.",
+        );
+        if (choice) {
+          await updateBackendRef.current(true);
+        }
+      }
+    }
     setSolverRunError(null);
     setSolverRunStatus("loading");
     beginSolverProgress();
@@ -2284,18 +2310,19 @@ type MeetingPatternPlacementOption = {
         errors?: { message?: string }[];
         diagnostics?: unknown;
       };
+      if (response.status === 409) {
+        const busyMsg =
+          Array.isArray(result.errors) && result.errors[0]?.message
+            ? String(result.errors[0].message)
+            : "The solver is currently running. Please wait for it to finish.";
+        failSolverProgress();
+        setSolverRunError(busyMsg);
+        setSolverRunStatus("idle");
+        return;
+      }
       if (!response.ok || result.status === "error") {
-        if (typeof window !== "undefined") {
-          localStorage.setItem(
-            LAST_SOLVER_ERROR_STORAGE_KEY,
-            JSON.stringify({
-              input: nextInput,
-              errors: result.errors ?? [],
-              diagnostics: result.diagnostics,
-              createdAt: new Date().toISOString(),
-            }),
-          );
-        }
+        const errors = (result.errors ?? []) as ValidationError[];
+        storeSolverErrorSnapshot(nextInput, errors, result.diagnostics);
         failSolverProgress();
         router.push("/solver-errors");
         return;
@@ -2341,17 +2368,27 @@ type MeetingPatternPlacementOption = {
       succeedSolverProgress();
     } catch (e) {
       failSolverProgress();
-      setSolverRunError(e instanceof Error ? e.message : "Failed to run solver.");
+      const raw = e instanceof Error ? e.message : "Failed to run solver.";
+      if (solverInput) {
+        const errors = storeSolverNetworkError(solverInput, raw);
+        setSolverRunError(errors.map((err) => err.message).join(" "));
+      } else {
+        setSolverRunError(normalizeNetworkError(raw, "solver"));
+      }
     } finally {
       setSolverRunStatus("idle");
     }
   }, [
     assignmentsBySection,
+    autoSaveEnabled,
     beginSolverProgress,
     data,
     failSolverProgress,
+    hasValidUnsavedEdit,
     lockedSectionIds,
     router,
+    solverBusyRemote,
+    solverLock.startedBy,
     succeedSolverProgress,
     solverInput,
     updateLastRunStorage,
@@ -2860,8 +2897,8 @@ type MeetingPatternPlacementOption = {
               type: "success",
               text:
                 linkedSectionIds.length > 1
-                  ? "Cross-listed group placed on the calendar. Click Update Backend to persist this placement."
-                  : "Section placed on the calendar. Click Update Backend to persist this placement.",
+                  ? "Cross-listed group placed on the calendar. Click Save to persist this placement."
+                  : "Section placed on the calendar. Click Save to persist this placement.",
             },
       );
     },
@@ -2875,7 +2912,7 @@ type MeetingPatternPlacementOption = {
     ],
   );
 
-  const handleUpdateBackend = async () => {
+  const handleUpdateBackend = async (silent = false) => {
     if (!data || !hasValidUnsavedEdit) return;
     setIsSavingBackend(true);
     setBackendSaveMessage(null);
@@ -2923,22 +2960,40 @@ type MeetingPatternPlacementOption = {
         setSolverInput(nextInput);
         updateLastRunStorage(nextInput, assignmentsBySection);
       }
-      setBackendSaveMessage({
-        type: "success",
-        text: "Backend updated. Sections will appear in the Sections editor and be used by Run Solver.",
-      });
+      if (!silent) {
+        setBackendSaveMessage({
+          type: "success",
+          text: "Saved. Sections will appear in the Sections editor and be used by Run Solver.",
+        });
+      }
       if (typeof window !== "undefined") {
+        await recordOwnServerWrite();
         window.dispatchEvent(new Event(SCHEDULING_DATA_REFRESH_EVENT));
       }
     } catch (err) {
       setBackendSaveMessage({
         type: "error",
-        text: err instanceof Error ? err.message : "Failed to update backend.",
+        text: err instanceof Error ? err.message : "Failed to save.",
       });
     } finally {
       setIsSavingBackend(false);
     }
   };
+
+  const updateBackendRef = useRef(handleUpdateBackend);
+  updateBackendRef.current = handleUpdateBackend;
+
+  // Autosave: when enabled and there's a valid unsaved edit, silently persist
+  // after a short debounce so users don't have to click Save.
+  useEffect(() => {
+    if (!autoSaveEnabled) return;
+    if (!hasValidUnsavedEdit) return;
+    if (isSavingBackend) return;
+    const timer = window.setTimeout(() => {
+      void updateBackendRef.current(true);
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [autoSaveEnabled, hasValidUnsavedEdit, isSavingBackend, assignmentsBySection]);
 
   const handleSaveSectionModal = useCallback(async () => {
     if (!data || !sectionModal) return;
@@ -3053,6 +3108,7 @@ type MeetingPatternPlacementOption = {
             : "Section updates saved to backend.",
       });
       if (typeof window !== "undefined") {
+        await recordOwnServerWrite();
         window.dispatchEvent(new Event(SCHEDULING_DATA_REFRESH_EVENT));
       }
       if (sectionModal.mode === "create") {
@@ -3073,6 +3129,7 @@ type MeetingPatternPlacementOption = {
     assignmentsBySection,
     data,
     persistSections,
+    recordOwnServerWrite,
     sectionModal,
     solverInput,
     solverTimeslotIdsBySection,
@@ -3248,67 +3305,79 @@ type MeetingPatternPlacementOption = {
         <div className="flex flex-col items-stretch gap-2 w-full md:w-auto">
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2">
             <div
-              onMouseEnter={() => setToolbarActionHint("Run solver using current backend data and placement locks.")}
+              onMouseEnter={() =>
+                setToolbarActionHint(
+                  solverBusyRemote
+                    ? solverLock.startedBy
+                      ? `Solver is running (started by ${solverLock.startedBy}). Please wait.`
+                      : "Solver is running. Please wait."
+                    : "Run solver using current backend data and placement locks.",
+                )
+              }
               onMouseLeave={() => setToolbarActionHint(null)}
-              onFocus={() => setToolbarActionHint("Run solver using current backend data and placement locks.")}
+              onFocus={() =>
+                setToolbarActionHint(
+                  solverBusyRemote
+                    ? solverLock.startedBy
+                      ? `Solver is running (started by ${solverLock.startedBy}). Please wait.`
+                      : "Solver is running. Please wait."
+                    : "Run solver using current backend data and placement locks.",
+                )
+              }
               onBlur={() => setToolbarActionHint(null)}
               className="contents"
             >
               <button
                 type="button"
-                disabled={solverRunStatus === "loading" || !data}
+                disabled={
+                  solverRunStatus === "loading" || !data || solverBusyRemote
+                }
                 onClick={() => void handleRunSolverFromCalendar()}
                 className={clsx(
                   "flex items-center justify-center rounded-lg size-10 font-bold border transition-colors",
-                  solverRunStatus !== "loading" && data
+                  solverRunStatus !== "loading" && data && !solverBusyRemote
                     ? "bg-[#137fec] text-white border-[#137fec] shadow-lg shadow-[#137fec]/20 hover:bg-[#0f6dca]"
                     : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
                 )}
-                title="Run the solver using backend scheduling data and locks from this page"
+                title={
+                  solverBusyRemote
+                    ? solverLock.startedBy
+                      ? `Solver is running (started by ${solverLock.startedBy})`
+                      : "Solver is running"
+                    : "Run the solver using backend scheduling data and locks from this page"
+                }
                 aria-label="Run solver"
               >
                 <Play className="size-4" />
               </button>
             </div>
-            <div
-              onMouseEnter={() => setToolbarActionHint("Persist valid calendar edits to backend tables.")}
-              onMouseLeave={() => setToolbarActionHint(null)}
-              onFocus={() => setToolbarActionHint("Persist valid calendar edits to backend tables.")}
-              onBlur={() => setToolbarActionHint(null)}
-              className="contents"
-            >
-              <button
-                type="button"
-                disabled={!hasValidUnsavedEdit || isSavingBackend}
-                onClick={handleUpdateBackend}
-                className={clsx(
-                  "flex items-center justify-center rounded-lg size-10 font-bold border transition-colors",
-                  hasValidUnsavedEdit && !isSavingBackend
-                    ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
-                    : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
-                )}
-                title={
-                  hasValidUnsavedEdit
-                    ? "Persist valid calendar edits to backend"
-                    : "Make a valid edit first to enable backend update"
+            {!autoSaveEnabled && hasValidUnsavedEdit && (
+              <div
+                onMouseEnter={() =>
+                  setToolbarActionHint("Autosave is off — click Save to persist calendar edits.")
                 }
-                aria-label="Update backend"
+                onMouseLeave={() => setToolbarActionHint(null)}
+                className="flex items-center pl-1 pr-2"
               >
-                <CloudBackup className="size-4" />
-              </button>
-            </div>
+                <button
+                  type="button"
+                  disabled={isSavingBackend}
+                  onClick={() => void handleUpdateBackend(false)}
+                  className={clsx(
+                    "flex items-center justify-center rounded-lg h-8 px-3 text-xs font-bold border transition-colors",
+                    isSavingBackend
+                      ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                      : "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100",
+                  )}
+                  title="Save valid calendar edits"
+                  aria-label="Save"
+                >
+                  <CloudBackup className="size-4 mr-1" />
+                  Save
+                </button>
+              </div>
+            )}
             <div className="hidden lg:block h-7 w-px bg-slate-200 mx-1" />
-            <Link
-              href="/editor/sections"
-              onMouseEnter={() => setToolbarActionHint("Open section editor tables to manage course data.")}
-              onMouseLeave={() => setToolbarActionHint(null)}
-              onFocus={() => setToolbarActionHint("Open section editor tables to manage course data.")}
-              onBlur={() => setToolbarActionHint(null)}
-              className="flex items-center justify-center rounded-lg size-10 bg-slate-100 text-slate-800 font-bold border border-slate-200 hover:bg-slate-200 transition-colors"
-              aria-label="Edit schedule data"
-            >
-              <Pencil className="size-4" />
-            </Link>
             <button
               type="button"
               onClick={openSaveScheduleModal}
@@ -3322,17 +3391,6 @@ type MeetingPatternPlacementOption = {
             >
               <Save className="size-4" />
             </button>
-            <Link
-              href="/history"
-              onMouseEnter={() => setToolbarActionHint("Open schedule history entries.")}
-              onMouseLeave={() => setToolbarActionHint(null)}
-              onFocus={() => setToolbarActionHint("Open schedule history entries.")}
-              onBlur={() => setToolbarActionHint(null)}
-              className="flex items-center justify-center rounded-lg size-10 bg-slate-100 text-slate-800 font-bold border border-slate-200 hover:bg-slate-200 transition-colors"
-              aria-label="History"
-            >
-              <FolderClock className="size-4" />
-            </Link>
             <button
               onMouseEnter={() => setToolbarActionHint("Export the visible calendar to PDF.")}
               onMouseLeave={() => setToolbarActionHint(null)}
@@ -3345,50 +3403,37 @@ type MeetingPatternPlacementOption = {
               <Share2 className="size-4" />
             </button>
             <div className="hidden lg:block h-7 w-px bg-slate-200 mx-1" />
-            <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden">
-              <button
-                type="button"
-                onClick={lockAllPlacementChanges}
-                onMouseEnter={() => setToolbarActionHint("Lock all changed placements for solver runs.")}
-                onMouseLeave={() => setToolbarActionHint(null)}
-                onFocus={() => setToolbarActionHint("Lock all changed placements for solver runs.")}
-                onBlur={() => setToolbarActionHint(null)}
-                className="flex items-center justify-center h-10 w-10 bg-amber-50 text-amber-900 font-bold hover:bg-amber-100 transition-colors"
-                title="Hard-lock every section whose placement differs from the saved baseline (needs room + times)"
-                aria-label="Lock all changes"
-              >
-                <Lock className="size-4" />
-              </button>
-              <div
-                onMouseEnter={() => setToolbarActionHint("Remove all placement locks from this calendar view.")}
-                onMouseLeave={() => setToolbarActionHint(null)}
-                onFocus={() => setToolbarActionHint("Remove all placement locks from this calendar view.")}
-                onBlur={() => setToolbarActionHint(null)}
-                className="contents"
-              >
-                <button
-                  type="button"
-                  disabled={!hasAnyPlacementLock}
-                  onClick={unlockAllPlacementLocks}
-                  className={clsx(
-                    "flex items-center justify-center h-10 w-10 font-bold border-l transition-colors",
-                    hasAnyPlacementLock
-                      ? "bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100"
-                      : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
-                  )}
-                  title="Remove all placement locks added from this calendar view"
-                  aria-label="Unlock all changes"
-                >
-                  <Unlock className="size-4" />
-                </button>
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={() => setScheduleDrawerOpen(true)}
+              onMouseEnter={() => setToolbarActionHint("Open the schedule table to bulk lock/unlock sections for the solver.")}
+              onMouseLeave={() => setToolbarActionHint(null)}
+              onFocus={() => setToolbarActionHint("Open the schedule table to bulk lock/unlock sections for the solver.")}
+              onBlur={() => setToolbarActionHint(null)}
+              className="relative flex items-center justify-center rounded-lg size-10 bg-slate-100 text-slate-800 font-bold border border-slate-200 hover:bg-slate-200 transition-colors"
+              title="Open schedule table (lock sections for the solver)"
+              aria-label="Open schedule table"
+            >
+              <Table2 className="size-4" />
+              {hasAnyPlacementLock && (
+                <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold leading-4 text-center">
+                  {lockedSectionIds.length}
+                </span>
+              )}
+            </button>
           </div>
+          <div className="relative h-[34px] w-full">
           <div
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 min-h-[34px] flex items-center"
+            className={clsx(
+              "rounded-lg px-3 py-2 text-xs font-semibold flex items-center transition-opacity absolute inset-0",
+              toolbarActionHint
+                ? "border border-slate-200 bg-slate-50 text-slate-700 opacity-100"
+                : "opacity-0 pointer-events-none",
+            )}
             aria-live="polite"
           >
-            {toolbarActionHint ?? "\u00A0"}
+            <span>{toolbarActionHint ?? " "}</span>
+          </div>
           </div>
           {hasValidUnsavedEdit && (
             <p className="text-[11px] font-semibold text-emerald-700 px-1">
@@ -3427,7 +3472,6 @@ type MeetingPatternPlacementOption = {
           </div>
           <div className="flex flex-1 flex-col sm:flex-row gap-3">
             <MultiSelect
-              label="Filter by departments"
               placeholder="Departments"
               options={departmentFilterOptions}
               value={selectedDepartmentKeys}
@@ -3435,7 +3479,6 @@ type MeetingPatternPlacementOption = {
               showSearch
             />
             <MultiSelect
-              label="Filter by professors"
               placeholder="Professors"
               options={professorFilterOptions}
               value={selectedInstructorIds}
@@ -3581,7 +3624,7 @@ type MeetingPatternPlacementOption = {
           onClick={openCreateSectionModal}
           className="flex items-center justify-center rounded-lg h-10 px-4 bg-indigo-50 text-indigo-800 font-bold border border-indigo-200 hover:bg-indigo-100 transition-colors shrink-0"
         >
-          + Add Section
+          Add Section
         </button>
       </div>
 
@@ -4173,54 +4216,75 @@ type MeetingPatternPlacementOption = {
         </div>
       </div>
 
-      {/* Bottom cards - similar vibe to reference */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <BarChart3 className="size-5 text-[#137fec]" />
-            <h3 className="font-bold text-sm text-slate-900">
-              Day Summary
-            </h3>
-          </div>
-          <div className="text-sm text-slate-600">
-            Showing <span className="font-bold">{dayEvents.length}</span>{" "}
-            scheduled section(s) across <span className="font-bold">{roomRows.length}</span>{" "}
-            room(s) for <span className="font-bold">{selectedDay}</span>. Use the{" "}
-            <span className="font-bold">department colors</span> legend above to match swatches to departments.
-          </div>
-        </div>
-
-        <div className="bg-rose-50 p-6 rounded-xl border border-rose-100 shadow-sm col-span-1 md:col-span-2">
-          <div className="flex items-center gap-2 mb-4">
-            <AlertTriangle className="size-5 text-rose-500" />
-            <h3 className="font-bold text-sm text-rose-900">
-              Conflict Detection (prototype)
-            </h3>
-          </div>
-          <div className="text-[11px] leading-relaxed text-slate-700">
-            This view is a visual schedule representation. Conflict detection can
-            be computed from constraints and solver output in a later step.
-          </div>
-        </div>
-      </div>
-
-      {/* Table view: placements + lock for solver */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="flex flex-col gap-1 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+      {scheduleDrawerOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-slate-900/40"
+          onClick={() => setScheduleDrawerOpen(false)}
+          aria-hidden
+        />
+      )}
+      <aside
+        className={clsx(
+          "fixed top-0 right-0 z-50 h-full w-full max-w-[720px] bg-white shadow-2xl flex flex-col transition-transform duration-200",
+          scheduleDrawerOpen ? "translate-x-0" : "translate-x-full",
+        )}
+        role="dialog"
+        aria-label="Schedule table"
+        aria-hidden={!scheduleDrawerOpen}
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+          <div className="min-w-0">
             <h3 className="text-sm font-bold text-slate-900">Schedule table</h3>
-            <p className="text-[11px] text-slate-500">
-              Lock keeps a section on its current room and times when you run the solver. Cross-listed
-              sections lock as a group.
+            <p className="text-[11px] text-slate-500 truncate">
+              Lock keeps a section on its current room and times when you run the solver. Cross-listed sections lock as a group.
             </p>
           </div>
+          <button
+            type="button"
+            onClick={() => setScheduleDrawerOpen(false)}
+            className="flex items-center justify-center rounded-lg size-8 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors shrink-0"
+            aria-label="Close schedule table"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-4 py-2 bg-slate-50">
+          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+            {tableSectionsFiltered.length} section{tableSectionsFiltered.length === 1 ? "" : "s"}
+          </span>
           {hasAnyPlacementLock && (
             <span className="text-[10px] font-bold uppercase tracking-wide text-amber-800">
-              {lockedSectionIds.length} locked id(s)
+              · {lockedSectionIds.length} locked
             </span>
           )}
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={lockAllPlacementChanges}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-900 hover:bg-amber-100 transition-colors"
+              title="Hard-lock every section whose placement differs from the saved baseline (needs room + times)"
+            >
+              <Lock className="size-3.5" />
+              Lock all changes
+            </button>
+            <button
+              type="button"
+              disabled={!hasAnyPlacementLock}
+              onClick={unlockAllPlacementLocks}
+              className={clsx(
+                "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold transition-colors",
+                hasAnyPlacementLock
+                  ? "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed",
+              )}
+              title="Remove all placement locks added from this calendar view"
+            >
+              <Unlock className="size-3.5" />
+              Unlock all
+            </button>
+          </div>
         </div>
-        <div className="overflow-x-auto max-h-[min(480px,55vh)] overflow-y-auto">
+        <div className="flex-1 overflow-x-auto overflow-y-auto">
           <table className="w-full text-left text-sm">
             <thead className="sticky top-0 z-[1] bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
@@ -4290,7 +4354,7 @@ type MeetingPatternPlacementOption = {
             </tbody>
           </table>
         </div>
-      </div>
+      </aside>
 
       {calendarContextMenu &&
         dragFeedbackToastMount &&

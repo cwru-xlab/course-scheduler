@@ -8,12 +8,20 @@ export type PersistSchedulingResult =
 /** Write full scheduling input to the solver database (sections, states, constraints, etc.). */
 export async function persistSchedulingInput(
   input: SchedulingInput,
+  options?: { manualActivity?: boolean },
 ): Promise<PersistSchedulingResult> {
   const normalized = normalizeCrosslistData(input);
 
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (options?.manualActivity) {
+    headers["X-Activity-Source"] = "manual";
+  }
+
   const response = await fetch("/api/update-all", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(normalized),
   });
 

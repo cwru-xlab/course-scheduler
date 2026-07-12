@@ -7,6 +7,7 @@ import { EditorModalShell } from "@/components/scheduler/editors/EditorModalShel
 import type { RowNote as StoredRowNote } from "@/lib/notes/types";
 import { NOTES_STORAGE_PREFIX } from "@/lib/notes/types";
 import type { SchedulingInput } from "@/lib/scheduling/types";
+import { isSectionArchived, normalizeSectionState } from "@/lib/scheduling/sectionState";
 
 type FeedItem = {
   id: string;
@@ -23,6 +24,7 @@ type FeedItem = {
 type RowPreview = {
   title: string;
   fields: Array<{ label: string; value: string }>;
+  isArchivedSection?: boolean;
 };
 
 const STORAGE_PREFIX = NOTES_STORAGE_PREFIX;
@@ -55,14 +57,29 @@ const scopeToLabel: Record<string, string> = {
   "constraints-soft-locks": "Constraints: Soft Locks",
 };
 
+function isArchivedSectionFeedItem(
+  item: FeedItem,
+  data: SchedulingInput | null,
+): boolean {
+  if (item.scope !== "sections" || !data) return false;
+  const row = data.sections.find((s) => String(s.id) === item.rowId);
+  return row ? isSectionArchived(row) : false;
+}
+
 /** Opens the row's notes modal on the editor page and focuses the feed item's note/reply. */
-function editorHrefWithNotesModal(item: FeedItem): string {
+function editorHrefWithNotesModal(
+  item: FeedItem,
+  data: SchedulingInput | null,
+): string {
   const route = scopeToRoute[item.scope] ?? "/editor/sections";
   const anchorId = `note-${item.scope}-${encodeURIComponent(item.rowId)}`;
   const params = new URLSearchParams();
   params.set("openRowNotes", "1");
   params.set("noteScope", item.scope);
   params.set("noteRow", item.rowId);
+  if (isArchivedSectionFeedItem(item, data)) {
+    params.set("revealArchived", "1");
+  }
   if (item.kind === "note") {
     const noteId = item.id.startsWith("note-") ? item.id.slice("note-".length) : item.id;
     params.set("focusNote", noteId);
@@ -214,9 +231,12 @@ export default function NotesFeedPage() {
       case "sections": {
         const row = data.sections.find((s) => String(s.id) === item.rowId);
         if (!row) return null;
+        const archived = isSectionArchived(row);
         return {
           title: `Section ${row.id}`,
+          isArchivedSection: archived,
           fields: [
+            { label: "State", value: normalizeSectionState(row.state) },
             { label: "Department", value: String((row as { department?: string }).department ?? "N/A") },
             { label: "Course ID", value: String(row.course_id) },
             { label: "Section Code", value: String(row.section_code) },
@@ -459,7 +479,8 @@ export default function NotesFeedPage() {
           </div>
         ) : (
           filteredFeedItems.map((item) => {
-            const href = editorHrefWithNotesModal(item);
+            const href = editorHrefWithNotesModal(item, scheduleData);
+            const isArchivedSection = isArchivedSectionFeedItem(item, scheduleData);
             return (
               <div
                 key={item.id}
@@ -493,6 +514,11 @@ export default function NotesFeedPage() {
                       <span className="font-semibold text-slate-700">
                         {scopeToLabel[item.scope] ?? item.scope}
                       </span>
+                      {isArchivedSection && (
+                        <span className="rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                          Archived section
+                        </span>
+                      )}
                       <span>-</span>
                       <span>{new Date(item.createdAt).toLocaleString()}</span>
                       <span>-</span>
@@ -529,7 +555,7 @@ export default function NotesFeedPage() {
         footer={
           selectedItem ? (
             <Link
-              href={editorHrefWithNotesModal(selectedItem)}
+              href={editorHrefWithNotesModal(selectedItem, scheduleData)}
               className="rounded-lg bg-[#137fec] px-4 py-2 text-white text-sm font-bold hover:opacity-90"
             >
               Open notes for this row
@@ -564,7 +590,20 @@ export default function NotesFeedPage() {
                 }
                 return (
                   <div className="mt-2 rounded-lg border border-slate-200 p-3">
-                    <div className="font-semibold text-slate-900">{preview.title}</div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="font-semibold text-slate-900">{preview.title}</div>
+                      {preview.isArchivedSection && (
+                        <span className="rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                          Archived section
+                        </span>
+                      )}
+                    </div>
+                    {preview.isArchivedSection && (
+                      <p className="mt-2 text-xs text-slate-500">
+                        Opening this row will show archived sections in the editor so the notes
+                        modal can open.
+                      </p>
+                    )}
                     <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {preview.fields.map((f) => (
                         <div key={f.label} className="text-slate-700">

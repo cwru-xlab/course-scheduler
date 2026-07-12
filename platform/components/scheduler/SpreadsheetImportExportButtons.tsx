@@ -2,26 +2,40 @@
 
 import { useRef, useState, type ChangeEvent } from "react";
 import { Button } from "@heroui/button";
+import { FileDown, FileUp } from "lucide-react";
 
 import { ImportSpreadsheetWarningModal } from "@/components/scheduler/ImportSpreadsheetWarningModal";
+import {
+  editorToolbarBtnSecondary,
+} from "@/components/scheduler/editors/editorToolbarStyles";
 import { collectRowNotesForExport } from "@/lib/notes/storage";
 import { importSpreadsheetFile } from "@/lib/spreadsheet-import-client";
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
+import {
+  enrichSpreadsheetErrors,
+  formatErrorsDetail,
+  formatErrorsSummary,
+  normalizeNetworkError,
+} from "@/lib/spreadsheet/formatGuide";
 import type { SchedulingInput, ValidationError } from "@/lib/scheduling/types";
-
-const secondaryClassName =
-  "bg-slate-100 dark:bg-default-100 text-slate-700 dark:text-foreground font-bold border border-slate-200 dark:border-default-200";
 
 type Props = {
   data: SchedulingInput;
+  onFeedbackChange?: (feedback: SpreadsheetFeedback | null) => void;
 };
 
-export function SpreadsheetImportExportButtons({ data }: Props) {
+export type SpreadsheetFeedback = {
+  type: "success" | "error";
+  message: string;
+  errors?: ValidationError[];
+  detail?: string;
+};
+
+export function SpreadsheetImportExportButtons({ data, onFeedbackChange }: Props) {
   const { updateData } = useSchedulingData();
   const [spreadsheetStatus, setSpreadsheetStatus] = useState<
     "idle" | "importing" | "import-success" | "import-error" | "exporting" | "export-error"
   >("idle");
-  const [spreadsheetMessage, setSpreadsheetMessage] = useState("");
   const [importWarningOpen, setImportWarningOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -39,7 +53,7 @@ export function SpreadsheetImportExportButtons({ data }: Props) {
     if (!file) return;
 
     setSpreadsheetStatus("importing");
-    setSpreadsheetMessage("");
+    onFeedbackChange?.(null);
 
     try {
       const result = await importSpreadsheetFile(file, {
@@ -47,26 +61,37 @@ export function SpreadsheetImportExportButtons({ data }: Props) {
       });
       if (!result.ok) {
         setSpreadsheetStatus("import-error");
-        setSpreadsheetMessage(result.message);
+        onFeedbackChange?.({
+          type: "error",
+          message: result.message,
+          errors: result.errors,
+          detail: result.detail,
+        });
         return;
       }
 
       updateData(result.scheduling_input);
       setSpreadsheetStatus("import-success");
-      setSpreadsheetMessage(result.message);
+      onFeedbackChange?.({ type: "success", message: result.message });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to import spreadsheet.";
+      const raw = err instanceof Error ? err.message : "Failed to import spreadsheet.";
+      const errors = enrichSpreadsheetErrors(
+        [{ code: "import_failed", message: normalizeNetworkError(raw, "import") }],
+        "import",
+      );
       setSpreadsheetStatus("import-error");
-      setSpreadsheetMessage(message);
-    } finally {
-      event.target.value = "";
-      setTimeout(() => setSpreadsheetStatus("idle"), 3000);
+      onFeedbackChange?.({
+        type: "error",
+        message: formatErrorsSummary(errors),
+        errors,
+        detail: formatErrorsDetail(errors),
+      });
     }
   };
 
   const exportSpreadsheet = async () => {
     setSpreadsheetStatus("exporting");
-    setSpreadsheetMessage("");
+    onFeedbackChange?.(null);
     try {
       const response = await fetch("/api/export-scheduling-spreadsheet", {
         method: "POST",
@@ -74,15 +99,32 @@ export function SpreadsheetImportExportButtons({ data }: Props) {
         body: JSON.stringify({ input: data, notes: collectRowNotesForExport() }),
       });
       if (!response.ok) {
-        let message = "Failed to export spreadsheet.";
+        let errors: ValidationError[] = [
+          { code: "export_failed", message: "Failed to export spreadsheet." },
+        ];
         try {
           const payload = (await response.json()) as { errors?: ValidationError[] };
-          message = payload.errors?.[0]?.message ?? message;
+          if (Array.isArray(payload.errors) && payload.errors.length > 0) {
+            errors = enrichSpreadsheetErrors(payload.errors, "export");
+          }
         } catch {
-          // Keep fallback message.
+          errors = enrichSpreadsheetErrors(
+            [
+              {
+                code: "export_failed",
+                message: `Export failed with status ${response.status}.`,
+              },
+            ],
+            "export",
+          );
         }
         setSpreadsheetStatus("export-error");
-        setSpreadsheetMessage(message);
+        onFeedbackChange?.({
+          type: "error",
+          message: formatErrorsSummary(errors),
+          errors,
+          detail: formatErrorsDetail(errors),
+        });
         return;
       }
 
@@ -99,11 +141,20 @@ export function SpreadsheetImportExportButtons({ data }: Props) {
       anchor.remove();
       window.URL.revokeObjectURL(url);
       setSpreadsheetStatus("idle");
-      setSpreadsheetMessage("");
+      onFeedbackChange?.(null);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to export spreadsheet.";
+      const raw = err instanceof Error ? err.message : "Failed to export spreadsheet.";
+      const errors = enrichSpreadsheetErrors(
+        [{ code: "network_error", message: normalizeNetworkError(raw, "export") }],
+        "export",
+      );
       setSpreadsheetStatus("export-error");
-      setSpreadsheetMessage(message);
+      onFeedbackChange?.({
+        type: "error",
+        message: formatErrorsSummary(errors),
+        errors,
+        detail: formatErrorsDetail(errors),
+      });
     }
   };
 
@@ -124,29 +175,25 @@ export function SpreadsheetImportExportButtons({ data }: Props) {
         }}
       />
       <Button
-        className={secondaryClassName}
+        size="sm"
+        radius="md"
+        className={editorToolbarBtnSecondary}
+        startContent={<FileUp className="size-3.5" aria-hidden />}
         onPress={handleImportButtonPress}
         isLoading={spreadsheetStatus === "importing"}
       >
-        Import Spreadsheet
+        Import
       </Button>
       <Button
-        className={secondaryClassName}
+        size="sm"
+        radius="md"
+        className={editorToolbarBtnSecondary}
+        startContent={<FileDown className="size-3.5" aria-hidden />}
         onPress={exportSpreadsheet}
         isLoading={spreadsheetStatus === "exporting"}
       >
-        Export Spreadsheet
+        Export
       </Button>
-      {spreadsheetStatus === "import-success" && (
-        <span className="text-sm text-emerald-600 dark:text-emerald-400 font-semibold">
-          {spreadsheetMessage}
-        </span>
-      )}
-      {(spreadsheetStatus === "import-error" || spreadsheetStatus === "export-error") && (
-        <span className="text-sm text-red-600 dark:text-red-400 font-semibold">
-          {spreadsheetMessage}
-        </span>
-      )}
     </>
   );
 }

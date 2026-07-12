@@ -1,13 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
+import { ReadOnlyIdCell } from "./ReadOnlyIdCell";
 import { EditableCell } from "../EditableCell";
 import { EditableSelectCell } from "../EditableSelectCell";
 import { MultiSelect } from "../MultiSelect";
 import { RowNotesButton } from "../RowNotesButton";
 import { EditorColumnFilters } from "./EditorColumnFilters";
+import { EditorColumnPicker } from "./EditorColumnPicker";
 import { EditorConfigurableTable } from "./EditorConfigurableTable";
+import { useEditorColumnVisibility } from "./useEditorColumnVisibility";
+import { useStableRowWrappers } from "./useStableRowWrappers";
 import { EditorRowActions } from "./EditorRowActions";
 import { EditorTableShell } from "./EditorTableShell";
 import {
@@ -18,7 +22,7 @@ import {
 import { sortDefsFromFilterDefs } from "./editorSort";
 import { TIMESLOT_COLUMN_SPECS } from "./editorColumnSpecs";
 import { useEditorActions } from "./EditorActionProvider";
-import { editorRowKey, recentlyAddedRowClass } from "./editorRowHighlight";
+import { editorRowKey } from "./editorRowHighlight";
 import { TimeslotEditModal } from "./modals/TimeslotEditModal";
 import {
   TIMESLOT_BLOCK_TYPE_OPTIONS,
@@ -53,9 +57,10 @@ const createEmptyTimeslot = (existing: Timeslot[]): Timeslot => ({
 export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
+  const columnVisibility = useEditorColumnVisibility("timeslots", TIMESLOT_COLUMN_SPECS);
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<Timeslot | null>(null);
-  const { confirmRowAdded, isRowRecentlyAdded } = useEditorActions();
+  const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
 
   const updateTimeslot = (index: number, field: keyof Timeslot, value: unknown) => {
     const newTimeslots = [...timeslots];
@@ -117,9 +122,15 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
     [timeslotFilterDefs],
   );
 
-  const timeslotRows = useMemo(
-    (): TimeslotRow[] => timeslots.map((slot, index) => ({ slot, index })),
-    [timeslots],
+  const buildTimeslotRow = useCallback(
+    (slot: Timeslot, index: number): TimeslotRow => ({ slot, index }),
+    [],
+  );
+  const pickTimeslotBase = useCallback((row: TimeslotRow) => row.slot, []);
+  const timeslotRows = useStableRowWrappers(
+    timeslots,
+    buildTimeslotRow,
+    pickTimeslotBase,
   );
 
   const filteredTimeslots = useMemo((): TimeslotRow[] => {
@@ -145,7 +156,7 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
   const renderCell = (columnId: string, { slot, index: idx }: TimeslotRow) => {
     switch (columnId) {
       case "id":
-        return <EditableCell value={slot.id} onChange={(v) => updateTimeslot(idx, "id", v)} />;
+        return <ReadOnlyIdCell value={slot.id} />;
       case "days":
         return (
           <MultiSelect
@@ -192,18 +203,27 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
   return (
     <EditorTableShell
       title={`Timeslots (${filteredTimeslots.length})`}
-      addLabel="+ Add Timeslot"
+      addLabel="Add Timeslot"
       onAdd={addTimeslot}
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
       searchPlaceholder="Search timeslots..."
       filterBar={
-        <EditorColumnFilters
-          defs={timeslotFilterDefs}
-          rows={timeslotRows}
-          filters={columnFilters}
-          onChange={setColumnFilters}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <EditorColumnFilters
+            defs={timeslotFilterDefs}
+            rows={timeslotRows}
+            filters={columnFilters}
+            onChange={setColumnFilters}
+          />
+          <EditorColumnPicker
+            specs={columnVisibility.specs}
+            visibleIds={columnVisibility.visibleIds}
+            onToggle={columnVisibility.toggleColumn}
+            onShowAll={columnVisibility.showAllColumns}
+            onHideAll={columnVisibility.hideAllColumns}
+          />
+        </div>
       }
       emptyMessage='No timeslots. Click "Add Timeslot" to create one.'
       noMatchMessage="No timeslots match your search or filters."
@@ -213,14 +233,16 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
       <EditorConfigurableTable
         editorKey="timeslots"
         columnSpecs={TIMESLOT_COLUMN_SPECS}
+        visibility={columnVisibility}
         rows={filteredTimeslots}
         sortDefs={timeslotSortDefs}
         getRowKey={({ slot, index }) => `${slot.id}-${index}`}
         getRowId={({ slot }) => `note-timeslots-${encodeURIComponent(String(slot.id))}`}
         getRowClassName={({ slot }) =>
-          recentlyAddedRowClass(
+          getRowHighlightClass(
             "border-t border-default-200",
-            isRowRecentlyAdded(editorRowKey("timeslots", String(slot.id))),
+            "timeslots",
+            String(slot.id),
           )
         }
         renderCell={renderCell}

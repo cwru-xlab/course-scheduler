@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
-import { Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from "@heroui/dropdown";
+import clsx from "clsx";
+
+import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 
 type EditorPageTitleDropdownProps = {
   current: "sections" | "instructors" | "rooms" | "timeslots" | "meeting-patterns" | "constraints";
@@ -18,34 +19,39 @@ const EDITOR_PAGES: Array<{ key: EditorPageTitleDropdownProps["current"]; label:
   { key: "constraints", label: "Constraints", href: "/editor/constraints" },
 ];
 
-export function EditorPageTitleDropdown({ current, title }: EditorPageTitleDropdownProps) {
+export function EditorPageTitleDropdown({ current, title: _title }: EditorPageTitleDropdownProps) {
+  const { confirmLeaveIfUnsaved } = useSchedulingData();
+
   return (
-    <Dropdown placement="bottom-start">
-      <DropdownTrigger>
-        <button
-          type="button"
-          className="inline-flex items-center gap-2 rounded-lg transition-colors hover:text-weatherhead-primary"
-          aria-label="Open editor page selector"
-        >
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">{title}</h1>
-          <ChevronDown className="size-5 text-slate-500" />
-        </button>
-      </DropdownTrigger>
-      <DropdownMenu aria-label="Editor pages">
-        {EDITOR_PAGES.map((page) => (
-          <DropdownItem key={page.key} textValue={page.label}>
-            <Link
-              href={page.href}
-              className={`block w-full ${
-                page.key === current ? "font-bold text-weatherhead-primary" : "text-slate-700"
-              }`}
-            >
-              {page.label}
-            </Link>
-          </DropdownItem>
-        ))}
-      </DropdownMenu>
-    </Dropdown>
+    <nav
+      aria-label="Editor pages"
+      className="inline-flex flex-wrap items-center gap-1 rounded-lg border border-slate-200 bg-white p-1"
+    >
+      {EDITOR_PAGES.map((page) => {
+        const isActive = page.key === current;
+        return (
+          <Link
+            key={page.key}
+            href={page.href}
+            onClick={(event) => {
+              if (isActive) {
+                event.preventDefault();
+                return;
+              }
+              if (!confirmLeaveIfUnsaved()) event.preventDefault();
+            }}
+            aria-current={isActive ? "page" : undefined}
+            className={clsx(
+              "px-3 py-1.5 rounded-md text-sm font-semibold whitespace-nowrap transition-colors",
+              isActive
+                ? "bg-weatherhead-primary/10 text-weatherhead-primary"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+            )}
+          >
+            {page.label}
+          </Link>
+        );
+      })}
+    </nav>
   );
 }
-

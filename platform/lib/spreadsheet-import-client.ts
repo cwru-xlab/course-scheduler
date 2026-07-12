@@ -4,6 +4,13 @@ import {
 } from "@/lib/notes/storage";
 import type { NotesRowPatch } from "@/lib/notes/types";
 import type { SchedulingInput, ValidationError } from "@/lib/scheduling/types";
+import {
+  enrichSpreadsheetErrors,
+  formatErrorsDetail,
+  formatErrorsSummary,
+  isFetchFailedMessage,
+  normalizeNetworkError,
+} from "@/lib/spreadsheet/formatGuide";
 
 export type ImportSpreadsheetResponse =
   | {
@@ -31,21 +38,68 @@ export async function importSpreadsheetFile(
   ok: false;
   errors: ValidationError[];
   message: string;
+  detail: string;
 }> {
   const formData = new FormData();
   formData.set("file", file, file.name);
 
-  const response = await fetch("/api/import-scheduling-spreadsheet", {
-    method: "POST",
-    body: formData,
-  });
-  const result = (await response.json()) as ImportSpreadsheetResponse;
+  let response: Response;
+  try {
+    response = await fetch("/api/import-scheduling-spreadsheet", {
+      method: "POST",
+      body: formData,
+    });
+  } catch (error) {
+    const raw = error instanceof Error ? error.message : "Failed to import spreadsheet.";
+    const message = normalizeNetworkError(
+      isFetchFailedMessage(raw) ? "fetch failed" : raw,
+      "import",
+    );
+    const errors = enrichSpreadsheetErrors([{ code: "network_error", message }], "import");
+    return {
+      ok: false,
+      errors,
+      message: formatErrorsSummary(errors),
+      detail: formatErrorsDetail(errors),
+    };
+  }
+
+  let result: ImportSpreadsheetResponse;
+  try {
+    result = (await response.json()) as ImportSpreadsheetResponse;
+  } catch {
+    const errors = enrichSpreadsheetErrors(
+      [
+        {
+          code: "import_failed",
+          message: `Import API returned a non-JSON response (status ${response.status}).`,
+        },
+      ],
+      "import",
+    );
+    return {
+      ok: false,
+      errors,
+      message: formatErrorsSummary(errors),
+      detail: formatErrorsDetail(errors),
+    };
+  }
 
   if (!response.ok || result.status === "error") {
     const importErrors =
       result.status === "error" && Array.isArray(result.errors) ? result.errors : [];
-    const message = importErrors[0]?.message ?? "Failed to import spreadsheet.";
-    return { ok: false, errors: importErrors, message };
+    const errors = enrichSpreadsheetErrors(
+      importErrors.length > 0
+        ? importErrors
+        : [{ code: "import_failed", message: "Failed to import spreadsheet." }],
+      "import",
+    );
+    return {
+      ok: false,
+      errors,
+      message: formatErrorsSummary(errors),
+      detail: formatErrorsDetail(errors),
+    };
   }
 
   const summary = applyNotesImportOverwriteToLocalStorage(result.notes_patches ?? []);

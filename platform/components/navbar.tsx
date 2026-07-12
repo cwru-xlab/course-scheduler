@@ -1,18 +1,12 @@
 "use client";
 
-import { siteConfig } from "@/config/site";
-import { Button } from "@heroui/button";
-import {
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownTrigger,
-} from "@heroui/dropdown";
 import clsx from "clsx";
-import { Calendar as CalendarIcon, ChevronDown, History, MessageSquare } from "lucide-react";
+import { Calendar as CalendarIcon, History, MessageSquare } from "lucide-react";
 import NextLink from "next/link";
 import { usePathname } from "next/navigation";
 
+import { LiveUsersIndicator } from "@/components/LiveUsersIndicator";
+import { NavbarSettingsMenu } from "@/components/NavbarSettingsMenu";
 import { UserMenu } from "@/components/user-menu";
 import { SolverProgressIndicator } from "@/components/SolverProgressIndicator";
 import { isFullBleedRoute, pageHorizontalGutterClassName } from "@/lib/layout/pageGutters";
@@ -46,29 +40,17 @@ export const Navbar = () => {
           </NextLink>
 
           <nav className="hidden md:flex items-center gap-1">
-            <Dropdown>
-              <DropdownTrigger>
-                <Button
-                  variant="light"
-                  className={clsx(
-                    "px-4 py-2 text-sm font-semibold rounded-lg transition-colors",
-                    isEditorActive
-                      ? "bg-weatherhead-primary/10 text-weatherhead-primary dark:bg-weatherhead-primary/20"
-                      : "text-slate-600 dark:text-default-500 hover:text-weatherhead-primary hover:bg-slate-100 dark:hover:bg-default-50",
-                  )}
-                  endContent={<ChevronDown className="size-4" />}
-                >
-                  Editor
-                </Button>
-              </DropdownTrigger>
-              <DropdownMenu aria-label="Editor pages">
-                {siteConfig.editorItems.map((item) => (
-                  <DropdownItem key={item.href} href={item.href}>
-                    {item.label}
-                  </DropdownItem>
-                ))}
-              </DropdownMenu>
-            </Dropdown>
+            <NextLink
+              href="/editor/sections"
+              className={clsx(
+                "px-4 py-2 text-sm font-semibold rounded-lg transition-colors",
+                isEditorActive
+                  ? "bg-weatherhead-primary/10 text-weatherhead-primary dark:bg-weatherhead-primary/20"
+                  : "text-slate-600 dark:text-default-500 hover:text-weatherhead-primary hover:bg-slate-100 dark:hover:bg-default-50",
+              )}
+            >
+              Editor
+            </NextLink>
 
             <NextLink
               href="/calendar"
@@ -106,12 +88,19 @@ export const Navbar = () => {
               <History className="size-4" />
               History
             </NextLink>
+
+            <NavbarSettingsMenu />
           </nav>
 
-          {/* Calendar page portals the Undo control here so it stays in the sticky header */}
-          <div className="flex flex-1 items-center justify-end gap-2 md:flex-none md:justify-end">
+          <div className="flex flex-1 items-center justify-end gap-1 md:flex-none md:justify-end">
             <div id="calendar-navbar-slot" className="flex items-center gap-2" />
-            <UserMenu />
+            <div className="md:hidden">
+              <NavbarSettingsMenu variant="compact" />
+            </div>
+            <LiveUsersIndicator />
+            <div className="ml-2">
+              <UserMenu />
+            </div>
           </div>
         </div>
       </div>
