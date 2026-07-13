@@ -6,6 +6,7 @@ export type SolverJsonBody = Record<string, unknown> & {
   errors?: Array<{
     code?: string;
     message?: string;
+    detail?: string;
     sheet?: string;
     row_id?: string;
     field?: string;
@@ -13,6 +14,7 @@ export type SolverJsonBody = Record<string, unknown> & {
   issues?: Array<{
     code?: string;
     message?: string;
+    detail?: string;
     sheet?: string;
     row_id?: string;
     field?: string;
@@ -88,6 +90,7 @@ export function solverErrorsFromBody(
 ): Array<{
   code: string;
   message: string;
+  detail?: string;
   sheet?: string;
   row_id?: string;
   field?: string;
@@ -102,6 +105,7 @@ export function solverErrorsFromBody(
     return source.map((error) => ({
       code: typeof error.code === "string" ? error.code : fallbackCode,
       message: typeof error.message === "string" ? error.message : fallbackMessage,
+      ...(typeof error.detail === "string" ? { detail: error.detail } : {}),
       ...(typeof error.sheet === "string" ? { sheet: error.sheet } : {}),
       ...(typeof error.row_id === "string" ? { row_id: error.row_id } : {}),
       ...(typeof error.field === "string" ? { field: error.field } : {}),
@@ -112,7 +116,9 @@ export function solverErrorsFromBody(
     return [
       {
         code: "solver_response_invalid",
-        message: `Scheduling service returned a non-JSON response: ${data.raw.slice(0, 240)}`,
+        message:
+          "The scheduling service returned an unexpected response. It may have restarted — confirm it is running and try again.",
+        detail: data.raw.slice(0, 500),
       },
     ];
   }

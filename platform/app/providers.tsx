@@ -9,6 +9,7 @@ import { ThemeProvider as NextThemesProvider } from "next-themes";
 
 import { AuthProvider } from "@/lib/auth-client";
 import { SolverProgressProvider } from "@/lib/solver-progress/SolverProgressContext";
+import { SolverActivityBridge } from "@/components/SolverActivityBridge";
 
 export interface ProvidersProps {
   children: React.ReactNode;
@@ -30,7 +31,10 @@ export function Providers({ children, themeProps }: ProvidersProps) {
     <HeroUIProvider navigate={router.push}>
       <NextThemesProvider {...themeProps}>
         <AuthProvider>
-          <SolverProgressProvider>{children}</SolverProgressProvider>
+          <SolverProgressProvider>
+            <SolverActivityBridge />
+            {children}
+          </SolverProgressProvider>
         </AuthProvider>
       </NextThemesProvider>
     </HeroUIProvider>

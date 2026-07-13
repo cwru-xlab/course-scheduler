@@ -114,6 +114,8 @@ export type ScheduleSolution = {
 export type ValidationError = {
   code: string;
   message: string;
+  /** Raw technical text for developers — not shown by default in the UI. */
+  detail?: string;
   sheet?: string;
   row_id?: string;
   field?: string;

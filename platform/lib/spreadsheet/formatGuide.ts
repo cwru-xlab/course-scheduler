@@ -1,25 +1,24 @@
 import type { ValidationError } from "@/lib/scheduling/types";
+import {
+  humanizedDetail,
+  humanizedSummary,
+  type HumanizeContext,
+} from "@/lib/errors/humanizeError";
+import {
+  EXAMPLE_SPREADSHEET_FILENAME,
+  EXAMPLE_SPREADSHEET_PATH,
+  FORMAT_COMPARE_HINT,
+  FORMAT_RULES_SUMMARY,
+  REQUIRED_SHEETS,
+} from "@/lib/spreadsheet/formatConstants";
 
-export const EXAMPLE_SPREADSHEET_PATH = "/example-format-spreadsheet.xlsx";
-export const EXAMPLE_SPREADSHEET_FILENAME = "example-format-spreadsheet.xlsx";
-
-export const REQUIRED_SHEETS = [
-  "Sections",
-  "Instructors",
-  "Rooms",
-  "Timeslots",
-  "MeetingPatterns",
-  "CrosslistGroups",
-  "NoOverlapGroups",
-  "BlockedTimes",
-  "LockedAssignments",
-  "SoftLocks",
-] as const;
-
-export const FORMAT_RULES_SUMMARY =
-  "Use the same sheet names and column headers as the example file. List values use semicolons (;). Nested timeslot sets use pipes (|).";
-
-export const FORMAT_COMPARE_HINT = `Compare your spreadsheet to ${EXAMPLE_SPREADSHEET_FILENAME} — the row content can differ, but sheet names, headers, and cell formatting rules must match.`;
+export {
+  EXAMPLE_SPREADSHEET_FILENAME,
+  EXAMPLE_SPREADSHEET_PATH,
+  FORMAT_COMPARE_HINT,
+  FORMAT_RULES_SUMMARY,
+  REQUIRED_SHEETS,
+};
 
 const FORMAT_HINT_CODE = "format_reference";
 
@@ -150,13 +149,28 @@ export function enrichSolverErrors(errors: ValidationError[]): ValidationError[]
   ];
 }
 
-export function formatErrorsSummary(errors: ValidationError[]): string {
-  return errors
-    .filter((error) => error.code !== FORMAT_HINT_CODE)
-    .map((error) => error.message)
-    .join(" ");
+export function formatErrorsSummary(
+  errors: ValidationError[],
+  context: HumanizeContext = "general",
+): string {
+  const enriched =
+    context === "import" || context === "export"
+      ? enrichSpreadsheetErrors(errors, context)
+      : context === "solver"
+        ? enrichSolverErrors(errors)
+        : errors;
+  return humanizedSummary(enriched, context);
 }
 
-export function formatErrorsDetail(errors: ValidationError[]): string {
-  return errors.map((error) => error.message).join("\n\n");
+export function formatErrorsDetail(
+  errors: ValidationError[],
+  context: HumanizeContext = "general",
+): string {
+  const enriched =
+    context === "import" || context === "export"
+      ? enrichSpreadsheetErrors(errors, context)
+      : context === "solver"
+        ? enrichSolverErrors(errors)
+        : errors;
+  return humanizedDetail(enriched, context);
 }

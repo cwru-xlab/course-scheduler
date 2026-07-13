@@ -12,6 +12,7 @@ import {
 import { tryRecordActivity } from "@/lib/record-activity";
 import { fetchSolver, solverErrorsFromBody } from "@/lib/api/solverFetch";
 import { enrichSolverErrors, normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
+import { publishSharedSchedule } from "@/lib/shared-schedule";
 
 // The CP-SAT solver may take up to 120s; give extra headroom.
 export const maxDuration = 180;
@@ -111,7 +112,39 @@ export async function POST(request: NextRequest) {
 
     await tryRecordActivity(request, "solver_run");
 
-    return NextResponse.json(data);
+    // Publish the result as the shared "latest schedule" so other live users can
+    // see it on their calendar. Skip hypothetical preview runs (e.g. the
+    // "Test without these instructors" retry) so they don't overwrite everyone.
+    let sharedRevision: number | undefined;
+    if (!removeInstructors?.length) {
+      try {
+        const lockedSectionIds = Array.isArray(input.locked_assignments)
+          ? Array.from(
+              new Set(
+                input.locked_assignments
+                  .map((la) => (la as { section_id?: string }).section_id)
+                  .filter((id): id is string => typeof id === "string"),
+              ),
+            )
+          : [];
+        const meta = publishSharedSchedule({
+          ranBy: userLabel,
+          snapshot: {
+            input,
+            solution: data,
+            lockedSectionIds,
+            createdAt: new Date().toISOString(),
+          },
+        });
+        sharedRevision = meta.revision;
+      } catch {
+        // Publishing is best-effort; never fail the solve because of it.
+      }
+    }
+
+    return NextResponse.json(
+      sharedRevision !== undefined ? { ...data, shared_revision: sharedRevision } : data,
+    );
   } catch (error) {
     const isTimeout = error instanceof DOMException && error.name === "AbortError";
     const rawMessage = isTimeout

@@ -4,8 +4,12 @@ import { useState } from "react";
 import { Button } from "@heroui/button";
 import { CloudUpload } from "lucide-react";
 
+import { PageHeader } from "@/components/layout/PageHeader";
 import { SpreadsheetFormatHelp } from "@/components/scheduler/SpreadsheetFormatHelp";
 import { ValidationIssuesTable } from "@/components/scheduler/ValidationIssuesTable";
+import { humanizeError } from "@/lib/errors/humanizeError";
+import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
+import type { SchedulingInput } from "@/lib/scheduling/types";
 import { hasLocatedIssues } from "@/lib/spreadsheet/validateClient";
 import { EditorPageTitleDropdown } from "./EditorPageTitleDropdown";
 import {
@@ -24,8 +28,6 @@ import {
   editorToolbarDivider,
   editorToolbarShellClass,
 } from "./editors/editorToolbarStyles";
-import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
-import type { SchedulingInput } from "@/lib/scheduling/types";
 
 type EditorPageKey =
   | "sections"
@@ -55,10 +57,12 @@ export function EditorPageHeader({ current, title, subtitle, data }: EditorPageH
   const [solverError, setSolverError] = useState<string | null>(null);
 
   return (
-    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+    <div className="space-y-3">
+      <PageHeader title="Editor Table" subtitle={subtitle} />
+
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
       <div className="min-w-0">
         <EditorPageTitleDropdown current={current} title={title} />
-        <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>
       </div>
 
       <div className={editorToolbarShellClass}>
@@ -122,13 +126,24 @@ export function EditorPageHeader({ current, title, subtitle, data }: EditorPageH
           spreadsheetFeedback.errors.length > 0 &&
           hasLocatedIssues(spreadsheetFeedback.errors) ? (
             <div className="mt-3">
-              <ValidationIssuesTable issues={spreadsheetFeedback.errors} maxRows={12} />
+              <ValidationIssuesTable
+                issues={spreadsheetFeedback.errors}
+                maxRows={12}
+                context="import"
+              />
             </div>
-          ) : spreadsheetFeedback.errors && spreadsheetFeedback.errors.length > 1 ? (
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm font-normal">
-              {spreadsheetFeedback.errors.map((error) => (
-                <li key={`${error.code}-${error.message}`}>{error.message}</li>
-              ))}
+          ) : spreadsheetFeedback.errors && spreadsheetFeedback.errors.length > 0 ? (
+            <ul className="mt-2 space-y-2 text-sm font-normal">
+              {spreadsheetFeedback.errors.map((error, index) => {
+                const human = humanizeError(error, "import");
+                return (
+                  <li key={`${error.code}-${index}`} className="rounded-md bg-white/60 px-2 py-1.5">
+                    <div className="font-semibold text-slate-900">{human.title}</div>
+                    <div className="text-slate-700">{human.whatHappened}</div>
+                    <div className="text-xs text-slate-600">How to fix: {human.howToFix}</div>
+                  </li>
+                );
+              })}
             </ul>
           ) : spreadsheetFeedback.detail ? (
             <p className="mt-2 whitespace-pre-wrap text-sm font-normal">{spreadsheetFeedback.detail}</p>
@@ -152,6 +167,7 @@ export function EditorPageHeader({ current, title, subtitle, data }: EditorPageH
       {saveFeedback?.type === "error" && (
         <p className={editorFeedbackErrorClass}>Save failed. {saveFeedback.message}</p>
       )}
+      </div>
     </div>
   );
 }

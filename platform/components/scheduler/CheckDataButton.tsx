@@ -48,7 +48,11 @@ export function CheckDataButton({
       router.push("/solver-errors");
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Failed to validate scheduling data.";
+        error instanceof Error && /fetch|network/i.test(error.message)
+          ? "Could not reach the validation service. Confirm the scheduling service is running and try again."
+          : error instanceof Error
+            ? error.message
+            : "Failed to validate scheduling data.";
       onErrorChange?.(message);
     } finally {
       setStatus("idle");
