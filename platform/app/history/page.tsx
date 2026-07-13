@@ -125,7 +125,7 @@ export default function HistoryPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => exportSavedSchedule(item)}
+                    onClick={() => void exportSavedSchedule(item)}
                     className={appNativeBtnSecondary}
                   >
                     <Download className="size-4" />

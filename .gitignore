@@ -3,4 +3,5 @@
 test_importer.py
 instance/
 start.sh
+.env
 .env.local
