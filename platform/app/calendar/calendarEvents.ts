@@ -137,6 +137,24 @@ export function getCalendarEventRoomId(
   return roomIdForSection(event.section.id) || event.section.room_id || "";
 }
 
+/** All instructor ids taught within an event (crosslist events can have several). */
+export function calendarEventInstructorIds(event: CalendarEvent): string[] {
+  if (event.crosslistMembers?.length) {
+    return event.crosslistMembers
+      .map((member) => member.instructor_id)
+      .filter((id): id is string => Boolean(id));
+  }
+  return event.section.instructor_id ? [event.section.instructor_id] : [];
+}
+
+/** All section ids represented by an event (crosslist events expand to members). */
+export function calendarEventSectionIds(event: CalendarEvent): string[] {
+  if (event.crosslistMembers?.length) {
+    return event.crosslistMembers.map((member) => member.id);
+  }
+  return [event.section.id];
+}
+
 export function calendarEventDisplayLabel(event: CalendarEvent): string {
   if (isCrosslistGroupEvent(event)) {
     return event.crosslistGroupId ?? "Cross-list";

@@ -24,10 +24,10 @@ export const Navbar = () => {
             : `max-w-7xl mx-auto ${pageHorizontalGutterClassName}`,
         )}
       >
-        <div className="flex h-16 items-center justify-between">
+        <div className="flex h-16 items-center justify-between md:grid md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
           <NextLink
             href="/"
-            className="flex items-center gap-3 cursor-pointer"
+            className="flex items-center gap-3 cursor-pointer md:justify-self-start"
           >
             <img
               src="/cwru.jpeg"
@@ -39,7 +39,7 @@ export const Navbar = () => {
             </h1>
           </NextLink>
 
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex items-center gap-1 md:justify-self-center">
             <NextLink
               href="/editor/sections"
               className={clsx(
@@ -92,8 +92,8 @@ export const Navbar = () => {
             <NavbarSettingsMenu />
           </nav>
 
-          <div className="flex flex-1 items-center justify-end gap-1 md:flex-none md:justify-end">
-            <div id="calendar-navbar-slot" className="flex items-center gap-2" />
+          <div className="flex flex-1 items-center justify-end gap-1 md:flex-none md:justify-self-end">
+            <div id="calendar-navbar-slot" className="flex items-center justify-end gap-2" />
             <div className="md:hidden">
               <NavbarSettingsMenu variant="compact" />
             </div>

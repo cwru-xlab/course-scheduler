@@ -95,10 +95,10 @@ export async function POST(request: NextRequest) {
       const user = token ? await verifyToken(token) : null;
       notesResult = parseNotesFromWorkbook(fileBytes, user);
     } catch (notesError) {
-      const message =
+      const detail =
         notesError instanceof Error
           ? notesError.message
-          : "Scheduling data imported, but notes could not be parsed from the workbook.";
+          : "Notes sheet could not be parsed.";
       return NextResponse.json(
         {
           status: "error",
@@ -106,7 +106,9 @@ export async function POST(request: NextRequest) {
             [
               {
                 code: "notes_parse_failed",
-                message: `${message} Check the Notes sheet format in the example spreadsheet.`,
+                message:
+                  "The scheduling data imported, but the Notes sheet could not be read. Check the Notes sheet format in the example spreadsheet.",
+                detail,
               },
             ],
             "import",
@@ -136,7 +138,7 @@ export async function POST(request: NextRequest) {
       {
         status: "error",
         errors: enrichSpreadsheetErrors([{ code: "network_error", message }], "import"),
-        summary: formatErrorsSummary([{ code: "network_error", message }]),
+        summary: formatErrorsSummary([{ code: "network_error", message }], "import"),
       },
       { status: 502 },
     );

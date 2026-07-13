@@ -1,4 +1,24 @@
 import type { ValidationError } from "@/lib/scheduling/types";
+import {
+  humanizedDetail,
+  humanizedSummary,
+  type HumanizeContext,
+} from "@/lib/errors/humanizeError";
+import {
+  EXAMPLE_SPREADSHEET_FILENAME,
+  EXAMPLE_SPREADSHEET_PATH,
+  FORMAT_COMPARE_HINT,
+  FORMAT_RULES_SUMMARY,
+  REQUIRED_SHEETS,
+} from "@/lib/spreadsheet/formatConstants";
+
+export {
+  EXAMPLE_SPREADSHEET_FILENAME,
+  EXAMPLE_SPREADSHEET_PATH,
+  FORMAT_COMPARE_HINT,
+  FORMAT_RULES_SUMMARY,
+  REQUIRED_SHEETS,
+};
 
 export const EXAMPLE_SPREADSHEET_PATH = "/example-format-spreadsheet.xlsx";
 export const EXAMPLE_SPREADSHEET_FILENAME = "example-format-spreadsheet.xlsx";
@@ -150,13 +170,28 @@ export function enrichSolverErrors(errors: ValidationError[]): ValidationError[]
   ];
 }
 
-export function formatErrorsSummary(errors: ValidationError[]): string {
-  return errors
-    .filter((error) => error.code !== FORMAT_HINT_CODE)
-    .map((error) => error.message)
-    .join(" ");
+export function formatErrorsSummary(
+  errors: ValidationError[],
+  context: HumanizeContext = "general",
+): string {
+  const enriched =
+    context === "import" || context === "export"
+      ? enrichSpreadsheetErrors(errors, context)
+      : context === "solver"
+        ? enrichSolverErrors(errors)
+        : errors;
+  return humanizedSummary(enriched, context);
 }
 
-export function formatErrorsDetail(errors: ValidationError[]): string {
-  return errors.map((error) => error.message).join("\n\n");
+export function formatErrorsDetail(
+  errors: ValidationError[],
+  context: HumanizeContext = "general",
+): string {
+  const enriched =
+    context === "import" || context === "export"
+      ? enrichSpreadsheetErrors(errors, context)
+      : context === "solver"
+        ? enrichSolverErrors(errors)
+        : errors;
+  return humanizedDetail(enriched, context);
 }
