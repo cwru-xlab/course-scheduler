@@ -82,9 +82,9 @@ export function SpreadsheetImportExportButtons({ data, onFeedbackChange }: Props
       setSpreadsheetStatus("import-error");
       onFeedbackChange?.({
         type: "error",
-        message: formatErrorsSummary(errors),
+        message: formatErrorsSummary(errors, "import"),
         errors,
-        detail: formatErrorsDetail(errors),
+        detail: formatErrorsDetail(errors, "import"),
       });
     }
   };
@@ -111,8 +111,10 @@ export function SpreadsheetImportExportButtons({ data, onFeedbackChange }: Props
           errors = enrichSpreadsheetErrors(
             [
               {
-                code: "export_failed",
-                message: `Export failed with status ${response.status}.`,
+                code: "solver_response_invalid",
+                message:
+                  "The export service returned an unexpected response. Confirm the scheduling service is running and try again.",
+                detail: `HTTP status ${response.status}`,
               },
             ],
             "export",
@@ -121,9 +123,9 @@ export function SpreadsheetImportExportButtons({ data, onFeedbackChange }: Props
         setSpreadsheetStatus("export-error");
         onFeedbackChange?.({
           type: "error",
-          message: formatErrorsSummary(errors),
+          message: formatErrorsSummary(errors, "export"),
           errors,
-          detail: formatErrorsDetail(errors),
+          detail: formatErrorsDetail(errors, "export"),
         });
         return;
       }
@@ -151,9 +153,9 @@ export function SpreadsheetImportExportButtons({ data, onFeedbackChange }: Props
       setSpreadsheetStatus("export-error");
       onFeedbackChange?.({
         type: "error",
-        message: formatErrorsSummary(errors),
+        message: formatErrorsSummary(errors, "export"),
         errors,
-        detail: formatErrorsDetail(errors),
+        detail: formatErrorsDetail(errors, "export"),
       });
     }
   };

@@ -1,40 +1,64 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
+import { MultiSelect } from "@/components/scheduler/MultiSelect";
+import { ViewportModal } from "@/components/scheduler/ViewportModal";
+import { useAuth } from "@/lib/auth-client";
+import {
+  LAST_SOLVER_RUN_STORAGE_KEY,
+  saveScheduleToHistory,
+  type LastSolverRunSnapshot,
+} from "@/lib/scheduling/history";
+import { isSectionArchived, normalizeSectionState } from "@/lib/scheduling/sectionState";
+import {
+  SCHEDULING_WINDOW_END_HOUR,
+  SCHEDULING_WINDOW_START_HOUR,
+} from "@/lib/scheduling/timeWindow";
+import type {
+  BlockedTime,
+  LockedAssignment,
+  ScheduleSolution,
+  SchedulingInput,
+  ValidationError,
+} from "@/lib/scheduling/types";
+import { SCHEDULING_DATA_REFRESH_EVENT, useSchedulingData } from "@/lib/scheduling/useSchedulingData";
+import { useSolverLock } from "@/lib/solver-lock-client";
+import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
+import {
+  solverNetworkErrorSummary,
+  storeSolverErrorSnapshot,
+  storeSolverNetworkError,
+} from "@/lib/solver/solverErrorStorage";
+import { validateSchedulingInput } from "@/lib/spreadsheet/validateClient";
 import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
-  Archive,
   ArrowLeft,
+  CloudBackup,
   Filter,
-  Table2,
   Link2,
   Lock,
-  Maximize2,
-  Minimize2,
   Palette,
-  Printer,
+  Play,
+  Plus,
   Redo2,
-  Rocket,
   Save,
   Share2,
   Shuffle,
-  Unlock,
+  Table2,
   Undo2,
-  Play,
-  Plus,
-  CloudBackup,
-  X,
+  Unlock,
+  X
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { createPortal } from "react-dom";
 import { CrosslistCalendarEventCard, CrosslistLegendSwatch } from "./CrosslistCalendarEventCard";
 import {
   assignCalendarEventLanes,
   calendarEventInstructorIds,
-  calendarEventSectionIds,
   calendarEventMatchesFilters,
+  calendarEventSectionIds,
   findCalendarEventBySectionId,
   getCalendarEventKey,
   isCrosslistGroupEvent,
@@ -48,35 +72,6 @@ import {
   type PlacementEvaluation,
   type PlacementSeverity,
 } from "./placementValidation";
-import type {
-  BlockedTime,
-  LockedAssignment,
-  ScheduleSolution,
-  SchedulingInput,
-} from "@/lib/scheduling/types";
-import { MultiSelect } from "@/components/scheduler/MultiSelect";
-import { ViewportModal } from "@/components/scheduler/ViewportModal";
-import {
-  LAST_SOLVER_RUN_STORAGE_KEY,
-  saveScheduleToHistory,
-  type LastSolverRunSnapshot,
-} from "@/lib/scheduling/history";
-import { SCHEDULING_DATA_REFRESH_EVENT, useSchedulingData } from "@/lib/scheduling/useSchedulingData";
-import { useAuth } from "@/lib/auth-client";
-import { useSolverLock } from "@/lib/solver-lock-client";
-import {
-  SCHEDULING_WINDOW_END_HOUR,
-  SCHEDULING_WINDOW_START_HOUR,
-} from "@/lib/scheduling/timeWindow";
-import { isSectionArchived, normalizeSectionState } from "@/lib/scheduling/sectionState";
-import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
-import {
-  storeSolverErrorSnapshot,
-  storeSolverNetworkError,
-} from "@/lib/solver/solverErrorStorage";
-import { normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
-import { validateSchedulingInput } from "@/lib/spreadsheet/validateClient";
-import type { ValidationError } from "@/lib/scheduling/types";
 
 type TimeslotDto = {
   id: string;
@@ -2805,10 +2800,10 @@ type PatternDayApplyRow = {
       failSolverProgress();
       const raw = e instanceof Error ? e.message : "Failed to run solver.";
       if (solverInput) {
-        const errors = storeSolverNetworkError(solverInput, raw);
-        setSolverRunError(errors.map((err) => err.message).join(" "));
+        storeSolverNetworkError(solverInput, raw);
+        setSolverRunError(solverNetworkErrorSummary(raw));
       } else {
-        setSolverRunError(normalizeNetworkError(raw, "solver"));
+        setSolverRunError(solverNetworkErrorSummary(raw));
       }
     } finally {
       setSolverRunStatus("idle");
@@ -4060,7 +4055,7 @@ type PatternDayApplyRow = {
                     ? solverLock.startedBy
                       ? `Solver is running (started by ${solverLock.startedBy}). Please wait.`
                       : "Solver is running. Please wait."
-                    : "Run solver using current backend data and placement locks.",
+                    : "Run solver using current data and placement locks.",
                 )
               }
               onMouseLeave={() => setToolbarActionHint(null)}
@@ -4070,7 +4065,7 @@ type PatternDayApplyRow = {
                     ? solverLock.startedBy
                       ? `Solver is running (started by ${solverLock.startedBy}). Please wait.`
                       : "Solver is running. Please wait."
-                    : "Run solver using current backend data and placement locks.",
+                    : "Run solver using current data and placement locks.",
                 )
               }
               onBlur={() => setToolbarActionHint(null)}

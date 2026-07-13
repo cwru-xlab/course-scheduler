@@ -12,6 +12,9 @@ import {
   loadSavedScheduleToCurrentView,
   type SavedScheduleEntry,
 } from "@/lib/scheduling/history";
+import type { ValidationError } from "@/lib/scheduling/types";
+import { ValidationIssuesTable } from "@/components/scheduler/ValidationIssuesTable";
+import { SpreadsheetFormatHelp } from "@/components/scheduler/SpreadsheetFormatHelp";
 import {
   appNativeBtnPrimary,
   appNativeBtnSecondary,
@@ -28,6 +31,12 @@ const fmtDate = (iso: string): string => {
 export default function HistoryPage() {
   const router = useRouter();
   const [items, setItems] = useState<SavedScheduleEntry[]>([]);
+  const [exportFeedback, setExportFeedback] = useState<{
+    entryId: string;
+    message: string;
+    errors: ValidationError[];
+    detail: string;
+  } | null>(null);
 
   const refresh = () => {
     setItems(listSavedSchedules());
@@ -55,6 +64,36 @@ export default function HistoryPage() {
           </Link>
         }
       />
+
+      {exportFeedback ? (
+        <div
+          className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"
+          role="alert"
+        >
+          <p className="font-semibold">{exportFeedback.message}</p>
+          {exportFeedback.errors.length > 0 ? (
+            <div className="mt-3 rounded-lg border border-rose-100 bg-white/70 p-3">
+              <ValidationIssuesTable
+                issues={exportFeedback.errors}
+                maxRows={6}
+                context="export"
+              />
+            </div>
+          ) : exportFeedback.detail ? (
+            <p className="mt-2 whitespace-pre-wrap text-sm">{exportFeedback.detail}</p>
+          ) : null}
+          <div className="mt-3">
+            <SpreadsheetFormatHelp compact />
+          </div>
+          <button
+            type="button"
+            className="mt-3 text-xs font-semibold text-rose-800 underline hover:text-rose-950"
+            onClick={() => setExportFeedback(null)}
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : null}
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-slate-600">
@@ -125,7 +164,18 @@ export default function HistoryPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => void exportSavedSchedule(item)}
+                    onClick={async () => {
+                      setExportFeedback(null);
+                      const result = await exportSavedSchedule(item);
+                      if (!result.ok) {
+                        setExportFeedback({
+                          entryId: item.id,
+                          message: result.message,
+                          errors: result.errors,
+                          detail: result.detail,
+                        });
+                      }
+                    }}
                     className={appNativeBtnSecondary}
                   >
                     <Download className="size-4" />

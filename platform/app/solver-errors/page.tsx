@@ -3,13 +3,19 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ArrowRight } from "lucide-react";
 
 import { SpreadsheetFormatHelp } from "@/components/scheduler/SpreadsheetFormatHelp";
 import { ValidationIssuesTable } from "@/components/scheduler/ValidationIssuesTable";
+import { humanizeError } from "@/lib/errors/humanizeError";
 import type { SchedulingInput, ValidationError } from "@/lib/scheduling/types";
 import { hasLocatedIssues } from "@/lib/spreadsheet/validateClient";
 import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
+import {
+  appCardClass,
+  appNativeBtnPrimary,
+  appNativeBtnSecondary,
+} from "@/lib/ui/appChromeStyles";
 
 type SolverDiagnostics = {
   feasible_if_relax?: string[];
@@ -99,13 +105,20 @@ export default function SolverErrorsPage() {
       } else {
         fail();
         setRetryError(
-          result.errors?.[0]?.message ?? "Solver still returned an error after removal."
+          result.errors?.[0]?.message ??
+            "The solver still returned an error after removing those instructors.",
         );
         setRetryStatus("error");
       }
     } catch (err) {
       fail();
-      setRetryError(err instanceof Error ? err.message : "Network error");
+      setRetryError(
+        err instanceof Error
+          ? err.message.includes("fetch")
+            ? "Could not reach the scheduling service. Confirm it is running and try again."
+            : err.message
+          : "Could not reach the scheduling service.",
+      );
       setRetryStatus("error");
     }
   };
@@ -161,6 +174,44 @@ export default function SolverErrorsPage() {
     return `${instructor.name || instructorId} (${instructorId})`;
   };
 
+  const topHumanized = useMemo(() => {
+    if (!stored?.errors.length) return null;
+    return humanizeError(stored.errors[0], "solver");
+  }, [stored]);
+
+  // The first error is already surfaced in the headline card, so only show the
+  // "reported issues" card when it adds something: pinpointed rows or extra errors.
+  const hasLocated = useMemo(
+    () => locatedIssues.length > 0 || hasLocatedIssues(stored?.errors ?? []),
+    [locatedIssues, stored],
+  );
+  const extraErrors = useMemo(() => (stored?.errors ?? []).slice(1), [stored]);
+  const showReportedIssuesCard = hasLocated || extraErrors.length > 0;
+
+  // The solver can emit the same section more than once; dedupe so the list is clean.
+  const constrainedSections = useMemo(() => {
+    const seen = new Set<string>();
+    return (stored?.diagnostics?.most_constrained_sections ?? []).filter((x) => {
+      if (seen.has(x.section_id)) return false;
+      seen.add(x.section_id);
+      return true;
+    });
+  }, [stored]);
+
+  const capacitySections = useMemo(() => {
+    const seen = new Set<string>();
+    return (stored?.diagnostics?.sections_exceeding_room_capacity ?? []).filter((x) => {
+      if (seen.has(x.section_id)) return false;
+      seen.add(x.section_id);
+      return true;
+    });
+  }, [stored]);
+
+  const removableSections = useMemo(
+    () => Array.from(new Set(stored?.diagnostics?.feasible_if_remove_section ?? [])),
+    [stored],
+  );
+
   if (!isHydrated || !stored) {
     return (
       <div className="space-y-6">
@@ -185,158 +236,394 @@ export default function SolverErrorsPage() {
       <div className="rounded-xl border border-red-200 bg-red-50 p-6">
         <div className="flex items-start gap-3">
           <AlertTriangle className="mt-0.5 size-5 text-red-600" />
-          <div>
-            <h1 className="text-2xl font-black text-red-900">Solver Error Details</h1>
-            <p className="mt-1 text-sm text-red-800">
-              These specific values from your current input caused the solver failure.
-            </p>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold tracking-tight text-red-900">
+              {topHumanized?.title ?? "Solver could not complete"}
+            </h1>
+            {topHumanized ? (
+              <>
+                <p className="mt-2 text-sm text-red-900">{topHumanized.whatHappened}</p>
+                <p className="mt-2 text-sm font-semibold text-red-950">
+                  What to do: {topHumanized.howToFix}
+                </p>
+                {topHumanized.technicalDetail ? (
+                  <details className="mt-3">
+                    <summary className="cursor-pointer text-xs font-semibold text-red-800/80 hover:text-red-900">
+                      Technical details
+                    </summary>
+                    <pre className="mt-2 overflow-x-auto rounded-lg bg-red-100/60 px-3 py-2 font-mono text-[11px] text-red-900">
+                      {topHumanized.technicalDetail}
+                      {"\n"}Code: {topHumanized.code}
+                    </pre>
+                  </details>
+                ) : null}
+              </>
+            ) : (
+              <p className="mt-1 text-sm text-red-800">
+                These specific values from your current input caused the solver failure.
+              </p>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6">
-        <h2 className="text-lg font-bold text-slate-900">Returned Errors</h2>
-        {locatedIssues.length > 0 || hasLocatedIssues(stored.errors) ? (
-          <div className="mt-3">
-            <p className="text-sm text-slate-600">
-              Pinpointed issues — fix these rows in your spreadsheet or editor, then run Check Data
-              again.
-            </p>
-            <div className="mt-3">
-              <ValidationIssuesTable issues={stored.errors} />
-            </div>
-          </div>
-        ) : (
-          <ul className="mt-3 space-y-2 text-sm">
-            {stored.errors.map((err) => (
-              <li key={`${err.code}-${err.message}`} className="rounded-lg bg-slate-50 p-3">
-                <span className="font-mono text-xs font-bold text-red-600">{err.code}</span>
-                <div className="mt-1 whitespace-pre-wrap text-slate-700">{err.message}</div>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="mt-4">
-          <SpreadsheetFormatHelp />
+      {showReportedIssuesCard ? (
+        <div className={`${appCardClass} p-6`}>
+          {hasLocated ? (
+            <>
+              <h2 className="text-lg font-bold text-slate-900">Pinpointed issues</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Fix these rows in your spreadsheet or editor, then run Check Data again.
+              </p>
+              <div className="mt-4">
+                <ValidationIssuesTable issues={stored.errors} context="solver" />
+              </div>
+              <div className="mt-4">
+                <SpreadsheetFormatHelp />
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 className="text-lg font-bold text-slate-900">Other issues</h2>
+              <ul className="mt-3 space-y-3 text-sm">
+                {extraErrors.map((err, index) => {
+                  const human = humanizeError(err, "solver");
+                  return (
+                    <li
+                      key={`${err.code}-${index}`}
+                      className="rounded-lg border border-slate-200/80 bg-slate-50 p-3"
+                    >
+                      <div className="font-semibold text-slate-900">{human.title}</div>
+                      <p className="mt-1 text-slate-700">{human.whatHappened}</p>
+                      <p className="mt-1 text-xs text-slate-600">
+                        <span className="font-semibold">How to fix: </span>
+                        {human.howToFix}
+                      </p>
+                      {human.technicalDetail ? (
+                        <details className="mt-2">
+                          <summary className="cursor-pointer text-[11px] font-semibold text-slate-500">
+                            Technical details
+                          </summary>
+                          <pre className="mt-1 overflow-x-auto rounded bg-slate-100 px-2 py-1 font-mono text-[10px] text-slate-600">
+                            {human.technicalDetail}
+                            {"\n"}Code: {human.code}
+                          </pre>
+                        </details>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
         </div>
-      </div>
+      ) : null}
 
       {stored.diagnostics && (
-        <div className="rounded-xl border border-slate-200 bg-white p-6">
-          <h2 className="text-lg font-bold text-slate-900">Diagnostics</h2>
-          <div className="mt-3 space-y-2 text-sm text-slate-700">
-            <div>
-              <span className="font-semibold">Feasible if relax:</span>{" "}
-              {(stored.diagnostics.feasible_if_relax ?? []).join(", ") || "None"}
-            </div>
-            <div>
-              <span className="font-semibold">Feasible if remove section:</span>{" "}
-              {(stored.diagnostics.feasible_if_remove_section ?? []).length
-                ? stored.diagnostics.feasible_if_remove_section!
-                    .map((sectionId) => formatSectionLabel(sectionId))
-                    .join(", ")
-                : "None"}
-            </div>
-            <div>
-              <span className="font-semibold">Feasible if remove instructor:</span>{" "}
-              {(stored.diagnostics.feasible_if_remove_instructor ?? []).length
-                ? stored.diagnostics.feasible_if_remove_instructor!
-                    .map((i) => `${formatInstructorLabel(i.instructor_id)} (${i.section_count} sections)`)
-                    .join(", ")
-                : "None"}
-            </div>
-            {(stored.diagnostics.feasible_if_remove_instructor ?? []).length > 0 && (
-              <div className="mt-3 flex items-center gap-3">
-                <button
-                  className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-white hover:bg-amber-600 disabled:opacity-50 transition-colors"
-                  disabled={retryStatus === "loading"}
-                  onClick={() => {
-                    const ids = stored.diagnostics!.feasible_if_remove_instructor!.map((i) => i.instructor_id);
-                    retryWithRemovedInstructors(ids);
-                  }}
-                >
-                  {retryStatus === "loading" ? "Solving..." : `Retry without ${stored.diagnostics.feasible_if_remove_instructor!.length} instructor(s)`}
-                </button>
-                <span className="text-xs text-slate-400">
-                  Removes {stored.diagnostics.feasible_if_remove_instructor!.reduce((s, i) => s + i.section_count, 0)} sections
-                  ({stored.diagnostics.feasible_if_remove_instructor!.map((i) => formatInstructorLabel(i.instructor_id)).join(", ")})
-                </span>
-                {retryStatus === "error" && retryError && (
-                  <span className="text-xs text-red-600 font-medium">{retryError}</span>
-                )}
-              </div>
+        <div className={`${appCardClass} p-6`}>
+          <h2 className="text-lg font-bold text-slate-900">How to get a working schedule</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            The solver couldn&apos;t fit every section. Here are the fixes most likely to help,
+            easiest first. Try one, then run the solver again.
+          </p>
+
+          <ol className="mt-5 space-y-4">
+            {/* Fix 1: over-capacity sections (usually the clearest root cause) */}
+            {capacitySections.length > 0 && (
+              <li className="rounded-lg border border-red-200 bg-red-50 p-4">
+                <div className="flex items-center gap-2">
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-red-600 text-xs font-black text-white">
+                    1
+                  </span>
+                  <h3 className="text-sm font-bold text-red-900">
+                    Make rooms big enough for these sections
+                  </h3>
+                </div>
+                <p className="mt-2 text-sm text-red-900">
+                  These sections need more seats than your largest room can hold, so they can never
+                  be placed.
+                </p>
+                <p className="mt-2 text-sm font-semibold text-red-950">How to fix (do one):</p>
+                <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-red-900">
+                  <li>
+                    Lower the enrollment cap: go to{" "}
+                    <span className="font-semibold">Editor → Sections</span>, find the section, and
+                    reduce its cap to fit an existing room.
+                  </li>
+                  <li>
+                    Or add a bigger room: go to{" "}
+                    <span className="font-semibold">Editor → Rooms</span> and add a room with enough
+                    capacity.
+                  </li>
+                </ul>
+                <ul className="mt-2 space-y-1 rounded-md bg-white/70 p-2 text-xs text-red-900">
+                  {capacitySections.map((x) => (
+                    <li key={`capacity-${x.section_id}`}>
+                      <span className="font-semibold">{formatSectionLabel(x.section_id)}</span> needs{" "}
+                      {x.required_capacity ?? x.expected_enrollment ?? "unknown"} seats — largest
+                      room holds {x.max_room_capacity}.
+                    </li>
+                  ))}
+                </ul>
+              </li>
             )}
-            <div>
-              <span className="font-semibold">Error codes:</span>{" "}
-              {(stored.diagnostics.error_codes ?? []).join(", ") || "None"}
-            </div>
-            {stored.diagnostics.diagnosis_truncated ? (
-              <p className="text-xs text-amber-700">
-                Infeasibility diagnosis was truncated to avoid a long wait. Use Check Data for
-                row-level issues, or retry the solver.
-              </p>
-            ) : null}
-            <div>
-              <span className="font-semibold">Referenced sections:</span>{" "}
-              {(stored.diagnostics.referenced_sections ?? []).length
-                ? stored.diagnostics.referenced_sections!
-                    .map((sectionId) => formatSectionLabel(sectionId))
-                    .join(", ")
-                : "None"}
-            </div>
-          </div>
-          {(stored.diagnostics.sections_exceeding_room_capacity ?? []).length > 0 && (
-            <div className="mt-5">
-              <h3 className="text-sm font-bold text-slate-900">Sections Exceeding All Room Capacities</h3>
-              <ul className="mt-2 space-y-1 text-sm text-slate-700">
-                {stored.diagnostics.sections_exceeding_room_capacity?.map((x) => (
-                  <li key={`capacity-${x.section_id}`}>
-                    {formatSectionLabel(x.section_id)}: required capacity{" "}
-                    {x.required_capacity ?? x.expected_enrollment ?? "unknown"} &gt; max room capacity{" "}
-                    {x.max_room_capacity}
+
+            {/* Fix 2: overloaded instructors */}
+            {(stored.diagnostics.feasible_if_remove_instructor ?? []).length > 0 && (
+              <li className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                <div className="flex items-center gap-2">
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-amber-500 text-xs font-black text-white">
+                    {capacitySections.length > 0 ? 2 : 1}
+                  </span>
+                  <h3 className="text-sm font-bold text-amber-900">
+                    Ease the load on these instructors
+                  </h3>
+                </div>
+                <p className="mt-2 text-sm text-amber-900">
+                  These instructors are assigned more sections than can fit into the times they are
+                  available. They&apos;re the biggest reason a schedule can&apos;t be built.
+                </p>
+                <p className="mt-2 text-sm font-semibold text-amber-950">How to fix (do one):</p>
+                <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-amber-900">
+                  <li>
+                    Give them more available times: go to{" "}
+                    <span className="font-semibold">Editor → Instructors</span> and remove some of
+                    their unavailable times, or allow more meeting patterns.
                   </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {(stored.diagnostics.most_constrained_sections ?? []).length > 0 && (
-            <div className="mt-5">
-              <h3 className="text-sm font-bold text-slate-900">Most Constrained Sections (fewest valid options)</h3>
-              <ul className="mt-2 space-y-1 text-sm text-slate-700">
-                {stored.diagnostics.most_constrained_sections?.slice(0, 8).map((x) => (
-                  <li key={`constrained-${x.section_id}`}>
-                    {formatSectionLabel(x.section_id)} - options: {x.option_count}
-                    {x.instructor_id ? `, instructor: ${formatInstructorLabel(x.instructor_id)}` : ""}
+                  <li>
+                    Or move some sections to another instructor: go to{" "}
+                    <span className="font-semibold">Editor → Sections</span> and reassign a few of
+                    their sections.
                   </li>
-                ))}
-              </ul>
-            </div>
-          )}
+                  <li>
+                    Or reduce how many sections they teach this term.
+                  </li>
+                </ul>
+                <ul className="mt-2 space-y-1 rounded-md bg-white/70 p-2 text-xs text-amber-900">
+                  {stored.diagnostics.feasible_if_remove_instructor?.map((i) => (
+                    <li key={`overloaded-${i.instructor_id}`}>
+                      <span className="font-semibold">{formatInstructorLabel(i.instructor_id)}</span>{" "}
+                      — {i.section_count} section{i.section_count === 1 ? "" : "s"}
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-3 rounded-md border border-amber-300 bg-white/60 p-3">
+                  <p className="text-xs text-amber-900">
+                    <span className="font-bold">Just want to test it?</span> Try building a schedule
+                    with these instructors&apos; sections left out. This does not change your data —
+                    it only previews whether the rest fits.
+                  </p>
+                  <div className="mt-2.5 flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-amber-500 px-3 text-xs font-semibold text-white transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={retryStatus === "loading"}
+                      onClick={() => {
+                        const ids = stored.diagnostics!.feasible_if_remove_instructor!.map(
+                          (i) => i.instructor_id,
+                        );
+                        retryWithRemovedInstructors(ids);
+                      }}
+                    >
+                      {retryStatus === "loading"
+                        ? "Testing..."
+                        : `Test without these ${stored.diagnostics.feasible_if_remove_instructor!.length} instructor(s)`}
+                    </button>
+                    <span className="text-xs text-amber-700">
+                      Temporarily leaves out{" "}
+                      {stored.diagnostics.feasible_if_remove_instructor!.reduce(
+                        (s, i) => s + i.section_count,
+                        0,
+                      )}{" "}
+                      sections
+                    </span>
+                    {retryStatus === "error" && retryError && (
+                      <span className="text-xs font-medium text-red-600">{retryError}</span>
+                    )}
+                  </div>
+                </div>
+              </li>
+            )}
+
+            {/* Fix 3: loosen specific rules the solver flagged */}
+            {(stored.diagnostics.feasible_if_relax ?? []).length > 0 && (
+              <li className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center gap-2">
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-500 text-xs font-black text-white">
+                    •
+                  </span>
+                  <h3 className="text-sm font-bold text-slate-900">Loosen a few strict rules</h3>
+                </div>
+                <p className="mt-2 text-sm text-slate-700">
+                  These specific rules are blocking a schedule. Relaxing any of them may be enough.
+                </p>
+                <p className="mt-2 text-sm font-semibold text-slate-800">How to fix:</p>
+                <p className="mt-1 text-sm text-slate-700">
+                  In <span className="font-semibold">Editor → Constraints</span>, review and loosen
+                  the rules below (for example, widen allowed days/times or remove an overly tight
+                  restriction), then run the solver again.
+                </p>
+                <ul className="mt-2 space-y-1 rounded-md bg-white/80 p-2 text-xs text-slate-700">
+                  {stored.diagnostics.feasible_if_relax?.map((item, index) => (
+                    <li key={`relax-${index}`}>{item}</li>
+                  ))}
+                </ul>
+              </li>
+            )}
+
+            {/* Fix 4: hard-to-place sections */}
+            {constrainedSections.length > 0 && (
+              <li className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center gap-2">
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-500 text-xs font-black text-white">
+                    •
+                  </span>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Give hard-to-place sections more options
+                  </h3>
+                </div>
+                <p className="mt-2 text-sm text-slate-700">
+                  These sections have the fewest valid time/room combinations, so they&apos;re the
+                  first to fail. Giving them more flexibility often unblocks the whole schedule.
+                </p>
+                <p className="mt-2 text-sm font-semibold text-slate-800">How to fix (do one):</p>
+                <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-700">
+                  <li>
+                    Allow more meeting patterns for the section in{" "}
+                    <span className="font-semibold">Editor → Sections</span>.
+                  </li>
+                  <li>
+                    Loosen its room requirements (for example, don&apos;t require a specific
+                    feature) in <span className="font-semibold">Editor → Sections</span>.
+                  </li>
+                  <li>
+                    Free up the instructor&apos;s time in{" "}
+                    <span className="font-semibold">Editor → Instructors</span>.
+                  </li>
+                </ul>
+                <ul className="mt-2 space-y-1 rounded-md bg-white/80 p-2 text-xs text-slate-700">
+                  {constrainedSections.slice(0, 8).map((x) => (
+                    <li key={`constrained-${x.section_id}`}>
+                      <span className="font-semibold">{formatSectionLabel(x.section_id)}</span> — only{" "}
+                      {x.option_count} valid time/room option{x.option_count === 1 ? "" : "s"}
+                      {x.instructor_id
+                        ? `, taught by ${formatInstructorLabel(x.instructor_id)}`
+                        : ""}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            )}
+
+            {/* Fix 5: last resort — remove a section */}
+            {removableSections.length > 0 && (
+              <li className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center gap-2">
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-500 text-xs font-black text-white">
+                    •
+                  </span>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Last resort: drop a blocking section
+                  </h3>
+                </div>
+                <p className="mt-2 text-sm text-slate-700">
+                  If nothing else works, removing one of these sections lets the rest schedule.
+                </p>
+                <p className="mt-2 text-sm font-semibold text-slate-800">How to fix:</p>
+                <p className="mt-1 text-sm text-slate-700">
+                  In <span className="font-semibold">Editor → Sections</span>, archive or delete the
+                  section (or move it to a later term), then run the solver again.
+                </p>
+                <ul className="mt-2 space-y-1 rounded-md bg-white/80 p-2 text-xs text-slate-700">
+                  {removableSections.map((sectionId) => (
+                    <li key={`remove-${sectionId}`}>
+                      <span className="font-semibold">{formatSectionLabel(sectionId)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            )}
+
+            {/* Fallback when the solver couldn't pinpoint a specific lever */}
+            {capacitySections.length === 0 &&
+              (stored.diagnostics.feasible_if_remove_instructor ?? []).length === 0 &&
+              (stored.diagnostics.feasible_if_relax ?? []).length === 0 &&
+              constrainedSections.length === 0 &&
+              removableSections.length === 0 && (
+                <li className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <h3 className="text-sm font-bold text-slate-900">
+                    No single fix stood out — try these general steps
+                  </h3>
+                  <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-slate-700">
+                    <li>
+                      Run <span className="font-semibold">Check Data</span> in the editor to catch
+                      row-level problems (missing rooms, bad IDs, empty fields).
+                    </li>
+                    <li>
+                      In <span className="font-semibold">Editor → Instructors</span>, widen
+                      availability for instructors who teach many sections.
+                    </li>
+                    <li>
+                      In <span className="font-semibold">Editor → Sections</span>, allow more meeting
+                      patterns and loosen room requirements.
+                    </li>
+                    <li>Then run the solver again.</li>
+                  </ol>
+                </li>
+              )}
+          </ol>
+
+          {/* Reference: busiest instructors (context, not an action) */}
           {(stored.diagnostics.busiest_instructors ?? []).length > 0 && (
-            <div className="mt-5">
-              <h3 className="text-sm font-bold text-slate-900">Busiest Instructors (section count)</h3>
-              <ul className="mt-2 space-y-1 text-sm text-slate-700">
+            <details className="mt-4">
+              <summary className="cursor-pointer text-xs font-semibold text-slate-500 hover:text-slate-700">
+                See section counts per instructor
+              </summary>
+              <ul className="mt-2 space-y-1 text-xs text-slate-600">
                 {stored.diagnostics.busiest_instructors?.slice(0, 8).map((x) => (
                   <li key={`busy-${x.instructor_id}`}>
-                    {formatInstructorLabel(x.instructor_id)}: {x.section_count}
+                    {formatInstructorLabel(x.instructor_id)}: {x.section_count} sections
                   </li>
                 ))}
               </ul>
-            </div>
+            </details>
           )}
+
+          <details className="mt-2">
+            <summary className="cursor-pointer text-xs font-semibold text-slate-500 hover:text-slate-700">
+              Technical details
+            </summary>
+            <div className="mt-2 space-y-1 text-xs text-slate-600">
+              <div>
+                <span className="font-semibold text-slate-700">Error codes: </span>
+                {(stored.diagnostics.error_codes ?? []).join(", ") || "None"}
+              </div>
+              {(stored.diagnostics.referenced_sections ?? []).length > 0 ? (
+                <div>
+                  <span className="font-semibold text-slate-700">Sections flagged: </span>
+                  {stored.diagnostics.referenced_sections!
+                    .map((sectionId) => formatSectionLabel(sectionId))
+                    .join(", ")}
+                </div>
+              ) : null}
+              {stored.diagnostics.diagnosis_truncated ? (
+                <p className="text-amber-700">
+                  The analysis was shortened to avoid a long wait. Use Check Data for row-level
+                  issues, or retry the solver.
+                </p>
+              ) : null}
+            </div>
+          </details>
         </div>
       )}
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6">
-        <h2 className="text-lg font-bold text-slate-900">Problematic Section Values</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Sections referenced directly in solver error messages.
-        </p>
-        {problematicSections.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-600">
-            No explicit section IDs were identified in error messages.
+      {problematicSections.length > 0 ? (
+        <div className={`${appCardClass} p-6`}>
+          <h2 className="text-lg font-bold text-slate-900">Current values for flagged sections</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            These sections were named in the error above. Here are their current settings so you can
+            spot what to change in <span className="font-semibold">Editor → Sections</span>.
           </p>
-        ) : (
           <div className="mt-4 overflow-x-auto">
             <table className="min-w-full text-left text-sm">
               <thead className="text-xs uppercase text-slate-500">
@@ -361,15 +648,16 @@ export default function SolverErrorsPage() {
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </div>
+      ) : null}
 
-      <div>
-        <Link
-          href="/editor/sections"
-          className="inline-flex items-center rounded-lg bg-weatherhead-primary px-4 py-2 font-bold text-white"
-        >
-          Back to Editor Sections to Fix Data
+      <div className="flex flex-wrap items-center gap-2">
+        <Link href="/editor/sections" className={appNativeBtnPrimary}>
+          Go to Editor to fix your data
+          <ArrowRight className="size-3.5" />
+        </Link>
+        <Link href="/calendar" className={appNativeBtnSecondary}>
+          Back to Calendar
         </Link>
       </div>
     </div>

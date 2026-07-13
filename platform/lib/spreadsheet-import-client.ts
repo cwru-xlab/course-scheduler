@@ -59,8 +59,8 @@ export async function importSpreadsheetFile(
     return {
       ok: false,
       errors,
-      message: formatErrorsSummary(errors),
-      detail: formatErrorsDetail(errors),
+      message: formatErrorsSummary(errors, "import"),
+      detail: formatErrorsDetail(errors, "import"),
     };
   }
 
@@ -71,8 +71,10 @@ export async function importSpreadsheetFile(
     const errors = enrichSpreadsheetErrors(
       [
         {
-          code: "import_failed",
-          message: `Import API returned a non-JSON response (status ${response.status}).`,
+          code: "solver_response_invalid",
+          message:
+            "The import service returned an unexpected response. Confirm the scheduling service is running and try again.",
+          detail: `HTTP status ${response.status}`,
         },
       ],
       "import",
@@ -80,8 +82,8 @@ export async function importSpreadsheetFile(
     return {
       ok: false,
       errors,
-      message: formatErrorsSummary(errors),
-      detail: formatErrorsDetail(errors),
+      message: formatErrorsSummary(errors, "import"),
+      detail: formatErrorsDetail(errors, "import"),
     };
   }
 
@@ -97,8 +99,8 @@ export async function importSpreadsheetFile(
     return {
       ok: false,
       errors,
-      message: formatErrorsSummary(errors),
-      detail: formatErrorsDetail(errors),
+      message: formatErrorsSummary(errors, "import"),
+      detail: formatErrorsDetail(errors, "import"),
     };
   }
 

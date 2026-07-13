@@ -2150,13 +2150,18 @@ def _solve_schedule(input_data: SchedulingInput):
             )
         else:
             diagnostics = base_diag
+            status_name = solver.StatusName(status)
             err_code, err_msg = (
                 "solver_failed",
-                f"Solver finished with status {solver.StatusName(status)}.",
+                "The solver could not complete. Try adjusting constraints or increasing the solver time limit.",
             )
+            err_detail = f"Solver status: {status_name}"
+        error_entry: dict = {"code": err_code, "message": err_msg}
+        if err_code == "solver_failed":
+            error_entry["detail"] = err_detail
         return {
             "status": "error",
-            "errors": [{"code": err_code, "message": err_msg}],
+            "errors": [error_entry],
             "diagnostics": diagnostics,
         }
 
@@ -2421,6 +2426,7 @@ def import_excel():
         file_bytes = file.read()
         parsed = build_parsed_data_from_excel(file_bytes)
     except Exception as exc:  # pylint: disable=broad-except
+        parsed_error = format_import_parse_error(exc)
         return (
             jsonify(
                 {
@@ -2428,7 +2434,8 @@ def import_excel():
                     "errors": [
                         {
                             "code": "parse_failed",
-                            "message": f"Failed to parse Excel file: {exc}",
+                            "message": parsed_error["message"],
+                            "detail": parsed_error.get("detail"),
                         }
                     ],
                 }
@@ -2512,7 +2519,11 @@ def solve():
             "errors": [
                 {
                     "code": "internal_error",
-                    "message": f"Solver crashed: {type(exc).__name__}: {exc}",
+                    "message": (
+                        "The scheduling service hit an unexpected error while running the solver. "
+                        "Try again, or use Check Data to find spreadsheet issues."
+                    ),
+                    "detail": f"{type(exc).__name__}: {exc}",
                 }
             ],
         }
@@ -2614,6 +2625,7 @@ def import_scheduling_spreadsheet():
                 400,
             )
     except Exception as exc:  # pylint: disable=broad-except
+        parsed_error = format_import_parse_error(exc)
         return (
             jsonify(
                 {
@@ -2621,7 +2633,8 @@ def import_scheduling_spreadsheet():
                     "errors": [
                         {
                             "code": "parse_failed",
-                            "message": format_import_parse_error(exc),
+                            "message": parsed_error["message"],
+                            "detail": parsed_error.get("detail"),
                         }
                     ],
                 }
@@ -2682,7 +2695,11 @@ def validate_scheduling_input_route():
             issues.append(
                 {
                     "code": "validation_failed",
-                    "message": f"Could not complete feasibility preview: {exc}",
+                    "message": (
+                        "Could not complete the feasibility preview. "
+                        "Use Check Data in the editor to find row-level issues instead."
+                    ),
+                    "detail": str(exc),
                 }
             )
 
@@ -2732,7 +2749,11 @@ def export_scheduling_spreadsheet():
                     "errors": [
                         {
                             "code": "export_failed",
-                            "message": f"Failed to generate spreadsheet: {exc}",
+                            "message": (
+                                "Could not generate the spreadsheet file. "
+                                "Try again, or verify your scheduling data is complete."
+                            ),
+                            "detail": str(exc),
                         }
                     ],
                 }

@@ -1,5 +1,5 @@
 import type { SchedulingInput, ValidationError } from "@/lib/scheduling/types";
-import { enrichSolverErrors, normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
+import { enrichSolverErrors, formatErrorsSummary, normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
 
 export const LAST_SOLVER_ERROR_STORAGE_KEY = "wsom-last-solver-error";
 
@@ -30,4 +30,10 @@ export function storeSolverNetworkError(input: SchedulingInput, rawMessage: stri
   const errors = enrichSolverErrors([{ code: "network_error", message }]);
   storeSolverErrorSnapshot(input, errors);
   return errors;
+}
+
+export function solverNetworkErrorSummary(rawMessage: string): string {
+  const message = normalizeNetworkError(rawMessage, "solver");
+  const errors = enrichSolverErrors([{ code: "network_error", message }]);
+  return formatErrorsSummary(errors, "solver");
 }

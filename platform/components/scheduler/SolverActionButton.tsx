@@ -12,7 +12,8 @@ import type {
   SchedulingInput,
   ValidationError,
 } from "@/lib/scheduling/types";
-import { enrichSolverErrors, normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
+import { enrichSolverErrors, formatErrorsSummary, normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
+import { humanizedSummary } from "@/lib/errors/humanizeError";
 import { validateSchedulingInput } from "@/lib/spreadsheet/validateClient";
 import { isSectionArchived } from "@/lib/scheduling/sectionState";
 import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
@@ -92,8 +93,15 @@ export const SolverActionButton = ({
         result = JSON.parse(raw) as ApiSuccess | ApiError;
       } catch {
         fail();
-        const msg = `Schedule API returned non-JSON response (status ${response.status}).`;
-        onErrorChange?.(msg);
+        const errors = enrichSolverErrors([
+          {
+            code: "solver_response_invalid",
+            message:
+              "The scheduling service returned an unexpected response. Confirm it is running and try again.",
+            detail: `HTTP status ${response.status}`,
+          },
+        ]);
+        onErrorChange?.(humanizedSummary(errors, "solver"));
         return;
       }
 
@@ -104,7 +112,7 @@ export const SolverActionButton = ({
             : enrichSolverErrors([
                 { code: "solver_error", message: "Solver failed for this input." },
               ]);
-        const nextError = enrichedErrors.map((err) => err.message).join(" ");
+        const nextError = formatErrorsSummary(enrichedErrors, "solver");
 
         if (typeof window !== "undefined") {
           storeSolverErrorSnapshot(data, enrichedErrors, result?.status === "error" ? result.diagnostics : undefined);
@@ -142,7 +150,7 @@ export const SolverActionButton = ({
       if (typeof window !== "undefined" && data) {
         storeSolverErrorSnapshot(data, enrichedErrors);
       }
-      onErrorChange?.(enrichedErrors.map((err) => err.message).join(" "));
+      onErrorChange?.(formatErrorsSummary(enrichedErrors, "solver"));
     } finally {
       setSolverStatus("idle");
     }

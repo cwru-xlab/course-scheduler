@@ -1,6 +1,7 @@
 "use client";
 
-import type { ScheduleSolution, SchedulingInput } from "./types";
+import type { ScheduleSolution, SchedulingInput, ValidationError } from "./types";
+import { enrichSpreadsheetErrors, formatErrorsDetail, formatErrorsSummary, normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
 
 export const LAST_SOLVER_RUN_STORAGE_KEY = "wsom-last-solver-run";
 export const LAST_SOLVER_ERROR_STORAGE_KEY = "wsom-last-solver-error";
@@ -90,8 +91,21 @@ export const loadSavedScheduleToCurrentView = (entry: SavedScheduleEntry): void 
   );
 };
 
-export const exportSavedSchedule = async (entry: SavedScheduleEntry): Promise<void> => {
-  if (typeof window === "undefined") return;
+export type ExportSavedScheduleResult =
+  | { ok: true }
+  | { ok: false; message: string; errors: ValidationError[]; detail: string };
+
+export const exportSavedSchedule = async (
+  entry: SavedScheduleEntry,
+): Promise<ExportSavedScheduleResult> => {
+  if (typeof window === "undefined") {
+    return {
+      ok: false,
+      message: "Export is only available in the browser.",
+      errors: [{ code: "export_failed", message: "Export is only available in the browser." }],
+      detail: "",
+    };
+  }
 
   const safeDate = entry.scheduleDate.replace(/[^0-9-]/g, "") || "schedule";
   const safeName = entry.name.replace(/[^a-z0-9-_]+/gi, "_").replace(/^_+|_+$/g, "");
@@ -104,18 +118,45 @@ export const exportSavedSchedule = async (entry: SavedScheduleEntry): Promise<vo
     });
 
     if (!response.ok) {
-      let message = "Failed to export spreadsheet.";
+      let errors: ValidationError[] = [
+        { code: "export_failed", message: "Could not export this saved schedule." },
+      ];
       try {
-        const payload = (await response.json()) as {
-          errors?: Array<{ message?: string }>;
-        };
-        message = payload.errors?.[0]?.message ?? message;
+        const payload = (await response.json()) as { errors?: ValidationError[] };
+        if (Array.isArray(payload.errors) && payload.errors.length > 0) {
+          errors = enrichSpreadsheetErrors(payload.errors, "export");
+        } else {
+          errors = enrichSpreadsheetErrors(
+            [
+              {
+                code: "solver_response_invalid",
+                message:
+                  "The export service returned an unexpected response. Confirm the scheduling service is running and try again.",
+                detail: `HTTP status ${response.status}`,
+              },
+            ],
+            "export",
+          );
+        }
       } catch {
-        // Keep fallback message.
+        errors = enrichSpreadsheetErrors(
+          [
+            {
+              code: "solver_response_invalid",
+              message:
+                "The export service returned an unexpected response. Confirm the scheduling service is running and try again.",
+              detail: `HTTP status ${response.status}`,
+            },
+          ],
+          "export",
+        );
       }
-      console.error(message);
-      alert(message);
-      return;
+      return {
+        ok: false,
+        message: formatErrorsSummary(errors, "export"),
+        errors,
+        detail: formatErrorsDetail(errors, "export"),
+      };
     }
 
     const blob = await response.blob();
@@ -127,9 +168,18 @@ export const exportSavedSchedule = async (entry: SavedScheduleEntry): Promise<vo
     a.click();
     a.remove();
     window.URL.revokeObjectURL(url);
+    return { ok: true };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to reach export service.";
-    console.error(message);
-    alert(message);
+    const raw = err instanceof Error ? err.message : "Failed to reach export service.";
+    const errors = enrichSpreadsheetErrors(
+      [{ code: "network_error", message: normalizeNetworkError(raw, "export") }],
+      "export",
+    );
+    return {
+      ok: false,
+      message: formatErrorsSummary(errors, "export"),
+      errors,
+      detail: formatErrorsDetail(errors, "export"),
+    };
   }
 };
