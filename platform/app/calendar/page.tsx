@@ -3226,11 +3226,11 @@ type PatternDayApplyRow = {
         setConflictSectionIds(new Set(evaluation.conflictSectionIds));
         setDragFeedback({
           status: "warning",
-          message: multiDay ? `${evaluation.message} ${multiDayNotice}` : evaluation.message,
+          message: canOfferPatternApply ? `${evaluation.message} ${multiDayNotice}` : evaluation.message,
         });
       } else {
         setConflictSectionIds(new Set());
-        if (multiDay) {
+        if (canOfferPatternApply) {
           setDragFeedback({ status: "warning", message: multiDayNotice });
         } else {
           setDragFeedback({ status: "valid", message: evaluation.message });
