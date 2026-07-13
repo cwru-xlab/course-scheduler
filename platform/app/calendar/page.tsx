@@ -688,10 +688,42 @@ function rgbaBorderForTimeslotDuration(durationMin: number): string {
   return "rgba(109, 40, 217, 0.5)";
 }
 
+/**
+ * Single source of truth for which slot lengths a dragged section may land on.
+ * Shared by the highlight bands (`dragPossibleTimeslots`) and the drop snap
+ * (`selectSlotNearMinutes`) so every highlighted band is a valid drop target
+ * (issue C8). Falls back to the section's current on-grid duration when its
+ * meeting pattern has no compatible slots for the day.
+ */
+function getAllowedSlotDurationsForDrag(
+  sectionId: string,
+  assignments: CalendarAssignmentMap,
+  data: SolverDataDto,
+  solverInput: SchedulingInput | null,
+  selectedDay: Day,
+  timeslotById: Map<string, TimeslotDto>,
+  allDayEvents: CalendarEvent[],
+): number[] {
+  const section = data.sections.find((entry) => entry.id === sectionId);
+  const patternId =
+    assignments[sectionId]?.meeting_pattern_id?.trim() ||
+    section?.previous_meeting_pattern?.trim() ||
+    "";
+  const pattern = solverInput?.meeting_patterns?.find((entry) => entry.id === patternId);
+  let allowedDurations = meetingPatternSlotDurationsForDay(pattern, selectedDay, timeslotById);
+  if (allowedDurations.length === 0) {
+    const dragged = findCalendarEventBySectionId(allDayEvents, sectionId);
+    if (dragged) {
+      allowedDurations = [Math.max(0, dragged.end - dragged.start)];
+    }
+  }
+  return allowedDurations;
+}
+
 function selectSlotNearMinutes(
   timeslots: TimeslotDto[],
   selectedDay: Day,
-  durationMinutes: number,
+  allowedDurations: number[],
   dropMinutes: number,
 ): TimeslotWithMinutes | null {
   const daySlots = timeslots
@@ -701,7 +733,9 @@ function selectSlotNearMinutes(
       start: parseMinutes(slot.start_time),
       end: parseMinutes(slot.end_time),
     }))
-    .filter((slot) => Math.abs(slot.end - slot.start - durationMinutes) <= 5);
+    .filter((slot) =>
+      slotDurationMatchesAllowedLengths(Math.max(0, slot.end - slot.start), allowedDurations),
+    );
   if (daySlots.length === 0) return null;
   return daySlots.sort(
     (a, b) => Math.abs(a.start - dropMinutes) - Math.abs(b.start - dropMinutes),
@@ -1068,6 +1102,12 @@ export default function CalendarPage() {
     assignmentsBySection: AssignmentMap;
     solverTimeslotIdsBySection: Record<string, string[]>;
     backendSaveMessage: { type: "success" | "error"; text: string } | null;
+    // Enriched history: the exact drag toast + conflict rings that were showing
+    // for this state, so undo/redo restores them without a re-scan (issue C7).
+    // Optional so older snapshots (pushed before enrichment) fall back to the
+    // `computeCalendarDayConflicts` rescan path.
+    dragFeedback?: CalendarDragFeedbackState;
+    conflictSectionIds?: string[];
   };
 
   const [selectedDay, setSelectedDay] = useState<Day>("Mon");
@@ -1083,6 +1123,45 @@ export default function CalendarPage() {
   const undoStackRef = useRef<UndoSnapshot[]>([]);
   const [redoStack, setRedoStack] = useState<UndoSnapshot[]>([]);
   const redoStackRef = useRef<UndoSnapshot[]>([]);
+
+  // Shared push used by every mutation path (drag, click, pattern-apply) so all
+  // of them record the same enriched snapshot (assignments + feedback + rings)
+  // and consistently clear the redo stack on a new action.
+  const pushUndoSnapshot = useCallback(
+    (snap: {
+      assignmentsBySection: AssignmentMap;
+      solverTimeslotIdsBySection: Record<string, string[]>;
+      backendSaveMessage: { type: "success" | "error"; text: string } | null;
+      dragFeedback: CalendarDragFeedbackState;
+      conflictSectionIds: Set<string> | string[];
+    }) => {
+      setRedoStack([]);
+      redoStackRef.current = [];
+      setUndoStack((prev) => {
+        const key = stateKeyForUndo(
+          snap.assignmentsBySection,
+          snap.solverTimeslotIdsBySection,
+        );
+        const lastKey = prev.length ? prev[prev.length - 1]?.key : null;
+        if (lastKey === key) return prev;
+        const entry: UndoSnapshot = {
+          key,
+          assignmentsBySection: snap.assignmentsBySection,
+          solverTimeslotIdsBySection: snap.solverTimeslotIdsBySection,
+          backendSaveMessage: snap.backendSaveMessage,
+          dragFeedback: snap.dragFeedback,
+          conflictSectionIds: Array.isArray(snap.conflictSectionIds)
+            ? snap.conflictSectionIds
+            : Array.from(snap.conflictSectionIds),
+        };
+        const next = [...prev, entry];
+        const trimmed = next.length > 25 ? next.slice(next.length - 25) : next;
+        undoStackRef.current = trimmed;
+        return trimmed;
+      });
+    },
+    [stateKeyForUndo],
+  );
   const [dragError, setDragError] = useState<string | null>(null);
   // Section ids to visually flag after a placement creates a conflict (instructor
   // double-booking or room overlap) so the user can spot both sides of the clash.
@@ -1173,9 +1252,13 @@ type MeetingPatternPlacementOption = {
     options: MeetingPatternPlacementOption[];
     selectedOptionKey: string;
     // Pre-click snapshot used to revert the deferred placement if the user
-    // dismisses the modal without choosing a pattern (issue C5).
+    // dismisses the modal without choosing a pattern (issue C5), and to push a
+    // single undo entry covering place+choose-pattern once applied (issue C6).
     revertAssignments: AssignmentMap;
     revertSolverTimeslots: Record<string, string[]>;
+    revertBackendSaveMessage: { type: "success" | "error"; text: string } | null;
+    revertDragFeedback: CalendarDragFeedbackState;
+    revertConflictSectionIds: string[];
   } | null>(null);
   const [meetingPatternSelectionError, setMeetingPatternSelectionError] = useState<string | null>(null);
   const [toolbarActionHint, setToolbarActionHint] = useState<string | null>(null);
@@ -1783,6 +1866,15 @@ type MeetingPatternPlacementOption = {
         meeting_pattern_id: selection.meetingPatternId,
       };
     }
+    // Push a single undo entry covering the whole place+choose-pattern action,
+    // using the pre-click state captured on the modal, before persisting (C6).
+    pushUndoSnapshot({
+      assignmentsBySection: meetingPatternSelectionModal.revertAssignments,
+      solverTimeslotIdsBySection: meetingPatternSelectionModal.revertSolverTimeslots,
+      backendSaveMessage: meetingPatternSelectionModal.revertBackendSaveMessage,
+      dragFeedback: meetingPatternSelectionModal.revertDragFeedback,
+      conflictSectionIds: meetingPatternSelectionModal.revertConflictSectionIds,
+    });
     setAssignmentsBySection(nextAssignments);
     setSolverTimeslotIdsBySection((prev) => ({
       ...prev,
@@ -1806,6 +1898,7 @@ type MeetingPatternPlacementOption = {
     data,
     meetingPatternSelectionModal,
     persistCalendarAssignments,
+    pushUndoSnapshot,
     validatePatternPlacement,
   ]);
 
@@ -2093,6 +2186,20 @@ type MeetingPatternPlacementOption = {
     window.print();
   };
 
+  // Restore a snapshot's feedback (toast + conflict rings) directly when it was
+  // captured with enriched history; otherwise fall back to the day re-scan so
+  // older snapshots still re-surface conflicts (issue C7).
+  const restoreSnapshotFeedback = useCallback((snapshot: UndoSnapshot) => {
+    setDragError(null);
+    if (snapshot.dragFeedback !== undefined && snapshot.conflictSectionIds !== undefined) {
+      setConflictSectionIds(new Set(snapshot.conflictSectionIds));
+      setDragFeedback(snapshot.dragFeedback);
+    } else {
+      conflictRescanRef.current = true;
+      setConflictRescanNonce((n) => n + 1);
+    }
+  }, []);
+
   const handleUndo = useCallback(() => {
     const stack = undoStackRef.current;
     const snapshot = stack[stack.length - 1];
@@ -2102,6 +2209,8 @@ type MeetingPatternPlacementOption = {
       assignmentsBySection,
       solverTimeslotIdsBySection,
       backendSaveMessage,
+      dragFeedback,
+      conflictSectionIds: Array.from(conflictSectionIds),
     };
     const nextRedo = [...redoStackRef.current, currentSnapshot];
     const trimmedRedo = nextRedo.length > 25 ? nextRedo.slice(nextRedo.length - 25) : nextRedo;
@@ -2113,13 +2222,17 @@ type MeetingPatternPlacementOption = {
     setUndoStack(nextStack);
     setAssignmentsBySection(snapshot.assignmentsBySection);
     setSolverTimeslotIdsBySection(snapshot.solverTimeslotIdsBySection);
-    // Re-scan the restored state so conflicts (and their highlights) reappear if
-    // undo/redo lands back on a conflicting layout.
-    setDragError(null);
-    conflictRescanRef.current = true;
-    setConflictRescanNonce((n) => n + 1);
+    restoreSnapshotFeedback(snapshot);
     setBackendSaveMessage(snapshot.backendSaveMessage);
-  }, [assignmentsBySection, backendSaveMessage, solverTimeslotIdsBySection, stateKeyForUndo]);
+  }, [
+    assignmentsBySection,
+    backendSaveMessage,
+    conflictSectionIds,
+    dragFeedback,
+    restoreSnapshotFeedback,
+    solverTimeslotIdsBySection,
+    stateKeyForUndo,
+  ]);
 
   const handleRedo = useCallback(() => {
     const stack = redoStackRef.current;
@@ -2130,6 +2243,8 @@ type MeetingPatternPlacementOption = {
       assignmentsBySection,
       solverTimeslotIdsBySection,
       backendSaveMessage,
+      dragFeedback,
+      conflictSectionIds: Array.from(conflictSectionIds),
     };
     const nextUndo = [...undoStackRef.current, currentSnapshot];
     const trimmedUndo = nextUndo.length > 25 ? nextUndo.slice(nextUndo.length - 25) : nextUndo;
@@ -2142,11 +2257,17 @@ type MeetingPatternPlacementOption = {
 
     setAssignmentsBySection(snapshot.assignmentsBySection);
     setSolverTimeslotIdsBySection(snapshot.solverTimeslotIdsBySection);
-    setDragError(null);
-    conflictRescanRef.current = true;
-    setConflictRescanNonce((n) => n + 1);
+    restoreSnapshotFeedback(snapshot);
     setBackendSaveMessage(snapshot.backendSaveMessage);
-  }, [assignmentsBySection, backendSaveMessage, solverTimeslotIdsBySection, stateKeyForUndo]);
+  }, [
+    assignmentsBySection,
+    backendSaveMessage,
+    conflictSectionIds,
+    dragFeedback,
+    restoreSnapshotFeedback,
+    solverTimeslotIdsBySection,
+    stateKeyForUndo,
+  ]);
 
   const updateLastRunStorage = useCallback(
     (nextInput: SchedulingInput, assignments: AssignmentMap, locks?: string[]) => {
@@ -2574,19 +2695,15 @@ type MeetingPatternPlacementOption = {
   const dragPossibleTimeslots = useMemo(() => {
     if (!data || !calendarDrag?.sectionId) return [];
     const sectionId = calendarDrag.sectionId;
-    const section = data.sections.find((entry) => entry.id === sectionId);
-    const patternId =
-      assignmentsBySection[sectionId]?.meeting_pattern_id?.trim() ||
-      section?.previous_meeting_pattern?.trim() ||
-      "";
-    const pattern = solverInput?.meeting_patterns?.find((entry) => entry.id === patternId);
-    let allowedDurations = meetingPatternSlotDurationsForDay(pattern, selectedDay, timeslotById);
-    if (allowedDurations.length === 0) {
-      const dragged = findCalendarEventBySectionId(allDayEvents, sectionId);
-      if (dragged) {
-        allowedDurations = [Math.max(0, dragged.end - dragged.start)];
-      }
-    }
+    const allowedDurations = getAllowedSlotDurationsForDrag(
+      sectionId,
+      assignmentsBySection,
+      data,
+      solverInput ?? null,
+      selectedDay,
+      timeslotById,
+      allDayEvents,
+    );
     return data.timeslots
       .filter((slot) => timeslotMatchesDay(slot, selectedDay))
       .map((slot) => ({
@@ -2730,24 +2847,14 @@ type MeetingPatternPlacementOption = {
         );
       });
       if (!alreadyPlaced) {
-        setRedoStack([]);
-        redoStackRef.current = [];
-        setUndoStack((prev) => {
-          const key = stateKeyForUndo(assignmentsBySection, solverTimeslotIdsBySection);
-          const lastKey = prev.length ? prev[prev.length - 1]?.key : null;
-          if (lastKey === key) return prev;
-          const next = [
-            ...prev,
-            {
-              key,
-              assignmentsBySection,
-              solverTimeslotIdsBySection,
-              backendSaveMessage,
-            },
-          ];
-          const trimmed = next.length > 25 ? next.slice(next.length - 25) : next;
-          undoStackRef.current = trimmed;
-          return trimmed;
+        // Snapshot the pre-placement state (assignments + the toast/rings showing
+        // right now) so undo restores the exact prior view without a re-scan.
+        pushUndoSnapshot({
+          assignmentsBySection,
+          solverTimeslotIdsBySection,
+          backendSaveMessage,
+          dragFeedback,
+          conflictSectionIds,
         });
       }
       const nextAssignments: AssignmentMap = {
@@ -2796,10 +2903,13 @@ type MeetingPatternPlacementOption = {
       assignmentsBySection,
       allDayEvents,
       backendSaveMessage,
+      conflictSectionIds,
+      dragFeedback,
       data,
       instructorById,
       linkedSectionIdsBySection,
       findBlockedPlacementMessage,
+      pushUndoSnapshot,
       sectionHasMultiDayPattern,
       selectedDay,
       solverTimeslotIdsBySection,
@@ -2996,9 +3106,13 @@ type MeetingPatternPlacementOption = {
           meeting_pattern_id: currentAssignment?.meeting_pattern_id ?? "",
         };
       }
-      // Capture pre-click state before mutating so a modal dismiss can restore it.
+      // Capture pre-click state before mutating so a modal dismiss can restore it
+      // and so undo (drag or click) reverts to the exact prior view.
       const revertAssignments = assignmentsBySection;
       const revertSolverTimeslots = solverTimeslotIdsBySection;
+      const revertBackendSaveMessage = backendSaveMessage;
+      const revertDragFeedback = dragFeedback;
+      const revertConflictSectionIds = Array.from(conflictSectionIds);
       setAssignmentsBySection(nextAssignments);
       setSolverTimeslotIdsBySection((prev) => ({
         ...prev,
@@ -3009,6 +3123,8 @@ type MeetingPatternPlacementOption = {
       if (needsPatternSelection) {
         // Defer persistence until the user chooses a meeting pattern. Applying
         // the local preview only keeps the backend clean if they cancel (C5).
+        // The undo entry is pushed on apply (not here) so a cancel leaves the
+        // undo stack untouched.
         setMeetingPatternSelectionModal({
           sectionId,
           roomId: targetRoomId,
@@ -3017,9 +3133,21 @@ type MeetingPatternPlacementOption = {
           selectedOptionKey: patternOptions[0].key,
           revertAssignments,
           revertSolverTimeslots,
+          revertBackendSaveMessage,
+          revertDragFeedback,
+          revertConflictSectionIds,
         });
         setMeetingPatternSelectionError(null);
       } else {
+        // Push undo before persisting so undo reverts local state and can skip a
+        // backend write (Phase 2 defer-persist alignment, issue C6).
+        pushUndoSnapshot({
+          assignmentsBySection: revertAssignments,
+          solverTimeslotIdsBySection: revertSolverTimeslots,
+          backendSaveMessage: revertBackendSaveMessage,
+          dragFeedback: revertDragFeedback,
+          conflictSectionIds: revertConflictSectionIds,
+        });
         void persistCalendarAssignments(nextAssignments);
       }
       setPendingPlacementSectionId(null);
@@ -3059,11 +3187,15 @@ type MeetingPatternPlacementOption = {
     },
     [
       assignmentsBySection,
+      backendSaveMessage,
       buildMeetingPatternOptionsForPlacement,
+      conflictSectionIds,
+      dragFeedback,
       evaluatePlacement,
       linkedSectionIdsBySection,
       pendingPlacementSectionId,
       persistCalendarAssignments,
+      pushUndoSnapshot,
       solverTimeslotIdsBySection,
     ],
   );
@@ -4162,39 +4294,63 @@ type MeetingPatternPlacementOption = {
                         });
                       },
                       onPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => {
-                        setCalendarDrag((prev) => {
-                          if (!prev || e.pointerId !== prev.pointerId) return prev;
-                          const dist = Math.hypot(e.clientX - prev.startX, e.clientY - prev.startY);
-                          const hasMoved =
-                            prev.hasMoved || dist > CALENDAR_DRAG_MOVE_THRESHOLD_PX;
-                          if (!data) return { ...prev, hasMoved };
-                          const draggedE = findCalendarEventBySectionId(allDayEvents, prev.sectionId);
-                          if (!draggedE) return { ...prev, hasMoved };
-                          const duration = draggedE.end - draggedE.start;
-                          let roomId =
-                            findRoomIdAtClientY(e.clientY) ??
-                            draggedE.section.room_id ??
-                            "";
-                          if (!roomId) return { ...prev, hasMoved };
-                          const mins = minutesFromPointerInRoom(e.clientX, roomId);
-                          if (mins === null) return { ...prev, hasMoved };
-                          const slot = selectSlotNearMinutes(
-                            data.timeslots,
-                            selectedDay,
-                            duration,
-                            mins,
-                          );
-                          if (!slot) return { ...prev, hasMoved };
-                          return {
-                            ...prev,
-                            hasMoved,
-                            preview: {
-                              targetRoomId: roomId,
-                              slotId: slot.id,
-                              startMin: slot.start,
-                              endMin: slot.end,
-                            },
-                          };
+                        const prev = calendarDrag;
+                        if (!prev || e.pointerId !== prev.pointerId) return;
+                        const dist = Math.hypot(e.clientX - prev.startX, e.clientY - prev.startY);
+                        const hasMoved =
+                          prev.hasMoved || dist > CALENDAR_DRAG_MOVE_THRESHOLD_PX;
+                        const keepHasMoved = () => {
+                          if (hasMoved !== prev.hasMoved) {
+                            setCalendarDrag({ ...prev, hasMoved });
+                          }
+                        };
+                        if (!data) return keepHasMoved();
+                        const draggedE = findCalendarEventBySectionId(allDayEvents, prev.sectionId);
+                        if (!draggedE) return keepHasMoved();
+                        // Snap targets use the same allowed durations as the highlight
+                        // bands so every highlighted band is a valid drop target (C8).
+                        const allowedDurations = getAllowedSlotDurationsForDrag(
+                          prev.sectionId,
+                          assignmentsBySection,
+                          data,
+                          solverInput ?? null,
+                          selectedDay,
+                          timeslotById,
+                          allDayEvents,
+                        );
+                        const roomId =
+                          findRoomIdAtClientY(e.clientY) ??
+                          draggedE.section.room_id ??
+                          "";
+                        if (!roomId) return keepHasMoved();
+                        const mins = minutesFromPointerInRoom(e.clientX, roomId);
+                        if (mins === null) return keepHasMoved();
+                        const slot = selectSlotNearMinutes(
+                          data.timeslots,
+                          selectedDay,
+                          allowedDurations,
+                          mins,
+                        );
+                        if (!slot) {
+                          keepHasMoved();
+                          // No highlighted band under the pointer — tell the user why the
+                          // preview isn't following instead of freezing silently (C8).
+                          setDragFeedback({
+                            status: "invalid",
+                            message:
+                              "No compatible slot here for this section's meeting length.",
+                          });
+                          return;
+                        }
+                        setCalendarDrag({
+                          ...prev,
+                          hasMoved,
+                          preview: {
+                            targetRoomId: roomId,
+                            slotId: slot.id,
+                            startMin: slot.start,
+                            endMin: slot.end,
+                          },
                         });
                       },
                       onPointerUp: (e: ReactPointerEvent<HTMLDivElement>) => {
