@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   CloudBackup,
   Filter,
+  Table2,
   Link2,
   Lock,
   Palette,
