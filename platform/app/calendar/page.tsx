@@ -1172,6 +1172,10 @@ type MeetingPatternPlacementOption = {
     anchorSlotId: string;
     options: MeetingPatternPlacementOption[];
     selectedOptionKey: string;
+    // Pre-click snapshot used to revert the deferred placement if the user
+    // dismisses the modal without choosing a pattern (issue C5).
+    revertAssignments: AssignmentMap;
+    revertSolverTimeslots: Record<string, string[]>;
   } | null>(null);
   const [meetingPatternSelectionError, setMeetingPatternSelectionError] = useState<string | null>(null);
   const [toolbarActionHint, setToolbarActionHint] = useState<string | null>(null);
@@ -1805,6 +1809,26 @@ type MeetingPatternPlacementOption = {
     validatePatternPlacement,
   ]);
 
+  // Dismissing the modal without choosing a pattern reverts the deferred (never
+  // persisted) placement so the calendar matches its pre-click state (issue C5).
+  const dismissMeetingPatternSelection = useCallback(() => {
+    if (meetingPatternSelectionModal) {
+      setAssignmentsBySection(meetingPatternSelectionModal.revertAssignments);
+      setSolverTimeslotIdsBySection(meetingPatternSelectionModal.revertSolverTimeslots);
+      setConflictSectionIds(new Set());
+      setPendingPlacementSectionId(meetingPatternSelectionModal.sectionId);
+      setPlacementPreview(null);
+      setDragFeedback({
+        status: "neutral",
+        message:
+          "Placement canceled — no meeting pattern was chosen, so the section was returned to its previous state. Click an available space to place it again.",
+      });
+      setBackendSaveMessage(null);
+    }
+    setMeetingPatternSelectionModal(null);
+    setMeetingPatternSelectionError(null);
+  }, [meetingPatternSelectionModal]);
+
   useEffect(() => {
     const validDepartmentKeys = new Set(departmentFilterOptions.map((option) => option.key));
     setSelectedDepartmentKeys((prev) => prev.filter((key) => validDepartmentKeys.has(key)));
@@ -2205,6 +2229,7 @@ type MeetingPatternPlacementOption = {
         return;
       }
       const peers = crosslistPeerSectionIds(sectionId, data.sections);
+      const willLock = !peers.some((p) => lockedSectionIds.includes(p));
       setLockedSectionIds((prev) => {
         const next = new Set(prev);
         const anyLocked = peers.some((p) => next.has(p));
@@ -2212,9 +2237,14 @@ type MeetingPatternPlacementOption = {
         else peers.forEach((p) => next.add(p));
         return Array.from(next);
       });
+      // Locking must immediately invalidate any in-progress drag so a pointer
+      // sequence started before the lock cannot commit a move.
+      if (willLock && calendarDrag && peers.includes(calendarDrag.sectionId)) {
+        setCalendarDrag(null);
+      }
       setCalendarContextMenu(null);
     },
-    [canLockSectionPlacement, data],
+    [calendarDrag, canLockSectionPlacement, data, lockedSectionIds],
   );
 
   const lockAllPlacementChanges = useCallback(() => {
@@ -2239,6 +2269,9 @@ type MeetingPatternPlacementOption = {
       if (next.size > before) groupsLocked += 1;
     }
     setLockedSectionIds(Array.from(next));
+    if (calendarDrag && next.has(calendarDrag.sectionId)) {
+      setCalendarDrag(null);
+    }
     setDragFeedback({
       status: groupsLocked > 0 ? "valid" : "neutral",
       message:
@@ -2246,7 +2279,7 @@ type MeetingPatternPlacementOption = {
           ? `Locked ${groupsLocked} section group(s) that differ from the baseline. Cross-listed peers lock together.`
           : "No changed sections with both a room and times to lock.",
     });
-  }, [assignmentsBySection, baselineAssignments, data, lockedSectionIds]);
+  }, [assignmentsBySection, baselineAssignments, calendarDrag, data, lockedSectionIds]);
 
   const unlockAllPlacementLocks = useCallback(() => {
     setLockedSectionIds([]);
@@ -2617,6 +2650,32 @@ type MeetingPatternPlacementOption = {
     solverInput,
   ]);
 
+  // A section is "multi-day" if it occupies more than one timeslot, if any of its
+  // timeslots spans multiple days, or if its meeting pattern spans multiple days.
+  // Dragging one day of such a section only moves that day (issue C3).
+  const sectionHasMultiDayPattern = useCallback(
+    (sectionId: string) => {
+      const assignment = assignmentsBySection[sectionId];
+      const timeslotIds = assignment?.timeslot_ids ?? [];
+      if (timeslotIds.length > 1) return true;
+      for (const id of timeslotIds) {
+        const slot = timeslotById.get(id);
+        if (slot && DAYS.filter((day) => timeslotMatchesDay(slot, day)).length > 1) {
+          return true;
+        }
+      }
+      const patternId = assignment?.meeting_pattern_id?.trim();
+      if (patternId && solverInput) {
+        const pattern = (solverInput.meeting_patterns ?? []).find((p) => p.id === patternId);
+        if (pattern && DAYS.filter((day) => meetingPatternIncludesDay(pattern, day)).length > 1) {
+          return true;
+        }
+      }
+      return false;
+    },
+    [assignmentsBySection, solverInput, timeslotById],
+  );
+
   const commitCalendarPlacement = useCallback(
     (sectionId: string, targetRoomId: string, selectedSlot: TimeslotWithMinutes) => {
       if (!data) return;
@@ -2710,14 +2769,26 @@ type MeetingPatternPlacementOption = {
         ),
       }));
 
+      // Dragging a multi-day pattern only moves the selected day's slot, so warn
+      // the user their other pattern days were left untouched (issue C3, Option B).
+      const multiDay = sectionHasMultiDayPattern(sectionId);
+      const multiDayNotice = `Only ${selectedDay} was updated. This section uses a multi-day pattern — its other days are unchanged. Adjust them from the schedule table or re-place per day.`;
+
       // Warnings (room overlap, instructor double-booking) keep the applied move
       // but flag the involved sections for review.
       if (evaluation.severity === "warn") {
         setConflictSectionIds(new Set(evaluation.conflictSectionIds));
-        setDragFeedback({ status: "warning", message: evaluation.message });
+        setDragFeedback({
+          status: "warning",
+          message: multiDay ? `${evaluation.message} ${multiDayNotice}` : evaluation.message,
+        });
       } else {
         setConflictSectionIds(new Set());
-        setDragFeedback({ status: "valid", message: evaluation.message });
+        if (multiDay) {
+          setDragFeedback({ status: "warning", message: multiDayNotice });
+        } else {
+          setDragFeedback({ status: "valid", message: evaluation.message });
+        }
         setDragError(null);
       }
     },
@@ -2729,6 +2800,7 @@ type MeetingPatternPlacementOption = {
       instructorById,
       linkedSectionIdsBySection,
       findBlockedPlacementMessage,
+      sectionHasMultiDayPattern,
       selectedDay,
       solverTimeslotIdsBySection,
       timeslotById,
@@ -2924,6 +2996,9 @@ type MeetingPatternPlacementOption = {
           meeting_pattern_id: currentAssignment?.meeting_pattern_id ?? "",
         };
       }
+      // Capture pre-click state before mutating so a modal dismiss can restore it.
+      const revertAssignments = assignmentsBySection;
+      const revertSolverTimeslots = solverTimeslotIdsBySection;
       setAssignmentsBySection(nextAssignments);
       setSolverTimeslotIdsBySection((prev) => ({
         ...prev,
@@ -2931,16 +3006,21 @@ type MeetingPatternPlacementOption = {
           linkedSectionIds.map((linkedSectionId) => [linkedSectionId, [slot.id]]),
         ),
       }));
-      void persistCalendarAssignments(nextAssignments);
       if (needsPatternSelection) {
+        // Defer persistence until the user chooses a meeting pattern. Applying
+        // the local preview only keeps the backend clean if they cancel (C5).
         setMeetingPatternSelectionModal({
           sectionId,
           roomId: targetRoomId,
           anchorSlotId: slot.id,
           options: patternOptions,
           selectedOptionKey: patternOptions[0].key,
+          revertAssignments,
+          revertSolverTimeslots,
         });
         setMeetingPatternSelectionError(null);
+      } else {
+        void persistCalendarAssignments(nextAssignments);
       }
       setPendingPlacementSectionId(null);
       setPlacementPreview(null);
@@ -2984,6 +3064,7 @@ type MeetingPatternPlacementOption = {
       linkedSectionIdsBySection,
       pendingPlacementSectionId,
       persistCalendarAssignments,
+      solverTimeslotIdsBySection,
     ],
   );
 
@@ -4048,6 +4129,17 @@ type MeetingPatternPlacementOption = {
                         if (!solverInput || e.button !== 0) return;
                         e.stopPropagation();
                         e.preventDefault();
+                        // Locked placements (or any locked cross-list peer) must not
+                        // start a drag — corruption guard for solver-pinned sections.
+                        if (placementLocked) {
+                          setCalendarDrag(null);
+                          setDragFeedback({
+                            status: "invalid",
+                            message:
+                              "This section is locked for the solver. Unlock it in the schedule table to move it.",
+                          });
+                          return;
+                        }
                         calendarDragPointerYRef.current = e.clientY;
                         const targetEl = e.currentTarget;
                         targetEl.setPointerCapture(e.pointerId);
@@ -4936,10 +5028,7 @@ type MeetingPatternPlacementOption = {
 
       <ViewportModal
         isOpen={Boolean(meetingPatternSelectionModal)}
-        onClose={() => {
-          setMeetingPatternSelectionModal(null);
-          setMeetingPatternSelectionError(null);
-        }}
+        onClose={dismissMeetingPatternSelection}
         zIndex={1000}
       >
         {meetingPatternSelectionModal ? (
@@ -4957,10 +5046,7 @@ type MeetingPatternPlacementOption = {
               <button
                 type="button"
                 className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
-                onClick={() => {
-                  setMeetingPatternSelectionModal(null);
-                  setMeetingPatternSelectionError(null);
-                }}
+                onClick={dismissMeetingPatternSelection}
               >
                 Close
               </button>
@@ -5002,10 +5088,7 @@ type MeetingPatternPlacementOption = {
               <button
                 type="button"
                 className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
-                onClick={() => {
-                  setMeetingPatternSelectionModal(null);
-                  setMeetingPatternSelectionError(null);
-                }}
+                onClick={dismissMeetingPatternSelection}
               >
                 Later
               </button>
