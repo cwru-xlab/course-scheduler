@@ -2,7 +2,7 @@
 
 import { useState, type MouseEvent, type PointerEvent } from "react";
 import clsx from "clsx";
-import { Lock } from "lucide-react";
+import { Lock, Shuffle, Unlock } from "lucide-react";
 
 import type { CalendarSectionLike } from "./calendarEvents";
 
@@ -26,6 +26,9 @@ type CrosslistCalendarEventCardProps = {
   hasDragMoved: boolean;
   placementLocked: boolean;
   draggable: boolean;
+  lockable?: boolean;
+  isStaggered?: boolean;
+  onToggleLock?: () => void;
   isConflicting?: boolean;
   style: {
     left: string;
@@ -118,6 +121,9 @@ export function CrosslistCalendarEventCard({
   hasDragMoved,
   placementLocked,
   draggable,
+  lockable = false,
+  isStaggered = false,
+  onToggleLock,
   isConflicting = false,
   style,
   instructorById,
@@ -144,12 +150,13 @@ export function CrosslistCalendarEventCard({
     >
       <div
         className={clsx(
-          "relative overflow-hidden border-l-4 rounded-lg p-2.5 flex flex-col justify-between shadow-sm select-none",
+          "group relative overflow-hidden border-l-4 rounded-lg p-2.5 flex flex-col justify-between shadow-sm select-none",
           draggable && "cursor-grab touch-none active:cursor-grabbing",
           !isDragSource && "hover:shadow-md",
           isDragSource && hasDragMoved && "opacity-[0.12] pointer-events-none",
           !matchesHoveredDepartment && "opacity-35",
           matchesHoveredDepartment && "ring-2 ring-slate-300/80 shadow-md",
+          isStaggered && !isConflicting && "ring-1 ring-inset ring-indigo-400/70",
           isConflicting && "ring-2 ring-red-500 ring-offset-1 shadow-md",
         )}
         style={{
@@ -166,13 +173,40 @@ export function CrosslistCalendarEventCard({
         onClick={onClick}
       >
         <CrosslistXOverlay />
-        {placementLocked && (
-          <Lock
-            className="pointer-events-none absolute right-1 top-1 z-[2] size-3.5 text-slate-800 drop-shadow-sm opacity-90"
-            aria-label="Placement locked for solver"
-          />
-        )}
-        <div className="relative z-[1] font-black text-[10px] truncate text-slate-900 pr-4">
+        <div className="absolute right-1 top-1 z-[4] flex items-center gap-1">
+          {isStaggered && (
+            <Shuffle
+              className="pointer-events-none size-3.5 text-indigo-600 drop-shadow-sm"
+              aria-label="Staggered across days"
+            />
+          )}
+          {lockable && onToggleLock && (
+            <button
+              type="button"
+              className={clsx(
+                "flex size-5 shrink-0 items-center justify-center rounded-md border shadow-sm transition-opacity",
+                placementLocked
+                  ? "border-amber-300 bg-amber-50 text-amber-900 opacity-100"
+                  : "border-slate-300 bg-white/90 text-slate-600 opacity-0 hover:bg-white focus-visible:opacity-100 group-hover:opacity-100",
+              )}
+              title={
+                placementLocked
+                  ? "Locked for solver — click to unlock (all pattern days)"
+                  : "Lock for solver (locks every day in the pattern)"
+              }
+              aria-label={placementLocked ? "Unlock placement" : "Lock placement"}
+              onPointerDown={(e) => e.stopPropagation()}
+              onPointerUp={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleLock();
+              }}
+            >
+              {placementLocked ? <Lock className="size-3" /> : <Unlock className="size-3" />}
+            </button>
+          )}
+        </div>
+        <div className="relative z-[1] font-black text-[10px] truncate text-slate-900 pr-9">
           {crosslistGroupId}
         </div>
         <div className="relative z-[1] text-[9px] font-bold leading-tight text-slate-700">

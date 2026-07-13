@@ -44,13 +44,13 @@ Phase 1 is a hard prerequisite for Phase 2 (pattern modal and locks should call 
 
 ## Success criteria (milestone)
 
-- [ ] Drag and click-to-place use the same validation rules and severity levels
-- [ ] Warning placements (room overlap, instructor conflict) can be saved when autosave is off
-- [ ] Locked sections cannot be dragged without explicit unlock
-- [ ] Multi-day pattern sections cannot be silently broken by drag
-- [ ] Meeting-pattern modal cancel does not leave orphan single-day placements
-- [ ] Undo/redo restores conflict highlights and messages when applicable
-- [ ] Drag snap targets match visible highlight bands
+- [x] Drag and click-to-place use the same validation rules and severity levels
+- [x] Warning placements (room overlap, instructor conflict) can be saved when autosave is off
+- [x] Locked sections cannot be dragged without explicit unlock
+- [x] Multi-day pattern sections cannot be silently broken by drag
+- [x] Meeting-pattern modal cancel does not leave orphan single-day placements
+- [x] Undo/redo restores conflict highlights and messages when applicable
+- [x] Drag snap targets match visible highlight bands
 - [x] Calendar "Run solver" runs the same pre-validation as the editor
 
 ## How to execute with GSD

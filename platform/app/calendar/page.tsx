@@ -21,6 +21,7 @@ import {
   Rocket,
   Save,
   Share2,
+  Shuffle,
   Unlock,
   Undo2,
   Play,
@@ -975,10 +976,12 @@ function CalendarDragFeedbackToastPortal({
   mountedOn,
   dragFeedback,
   onDismiss,
+  action,
 }: {
   mountedOn: HTMLElement | null;
   dragFeedback: CalendarDragFeedbackState;
   onDismiss: () => void;
+  action?: { label: string; onClick: () => void } | null;
 }) {
   if (!mountedOn) return null;
   const line = dragFeedback.message;
@@ -1016,6 +1019,20 @@ function CalendarDragFeedbackToastPortal({
             )}
           >
             <span className="min-w-0 flex-1 leading-snug">{line}</span>
+            {action ? (
+              <button
+                type="button"
+                className={clsx(
+                  "shrink-0 rounded-md border px-2.5 py-1 text-xs font-bold transition-colors",
+                  isWarning
+                    ? "border-amber-300 bg-amber-100/70 text-amber-900 hover:bg-amber-200/70 dark:border-amber-500/50 dark:bg-amber-500/20 dark:text-amber-100 dark:hover:bg-amber-500/30"
+                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-default-200 dark:bg-default-100 dark:text-foreground",
+                )}
+                onClick={action.onClick}
+              >
+                {action.label}
+              </button>
+            ) : null}
             <button
               type="button"
               className={clsx(
@@ -1210,6 +1227,17 @@ type MeetingPatternPlacementOption = {
   timeslotIds: string[];
   label: string;
 };
+// One row per other pattern day when offering to apply a per-day edit across the
+// whole meeting pattern (issue: multi-day pattern consistency).
+type PatternDayApplySeverity = "ok" | "warn" | "block" | "none";
+type PatternDayApplyRow = {
+  day: Day;
+  targetSlotId: string | null;
+  timeLabel: string;
+  severity: PatternDayApplySeverity;
+  message: string;
+  selected: boolean;
+};
   const [calendarDrag, setCalendarDrag] = useState<CalendarDragState | null>(null);
   const [pendingPlacementSectionId, setPendingPlacementSectionId] = useState<string | null>(null);
   const [placementPreview, setPlacementPreview] = useState<PlacementPreview | null>(null);
@@ -1259,6 +1287,32 @@ type MeetingPatternPlacementOption = {
     revertConflictSectionIds: string[];
   } | null>(null);
   const [meetingPatternSelectionError, setMeetingPatternSelectionError] = useState<string | null>(null);
+  // After a single day of a multi-day pattern is moved, remember enough to offer
+  // "apply this time to the pattern's other days". Drives the toast action button.
+  const [patternApplyPrompt, setPatternApplyPrompt] = useState<{
+    sectionId: string;
+    roomId: string;
+    anchorSlotId: string;
+    anchorDay: Day;
+    otherDays: Day[];
+  } | null>(null);
+  // Open per-day breakdown modal: shows which pattern days can take the new time
+  // cleanly, which would conflict, and which have no matching timeslot.
+  const [patternApplyModal, setPatternApplyModal] = useState<{
+    sectionId: string;
+    roomId: string;
+    anchorDay: Day;
+    anchorTimeLabel: string;
+    courseLabel: string;
+    rows: PatternDayApplyRow[];
+  } | null>(null);
+  // Confirmation shown before locking a section whose days are staggered, so the
+  // user can double-check the per-day times before pinning them for the solver.
+  const [staggeredLockConfirm, setStaggeredLockConfirm] = useState<{
+    sectionId: string;
+    courseLabel: string;
+    dayTimes: { day: Day; timeLabel: string }[];
+  } | null>(null);
   const [toolbarActionHint, setToolbarActionHint] = useState<string | null>(null);
   // Keep multiple pinned highlights; hovering adds a temporary highlight.
   const activeLegendDepartmentKeys = useMemo(() => {
@@ -2314,6 +2368,42 @@ type MeetingPatternPlacementOption = {
     return changed && saveableStatus;
   }, [assignmentsBySection, baselineAssignments, dragFeedback.status]);
 
+  // Per-day (start,end) times a section currently meets, keyed by weekday. Used for
+  // the staggered indicator and the pre-lock summary.
+  const sectionDayTimes = useCallback(
+    (sectionId: string): { day: Day; timeLabel: string }[] => {
+      const assignment = assignmentsBySection[sectionId];
+      const section = sectionById.get(sectionId);
+      const timeslotIds =
+        assignment?.timeslot_ids ?? (section?.timeslot_id ? [section.timeslot_id] : []);
+      const byDay = new Map<Day, string>();
+      for (const id of timeslotIds) {
+        const slot = timeslotById.get(id);
+        if (!slot) continue;
+        for (const day of DAYS) {
+          if (timeslotMatchesDay(slot, day)) {
+            byDay.set(day, `${formatTimeAmPm(slot.start_time)}-${formatTimeAmPm(slot.end_time)}`);
+          }
+        }
+      }
+      return DAYS.filter((day) => byDay.has(day)).map((day) => ({
+        day,
+        timeLabel: byDay.get(day) as string,
+      }));
+    },
+    [assignmentsBySection, sectionById, timeslotById],
+  );
+
+  // "Staggered" = meets on more than one day, but not all days share the same time.
+  const sectionIsStaggered = useCallback(
+    (sectionId: string): boolean => {
+      const dayTimes = sectionDayTimes(sectionId);
+      if (dayTimes.length <= 1) return false;
+      return new Set(dayTimes.map((entry) => entry.timeLabel)).size > 1;
+    },
+    [sectionDayTimes],
+  );
+
   const isPlacementLocked = useCallback(
     (sectionId: string) => {
       if (!data) return false;
@@ -2364,6 +2454,51 @@ type MeetingPatternPlacementOption = {
     },
     [calendarDrag, canLockSectionPlacement, data, lockedSectionIds],
   );
+
+  // Entry point for the on-card lock button. Unlocking is immediate; locking a
+  // staggered section first surfaces a confirmation so the user reviews its
+  // per-day times. Locking pins every day of the meeting pattern (peers included).
+  const requestToggleLockFromCalendar = useCallback(
+    (sectionId: string) => {
+      const willLock = !isPlacementLocked(sectionId);
+      if (willLock && !canLockSectionPlacement(sectionId)) {
+        setDragFeedback({
+          status: "invalid",
+          message: "Assign a room and times before locking this section.",
+        });
+        return;
+      }
+      if (willLock && sectionIsStaggered(sectionId)) {
+        const section = sectionById.get(sectionId);
+        const courseLabel =
+          [section?.department, String(section?.course_id ?? sectionId)]
+            .filter(Boolean)
+            .join(" ")
+            .trim() || sectionId;
+        setStaggeredLockConfirm({
+          sectionId,
+          courseLabel,
+          dayTimes: sectionDayTimes(sectionId),
+        });
+        return;
+      }
+      togglePlacementLockForSection(sectionId);
+    },
+    [
+      canLockSectionPlacement,
+      isPlacementLocked,
+      sectionById,
+      sectionDayTimes,
+      sectionIsStaggered,
+      togglePlacementLockForSection,
+    ],
+  );
+
+  const confirmStaggeredLock = useCallback(() => {
+    if (!staggeredLockConfirm) return;
+    togglePlacementLockForSection(staggeredLockConfirm.sectionId);
+    setStaggeredLockConfirm(null);
+  }, [staggeredLockConfirm, togglePlacementLockForSection]);
 
   const lockAllPlacementChanges = useCallback(() => {
     if (!data) return;
@@ -2452,6 +2587,7 @@ type MeetingPatternPlacementOption = {
     // Conflict highlights are computed for a specific day's layout; drop them when
     // the visible day changes so stale flags don't linger.
     setConflictSectionIds(new Set());
+    setPatternApplyPrompt(null);
   }, [selectedDay]);
 
   useEffect(() => {
@@ -2892,10 +3028,33 @@ type MeetingPatternPlacementOption = {
         ),
       }));
 
-      // Dragging a multi-day pattern only moves the selected day's slot, so warn
-      // the user their other pattern days were left untouched (issue C3, Option B).
+      // Dragging a multi-day pattern only moves the selected day's slot. Offer to
+      // extend the new time to the pattern's other days (issue C3, Option B).
       const multiDay = sectionHasMultiDayPattern(sectionId);
-      const multiDayNotice = `Only ${selectedDay} was updated. This section uses a multi-day pattern — its other days are unchanged. Adjust them from the schedule table or re-place per day.`;
+      const otherPatternDaySet = new Set<Day>();
+      for (const id of currentTimeslotIds) {
+        const slot = timeslotById.get(id);
+        if (!slot) continue;
+        for (const day of DAYS) {
+          if (day !== selectedDay && timeslotMatchesDay(slot, day)) otherPatternDaySet.add(day);
+        }
+      }
+      const otherPatternDays = DAYS.filter((day) => otherPatternDaySet.has(day));
+      const canOfferPatternApply = multiDay && otherPatternDays.length > 0;
+      if (canOfferPatternApply) {
+        setPatternApplyPrompt({
+          sectionId,
+          roomId: targetRoomId,
+          anchorSlotId: selectedSlot.id,
+          anchorDay: selectedDay,
+          otherDays: otherPatternDays,
+        });
+      } else {
+        setPatternApplyPrompt(null);
+      }
+      const multiDayNotice = canOfferPatternApply
+        ? `Only ${selectedDay} was updated. Use "Apply to all pattern days" to extend this time to its other days (${otherPatternDays.join(", ")}).`
+        : `Only ${selectedDay} was updated. This section uses a multi-day pattern — its other days are unchanged. Adjust them from the schedule table or re-place per day.`;
 
       // Warnings (room overlap, instructor double-booking) keep the applied move
       // but flag the involved sections for review.
@@ -2931,6 +3090,287 @@ type MeetingPatternPlacementOption = {
       timeslotById,
     ],
   );
+
+  // Finds a timeslot on `day` whose start/end minutes match the anchor time. Prefers
+  // a single-day slot so extending a pattern day-by-day doesn't re-introduce a
+  // multi-day slot into the section's assignment.
+  const findSlotOnDayAtTime = useCallback(
+    (day: Day, startTime: string, endTime: string): TimeslotDto | null => {
+      if (!data) return null;
+      const startMin = parseMinutes(startTime);
+      const endMin = parseMinutes(endTime);
+      const candidates = data.timeslots.filter(
+        (slot) =>
+          timeslotMatchesDay(slot, day) &&
+          parseMinutes(slot.start_time) === startMin &&
+          parseMinutes(slot.end_time) === endMin,
+      );
+      if (!candidates.length) return null;
+      const singleDay = candidates.find(
+        (slot) => DAYS.filter((d) => timeslotMatchesDay(slot, d)).length === 1,
+      );
+      return singleDay ?? candidates[0];
+    },
+    [data],
+  );
+
+  // Day-agnostic placement check used to preview extending a time onto another
+  // pattern day. Mirrors evaluatePlacement's rules (blocked time = hard block,
+  // room/instructor overlap = warning) but scans assignments so it works for a day
+  // the user isn't currently viewing.
+  const evaluatePatternDayPlacement = useCallback(
+    (
+      sectionId: string,
+      targetRoomId: string,
+      candidateSlot: TimeslotDto,
+      day: Day,
+      baseAssignments: AssignmentMap,
+    ): { severity: "ok" | "warn" | "block"; message: string } => {
+      if (!data) return { severity: "block", message: "Calendar data unavailable." };
+      const linkedIds = crosslistPeerSectionIds(sectionId, data.sections);
+      const linkedSet = new Set(linkedIds);
+      const slotWM: TimeslotWithMinutes = {
+        ...candidateSlot,
+        start: parseMinutes(candidateSlot.start_time),
+        end: parseMinutes(candidateSlot.end_time),
+      };
+      const timeStr = `${formatTimeAmPm(candidateSlot.start_time)}-${formatTimeAmPm(candidateSlot.end_time)}`;
+
+      for (const linkedId of linkedIds) {
+        const blocked = findBlockedPlacementMessage(linkedId, targetRoomId, slotWM, day);
+        if (blocked) return { severity: "block", message: blocked };
+      }
+
+      const instructorIds = new Set<string>();
+      for (const id of linkedIds) {
+        const instr = sectionById.get(id)?.instructor_id;
+        if (instr) instructorIds.add(instr);
+      }
+
+      const roomConflictLabels: string[] = [];
+      let instructorConflict: { name: string; label: string } | null = null;
+      for (const [otherId, assignment] of Object.entries(baseAssignments)) {
+        if (linkedSet.has(otherId)) continue;
+        const otherSlotIds = assignment?.timeslot_ids ?? [];
+        const overlaps = otherSlotIds.some((sid) => {
+          const s = timeslotById.get(sid);
+          if (!s || !timeslotMatchesDay(s, day)) return false;
+          return minutesOverlap(
+            slotWM.start,
+            slotWM.end,
+            parseMinutes(s.start_time),
+            parseMinutes(s.end_time),
+          );
+        });
+        if (!overlaps) continue;
+        const otherSection = sectionById.get(otherId);
+        const otherLabel =
+          [otherSection?.department, String(otherSection?.course_id ?? otherId)]
+            .filter(Boolean)
+            .join(" ")
+            .trim() || otherId;
+        const otherRoom = assignment?.room_id ?? otherSection?.room_id ?? "";
+        if (otherRoom === targetRoomId) roomConflictLabels.push(otherLabel);
+        const otherInstr = otherSection?.instructor_id;
+        if (otherInstr && instructorIds.has(otherInstr) && !instructorConflict) {
+          instructorConflict = {
+            name: instructorById.get(otherInstr)?.name ?? otherInstr,
+            label: otherLabel,
+          };
+        }
+      }
+
+      if (instructorConflict) {
+        return {
+          severity: "warn",
+          message: `${instructorConflict.name} already teaches ${instructorConflict.label} at ${day} ${timeStr}.`,
+        };
+      }
+      if (roomConflictLabels.length) {
+        return {
+          severity: "warn",
+          message: `Room ${targetRoomId} is shared with ${roomConflictLabels.slice(0, 3).join(", ")} at ${day} ${timeStr}.`,
+        };
+      }
+      return { severity: "ok", message: `Available in room ${targetRoomId} at ${day} ${timeStr}.` };
+    },
+    [data, findBlockedPlacementMessage, instructorById, sectionById, timeslotById],
+  );
+
+  const buildPatternApplyRows = useCallback(
+    (
+      sectionId: string,
+      targetRoomId: string,
+      anchorSlot: TimeslotDto,
+      otherDays: Day[],
+      baseAssignments: AssignmentMap,
+    ): PatternDayApplyRow[] => {
+      const timeLabel = `${formatTimeAmPm(anchorSlot.start_time)}-${formatTimeAmPm(anchorSlot.end_time)}`;
+      return otherDays.map((day) => {
+        const slot = findSlotOnDayAtTime(day, anchorSlot.start_time, anchorSlot.end_time);
+        if (!slot) {
+          return {
+            day,
+            targetSlotId: null,
+            timeLabel,
+            severity: "none" as const,
+            message: `No timeslot exists at ${timeLabel} on ${day}. Stagger this day or pick a different time.`,
+            selected: false,
+          };
+        }
+        const result = evaluatePatternDayPlacement(
+          sectionId,
+          targetRoomId,
+          slot,
+          day,
+          baseAssignments,
+        );
+        return {
+          day,
+          targetSlotId: slot.id,
+          timeLabel,
+          severity: result.severity,
+          message: result.message,
+          // Pre-check clean days; leave conflicting/impossible days for the user.
+          selected: result.severity === "ok",
+        };
+      });
+    },
+    [evaluatePatternDayPlacement, findSlotOnDayAtTime],
+  );
+
+  const openPatternApplyModal = useCallback(() => {
+    if (!patternApplyPrompt) return;
+    const anchorSlot = timeslotById.get(patternApplyPrompt.anchorSlotId);
+    if (!anchorSlot) return;
+    const rows = buildPatternApplyRows(
+      patternApplyPrompt.sectionId,
+      patternApplyPrompt.roomId,
+      anchorSlot,
+      patternApplyPrompt.otherDays,
+      assignmentsBySection,
+    );
+    const section = sectionById.get(patternApplyPrompt.sectionId);
+    const courseLabel =
+      [section?.department, String(section?.course_id ?? patternApplyPrompt.sectionId)]
+        .filter(Boolean)
+        .join(" ")
+        .trim() || patternApplyPrompt.sectionId;
+    setPatternApplyModal({
+      sectionId: patternApplyPrompt.sectionId,
+      roomId: patternApplyPrompt.roomId,
+      anchorDay: patternApplyPrompt.anchorDay,
+      anchorTimeLabel: `${formatTimeAmPm(anchorSlot.start_time)}-${formatTimeAmPm(anchorSlot.end_time)}`,
+      courseLabel,
+      rows,
+    });
+  }, [assignmentsBySection, buildPatternApplyRows, patternApplyPrompt, sectionById, timeslotById]);
+
+  const togglePatternApplyRow = useCallback((day: Day) => {
+    setPatternApplyModal((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        rows: prev.rows.map((row) =>
+          row.day === day && (row.severity === "ok" || row.severity === "warn")
+            ? { ...row, selected: !row.selected }
+            : row,
+        ),
+      };
+    });
+  }, []);
+
+  const dismissPatternApplyModal = useCallback(() => {
+    setPatternApplyModal(null);
+  }, []);
+
+  const applyPatternDays = useCallback(() => {
+    if (!patternApplyModal || !data) return;
+    const selectedRows = patternApplyModal.rows.filter(
+      (row) => row.selected && row.targetSlotId && (row.severity === "ok" || row.severity === "warn"),
+    );
+    if (!selectedRows.length) {
+      setPatternApplyModal(null);
+      return;
+    }
+    const { sectionId, roomId: targetRoomId } = patternApplyModal;
+    const linkedSectionIds = linkedSectionIdsBySection.get(sectionId) ?? [sectionId];
+
+    // Extending across days is a separate user action from the drag, so give it its
+    // own undo entry.
+    pushUndoSnapshot({
+      assignmentsBySection,
+      solverTimeslotIdsBySection,
+      backendSaveMessage,
+      dragFeedback,
+      conflictSectionIds,
+    });
+
+    const dayToSlotId = new Map<Day, string>();
+    for (const row of selectedRows) {
+      if (row.targetSlotId) dayToSlotId.set(row.day, row.targetSlotId);
+    }
+
+    const nextAssignments: AssignmentMap = { ...assignmentsBySection };
+    const nextSolverTimeslots: Record<string, string[]> = {};
+    for (const linkedSectionId of linkedSectionIds) {
+      const current = assignmentsBySection[linkedSectionId];
+      const currentIds = current?.timeslot_ids ?? [];
+      const updated = currentIds.map((id) => {
+        const slot = timeslotById.get(id);
+        if (!slot) return id;
+        for (const [day, newSlotId] of Array.from(dayToSlotId)) {
+          if (timeslotMatchesDay(slot, day)) return newSlotId;
+        }
+        return id;
+      });
+      const uniqueIds = Array.from(new Set(updated));
+      nextAssignments[linkedSectionId] = {
+        timeslot_ids: uniqueIds,
+        room_id: targetRoomId,
+        meeting_pattern_id: current?.meeting_pattern_id ?? "",
+      };
+      nextSolverTimeslots[linkedSectionId] = uniqueIds;
+    }
+    setAssignmentsBySection(nextAssignments);
+    setSolverTimeslotIdsBySection((prev) => ({ ...prev, ...nextSolverTimeslots }));
+
+    const appliedDays = selectedRows.map((row) => row.day);
+    const warnDays = selectedRows.filter((row) => row.severity === "warn").map((row) => row.day);
+    const skippedDays = patternApplyModal.rows
+      .filter((row) => !selectedRows.includes(row))
+      .map((row) => row.day);
+
+    const parts = [
+      `Applied ${patternApplyModal.anchorTimeLabel} to ${appliedDays.join(", ")}.`,
+    ];
+    if (warnDays.length) {
+      parts.push(
+        `${warnDays.join(", ")} applied with a conflict — review those days for staggering.`,
+      );
+    }
+    if (skippedDays.length) {
+      parts.push(`Left unchanged: ${skippedDays.join(", ")}.`);
+    }
+    setDragFeedback({
+      status: warnDays.length ? "warning" : "valid",
+      message: parts.join(" "),
+    });
+
+    setPatternApplyModal(null);
+    setPatternApplyPrompt(null);
+  }, [
+    assignmentsBySection,
+    backendSaveMessage,
+    conflictSectionIds,
+    data,
+    dragFeedback,
+    linkedSectionIdsBySection,
+    patternApplyModal,
+    pushUndoSnapshot,
+    solverTimeslotIdsBySection,
+    timeslotById,
+  ]);
 
   const findRoomIdAtClientY = useCallback(
     (clientY: number): string | null => {
@@ -3591,9 +4031,15 @@ type MeetingPatternPlacementOption = {
       <CalendarDragFeedbackToastPortal
         mountedOn={dragFeedbackToastMount}
         dragFeedback={dragFeedback}
+        action={
+          patternApplyPrompt && dragFeedback.status === "warning"
+            ? { label: "Apply to all pattern days", onClick: openPatternApplyModal }
+            : null
+        }
         onDismiss={() => {
           setDragFeedback({ status: "neutral", message: null });
           setConflictSectionIds(new Set());
+          setPatternApplyPrompt(null);
         }}
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -4430,6 +4876,9 @@ type MeetingPatternPlacementOption = {
                           hasDragMoved={Boolean(calendarDrag?.hasMoved)}
                           placementLocked={placementLocked}
                           draggable={Boolean(solverInput)}
+                          lockable={Boolean(solverInput)}
+                          isStaggered={sectionIsStaggered(section.id)}
+                          onToggleLock={() => requestToggleLockFromCalendar(section.id)}
                           isConflicting={event.crosslistMembers.some((member) =>
                             conflictSectionIds.has(member.id),
                           )}
@@ -4457,12 +4906,13 @@ type MeetingPatternPlacementOption = {
                     const professor = inst?.name ?? section.instructor_id ?? "—";
                     const title = section.department + " " + section.course_id;
                     const isConflicting = conflictSectionIds.has(section.id);
+                    const isStaggered = sectionIsStaggered(section.id);
 
                     return (
                       <div
                         key={getCalendarEventKey(event, room.id)}
                         className={clsx(
-                          "absolute border-l-4 rounded-lg p-2.5 flex flex-col justify-between z-10 shadow-sm select-none",
+                          "group absolute border-l-4 rounded-lg p-2.5 flex flex-col justify-between z-10 shadow-sm select-none",
                           solverInput && "cursor-grab touch-none active:cursor-grabbing",
                           !isDragSource && "hover:shadow-md",
                           isDragSource &&
@@ -4472,6 +4922,9 @@ type MeetingPatternPlacementOption = {
                           activeLegendDepartmentKeys.size > 0 &&
                             matchesHoveredDepartment &&
                             "ring-2 ring-slate-300/80 shadow-md",
+                          isStaggered &&
+                            !isConflicting &&
+                            "ring-1 ring-inset ring-indigo-400/70",
                           isConflicting &&
                             "ring-2 ring-red-500 ring-offset-1 z-20 shadow-md",
                         )}
@@ -4500,13 +4953,44 @@ type MeetingPatternPlacementOption = {
                           });
                         }}
                       >
-                        {placementLocked && (
-                          <Lock
-                            className="pointer-events-none absolute right-1 top-1 size-3.5 text-slate-800 drop-shadow-sm opacity-90"
-                            aria-label="Placement locked for solver"
-                          />
-                        )}
-                        <div className="font-black text-[10px] truncate text-slate-900 pr-4">
+                        <div className="absolute right-1 top-1 z-[3] flex items-center gap-1">
+                          {isStaggered && (
+                            <Shuffle
+                              className="pointer-events-none size-3.5 text-indigo-600 drop-shadow-sm"
+                              aria-label="Staggered across days"
+                            />
+                          )}
+                          {solverInput && (
+                            <button
+                              type="button"
+                              className={clsx(
+                                "flex size-5 shrink-0 items-center justify-center rounded-md border shadow-sm transition-opacity",
+                                placementLocked
+                                  ? "border-amber-300 bg-amber-50 text-amber-900 opacity-100"
+                                  : "border-slate-300 bg-white/90 text-slate-600 opacity-0 hover:bg-white focus-visible:opacity-100 group-hover:opacity-100",
+                              )}
+                              title={
+                                placementLocked
+                                  ? "Locked for solver — click to unlock (all pattern days)"
+                                  : "Lock for solver (locks every day in the pattern)"
+                              }
+                              aria-label={placementLocked ? "Unlock placement" : "Lock placement"}
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onPointerUp={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                requestToggleLockFromCalendar(section.id);
+                              }}
+                            >
+                              {placementLocked ? (
+                                <Lock className="size-3" />
+                              ) : (
+                                <Unlock className="size-3" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                        <div className="font-black text-[10px] truncate text-slate-900 pr-9">
                           {title}
                         </div>
                         <div className="text-[9px] font-bold leading-tight text-slate-700">
@@ -5277,6 +5761,193 @@ type MeetingPatternPlacementOption = {
                 onClick={applyMeetingPatternSelection}
               >
                 Apply Pattern
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </ViewportModal>
+
+      <ViewportModal
+        isOpen={Boolean(patternApplyModal)}
+        onClose={dismissPatternApplyModal}
+        zIndex={1000}
+      >
+        {patternApplyModal ? (
+          (() => {
+            const applicableRows = patternApplyModal.rows.filter(
+              (row) => row.severity === "ok" || row.severity === "warn",
+            );
+            const selectedCount = applicableRows.filter((row) => row.selected).length;
+            return (
+              <div
+                className="flex max-h-[min(85vh,640px)] w-full max-w-2xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="pattern-apply-modal-title"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">
+                  <h3
+                    id="pattern-apply-modal-title"
+                    className="text-lg font-black text-slate-900"
+                  >
+                    Apply time across pattern
+                  </h3>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                    onClick={dismissPatternApplyModal}
+                  >
+                    Close
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto space-y-4 px-6 py-5 text-sm">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                    You moved{" "}
+                    <span className="font-semibold">{patternApplyModal.courseLabel}</span> to{" "}
+                    <span className="font-semibold">{patternApplyModal.anchorTimeLabel}</span> on{" "}
+                    <span className="font-semibold">{patternApplyModal.anchorDay}</span> in room{" "}
+                    <span className="font-semibold">{patternApplyModal.roomId}</span>. Choose which of
+                    its other pattern days should move to the same time. Clean days are pre-selected;
+                    days with a conflict or no matching timeslot are called out below.
+                  </div>
+                  <ul className="space-y-2">
+                    {patternApplyModal.rows.map((row) => {
+                      const disabled = row.severity === "block" || row.severity === "none";
+                      const badge =
+                        row.severity === "ok"
+                          ? { text: "Available", cls: "bg-emerald-100 text-emerald-800" }
+                          : row.severity === "warn"
+                            ? { text: "Conflict", cls: "bg-amber-100 text-amber-900" }
+                            : row.severity === "block"
+                              ? { text: "Blocked", cls: "bg-rose-100 text-rose-700" }
+                              : { text: "No slot", cls: "bg-slate-200 text-slate-600" };
+                      return (
+                        <li
+                          key={row.day}
+                          className={clsx(
+                            "flex items-start gap-3 rounded-lg border px-3 py-2.5",
+                            disabled
+                              ? "border-slate-200 bg-slate-50 opacity-80"
+                              : "border-slate-200 bg-white",
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            className="mt-0.5 size-4 shrink-0 accent-[#137fec] disabled:cursor-not-allowed"
+                            checked={row.selected && !disabled}
+                            disabled={disabled}
+                            onChange={() => togglePatternApplyRow(row.day)}
+                            aria-label={`Apply to ${row.day}`}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-slate-900">{row.day}</span>
+                              <span className="text-xs text-slate-500">{row.timeLabel}</span>
+                              <span
+                                className={clsx(
+                                  "ml-auto shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold",
+                                  badge.cls,
+                                )}
+                              >
+                                {badge.text}
+                              </span>
+                            </div>
+                            <p className="mt-0.5 text-xs leading-snug text-slate-600">
+                              {row.message}
+                            </p>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+                <div className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-200 px-6 py-4">
+                  <span className="text-xs text-slate-500">
+                    {selectedCount} of {applicableRows.length} available day
+                    {applicableRows.length === 1 ? "" : "s"} selected
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                      onClick={dismissPatternApplyModal}
+                    >
+                      Keep staggered
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-lg bg-[#137fec] px-3 py-2 text-sm font-bold text-white hover:bg-[#0f6dca] disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={applyPatternDays}
+                      disabled={selectedCount === 0}
+                    >
+                      Apply to selected day{selectedCount === 1 ? "" : "s"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()
+        ) : null}
+      </ViewportModal>
+
+      <ViewportModal
+        isOpen={Boolean(staggeredLockConfirm)}
+        onClose={() => setStaggeredLockConfirm(null)}
+        zIndex={1000}
+      >
+        {staggeredLockConfirm ? (
+          <div
+            className="flex w-full max-w-md flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="staggered-lock-modal-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 px-6 py-4">
+              <Shuffle className="size-5 shrink-0 text-indigo-600" aria-hidden />
+              <h3 id="staggered-lock-modal-title" className="text-lg font-black text-slate-900">
+                Lock a staggered section?
+              </h3>
+            </div>
+            <div className="space-y-4 px-6 py-5 text-sm">
+              <p className="text-slate-700">
+                <span className="font-semibold">{staggeredLockConfirm.courseLabel}</span> meets at{" "}
+                different times across its days. Locking pins{" "}
+                <span className="font-semibold">every day</span> at its current room and time for the
+                solver. Double-check the times below before locking.
+              </p>
+              <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+                {staggeredLockConfirm.dayTimes.map((entry) => (
+                  <li
+                    key={entry.day}
+                    className="flex items-center justify-between px-3 py-2 text-xs"
+                  >
+                    <span className="font-semibold text-slate-900">{entry.day}</span>
+                    <span className="text-slate-600">{entry.timeLabel}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-slate-500">
+                Want them consistent instead? Cancel, then use “Apply to all pattern days” after
+                moving one day to line up the times first.
+              </p>
+            </div>
+            <div className="flex shrink-0 justify-end gap-2 border-t border-slate-200 px-6 py-4">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                onClick={() => setStaggeredLockConfirm(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-2 text-sm font-bold text-white hover:bg-amber-600"
+                onClick={confirmStaggeredLock}
+              >
+                <Lock className="size-4" aria-hidden />
+                Lock all days
               </button>
             </div>
           </div>
