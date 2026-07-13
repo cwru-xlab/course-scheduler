@@ -24,6 +24,7 @@ import {
   Unlock,
   Undo2,
   Play,
+  Plus,
   CloudBackup,
   X,
 } from "lucide-react";
@@ -55,6 +56,7 @@ import {
   type LastSolverRunSnapshot,
 } from "@/lib/scheduling/history";
 import { SCHEDULING_DATA_REFRESH_EVENT, useSchedulingData } from "@/lib/scheduling/useSchedulingData";
+import { useAuth } from "@/lib/auth-client";
 import { useSolverLock } from "@/lib/solver-lock-client";
 import {
   SCHEDULING_WINDOW_END_HOUR,
@@ -866,39 +868,34 @@ function CalendarHistoryNavbarPortal({
 
   if (!slot) return null;
 
+  const iconBtnBase =
+    "flex size-8 shrink-0 items-center justify-center rounded-md border transition-colors";
+  const iconBtnEnabled =
+    "border-slate-200/80 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:border-default-200 dark:bg-default-100 dark:text-foreground dark:hover:bg-default-200";
+  const iconBtnDisabled =
+    "cursor-not-allowed border-slate-200/70 bg-slate-50 text-slate-300 dark:border-default-100 dark:bg-default-50 dark:text-default-400";
+
   return createPortal(
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1">
       <button
         type="button"
         disabled={!canUndo}
         onClick={onUndo}
-        className={clsx(
-          "flex items-center justify-center rounded-lg h-9 px-3 text-sm font-bold gap-2 border transition-colors shrink-0",
-          canUndo
-            ? "bg-slate-100 text-slate-900 border-slate-200 hover:bg-slate-200 dark:bg-default-100 dark:text-foreground dark:border-default-200 dark:hover:bg-default-200"
-            : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed dark:bg-default-50 dark:text-default-400",
-        )}
+        className={clsx(iconBtnBase, canUndo ? iconBtnEnabled : iconBtnDisabled)}
         title={canUndo ? "Undo last manual calendar change" : "Nothing to undo"}
         aria-label={canUndo ? "Undo last manual calendar change" : "Nothing to undo"}
       >
         <Undo2 className="size-4 shrink-0" aria-hidden />
-        <span className="hidden sm:inline">Undo</span>
       </button>
       <button
         type="button"
         disabled={!canRedo}
         onClick={onRedo}
-        className={clsx(
-          "flex items-center justify-center rounded-lg h-9 px-3 text-sm font-bold gap-2 border transition-colors shrink-0",
-          canRedo
-            ? "bg-slate-100 text-slate-900 border-slate-200 hover:bg-slate-200 dark:bg-default-100 dark:text-foreground dark:border-default-200 dark:hover:bg-default-200"
-            : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed dark:bg-default-50 dark:text-default-400",
-        )}
+        className={clsx(iconBtnBase, canRedo ? iconBtnEnabled : iconBtnDisabled)}
         title={canRedo ? "Redo last undone calendar change" : "Nothing to redo"}
         aria-label={canRedo ? "Redo last undone calendar change" : "Nothing to redo"}
       >
         <Redo2 className="size-4 shrink-0" aria-hidden />
-        <span className="hidden sm:inline">Redo</span>
       </button>
     </div>,
     slot,
@@ -983,6 +980,7 @@ export default function CalendarPage() {
   type AssignmentMap = CalendarAssignmentMap;
 
   const router = useRouter();
+  const { user } = useAuth();
   const { begin: beginSolverProgress, succeed: succeedSolverProgress, fail: failSolverProgress } =
     useSolverProgress();
   const [lockedSectionIds, setLockedSectionIds] = useState<string[]>([]);
@@ -1052,6 +1050,11 @@ export default function CalendarPage() {
   const redoStackRef = useRef<UndoSnapshot[]>([]);
   const [dragError, setDragError] = useState<string | null>(null);
   const [scheduleDrawerOpen, setScheduleDrawerOpen] = useState<boolean>(false);
+  // Mount/enter states drive a smooth slide: `drawerRender` keeps the panel in the
+  // DOM through the exit animation; `drawerEntered` toggles the transform.
+  const [drawerRender, setDrawerRender] = useState<boolean>(false);
+  const [drawerEntered, setDrawerEntered] = useState<boolean>(false);
+  const [drawerSearch, setDrawerSearch] = useState<string>("");
   const [dragFeedback, setDragFeedback] = useState<{
     status: "neutral" | "valid" | "invalid";
     message: string | null;
@@ -2220,6 +2223,47 @@ type MeetingPatternPlacementOption = {
       });
   }, [data, sectionMatchesFilters]);
 
+  const drawerSectionsSearched = useMemo(() => {
+    const q = drawerSearch.trim().toLowerCase();
+    if (!q) return tableSectionsFiltered;
+    return tableSectionsFiltered.filter((section) => {
+      const assignment = normalizeAssignmentMapEntry(section, assignmentsBySection);
+      const haystack = [
+        section.id,
+        section.department,
+        section.course_id,
+        section.section_code,
+        section.instructor_id,
+        assignment.room_id,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [drawerSearch, tableSectionsFiltered, assignmentsBySection]);
+
+  useEffect(() => {
+    if (scheduleDrawerOpen) {
+      setDrawerRender(true);
+      // Two rAFs: mount off-screen, let the browser paint that state, then flip
+      // the transform on the *next* frame so the slide-in transition actually runs.
+      let raf2 = 0;
+      const raf1 = requestAnimationFrame(() => {
+        raf2 = requestAnimationFrame(() => setDrawerEntered(true));
+      });
+      return () => {
+        cancelAnimationFrame(raf1);
+        cancelAnimationFrame(raf2);
+      };
+    }
+    // Closing: play the slide-out, then unmount. `transitionend` handles the
+    // unmount; this timeout is a safety net if the event doesn't fire.
+    setDrawerEntered(false);
+    const timeout = setTimeout(() => setDrawerRender(false), 400);
+    return () => clearTimeout(timeout);
+  }, [scheduleDrawerOpen]);
+
   useEffect(() => {
     if (!solverInput) return;
     updateLastRunStorage(solverInput, assignmentsBySection, lockedSectionIds);
@@ -3238,6 +3282,7 @@ type MeetingPatternPlacementOption = {
       saveScheduleToHistory({
         name: trimmedName,
         scheduleDate: saveScheduleModal.draft.scheduleDate,
+        savedBy: user?.name,
         snapshot,
       });
       if (typeof window !== "undefined") {
@@ -3258,7 +3303,7 @@ type MeetingPatternPlacementOption = {
         error: e instanceof Error ? e.message : "Failed to save schedule history.",
       }));
     }
-  }, [buildSnapshotFromCurrentView, saveScheduleModal.draft.name, saveScheduleModal.draft.scheduleDate]);
+  }, [buildSnapshotFromCurrentView, saveScheduleModal.draft.name, saveScheduleModal.draft.scheduleDate, user?.name]);
 
   if (error) {
     return (
@@ -3293,12 +3338,12 @@ type MeetingPatternPlacementOption = {
           setDragError(null);
         }}
       />
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="flex flex-col">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 flex-col justify-start">
           <h1 className="text-3xl font-black tracking-tight text-slate-900">
             Schedule Output Calendar
           </h1>
-          <p className="text-slate-500 text-base">
+          <p className="mt-1 text-base leading-6 text-slate-500">
             Click through Monday–Friday to view scheduled sections.
           </p>
         </div>
@@ -3622,8 +3667,9 @@ type MeetingPatternPlacementOption = {
         <button
           type="button"
           onClick={openCreateSectionModal}
-          className="flex items-center justify-center rounded-lg h-10 px-4 bg-indigo-50 text-indigo-800 font-bold border border-indigo-200 hover:bg-indigo-100 transition-colors shrink-0"
+          className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-weatherhead-primary px-4 text-sm font-bold text-white shadow-sm shadow-weatherhead-primary/20 transition-colors hover:bg-[#0f6fd0]"
         >
+          <Plus className="size-4" aria-hidden />
           Add Section
         </button>
       </div>
@@ -4216,21 +4262,31 @@ type MeetingPatternPlacementOption = {
         </div>
       </div>
 
-      {scheduleDrawerOpen && (
+      {drawerRender &&
+        dragFeedbackToastMount &&
+        createPortal(
+          <>
         <div
-          className="fixed inset-0 z-40 bg-slate-900/40"
+          className={clsx(
+            "fixed inset-x-0 bottom-0 top-16 z-40 bg-slate-900/40 transition-opacity duration-300 ease-out",
+            drawerEntered ? "opacity-100" : "opacity-0",
+          )}
           onClick={() => setScheduleDrawerOpen(false)}
           aria-hidden
         />
-      )}
       <aside
         className={clsx(
-          "fixed top-0 right-0 z-50 h-full w-full max-w-[720px] bg-white shadow-2xl flex flex-col transition-transform duration-200",
-          scheduleDrawerOpen ? "translate-x-0" : "translate-x-full",
+          "fixed top-16 right-0 z-40 h-[calc(100dvh-4rem)] w-full max-w-[720px] bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-out will-change-transform",
+          drawerEntered ? "translate-x-0" : "translate-x-full",
         )}
         role="dialog"
         aria-label="Schedule table"
-        aria-hidden={!scheduleDrawerOpen}
+        aria-hidden={!drawerEntered}
+        onTransitionEnd={(e) => {
+          if (e.target === e.currentTarget && !scheduleDrawerOpen) {
+            setDrawerRender(false);
+          }
+        }}
       >
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
           <div className="min-w-0">
@@ -4248,9 +4304,34 @@ type MeetingPatternPlacementOption = {
             <X className="size-4" />
           </button>
         </div>
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-4 py-2 bg-slate-50">
+        <div className="border-b border-slate-200 px-4 py-2 bg-slate-50">
+          <div className="relative mb-2">
+            <Filter className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" aria-hidden />
+            <input
+              type="text"
+              value={drawerSearch}
+              onChange={(e) => setDrawerSearch(e.target.value)}
+              placeholder="Search by section, course, room, instructor…"
+              className="h-8 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-8 text-xs text-slate-800 placeholder:text-slate-400 focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-weatherhead-primary/20"
+              aria-label="Search sections"
+            />
+            {drawerSearch ? (
+              <button
+                type="button"
+                onClick={() => setDrawerSearch("")}
+                className="absolute right-1.5 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Clear search"
+              >
+                <X className="size-3.5" />
+              </button>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
           <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
-            {tableSectionsFiltered.length} section{tableSectionsFiltered.length === 1 ? "" : "s"}
+            {drawerSectionsSearched.length} section{drawerSectionsSearched.length === 1 ? "" : "s"}
+            {drawerSearch ? (
+              <span className="text-slate-400"> of {tableSectionsFiltered.length}</span>
+            ) : null}
           </span>
           {hasAnyPlacementLock && (
             <span className="text-[10px] font-bold uppercase tracking-wide text-amber-800">
@@ -4283,6 +4364,7 @@ type MeetingPatternPlacementOption = {
               Unlock all
             </button>
           </div>
+          </div>
         </div>
         <div className="flex-1 overflow-x-auto overflow-y-auto">
           <table className="w-full text-left text-sm">
@@ -4296,7 +4378,14 @@ type MeetingPatternPlacementOption = {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {tableSectionsFiltered.map((section) => {
+              {drawerSectionsSearched.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-500">
+                    No sections match “{drawerSearch}”.
+                  </td>
+                </tr>
+              ) : null}
+              {drawerSectionsSearched.map((section) => {
                 const a = normalizeAssignmentMapEntry(section, assignmentsBySection);
                 const locked = isPlacementLocked(section.id);
                 const canLock = canLockSectionPlacement(section.id);
@@ -4355,6 +4444,9 @@ type MeetingPatternPlacementOption = {
           </table>
         </div>
       </aside>
+          </>,
+          dragFeedbackToastMount,
+        )}
 
       {calendarContextMenu &&
         dragFeedbackToastMount &&

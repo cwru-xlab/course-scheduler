@@ -12,6 +12,12 @@ import {
   loadSavedScheduleToCurrentView,
   type SavedScheduleEntry,
 } from "@/lib/scheduling/history";
+import {
+  appNativeBtnPrimary,
+  appNativeBtnSecondary,
+  appNativeBtnDanger,
+} from "@/lib/ui/appChromeStyles";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 const fmtDate = (iso: string): string => {
   const d = new Date(iso);
@@ -39,23 +45,16 @@ export default function HistoryPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">
-            Schedule History
-          </h1>
-          <p className="text-slate-500 text-base">
-            Load, export, and manage schedules you saved from calendar edits.
-          </p>
-        </div>
-        <Link
-          href="/calendar"
-          className="inline-flex items-center justify-center rounded-lg h-10 px-4 bg-[#137fec] text-white font-bold gap-2 shadow-lg shadow-[#137fec]/20 hover:bg-[#0f6dca]"
-        >
-          <CalendarDays className="size-4" />
-          Back to Calendar
-        </Link>
-      </div>
+      <PageHeader
+        title="Schedule History"
+        subtitle="Load, export, and manage schedules you saved from calendar edits."
+        actions={
+          <Link href="/calendar" className={appNativeBtnPrimary}>
+            <CalendarDays className="size-4" />
+            Back to Calendar
+          </Link>
+        }
+      />
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-slate-600">
@@ -76,10 +75,8 @@ export default function HistoryPage() {
           <p className="mt-1 text-sm text-slate-500">
             Open the calendar, run or edit a schedule, then use Save Schedule.
           </p>
-          <Link
-            href="/calendar"
-            className="mt-5 inline-flex items-center justify-center rounded-lg h-10 px-4 bg-slate-100 text-slate-800 font-bold border border-slate-200 hover:bg-slate-200"
-          >
+          <Link href="/calendar" className={`mt-5 ${appNativeBtnSecondary}`}>
+            <CalendarDays className="size-4" />
             Go to Calendar
           </Link>
         </div>
@@ -95,6 +92,12 @@ export default function HistoryPage() {
                   <h2 className="text-lg font-bold text-slate-900 truncate">{item.name}</h2>
                   <div className="text-xs text-slate-500">
                     Term date: {item.scheduleDate} • Saved: {fmtDate(item.savedAt)}
+                    {item.savedBy ? (
+                      <>
+                        {" • "}Saved by:{" "}
+                        <span className="font-semibold text-slate-700">{item.savedBy}</span>
+                      </>
+                    ) : null}
                   </div>
                   <div className="text-xs text-slate-600">
                     Assignments:{" "}
@@ -115,7 +118,7 @@ export default function HistoryPage() {
                       loadSavedScheduleToCurrentView(item);
                       router.push("/calendar");
                     }}
-                    className="inline-flex items-center justify-center rounded-lg h-9 px-3 bg-[#137fec] text-white text-sm font-bold gap-2 hover:bg-[#0f6dca]"
+                    className={appNativeBtnPrimary}
                   >
                     <FolderOpen className="size-4" />
                     Load
@@ -123,7 +126,7 @@ export default function HistoryPage() {
                   <button
                     type="button"
                     onClick={() => exportSavedSchedule(item)}
-                    className="inline-flex items-center justify-center rounded-lg h-9 px-3 bg-slate-100 text-slate-800 text-sm font-bold gap-2 border border-slate-200 hover:bg-slate-200"
+                    className={appNativeBtnSecondary}
                   >
                     <Download className="size-4" />
                     Export
@@ -134,7 +137,7 @@ export default function HistoryPage() {
                       deleteSavedSchedule(item.id);
                       refresh();
                     }}
-                    className="inline-flex items-center justify-center rounded-lg h-9 px-3 bg-rose-50 text-rose-700 text-sm font-bold gap-2 border border-rose-200 hover:bg-rose-100"
+                    className={appNativeBtnDanger}
                   >
                     <Trash2 className="size-4" />
                     Delete

@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import clsx from "clsx";
 
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
+import { appNavLinkClass, appToolbarShellClass } from "@/lib/ui/appChromeStyles";
 
 type EditorPageTitleDropdownProps = {
   current: "sections" | "instructors" | "rooms" | "timeslots" | "meeting-patterns" | "constraints";
@@ -23,10 +23,7 @@ export function EditorPageTitleDropdown({ current, title: _title }: EditorPageTi
   const { confirmLeaveIfUnsaved } = useSchedulingData();
 
   return (
-    <nav
-      aria-label="Editor pages"
-      className="inline-flex flex-wrap items-center gap-1 rounded-lg border border-slate-200 bg-white p-1"
-    >
+    <nav aria-label="Editor pages" className={appToolbarShellClass}>
       {EDITOR_PAGES.map((page) => {
         const isActive = page.key === current;
         return (
@@ -41,12 +38,7 @@ export function EditorPageTitleDropdown({ current, title: _title }: EditorPageTi
               if (!confirmLeaveIfUnsaved()) event.preventDefault();
             }}
             aria-current={isActive ? "page" : undefined}
-            className={clsx(
-              "px-3 py-1.5 rounded-md text-sm font-semibold whitespace-nowrap transition-colors",
-              isActive
-                ? "bg-weatherhead-primary/10 text-weatherhead-primary"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
-            )}
+            className={`${appNavLinkClass(isActive)} whitespace-nowrap`}
           >
             {page.label}
           </Link>

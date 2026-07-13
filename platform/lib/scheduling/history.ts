@@ -18,6 +18,8 @@ export type SavedScheduleEntry = {
   name: string;
   scheduleDate: string;
   savedAt: string;
+  /** Display name of the user who saved this schedule (when known). */
+  savedBy?: string;
   snapshot: LastSolverRunSnapshot;
 };
 
@@ -34,6 +36,7 @@ const parseHistory = (raw: string | null): SavedScheduleEntry[] => {
         typeof candidate.name === "string" &&
         typeof candidate.scheduleDate === "string" &&
         typeof candidate.savedAt === "string" &&
+        (candidate.savedBy === undefined || typeof candidate.savedBy === "string") &&
         !!candidate.snapshot &&
         typeof candidate.snapshot === "object"
       );
@@ -52,17 +55,20 @@ export const listSavedSchedules = (): SavedScheduleEntry[] => {
 export const saveScheduleToHistory = (params: {
   name: string;
   scheduleDate: string;
+  savedBy?: string;
   snapshot: LastSolverRunSnapshot;
 }): SavedScheduleEntry => {
   if (typeof window === "undefined") {
     throw new Error("Schedule history is only available in the browser.");
   }
   const existing = listSavedSchedules();
+  const savedBy = params.savedBy?.trim();
   const entry: SavedScheduleEntry = {
     id: `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`,
     name: params.name.trim(),
     scheduleDate: params.scheduleDate,
     savedAt: new Date().toISOString(),
+    ...(savedBy ? { savedBy } : {}),
     snapshot: params.snapshot,
   };
   const next = [entry, ...existing];
@@ -91,6 +97,7 @@ export const exportSavedSchedule = (entry: SavedScheduleEntry): void => {
       name: entry.name,
       scheduleDate: entry.scheduleDate,
       savedAt: entry.savedAt,
+      savedBy: entry.savedBy ?? null,
       exportedAt: new Date().toISOString(),
     },
     snapshot: entry.snapshot,

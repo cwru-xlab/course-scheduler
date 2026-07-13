@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@heroui/button";
 import { CloudUpload } from "lucide-react";
 
+import { PageHeader } from "@/components/layout/PageHeader";
 import { SpreadsheetFormatHelp } from "@/components/scheduler/SpreadsheetFormatHelp";
 import { ValidationIssuesTable } from "@/components/scheduler/ValidationIssuesTable";
 import { hasLocatedIssues } from "@/lib/spreadsheet/validateClient";
@@ -55,10 +56,12 @@ export function EditorPageHeader({ current, title, subtitle, data }: EditorPageH
   const [solverError, setSolverError] = useState<string | null>(null);
 
   return (
-    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+    <div className="space-y-3">
+      <PageHeader title="Editor Table" subtitle={subtitle} />
+
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
       <div className="min-w-0">
         <EditorPageTitleDropdown current={current} title={title} />
-        <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>
       </div>
 
       <div className={editorToolbarShellClass}>
@@ -152,6 +155,7 @@ export function EditorPageHeader({ current, title, subtitle, data }: EditorPageH
       {saveFeedback?.type === "error" && (
         <p className={editorFeedbackErrorClass}>Save failed. {saveFeedback.message}</p>
       )}
+      </div>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { MessageSquare, Reply } from "lucide-react";
 import { EditorModalShell } from "@/components/scheduler/editors/EditorModalShell";
+import { PageHeader } from "@/components/layout/PageHeader";
 import type { RowNote as StoredRowNote } from "@/lib/notes/types";
 import { NOTES_STORAGE_PREFIX } from "@/lib/notes/types";
 import type { SchedulingInput } from "@/lib/scheduling/types";
@@ -377,15 +378,10 @@ export default function NotesFeedPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">Recent Notes & Replies</h1>
-          <p className="text-slate-500 mt-1">
-            Activity feed ordered by recency. Open a note to view row details; use the link to jump to the editor
-            with that row&apos;s notes modal open.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Recent Notes & Replies"
+        subtitle="Activity feed ordered by recency. Open a note to view row details; use the link to jump to the editor with that row's notes modal open."
+      />
 
       <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
