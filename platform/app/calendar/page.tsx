@@ -34,6 +34,9 @@ import {
   storeSolverNetworkError,
 } from "@/lib/solver/solverErrorStorage";
 import { validateSchedulingInput } from "@/lib/spreadsheet/validateClient";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -41,6 +44,7 @@ import {
   ArrowLeft,
   CloudBackup,
   Filter,
+  Table2,
   Link2,
   Lock,
   Palette,
@@ -53,7 +57,9 @@ import {
   Table2,
   Undo2,
   Unlock,
-  X
+  Play,
+  CloudBackup,
+  X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
@@ -77,6 +83,33 @@ import {
   type PlacementEvaluation,
   type PlacementSeverity,
 } from "./placementValidation";
+import type {
+  BlockedTime,
+  LockedAssignment,
+  ScheduleSolution,
+  SchedulingInput,
+} from "@/lib/scheduling/types";
+import { MultiSelect } from "@/components/scheduler/MultiSelect";
+import { ViewportModal } from "@/components/scheduler/ViewportModal";
+import {
+  LAST_SOLVER_RUN_STORAGE_KEY,
+  saveScheduleToHistory,
+  type LastSolverRunSnapshot,
+} from "@/lib/scheduling/history";
+import { SCHEDULING_DATA_REFRESH_EVENT, useSchedulingData } from "@/lib/scheduling/useSchedulingData";
+import { useSolverLock } from "@/lib/solver-lock-client";
+import {
+  SCHEDULING_WINDOW_END_HOUR,
+  SCHEDULING_WINDOW_START_HOUR,
+} from "@/lib/scheduling/timeWindow";
+import { isSectionArchived, normalizeSectionState } from "@/lib/scheduling/sectionState";
+import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
+import {
+  storeSolverErrorSnapshot,
+  storeSolverNetworkError,
+} from "@/lib/solver/solverErrorStorage";
+import { normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
+import type { ValidationError } from "@/lib/scheduling/types";
 
 type TimeslotDto = {
   id: string;
@@ -2783,10 +2816,15 @@ type PatternDayApplyRow = {
       );
       return;
     }
-    // Persist unsaved calendar edits to the backend first so the solver runs
-    // against what the user currently sees.
     if (hasValidUnsavedEdit && !autoSaveEnabled) {
-      await updateBackendRef.current(true);
+      if (typeof window !== "undefined") {
+        const choice = window.confirm(
+          "You have unsaved calendar edits. Save them to the backend before running the solver?\n\nOK = save first, Cancel = run without saving.",
+        );
+        if (choice) {
+          await updateBackendRef.current(true);
+        }
+      }
     }
     setSolverRunError(null);
     setSolverRunStatus("loading");
@@ -2924,10 +2962,10 @@ type PatternDayApplyRow = {
       failSolverProgress();
       const raw = e instanceof Error ? e.message : "Failed to run solver.";
       if (solverInput) {
-        storeSolverNetworkError(solverInput, raw);
-        setSolverRunError(solverNetworkErrorSummary(raw));
+        const errors = storeSolverNetworkError(solverInput, raw);
+        setSolverRunError(errors.map((err) => err.message).join(" "));
       } else {
-        setSolverRunError(solverNetworkErrorSummary(raw));
+        setSolverRunError(normalizeNetworkError(raw, "solver"));
       }
     } finally {
       setSolverRunStatus("idle");

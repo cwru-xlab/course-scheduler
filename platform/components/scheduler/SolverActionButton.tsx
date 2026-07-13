@@ -14,6 +14,7 @@ import type {
 } from "@/lib/scheduling/types";
 import { enrichSolverErrors, formatErrorsSummary, normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
 import { humanizedSummary } from "@/lib/errors/humanizeError";
+import { enrichSolverErrors, normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
 import { validateSchedulingInput } from "@/lib/spreadsheet/validateClient";
 import { isSectionArchived } from "@/lib/scheduling/sectionState";
 import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";

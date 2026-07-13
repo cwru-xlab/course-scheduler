@@ -8,6 +8,8 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { SpreadsheetFormatHelp } from "@/components/scheduler/SpreadsheetFormatHelp";
 import { ValidationIssuesTable } from "@/components/scheduler/ValidationIssuesTable";
 import { humanizeError } from "@/lib/errors/humanizeError";
+import { SpreadsheetFormatHelp } from "@/components/scheduler/SpreadsheetFormatHelp";
+import { ValidationIssuesTable } from "@/components/scheduler/ValidationIssuesTable";
 import { hasLocatedIssues } from "@/lib/spreadsheet/validateClient";
 import { EditorPageTitleDropdown } from "./EditorPageTitleDropdown";
 import {
