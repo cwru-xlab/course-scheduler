@@ -12,9 +12,9 @@ Maps audit findings to GSD phases. Reference when scoping or verifying work.
 | C6 | Click persist immediate, no undo; drag local-only | High | 2, 3 | Partial (pattern persist deferred; full undo Phase 3) |
 | C7 | Stale conflict highlights after undo | High | 3 | Partial (rescan added) |
 | C8 | Snap vs highlight duration mismatch | Medium | 3 | Open |
-| C9 | Touch tap may not place without pointermove | Medium | 4 | Open |
-| C10 | `dragError` dead state | Low | 4 | Open |
-| C11 | Calendar solver skips Check Data | Medium | 4 | Open |
+| C9 | Touch tap may not place without pointermove | Medium | 4 | Done |
+| C10 | `dragError` dead state | Low | 4 | Done |
+| C11 | Calendar solver skips Check Data | Medium | 4 | Done |
 
 ## Completed (outside phases)
 

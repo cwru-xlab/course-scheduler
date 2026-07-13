@@ -74,6 +74,7 @@ import {
   storeSolverNetworkError,
 } from "@/lib/solver/solverErrorStorage";
 import { normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
+import { validateSchedulingInput } from "@/lib/spreadsheet/validateClient";
 import type { ValidationError } from "@/lib/scheduling/types";
 
 type TimeslotDto = {
@@ -973,20 +974,18 @@ function computeCalendarDayConflicts(events: CalendarEvent[]): {
 function CalendarDragFeedbackToastPortal({
   mountedOn,
   dragFeedback,
-  dragError,
   onDismiss,
 }: {
   mountedOn: HTMLElement | null;
   dragFeedback: CalendarDragFeedbackState;
-  dragError: string | null;
   onDismiss: () => void;
 }) {
   if (!mountedOn) return null;
-  const line = dragFeedback.message ?? dragError;
-  const isError = !!dragError || dragFeedback.status === "invalid";
-  const isWarning = !dragError && dragFeedback.status === "warning";
-  const isValid = !dragError && dragFeedback.status === "valid";
-  const toastKey = `${dragFeedback.status}\u001f${dragError ?? ""}\u001f${dragFeedback.message ?? ""}`;
+  const line = dragFeedback.message;
+  const isError = dragFeedback.status === "invalid";
+  const isWarning = dragFeedback.status === "warning";
+  const isValid = dragFeedback.status === "valid";
+  const toastKey = `${dragFeedback.status}\u001f${dragFeedback.message ?? ""}`;
 
   return createPortal(
     <AnimatePresence>
@@ -1162,7 +1161,6 @@ export default function CalendarPage() {
     },
     [stateKeyForUndo],
   );
-  const [dragError, setDragError] = useState<string | null>(null);
   // Section ids to visually flag after a placement creates a conflict (instructor
   // double-booking or room overlap) so the user can spot both sides of the clash.
   const [conflictSectionIds, setConflictSectionIds] = useState<Set<string>>(() => new Set());
@@ -2190,7 +2188,6 @@ type MeetingPatternPlacementOption = {
   // captured with enriched history; otherwise fall back to the day re-scan so
   // older snapshots still re-surface conflicts (issue C7).
   const restoreSnapshotFeedback = useCallback((snapshot: UndoSnapshot) => {
-    setDragError(null);
     if (snapshot.dragFeedback !== undefined && snapshot.conflictSectionIds !== undefined) {
       setConflictSectionIds(new Set(snapshot.conflictSectionIds));
       setDragFeedback(snapshot.dragFeedback);
@@ -2576,6 +2573,25 @@ type MeetingPatternPlacementOption = {
         ...input,
         locked_assignments: mergedLocks,
       };
+      // Fail fast on spreadsheet row-level data issues before hitting the solver,
+      // matching the editor's Run Solver flow (issue C11). Located issues route to
+      // /solver-errors so the user sees the same row-anchored guidance.
+      const validation = await validateSchedulingInput(nextInput);
+      if (!validation.ok) {
+        const summary =
+          validation.issueCount === 1
+            ? "Found 1 data issue before running the solver."
+            : `Found ${validation.issueCount} data issues before running the solver.`;
+        storeSolverErrorSnapshot(nextInput, validation.issues, {
+          validation_issue_count: validation.issueCount,
+          error_codes: Array.from(new Set(validation.issues.map((issue) => issue.code))),
+        });
+        failSolverProgress();
+        setSolverRunError(summary);
+        setSolverRunStatus("idle");
+        router.push("/solver-errors");
+        return;
+      }
       const response = await fetch("/api/schedule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2896,7 +2912,6 @@ type MeetingPatternPlacementOption = {
         } else {
           setDragFeedback({ status: "valid", message: evaluation.message });
         }
-        setDragError(null);
       }
     },
     [
@@ -3576,10 +3591,8 @@ type MeetingPatternPlacementOption = {
       <CalendarDragFeedbackToastPortal
         mountedOn={dragFeedbackToastMount}
         dragFeedback={dragFeedback}
-        dragError={dragError}
         onDismiss={() => {
           setDragFeedback({ status: "neutral", message: null });
-          setDragError(null);
           setConflictSectionIds(new Set());
         }}
       />
@@ -3923,7 +3936,7 @@ type MeetingPatternPlacementOption = {
       <div
         className={clsx(
           "rounded-xl border shadow-lg overflow-hidden flex flex-col min-h-[600px]",
-          dragFeedback.status === "invalid" || dragError
+          dragFeedback.status === "invalid"
             ? "bg-red-50/40 border-red-200"
             : dragFeedback.status === "valid"
               ? "bg-emerald-50/35 border-emerald-200"
@@ -4012,16 +4025,27 @@ type MeetingPatternPlacementOption = {
                         "New section created. Hover over available room/timeslot space, then click to place it.",
                     });
                   }}
-                  onClick={() => {
-                    if (!pendingPlacementSectionId || !placementPreview || calendarDrag) return;
-                    if (placementPreview.targetRoomId !== room.id) return;
-                    const slot = timeslotById.get(placementPreview.slotId);
+                  onClick={(e) => {
+                    if (!pendingPlacementSectionId || calendarDrag || !data) return;
+                    // Prefer an existing hover preview (desktop pointer flow).
+                    // On touch, a pure tap fires no pointermove, so `placementPreview`
+                    // is null — compute the slot directly from the tap's coordinates
+                    // so the section places on the first tap (issue C9).
+                    if (placementPreview && placementPreview.targetRoomId === room.id) {
+                      const previewSlot = timeslotById.get(placementPreview.slotId);
+                      if (!previewSlot) return;
+                      commitPlacementByClick(pendingPlacementSectionId, room.id, {
+                        ...previewSlot,
+                        start: placementPreview.startMin,
+                        end: placementPreview.endMin,
+                      });
+                      return;
+                    }
+                    const mins = minutesFromPointerInRoom(e.clientX, room.id);
+                    if (mins === null) return;
+                    const slot = selectAnySlotNearMinutes(data.timeslots, selectedDay, mins);
                     if (!slot) return;
-                    commitPlacementByClick(pendingPlacementSectionId, room.id, {
-                      ...slot,
-                      start: placementPreview.startMin,
-                      end: placementPreview.endMin,
-                    });
+                    commitPlacementByClick(pendingPlacementSectionId, room.id, slot);
                   }}
                 >
                   {calendarDrag?.hasMoved &&
@@ -4275,7 +4299,6 @@ type MeetingPatternPlacementOption = {
                         calendarDragPointerYRef.current = e.clientY;
                         const targetEl = e.currentTarget;
                         targetEl.setPointerCapture(e.pointerId);
-                        setDragError(null);
                         setConflictSectionIds(new Set());
                         setBackendSaveMessage(null);
                         setCalendarDrag({
