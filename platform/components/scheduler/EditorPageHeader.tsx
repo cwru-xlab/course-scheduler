@@ -8,8 +8,8 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { SpreadsheetFormatHelp } from "@/components/scheduler/SpreadsheetFormatHelp";
 import { ValidationIssuesTable } from "@/components/scheduler/ValidationIssuesTable";
 import { humanizeError } from "@/lib/errors/humanizeError";
-import { SpreadsheetFormatHelp } from "@/components/scheduler/SpreadsheetFormatHelp";
-import { ValidationIssuesTable } from "@/components/scheduler/ValidationIssuesTable";
+import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
+import type { SchedulingInput } from "@/lib/scheduling/types";
 import { hasLocatedIssues } from "@/lib/spreadsheet/validateClient";
 import { EditorPageTitleDropdown } from "./EditorPageTitleDropdown";
 import {
@@ -28,8 +28,6 @@ import {
   editorToolbarDivider,
   editorToolbarShellClass,
 } from "./editors/editorToolbarStyles";
-import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
-import type { SchedulingInput } from "@/lib/scheduling/types";
 
 type EditorPageKey =
   | "sections"

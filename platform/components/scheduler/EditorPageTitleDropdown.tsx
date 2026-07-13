@@ -1,12 +1,10 @@
 "use client";
 
+import clsx from "clsx";
 import Link from "next/link";
 
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 import { appNavLinkClass, appToolbarShellClass } from "@/lib/ui/appChromeStyles";
-import clsx from "clsx";
-
-import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 
 type EditorPageTitleDropdownProps = {
   current: "sections" | "instructors" | "rooms" | "timeslots" | "meeting-patterns" | "constraints";

@@ -1,5 +1,39 @@
 "use client";
 
+import clsx from "clsx";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  CloudBackup,
+  Filter,
+  Link2,
+  Lock,
+  Palette,
+  Play,
+  Plus,
+  Redo2,
+  Save,
+  Share2,
+  Shuffle,
+  Table2,
+  Undo2,
+  Unlock,
+  X,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
+import { createPortal } from "react-dom";
+
 import { MultiSelect } from "@/components/scheduler/MultiSelect";
 import { ViewportModal } from "@/components/scheduler/ViewportModal";
 import { useAuth } from "@/lib/auth-client";
@@ -21,49 +55,23 @@ import type {
   SchedulingInput,
   ValidationError,
 } from "@/lib/scheduling/types";
-import { SCHEDULING_DATA_REFRESH_EVENT, useSchedulingData } from "@/lib/scheduling/useSchedulingData";
-import { useSolverLock } from "@/lib/solver-lock-client";
+import {
+  SCHEDULING_DATA_REFRESH_EVENT,
+  useSchedulingData,
+} from "@/lib/scheduling/useSchedulingData";
 import {
   fetchSharedScheduleFull,
   useSharedScheduleMeta,
 } from "@/lib/shared-schedule-client";
+import { useSolverLock } from "@/lib/solver-lock-client";
 import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
 import {
   solverNetworkErrorSummary,
   storeSolverErrorSnapshot,
   storeSolverNetworkError,
 } from "@/lib/solver/solverErrorStorage";
+import { normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
 import { validateSchedulingInput } from "@/lib/spreadsheet/validateClient";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
-import clsx from "clsx";
-import { AnimatePresence, motion } from "framer-motion";
-import {
-  AlertTriangle,
-  ArrowLeft,
-  CloudBackup,
-  Filter,
-  Table2,
-  Link2,
-  Lock,
-  Palette,
-  Play,
-  Plus,
-  Redo2,
-  Save,
-  Share2,
-  Shuffle,
-  Table2,
-  Undo2,
-  Unlock,
-  Play,
-  CloudBackup,
-  X,
-} from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { createPortal } from "react-dom";
 import { CrosslistCalendarEventCard, CrosslistLegendSwatch } from "./CrosslistCalendarEventCard";
 import {
   assignCalendarEventLanes,
@@ -83,33 +91,6 @@ import {
   type PlacementEvaluation,
   type PlacementSeverity,
 } from "./placementValidation";
-import type {
-  BlockedTime,
-  LockedAssignment,
-  ScheduleSolution,
-  SchedulingInput,
-} from "@/lib/scheduling/types";
-import { MultiSelect } from "@/components/scheduler/MultiSelect";
-import { ViewportModal } from "@/components/scheduler/ViewportModal";
-import {
-  LAST_SOLVER_RUN_STORAGE_KEY,
-  saveScheduleToHistory,
-  type LastSolverRunSnapshot,
-} from "@/lib/scheduling/history";
-import { SCHEDULING_DATA_REFRESH_EVENT, useSchedulingData } from "@/lib/scheduling/useSchedulingData";
-import { useSolverLock } from "@/lib/solver-lock-client";
-import {
-  SCHEDULING_WINDOW_END_HOUR,
-  SCHEDULING_WINDOW_START_HOUR,
-} from "@/lib/scheduling/timeWindow";
-import { isSectionArchived, normalizeSectionState } from "@/lib/scheduling/sectionState";
-import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
-import {
-  storeSolverErrorSnapshot,
-  storeSolverNetworkError,
-} from "@/lib/solver/solverErrorStorage";
-import { normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
-import type { ValidationError } from "@/lib/scheduling/types";
 
 type TimeslotDto = {
   id: string;

@@ -7,18 +7,24 @@ import { Rocket } from "lucide-react";
 
 import { ViewportModal } from "@/components/scheduler/ViewportModal";
 import { editorToolbarBtnAccent } from "@/components/scheduler/editors/editorToolbarStyles";
+import { humanizedSummary } from "@/lib/errors/humanizeError";
+import { isSectionArchived } from "@/lib/scheduling/sectionState";
 import type {
   ScheduleSolution,
   SchedulingInput,
   ValidationError,
 } from "@/lib/scheduling/types";
-import { enrichSolverErrors, formatErrorsSummary, normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
-import { humanizedSummary } from "@/lib/errors/humanizeError";
-import { enrichSolverErrors, normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
-import { validateSchedulingInput } from "@/lib/spreadsheet/validateClient";
-import { isSectionArchived } from "@/lib/scheduling/sectionState";
-import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
 import { useSolverLock } from "@/lib/solver-lock-client";
+import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
+import { storeSolverErrorSnapshot } from "@/lib/solver/solverErrorStorage";
+import {
+  enrichSolverErrors,
+  formatErrorsSummary,
+  normalizeNetworkError,
+} from "@/lib/spreadsheet/formatGuide";
+import { validateSchedulingInput } from "@/lib/spreadsheet/validateClient";
+
+const LAST_SOLVER_RUN_STORAGE_KEY = "wsom-last-solver-run";
 
 type ApiSuccess = ScheduleSolution & { status: "ok" };
 type ApiError = {
@@ -30,11 +36,6 @@ type ApiError = {
     feasible_if_remove_instructor?: { instructor_id: string; section_count: number }[];
   };
 };
-
-const LAST_SOLVER_RUN_STORAGE_KEY = "wsom-last-solver-run";
-import {
-  storeSolverErrorSnapshot,
-} from "@/lib/solver/solverErrorStorage";
 
 export const SolverActionButton = ({
   data,
