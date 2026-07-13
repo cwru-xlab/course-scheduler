@@ -17,6 +17,7 @@ import { humanizedSummary } from "@/lib/errors/humanizeError";
 import { validateSchedulingInput } from "@/lib/spreadsheet/validateClient";
 import { isSectionArchived } from "@/lib/scheduling/sectionState";
 import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
+import { useSolverLock } from "@/lib/solver-lock-client";
 
 type ApiSuccess = ScheduleSolution & { status: "ok" };
 type ApiError = {
@@ -43,8 +44,11 @@ export const SolverActionButton = ({
 }) => {
   const router = useRouter();
   const { begin, succeed, fail } = useSolverProgress();
+  const solverLock = useSolverLock();
   const [solverStatus, setSolverStatus] = useState<"idle" | "loading">("idle");
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  // Another user is running the solver (single-worker solver, one run at a time).
+  const solverBusyRemote = solverLock.active && solverStatus !== "loading";
   const archivedSectionCount =
     data?.sections.filter((section) => isSectionArchived(section)).length ?? 0;
 
@@ -166,9 +170,20 @@ export const SolverActionButton = ({
         startContent={solverStatus === "idle" ? <Rocket className="size-3.5" aria-hidden /> : undefined}
         isLoading={solverStatus === "loading"}
         onPress={() => setIsConfirmOpen(true)}
-        isDisabled={!data || solverStatus === "loading"}
+        isDisabled={!data || solverStatus === "loading" || solverBusyRemote}
+        title={
+          solverBusyRemote
+            ? solverLock.startedBy
+              ? `Solver is running (started by ${solverLock.startedBy}). Please wait.`
+              : "Solver is running. Please wait."
+            : undefined
+        }
       >
-        Run Solver
+        {solverBusyRemote
+          ? solverLock.startedBy
+            ? `Running (${solverLock.startedBy})…`
+            : "Solver running…"
+          : "Run Solver"}
       </Button>
 
       <ViewportModal isOpen={isConfirmOpen} onClose={() => setIsConfirmOpen(false)} zIndex={1000}>

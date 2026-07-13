@@ -6,6 +6,12 @@ import { enrichSpreadsheetErrors, formatErrorsDetail, formatErrorsSummary, norma
 export const LAST_SOLVER_RUN_STORAGE_KEY = "wsom-last-solver-run";
 export const LAST_SOLVER_ERROR_STORAGE_KEY = "wsom-last-solver-error";
 const SCHEDULE_HISTORY_STORAGE_KEY = "wsom-schedule-history-v1";
+/**
+ * Session flag set when the user loads a schedule from History into the
+ * calendar. The calendar reads it once on mount so that an incoming shared
+ * schedule from another user does not silently overwrite the history view.
+ */
+export const VIEW_FROM_HISTORY_KEY = "wsom-view-from-history";
 
 export type LastSolverRunSnapshot = {
   input: SchedulingInput;
@@ -89,6 +95,11 @@ export const loadSavedScheduleToCurrentView = (entry: SavedScheduleEntry): void 
     LAST_SOLVER_RUN_STORAGE_KEY,
     JSON.stringify(entry.snapshot),
   );
+  try {
+    window.sessionStorage.setItem(VIEW_FROM_HISTORY_KEY, "1");
+  } catch {
+    // sessionStorage may be unavailable; history-protection is best-effort.
+  }
 };
 
 export type ExportSavedScheduleResult =

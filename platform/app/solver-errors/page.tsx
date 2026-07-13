@@ -212,6 +212,32 @@ export default function SolverErrorsPage() {
     [stored],
   );
 
+  // Overload/capacity diagnostics are often inflated when cross-listed sections
+  // aren't grouped — surface a crosslist check in those cases.
+  const showCrosslistTip = useMemo(() => {
+    const d = stored?.diagnostics;
+    if (!d) return false;
+    return (
+      capacitySections.length > 0 ||
+      (d.feasible_if_remove_instructor ?? []).length > 0 ||
+      constrainedSections.length > 0 ||
+      (d.busiest_instructors ?? []).length > 0
+    );
+  }, [stored, capacitySections, constrainedSections]);
+
+  const crosslistTipBullet = (
+    <>
+      Confirm every cross-listed offering is grouped: in{" "}
+      <span className="font-semibold">Editor → Constraints</span>, open the{" "}
+      <span className="font-semibold">Cross-list groups</span> table and make sure sections that
+      share a room and time are in the same group. In{" "}
+      <span className="font-semibold">Editor → Sections</span>, check that each section&apos;s{" "}
+      <span className="font-semibold">Crosslist</span> column matches. Missing crosslists can make
+      the solver count the same class more than once, so instructors look overloaded or rooms look
+      too tight.
+    </>
+  );
+
   if (!isHydrated || !stored) {
     return (
       <div className="space-y-6">
@@ -326,6 +352,13 @@ export default function SolverErrorsPage() {
             The solver couldn&apos;t fit every section. Here are the fixes most likely to help,
             easiest first. Try one, then run the solver again.
           </p>
+
+          {showCrosslistTip ? (
+            <div className="mt-4 rounded-lg border border-violet-200 bg-violet-50/80 px-4 py-3">
+              <p className="text-sm font-bold text-violet-950">Check cross-lists first</p>
+              <p className="mt-1 text-sm text-violet-900">{crosslistTipBullet}</p>
+            </div>
+          ) : null}
 
           <ol className="mt-5 space-y-4">
             {/* Fix 1: over-capacity sections (usually the clearest root cause) */}
@@ -566,6 +599,11 @@ export default function SolverErrorsPage() {
                     <li>
                       In <span className="font-semibold">Editor → Sections</span>, allow more meeting
                       patterns and loosen room requirements.
+                    </li>
+                    <li>
+                      In <span className="font-semibold">Editor → Constraints</span>, review{" "}
+                      <span className="font-semibold">Cross-list groups</span> and confirm every
+                      cross-listed offering is grouped — missing groups can inflate section counts.
                     </li>
                     <li>Then run the solver again.</li>
                   </ol>

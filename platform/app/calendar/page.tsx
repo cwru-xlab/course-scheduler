@@ -5,6 +5,7 @@ import { ViewportModal } from "@/components/scheduler/ViewportModal";
 import { useAuth } from "@/lib/auth-client";
 import {
   LAST_SOLVER_RUN_STORAGE_KEY,
+  VIEW_FROM_HISTORY_KEY,
   saveScheduleToHistory,
   type LastSolverRunSnapshot,
 } from "@/lib/scheduling/history";
@@ -22,6 +23,10 @@ import type {
 } from "@/lib/scheduling/types";
 import { SCHEDULING_DATA_REFRESH_EVENT, useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 import { useSolverLock } from "@/lib/solver-lock-client";
+import {
+  fetchSharedScheduleFull,
+  useSharedScheduleMeta,
+} from "@/lib/shared-schedule-client";
 import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
 import {
   solverNetworkErrorSummary,
@@ -150,6 +155,23 @@ type LastSolverRun = LastSolverRunSnapshot & {
   // Backward compatibility for older snapshots without optional locks.
   lockedSectionIds?: string[];
 };
+
+/** Stable signature of an assignment map for cheap equality comparisons. */
+const assignmentsSignature = (map: Record<string, {
+  timeslot_ids?: string[];
+  room_id?: string | null;
+  meeting_pattern_id?: string | null;
+}>): string =>
+  JSON.stringify(
+    Object.entries(map)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([sectionId, v]) => [
+        sectionId,
+        v.room_id || "",
+        v.meeting_pattern_id || "",
+        [...(v.timeslot_ids ?? [])].sort(),
+      ]),
+  );
 
 type SaveScheduleDraft = {
   name: string;
@@ -1069,6 +1091,28 @@ export default function CalendarPage() {
   const solverBusyRemote = solverLock.active && solverRunStatus !== "loading";
   const { autoSaveEnabled, recordOwnServerWrite } = useSchedulingData();
   const [solverRunError, setSolverRunError] = useState<string | null>(null);
+  // Cross-user shared schedule: newest solver result published by any live user.
+  const sharedScheduleMeta = useSharedScheduleMeta();
+  // Highest shared revision already reflected on this page (applied or authored).
+  const appliedSharedRevisionRef = useRef(0);
+  // Adopt the current shared revision as baseline on first poll so we only react
+  // to runs that happen while this user is live (avoids clobbering on open).
+  const sharedInitializedRef = useRef(false);
+  // True while the current view came from History (protect it from auto-sync).
+  const historyViewActiveRef = useRef(false);
+  // Signature of the assignment map at the last successful "Save to History".
+  // Used to tell whether the current iteration is unsaved before a re-run.
+  const [lastHistorySavedSignature, setLastHistorySavedSignature] = useState<string | null>(null);
+  // Pending shared schedule from another user awaiting the user's decision
+  // (shown when auto-applying would discard local edits or a history view).
+  const [incomingShared, setIncomingShared] = useState<{
+    revision: number;
+    ranBy: string | null;
+  } | null>(null);
+  // Run Solver confirmation prompt (warns about unsaved iteration + save option).
+  const [runSolverPrompt, setRunSolverPrompt] = useState<{
+    hasUnsavedIteration: boolean;
+  } | null>(null);
   const [calendarContextMenu, setCalendarContextMenu] = useState<{
     clientX: number;
     clientY: number;
@@ -1321,6 +1365,125 @@ type PatternDayApplyRow = {
     setDragFeedbackToastMount(document.body);
   }, []);
 
+  // Rebuild the full calendar view (data, assignments, locks, undo/redo) from a
+  // solver-run snapshot. Shared by the localStorage hydration path and the
+  // cross-user shared-schedule sync so both stay identical.
+  const applyRunSnapshot = useCallback((parsed: LastSolverRun) => {
+    // Prefer the latest editor draft for `slot_type` so UI updates
+    // (short vs long blocks) reflect immediately without rerunning solver.
+    let slotTypeByTimeslotId = new Map<string, string>();
+    try {
+      const draftRaw = localStorage.getItem("wsom-scheduling-data");
+      if (draftRaw) {
+        const draft = JSON.parse(draftRaw) as Partial<SchedulingInput>;
+        const draftSlots = (draft?.timeslots ?? []) as Array<{ id: string; slot_type?: string }>;
+        slotTypeByTimeslotId = new Map(
+          draftSlots
+            .filter((t) => !!t?.id && typeof t.slot_type === "string" && t.slot_type.trim())
+            .map((t) => [String(t.id), String(t.slot_type)]),
+        );
+      }
+    } catch {
+      // Ignore malformed local draft payload.
+    }
+    const assignmentBySectionId = new Map(
+      parsed.solution.assignments.map((assignment) => [assignment.section_id, assignment]),
+    );
+    const allTimeslotIdsBySection = Object.fromEntries(
+      parsed.solution.assignments.map((assignment) => [
+        assignment.section_id,
+        assignment.timeslot_ids,
+      ]),
+    );
+    const nextAssignments = Object.fromEntries(
+      parsed.solution.assignments.map((assignment) => [
+        assignment.section_id,
+        {
+          timeslot_ids: assignment.timeslot_ids,
+          room_id: assignment.room_id,
+          meeting_pattern_id: assignment.meeting_pattern_id,
+        },
+      ]),
+    );
+
+    const sectionsFromSolver = parsed.input.sections.map((section) => {
+      const assignment = assignmentBySectionId.get(section.id);
+      return {
+        id: section.id,
+        course_id: section.course_id,
+        department: section.department ?? "",
+        section_code: section.section_code,
+        instructor_id: section.instructor_id,
+        expected_enrollment: section.expected_enrollment,
+        enrollment_cap: section.enrollment_cap,
+        allowed_meeting_patterns: section.allowed_meeting_patterns ?? [],
+        previous_meeting_pattern:
+          assignment?.meeting_pattern_id ?? section.previous_meeting_pattern ?? null,
+        room_requirements: section.room_requirements ?? [],
+        crosslist_group_id: section.crosslist_group_id ?? null,
+        tags: section.tags ?? [],
+        state: section.state ?? "active",
+        room_id: assignment?.room_id ?? null,
+        // Legacy field retained for compatibility with existing rendering.
+        timeslot_id: assignment?.timeslot_ids?.[0] ?? null,
+      };
+    });
+
+    const timeslotsFromSolver = parsed.input.timeslots.map((timeslot) => ({
+      id: timeslot.id,
+      day: timeslot.day,
+      start_time: timeslot.start_time,
+      end_time: timeslot.end_time,
+      slot_type: slotTypeByTimeslotId.get(timeslot.id) ?? timeslot.slot_type ?? "standard",
+    }));
+
+    const instructorsFromSolver = parsed.input.instructors.map((instructor) => {
+      const prefs = (instructor.preferences ?? {}) as {
+        preferred_times?: string[];
+        preferred_days?: string[];
+        preferred_patterns?: string[];
+        max_teaching_days?: number;
+        unavailable_times?: string[];
+      };
+      return {
+        id: instructor.id,
+        name: instructor.name || instructor.id,
+        rank_type: instructor.rank_type,
+        unavailable_times: instructor.unavailable_times ?? prefs.unavailable_times ?? [],
+        max_teaching_days: prefs.max_teaching_days,
+        preferences: {
+          unavailable_times: prefs.unavailable_times ?? [],
+          preferred_times: prefs.preferred_times ?? [],
+          preferred_days: prefs.preferred_days ?? [],
+          preferred_patterns: prefs.preferred_patterns ?? [],
+          max_teaching_days: prefs.max_teaching_days,
+        },
+      };
+    });
+    const roomsFromSolver = parsed.input.rooms.map((room) => ({
+      id: room.id,
+      building: room.building,
+      room_number: room.room_number,
+      capacity: room.capacity,
+    }));
+
+    setSolverInput(parsed.input);
+    setAssignmentsBySection(nextAssignments);
+    setBaselineAssignments(nextAssignments);
+    setSolverTimeslotIdsBySection(allTimeslotIdsBySection);
+    setLockedSectionIds(Array.isArray(parsed.lockedSectionIds) ? parsed.lockedSectionIds : []);
+    setUndoStack([]);
+    undoStackRef.current = [];
+    setRedoStack([]);
+    redoStackRef.current = [];
+    setData({
+      sections: sectionsFromSolver,
+      timeslots: timeslotsFromSolver,
+      instructors: instructorsFromSolver,
+      rooms: roomsFromSolver,
+    });
+  }, []);
+
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -1330,127 +1493,30 @@ type PatternDayApplyRow = {
           if (raw) {
             try {
               const parsed = JSON.parse(raw) as LastSolverRun;
-              // Prefer the latest editor draft for `slot_type` so UI updates
-              // (short vs long blocks) reflect immediately without rerunning solver.
-              let slotTypeByTimeslotId = new Map<string, string>();
-              try {
-                const draftRaw = localStorage.getItem("wsom-scheduling-data");
-                if (draftRaw) {
-                  const draft = JSON.parse(draftRaw) as Partial<SchedulingInput>;
-                  const draftSlots = (draft?.timeslots ?? []) as Array<{ id: string; slot_type?: string }>;
-                  slotTypeByTimeslotId = new Map(
-                    draftSlots
-                      .filter((t) => !!t?.id && typeof t.slot_type === "string" && t.slot_type.trim())
-                      .map((t) => [String(t.id), String(t.slot_type)]),
-                  );
-                }
-              } catch {
-                // Ignore malformed local draft payload.
-              }
-              const assignmentBySectionId = new Map(
-                parsed.solution.assignments.map((assignment) => [
-                  assignment.section_id,
-                  assignment,
-                ]),
-              );
-              const allTimeslotIdsBySection = Object.fromEntries(
-                parsed.solution.assignments.map((assignment) => [
-                  assignment.section_id,
-                  assignment.timeslot_ids,
-                ]),
-              );
-              const nextAssignments = Object.fromEntries(
-                parsed.solution.assignments.map((assignment) => [
-                  assignment.section_id,
-                  {
-                    timeslot_ids: assignment.timeslot_ids,
-                    room_id: assignment.room_id,
-                    meeting_pattern_id: assignment.meeting_pattern_id,
-                  },
-                ]),
-              );
-
-              const sectionsFromSolver = parsed.input.sections.map((section) => {
-                const assignment = assignmentBySectionId.get(section.id);
-                return {
-                  id: section.id,
-                  course_id: section.course_id,
-                  department: section.department ?? "",
-                  section_code: section.section_code,
-                  instructor_id: section.instructor_id,
-                  expected_enrollment: section.expected_enrollment,
-                  enrollment_cap: section.enrollment_cap,
-                  allowed_meeting_patterns: section.allowed_meeting_patterns ?? [],
-                  previous_meeting_pattern:
-                    assignment?.meeting_pattern_id ?? section.previous_meeting_pattern ?? null,
-                  room_requirements: section.room_requirements ?? [],
-                  crosslist_group_id: section.crosslist_group_id ?? null,
-                  tags: section.tags ?? [],
-                  state: section.state ?? "active",
-                  room_id: assignment?.room_id ?? null,
-                  // Legacy field retained for compatibility with existing rendering.
-                  timeslot_id: assignment?.timeslot_ids?.[0] ?? null,
-                };
-              });
-
-              const timeslotsFromSolver = parsed.input.timeslots.map((timeslot) => ({
-                id: timeslot.id,
-                day: timeslot.day,
-                start_time: timeslot.start_time,
-                end_time: timeslot.end_time,
-                slot_type: slotTypeByTimeslotId.get(timeslot.id) ?? timeslot.slot_type ?? "standard",
-              }));
-
-              const instructorsFromSolver = parsed.input.instructors.map(
-                (instructor) => {
-                  const prefs = (instructor.preferences ?? {}) as {
-                    preferred_times?: string[];
-                    preferred_days?: string[];
-                    preferred_patterns?: string[];
-                    max_teaching_days?: number;
-                    unavailable_times?: string[];
-                  };
-                  return {
-                    id: instructor.id,
-                    name: instructor.name || instructor.id,
-                    rank_type: instructor.rank_type,
-                    unavailable_times: instructor.unavailable_times ?? prefs.unavailable_times ?? [],
-                    max_teaching_days: prefs.max_teaching_days,
-                    preferences: {
-                      unavailable_times: prefs.unavailable_times ?? [],
-                      preferred_times: prefs.preferred_times ?? [],
-                      preferred_days: prefs.preferred_days ?? [],
-                      preferred_patterns: prefs.preferred_patterns ?? [],
-                      max_teaching_days: prefs.max_teaching_days,
-                    },
-                  };
-                },
-              );
-              const roomsFromSolver = parsed.input.rooms.map((room) => ({
-                id: room.id,
-                building: room.building,
-                room_number: room.room_number,
-                capacity: room.capacity,
-              }));
-
               if (mounted) {
-                setSolverInput(parsed.input);
-                setAssignmentsBySection(nextAssignments);
-                setBaselineAssignments(nextAssignments);
-                setSolverTimeslotIdsBySection(allTimeslotIdsBySection);
-                setLockedSectionIds(
-                  Array.isArray(parsed.lockedSectionIds) ? parsed.lockedSectionIds : [],
-                );
-                setUndoStack([]);
-                undoStackRef.current = [];
-                setRedoStack([]);
-                redoStackRef.current = [];
-                setData({
-                  sections: sectionsFromSolver,
-                  timeslots: timeslotsFromSolver,
-                  instructors: instructorsFromSolver,
-                  rooms: roomsFromSolver,
-                });
+                // Remember which shared revision this local snapshot corresponds
+                // to (if it came from a shared run) so we don't re-apply our own.
+                if (typeof sessionStorage !== "undefined") {
+                  const fromHistory = sessionStorage.getItem(VIEW_FROM_HISTORY_KEY) === "1";
+                  historyViewActiveRef.current = fromHistory;
+                  sessionStorage.removeItem(VIEW_FROM_HISTORY_KEY);
+                }
+                applyRunSnapshot(parsed);
+                if (historyViewActiveRef.current) {
+                  const sig = assignmentsSignature(
+                    Object.fromEntries(
+                      parsed.solution.assignments.map((assignment) => [
+                        assignment.section_id,
+                        {
+                          timeslot_ids: assignment.timeslot_ids,
+                          room_id: assignment.room_id,
+                          meeting_pattern_id: assignment.meeting_pattern_id,
+                        },
+                      ]),
+                    ),
+                  );
+                  setLastHistorySavedSignature(sig);
+                }
                 return;
               }
             } catch {
@@ -1497,7 +1563,31 @@ type PatternDayApplyRow = {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [applyRunSnapshot]);
+
+  // Pull the newest shared schedule from the server and apply it to this page.
+  const applySharedSnapshot = useCallback(async (): Promise<boolean> => {
+    const full = await fetchSharedScheduleFull();
+    if (!full || !full.snapshot) return false;
+    const snapshot = full.snapshot as unknown as LastSolverRun;
+    applyRunSnapshot(snapshot);
+    try {
+      localStorage.setItem(LAST_SOLVER_RUN_STORAGE_KEY, JSON.stringify(snapshot));
+    } catch {
+      // best-effort persistence
+    }
+    appliedSharedRevisionRef.current = full.revision;
+    historyViewActiveRef.current = false;
+    setLastHistorySavedSignature(null);
+    setIncomingShared(null);
+    setDragFeedback({
+      status: "valid",
+      message: full.ranBy
+        ? `Schedule from ${full.ranBy} applied.`
+        : "A new shared schedule was applied.",
+    });
+    return true;
+  }, [applyRunSnapshot]);
 
   const timeslotById = useMemo(() => {
     const map = new Map<string, TimeslotDto>();
@@ -2363,6 +2453,35 @@ type PatternDayApplyRow = {
     return changed && saveableStatus;
   }, [assignmentsBySection, baselineAssignments, dragFeedback.status]);
 
+  // React to solver runs published by other live users. On first poll we adopt
+  // the current revision as a baseline so we only react to runs that happen
+  // while this user is present. Newer revisions auto-apply when the page is
+  // clean, or surface an "apply" banner if that would discard local edits or a
+  // schedule the user pulled from history.
+  useEffect(() => {
+    const rev = sharedScheduleMeta.revision;
+    if (!sharedInitializedRef.current) {
+      sharedInitializedRef.current = true;
+      appliedSharedRevisionRef.current = rev;
+      return;
+    }
+    if (rev <= 0 || rev <= appliedSharedRevisionRef.current) return;
+    // Our own in-flight run will set the applied revision on success.
+    if (solverRunStatus === "loading") return;
+    const clean = !hasValidUnsavedEdit && !historyViewActiveRef.current;
+    if (clean) {
+      void applySharedSnapshot();
+    } else {
+      setIncomingShared({ revision: rev, ranBy: sharedScheduleMeta.ranBy });
+    }
+  }, [
+    sharedScheduleMeta.revision,
+    sharedScheduleMeta.ranBy,
+    solverRunStatus,
+    hasValidUnsavedEdit,
+    applySharedSnapshot,
+  ]);
+
   // Per-day (start,end) times a section currently meets, keyed by weekday. Used for
   // the staggered indicator and the pre-lock summary.
   const sectionDayTimes = useCallback(
@@ -2655,7 +2774,7 @@ type PatternDayApplyRow = {
     };
   }, [calendarContextMenu]);
 
-  const handleRunSolverFromCalendar = useCallback(async () => {
+  const runSolverNow = useCallback(async () => {
     if (solverBusyRemote) {
       setSolverRunError(
         solverLock.startedBy
@@ -2664,15 +2783,10 @@ type PatternDayApplyRow = {
       );
       return;
     }
+    // Persist unsaved calendar edits to the backend first so the solver runs
+    // against what the user currently sees.
     if (hasValidUnsavedEdit && !autoSaveEnabled) {
-      if (typeof window !== "undefined") {
-        const choice = window.confirm(
-          "You have unsaved calendar edits. Save them to the backend before running the solver?\n\nOK = save first, Cancel = run without saving.",
-        );
-        if (choice) {
-          await updateBackendRef.current(true);
-        }
-      }
+      await updateBackendRef.current(true);
     }
     setSolverRunError(null);
     setSolverRunStatus("loading");
@@ -2739,6 +2853,7 @@ type PatternDayApplyRow = {
         status?: string;
         errors?: { message?: string }[];
         diagnostics?: unknown;
+        shared_revision?: number;
       };
       if (response.status === 409) {
         const busyMsg =
@@ -2776,6 +2891,15 @@ type PatternDayApplyRow = {
       setBaselineAssignments(nextAssignments);
       setSolverTimeslotIdsBySection(allTimeslotIdsBySection);
       updateLastRunStorage(nextInput, nextAssignments, lockedSectionIds);
+      // This run is the newest shared schedule; adopt its revision so the sync
+      // effect doesn't treat our own result as an incoming change, and mark the
+      // fresh iteration as not-yet-saved to history.
+      if (typeof result.shared_revision === "number") {
+        appliedSharedRevisionRef.current = result.shared_revision;
+      }
+      historyViewActiveRef.current = false;
+      setLastHistorySavedSignature(null);
+      setIncomingShared(null);
       if (data) {
         setData({
           ...data,
@@ -2823,6 +2947,32 @@ type PatternDayApplyRow = {
     solverInput,
     updateLastRunStorage,
   ]);
+
+  // Whether the current calendar is a schedule iteration not yet saved to
+  // History (either a fresh solver result or manual edits since the last save).
+  const hasUnsavedIteration = useMemo(() => {
+    if (Object.keys(assignmentsBySection).length === 0) return false;
+    return lastHistorySavedSignature !== assignmentsSignature(assignmentsBySection);
+  }, [assignmentsBySection, lastHistorySavedSignature]);
+
+  // Entry point for the Run Solver button. Gates on the remote lock and, when
+  // the current schedule hasn't been saved to History, warns first (with the
+  // option to save) so a re-run doesn't quietly discard it — for everyone.
+  const handleRunSolverFromCalendar = useCallback(() => {
+    if (solverBusyRemote) {
+      setSolverRunError(
+        solverLock.startedBy
+          ? `The solver is currently running (started by ${solverLock.startedBy}). Please wait for it to finish.`
+          : "The solver is currently running. Please wait for it to finish.",
+      );
+      return;
+    }
+    if (hasUnsavedIteration) {
+      setRunSolverPrompt({ hasUnsavedIteration: true });
+      return;
+    }
+    void runSolverNow();
+  }, [solverBusyRemote, solverLock.startedBy, hasUnsavedIteration, runSolverNow]);
 
   const dayTimeslotBoundaries = useMemo(() => {
     if (!data) return [];
@@ -3985,6 +4135,8 @@ type PatternDayApplyRow = {
           JSON.stringify(snapshot),
         );
       }
+      // The current iteration is now saved, so a re-run won't be flagged unsaved.
+      setLastHistorySavedSignature(assignmentsSignature(assignmentsBySection));
       setSaveScheduleModal((prev) => ({ ...prev, isOpen: false, isSaving: false, error: null }));
       setBackendSaveMessage({
         type: "success",
@@ -3997,7 +4149,7 @@ type PatternDayApplyRow = {
         error: e instanceof Error ? e.message : "Failed to save schedule history.",
       }));
     }
-  }, [buildSnapshotFromCurrentView, saveScheduleModal.draft.name, saveScheduleModal.draft.scheduleDate, user?.name]);
+  }, [assignmentsBySection, buildSnapshotFromCurrentView, saveScheduleModal.draft.name, saveScheduleModal.draft.scheduleDate, user?.name]);
 
   if (error) {
     return (
@@ -4203,6 +4355,38 @@ type PatternDayApplyRow = {
       {solverRunError && (
         <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-800">
           {solverRunError}
+        </div>
+      )}
+
+      {incomingShared && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-2.5">
+          <p className="text-sm text-sky-950">
+            <span className="font-semibold">
+              {incomingShared.ranBy
+                ? `${incomingShared.ranBy} ran the solver.`
+                : "A new schedule is available."}
+            </span>{" "}
+            Applying it will replace the schedule currently on your screen.
+          </p>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                appliedSharedRevisionRef.current = incomingShared.revision;
+                setIncomingShared(null);
+              }}
+              className="rounded-md border border-sky-200 bg-white px-3 py-1.5 text-xs font-semibold text-sky-900 transition-colors hover:bg-sky-100"
+            >
+              Keep mine
+            </button>
+            <button
+              type="button"
+              onClick={() => void applySharedSnapshot()}
+              className="rounded-md bg-[#137fec] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#0f6dca]"
+            >
+              Apply new schedule
+            </button>
+          </div>
         </div>
       )}
 
@@ -5375,6 +5559,76 @@ type PatternDayApplyRow = {
                   onClick={() => void handleSaveScheduleToHistory()}
                 >
                   {saveScheduleModal.isSaving ? "Saving..." : "Save to History"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </ViewportModal>
+
+      <ViewportModal
+        isOpen={Boolean(runSolverPrompt)}
+        onClose={() => setRunSolverPrompt(null)}
+        zIndex={1000}
+      >
+        {runSolverPrompt ? (
+          <div
+            className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="run-solver-prompt-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <h3 id="run-solver-prompt-title" className="text-lg font-black text-slate-900">
+                Run the solver?
+              </h3>
+              <button
+                type="button"
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                onClick={() => setRunSolverPrompt(null)}
+              >
+                Close
+              </button>
+            </div>
+            <div className="space-y-4 px-6 py-5 text-sm text-slate-700">
+              <p>
+                The current schedule on your calendar{" "}
+                <span className="font-semibold">hasn&apos;t been saved to History.</span> Running
+                the solver will re-optimize the schedule and replace it —{" "}
+                <span className="font-semibold">for everyone viewing the calendar.</span>
+              </p>
+              <p className="text-slate-500">
+                Save it to History first if you want to keep this version to reload or compare
+                later.
+              </p>
+              <div className="flex flex-wrap justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                  onClick={() => setRunSolverPrompt(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-bold text-indigo-800 hover:bg-indigo-100"
+                  onClick={() => {
+                    setRunSolverPrompt(null);
+                    openSaveScheduleModal();
+                  }}
+                >
+                  Save to History
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg bg-[#137fec] px-3 py-2 text-sm font-bold text-white hover:bg-[#0f6dca]"
+                  onClick={() => {
+                    setRunSolverPrompt(null);
+                    void runSolverNow();
+                  }}
+                >
+                  Run without saving
                 </button>
               </div>
             </div>
