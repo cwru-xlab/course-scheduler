@@ -26,6 +26,7 @@ type CrosslistCalendarEventCardProps = {
   hasDragMoved: boolean;
   placementLocked: boolean;
   draggable: boolean;
+  isConflicting?: boolean;
   style: {
     left: string;
     width: string;
@@ -117,6 +118,7 @@ export function CrosslistCalendarEventCard({
   hasDragMoved,
   placementLocked,
   draggable,
+  isConflicting = false,
   style,
   instructorById,
   onContextMenu,
@@ -148,6 +150,7 @@ export function CrosslistCalendarEventCard({
           isDragSource && hasDragMoved && "opacity-[0.12] pointer-events-none",
           !matchesHoveredDepartment && "opacity-35",
           matchesHoveredDepartment && "ring-2 ring-slate-300/80 shadow-md",
+          isConflicting && "ring-2 ring-red-500 ring-offset-1 shadow-md",
         )}
         style={{
           height: style.height,

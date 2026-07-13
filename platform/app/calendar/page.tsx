@@ -31,17 +31,22 @@ import {
 import { CrosslistCalendarEventCard, CrosslistLegendSwatch } from "./CrosslistCalendarEventCard";
 import {
   assignCalendarEventLanes,
-  calendarEventConflictsWithSectionIds,
-  calendarEventDisplayLabel,
+  calendarEventInstructorIds,
+  calendarEventSectionIds,
   calendarEventMatchesFilters,
   findCalendarEventBySectionId,
   getCalendarEventKey,
-  getCalendarEventRoomId,
   isCrosslistGroupEvent,
   mergeCrosslistCalendarEvents,
   type CalendarEvent,
   type RawCalendarEvent,
 } from "./calendarEvents";
+import {
+  evaluatePlacement as evaluatePlacementShared,
+  minutesOverlap,
+  type PlacementEvaluation,
+  type PlacementSeverity,
+} from "./placementValidation";
 import type {
   BlockedTime,
   LockedAssignment,
@@ -166,14 +171,6 @@ type CalendarAssignmentMap = Record<
   { timeslot_ids: string[]; room_id: string; meeting_pattern_id: string }
 >;
 
-type PlacementEvaluationCode = "blocked" | "capacity" | "conflict" | "other";
-
-type PlacementEvaluation = {
-  isValid: boolean;
-  message: string;
-  reasonCode?: PlacementEvaluationCode;
-};
-
 type BlockedRuleMatch = {
   matches: boolean;
   label: string;
@@ -185,18 +182,6 @@ function crosslistPeerSectionIds(sectionId: string, sections: SectionDto[]): str
   if (!gid) return [sectionId];
   const peers = sections.filter((s) => s.crosslist_group_id === gid).map((s) => s.id);
   return peers.length ? peers : [sectionId];
-}
-
-/** Cross-listed sections share one room; capacity need is the max member cap (not the sum). */
-function requiredSeatsForLinkedSections(
-  linkedSectionIds: string[],
-  sections: SectionDto[],
-): number {
-  return linkedSectionIds.reduce((maxSeats, linkedSectionId) => {
-    const linkedSection = sections.find((section) => section.id === linkedSectionId);
-    const seats = linkedSection?.enrollment_cap ?? linkedSection?.expected_enrollment ?? 0;
-    return Math.max(maxSeats, seats);
-  }, 0);
 }
 
 function mergePlacementLocks(
@@ -903,9 +888,52 @@ function CalendarHistoryNavbarPortal({
 }
 
 type CalendarDragFeedbackState = {
-  status: "neutral" | "valid" | "invalid";
+  status: "neutral" | "valid" | "warning" | "invalid";
   message: string | null;
 };
+
+/**
+ * Scans a single day's rendered events for conflicts — two events that overlap in
+ * time while sharing the same room (double-booking) or the same instructor
+ * (double-teaching). Cross-list groups are already merged into one event, so their
+ * members never conflict with each other. Used to re-surface conflicts after
+ * undo/redo, when there's no active drag to compute them.
+ */
+function computeCalendarDayConflicts(events: CalendarEvent[]): {
+  sectionIds: Set<string>;
+  hasRoomConflict: boolean;
+  hasInstructorConflict: boolean;
+} {
+  const sectionIds = new Set<string>();
+  let hasRoomConflict = false;
+  let hasInstructorConflict = false;
+
+  for (let i = 0; i < events.length; i += 1) {
+    for (let j = i + 1; j < events.length; j += 1) {
+      const a = events[i];
+      const b = events[j];
+      const overlaps = a.start < b.end && a.end > b.start;
+      if (!overlaps) continue;
+
+      const roomA = a.section.room_id ?? "";
+      const roomB = b.section.room_id ?? "";
+      const sameRoom = Boolean(roomA) && roomA === roomB;
+
+      const instructorsA = new Set(calendarEventInstructorIds(a));
+      const sharedInstructor = calendarEventInstructorIds(b).some((id) =>
+        instructorsA.has(id),
+      );
+
+      if (!sameRoom && !sharedInstructor) continue;
+      if (sameRoom) hasRoomConflict = true;
+      if (sharedInstructor) hasInstructorConflict = true;
+      for (const id of calendarEventSectionIds(a)) sectionIds.add(id);
+      for (const id of calendarEventSectionIds(b)) sectionIds.add(id);
+    }
+  }
+
+  return { sectionIds, hasRoomConflict, hasInstructorConflict };
+}
 
 /** Fixed below the navbar so valid/invalid drag messages stay visible while the calendar scrolls. */
 function CalendarDragFeedbackToastPortal({
@@ -922,6 +950,7 @@ function CalendarDragFeedbackToastPortal({
   if (!mountedOn) return null;
   const line = dragFeedback.message ?? dragError;
   const isError = !!dragError || dragFeedback.status === "invalid";
+  const isWarning = !dragError && dragFeedback.status === "warning";
   const isValid = !dragError && dragFeedback.status === "valid";
   const toastKey = `${dragFeedback.status}\u001f${dragError ?? ""}\u001f${dragFeedback.message ?? ""}`;
 
@@ -943,9 +972,12 @@ function CalendarDragFeedbackToastPortal({
               "pointer-events-auto flex w-full max-w-3xl items-start gap-2 rounded-xl border px-4 py-3 text-sm font-medium shadow-lg backdrop-blur-md",
               isError &&
                 "border-red-200 bg-red-50/95 text-red-800 dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-200",
+              isWarning &&
+                "border-amber-200 bg-amber-50/95 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-100",
               isValid &&
                 "border-emerald-200 bg-emerald-50/95 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-100",
               !isError &&
+                !isWarning &&
                 !isValid &&
                 "border-slate-200 bg-white/95 text-slate-800 dark:border-default-200 dark:bg-default-100/95 dark:text-foreground",
             )}
@@ -957,9 +989,12 @@ function CalendarDragFeedbackToastPortal({
                 "shrink-0 rounded-md p-0.5",
                 isError &&
                   "text-red-700/80 hover:bg-red-100/80 hover:text-red-900 dark:text-red-200 dark:hover:bg-red-500/20",
+                isWarning &&
+                  "text-amber-700/80 hover:bg-amber-100/80 hover:text-amber-900 dark:text-amber-200 dark:hover:bg-amber-500/20",
                 isValid &&
                   "text-emerald-700/80 hover:bg-emerald-100/80 hover:text-emerald-900 dark:text-emerald-200 dark:hover:bg-emerald-500/20",
                 !isError &&
+                  !isWarning &&
                   !isValid &&
                   "text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-default-400 dark:hover:bg-default-200/40",
               )}
@@ -1049,16 +1084,24 @@ export default function CalendarPage() {
   const [redoStack, setRedoStack] = useState<UndoSnapshot[]>([]);
   const redoStackRef = useRef<UndoSnapshot[]>([]);
   const [dragError, setDragError] = useState<string | null>(null);
+  // Section ids to visually flag after a placement creates a conflict (instructor
+  // double-booking or room overlap) so the user can spot both sides of the clash.
+  const [conflictSectionIds, setConflictSectionIds] = useState<Set<string>>(() => new Set());
+  // Bumped after undo/redo to request a full day conflict re-scan (no active drag
+  // computes conflicts in that case). Paired with a ref so unrelated day/event
+  // changes don't trigger the scan.
+  const conflictRescanRef = useRef(false);
+  const [conflictRescanNonce, setConflictRescanNonce] = useState(0);
   const [scheduleDrawerOpen, setScheduleDrawerOpen] = useState<boolean>(false);
   // Mount/enter states drive a smooth slide: `drawerRender` keeps the panel in the
   // DOM through the exit animation; `drawerEntered` toggles the transform.
   const [drawerRender, setDrawerRender] = useState<boolean>(false);
   const [drawerEntered, setDrawerEntered] = useState<boolean>(false);
   const [drawerSearch, setDrawerSearch] = useState<string>("");
-  const [dragFeedback, setDragFeedback] = useState<{
-    status: "neutral" | "valid" | "invalid";
-    message: string | null;
-  }>({ status: "neutral", message: null });
+  const [dragFeedback, setDragFeedback] = useState<CalendarDragFeedbackState>({
+    status: "neutral",
+    message: null,
+  });
   /** Pointer-driven drag: no HTML5 ghost; block snaps on the grid. */
   type CalendarDragPreview = {
     targetRoomId: string;
@@ -1081,6 +1124,7 @@ export default function CalendarPage() {
     startMin: number;
     endMin: number;
     isValid: boolean;
+    severity: PlacementSeverity;
     message: string | null;
   };
 type MeetingPatternPlacementOption = {
@@ -1433,14 +1477,17 @@ type MeetingPatternPlacementOption = {
         selectedSlotMap.set(slotId, slot);
       }
 
+      // Shared overlap primitive so drag, click, and pattern paths agree on what
+      // "overlapping times" means.
       const slotOverlaps = (a: TimeslotDto, b: TimeslotDto): boolean => {
         const days = DAYS.filter((day) => timeslotMatchesDay(a, day) && timeslotMatchesDay(b, day));
         if (days.length === 0) return false;
-        const aStart = parseMinutes(a.start_time);
-        const aEnd = parseMinutes(a.end_time);
-        const bStart = parseMinutes(b.start_time);
-        const bEnd = parseMinutes(b.end_time);
-        return aStart < bEnd && aEnd > bStart;
+        return minutesOverlap(
+          parseMinutes(a.start_time),
+          parseMinutes(a.end_time),
+          parseMinutes(b.start_time),
+          parseMinutes(b.end_time),
+        );
       };
 
       for (const linkedSectionId of linkedSectionIds) {
@@ -2042,9 +2089,11 @@ type MeetingPatternPlacementOption = {
     setUndoStack(nextStack);
     setAssignmentsBySection(snapshot.assignmentsBySection);
     setSolverTimeslotIdsBySection(snapshot.solverTimeslotIdsBySection);
-  // Per-move validation feedback is transient; recomputing it on undo avoids stale/confusing messages.
-  setDragFeedback({ status: "neutral", message: null });
-  setDragError(null);
+    // Re-scan the restored state so conflicts (and their highlights) reappear if
+    // undo/redo lands back on a conflicting layout.
+    setDragError(null);
+    conflictRescanRef.current = true;
+    setConflictRescanNonce((n) => n + 1);
     setBackendSaveMessage(snapshot.backendSaveMessage);
   }, [assignmentsBySection, backendSaveMessage, solverTimeslotIdsBySection, stateKeyForUndo]);
 
@@ -2069,8 +2118,9 @@ type MeetingPatternPlacementOption = {
 
     setAssignmentsBySection(snapshot.assignmentsBySection);
     setSolverTimeslotIdsBySection(snapshot.solverTimeslotIdsBySection);
-    setDragFeedback({ status: "neutral", message: null });
     setDragError(null);
+    conflictRescanRef.current = true;
+    setConflictRescanNonce((n) => n + 1);
     setBackendSaveMessage(snapshot.backendSaveMessage);
   }, [assignmentsBySection, backendSaveMessage, solverTimeslotIdsBySection, stateKeyForUndo]);
 
@@ -2115,7 +2165,11 @@ type MeetingPatternPlacementOption = {
     const changed =
       JSON.stringify(normalize(assignmentsBySection)) !==
       JSON.stringify(normalize(baselineAssignments));
-    return changed && dragFeedback.status === "valid";
+    // Warning placements (room overlap, instructor conflict) are saveable too —
+    // only hard blocks (which never apply the move) are excluded.
+    const saveableStatus =
+      dragFeedback.status === "valid" || dragFeedback.status === "warning";
+    return changed && saveableStatus;
   }, [assignmentsBySection, baselineAssignments, dragFeedback.status]);
 
   const isPlacementLocked = useCallback(
@@ -2242,6 +2296,37 @@ type MeetingPatternPlacementOption = {
       return haystack.includes(q);
     });
   }, [drawerSearch, tableSectionsFiltered, assignmentsBySection]);
+
+  useEffect(() => {
+    // Conflict highlights are computed for a specific day's layout; drop them when
+    // the visible day changes so stale flags don't linger.
+    setConflictSectionIds(new Set());
+  }, [selectedDay]);
+
+  useEffect(() => {
+    // Runs only when undo/redo requested a re-scan (guarded by the ref). Reads the
+    // freshly recomputed `allDayEvents` and re-surfaces any conflicts + highlights.
+    if (!conflictRescanRef.current) return;
+    conflictRescanRef.current = false;
+    const { sectionIds, hasRoomConflict, hasInstructorConflict } =
+      computeCalendarDayConflicts(allDayEvents);
+    if (sectionIds.size === 0) {
+      setConflictSectionIds(new Set());
+      setDragFeedback({ status: "neutral", message: null });
+      return;
+    }
+    setConflictSectionIds(sectionIds);
+    const kinds: string[] = [];
+    if (hasRoomConflict) kinds.push("room double-booking");
+    if (hasInstructorConflict) kinds.push("instructor double-booking");
+    setDragFeedback({
+      status: "invalid",
+      message: `Warning: ${sectionIds.size} section${sectionIds.size === 1 ? "" : "s"} on ${selectedDay} still ${sectionIds.size === 1 ? "has" : "have"} a ${kinds.join(" and ")} at overlapping times. Highlighted sections show the conflict.`,
+    });
+    // selectedDay intentionally omitted — this reacts to the undo/redo nonce and the
+    // recomputed events, not day switches (which clear highlights above).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conflictRescanNonce, allDayEvents]);
 
   useEffect(() => {
     if (scheduleDrawerOpen) {
@@ -2538,38 +2623,28 @@ type MeetingPatternPlacementOption = {
       const dragged = findCalendarEventBySectionId(allDayEvents, sectionId);
       if (!dragged || !dragged.timeslot) return;
       const linkedSectionIds = linkedSectionIdsBySection.get(sectionId) ?? [sectionId];
-      for (const linkedSectionId of linkedSectionIds) {
-        const blockedMessage = findBlockedPlacementMessage(
-          linkedSectionId,
-          targetRoomId,
-          selectedSlot,
-        );
-        if (blockedMessage) {
-          setDragFeedback({
-            status: "invalid",
-            message: blockedMessage,
-          });
-          return;
-        }
-      }
-      const linkedSectionIdSet = new Set(linkedSectionIds);
 
-      const currentAssignment = assignmentsBySection[sectionId];
-      const currentRoomId = currentAssignment?.room_id ?? dragged.section.room_id ?? "";
-      const targetRoom = data.rooms.find((room) => room.id === targetRoomId);
-      const requiredSeats = requiredSeatsForLinkedSections(linkedSectionIds, data.sections);
-      if (
-        targetRoomId !== currentRoomId &&
-        Number.isFinite(targetRoom?.capacity) &&
-        requiredSeats > (targetRoom?.capacity ?? 0)
-      ) {
-        setDragFeedback({
-          status: "invalid",
-          message: `Invalid: ${dragged.section.department ?? ""} ${dragged.section.course_id} requires ${requiredSeats} seats, but room ${targetRoomId} capacity is ${targetRoom?.capacity}.`,
-        });
+      // Single source of truth shared with the click-to-place path.
+      const evaluation = evaluatePlacementShared({
+        sectionId,
+        targetRoomId,
+        slot: selectedSlot,
+        selectedDay,
+        data,
+        assignmentsBySection,
+        allDayEvents,
+        linkedSectionIds,
+        instructorById,
+        findBlockedPlacementMessage,
+        formatTime: formatTimeAmPm,
+      });
+      // Blocked time and capacity are hard blocks — the move is not applied.
+      if (evaluation.severity === "block") {
+        setDragFeedback({ status: "invalid", message: evaluation.message });
         return;
       }
 
+      const currentAssignment = assignmentsBySection[sectionId];
       const currentTimeslotIds =
         currentAssignment?.timeslot_ids ??
         (dragged.section.timeslot_id ? [dragged.section.timeslot_id] : []);
@@ -2635,39 +2710,14 @@ type MeetingPatternPlacementOption = {
         ),
       }));
 
-      const selectedStart = selectedSlot.start;
-      const selectedEnd = selectedSlot.end;
-      const resolveEventRoomId = (eventItem: CalendarEvent) =>
-        getCalendarEventRoomId(
-          eventItem,
-          (memberId) =>
-            assignmentsBySection[memberId]?.room_id ??
-            data.sections.find((section) => section.id === memberId)?.room_id ??
-            "",
-        );
-
-      const conflicts = allDayEvents.filter((eventItem) => {
-        if (!calendarEventConflictsWithSectionIds(eventItem, linkedSectionIdSet)) return false;
-        const itemRoomId = resolveEventRoomId(eventItem);
-        if (itemRoomId !== targetRoomId) return false;
-        return selectedStart < eventItem.end && selectedEnd > eventItem.start;
-      });
-
-      if (conflicts.length > 0) {
-        const conflictNames = conflicts
-          .map((c) => calendarEventDisplayLabel(c))
-          .filter(Boolean)
-          .slice(0, 3)
-          .join(", ");
-        setDragFeedback({
-          status: "invalid",
-          message: `Invalid: ${calendarEventDisplayLabel(dragged)} conflicts with ${conflictNames || "another class"} in room ${targetRoomId} at ${formatTimeAmPm(selectedSlot.start_time)}-${formatTimeAmPm(selectedSlot.end_time)}.`,
-        });
+      // Warnings (room overlap, instructor double-booking) keep the applied move
+      // but flag the involved sections for review.
+      if (evaluation.severity === "warn") {
+        setConflictSectionIds(new Set(evaluation.conflictSectionIds));
+        setDragFeedback({ status: "warning", message: evaluation.message });
       } else {
-        setDragFeedback({
-          status: "valid",
-          message: `Valid: moved ${linkedSectionIds.length > 1 ? "cross-listed group" : "section"} to room ${targetRoomId}, ${selectedDay} ${formatTimeAmPm(selectedSlot.start_time)}-${formatTimeAmPm(selectedSlot.end_time)}. This change can be persisted.`,
-        });
+        setConflictSectionIds(new Set());
+        setDragFeedback({ status: "valid", message: evaluation.message });
         setDragError(null);
       }
     },
@@ -2676,8 +2726,7 @@ type MeetingPatternPlacementOption = {
       allDayEvents,
       backendSaveMessage,
       data,
-      dragError,
-      dragFeedback,
+      instructorById,
       linkedSectionIdsBySection,
       findBlockedPlacementMessage,
       selectedDay,
@@ -2808,68 +2857,36 @@ type MeetingPatternPlacementOption = {
   }, [activeCalendarDragPointerId]);
 
   const evaluatePlacement = useCallback(
-    (sectionId: string, targetRoomId: string, slot: TimeslotWithMinutes) => {
+    (sectionId: string, targetRoomId: string, slot: TimeslotWithMinutes): PlacementEvaluation => {
       if (!data) {
-        return { isValid: false, message: "Calendar data is unavailable.", reasonCode: "other" } as PlacementEvaluation;
-      }
-      const section = data.sections.find((s) => s.id === sectionId);
-      if (!section) {
-        return { isValid: false, message: "Section not found.", reasonCode: "other" } as PlacementEvaluation;
+        return {
+          severity: "block",
+          reasonCode: "missing_data",
+          message: "Calendar data is unavailable.",
+          conflictSectionIds: [],
+        };
       }
       const linkedSectionIds = linkedSectionIdsBySection.get(sectionId) ?? [sectionId];
-      for (const linkedSectionId of linkedSectionIds) {
-        const blockedMessage = findBlockedPlacementMessage(linkedSectionId, targetRoomId, slot);
-        if (blockedMessage) {
-          return { isValid: false, message: blockedMessage, reasonCode: "blocked" } as PlacementEvaluation;
-        }
-      }
-      const linkedSectionIdSet = new Set(linkedSectionIds);
-      const targetRoom = data.rooms.find((room) => room.id === targetRoomId);
-      const requiredSeats = requiredSeatsForLinkedSections(linkedSectionIds, data.sections);
-      if (
-        Number.isFinite(targetRoom?.capacity) &&
-        requiredSeats > (targetRoom?.capacity ?? 0)
-      ) {
-        return {
-          isValid: false,
-          message: `Invalid: ${section.department ?? ""} ${section.course_id} requires ${requiredSeats} seats, but room ${targetRoomId} capacity is ${targetRoom?.capacity}.`,
-          reasonCode: "capacity",
-        } as PlacementEvaluation;
-      }
-      const conflicts = allDayEvents.filter((eventItem) => {
-        if (!calendarEventConflictsWithSectionIds(eventItem, linkedSectionIdSet)) return false;
-        const itemRoomId = getCalendarEventRoomId(
-          eventItem,
-          (memberId) =>
-            assignmentsBySection[memberId]?.room_id ??
-            data.sections.find((section) => section.id === memberId)?.room_id ??
-            "",
-        );
-        if (itemRoomId !== targetRoomId) return false;
-        return slot.start < eventItem.end && slot.end > eventItem.start;
+      return evaluatePlacementShared({
+        sectionId,
+        targetRoomId,
+        slot,
+        selectedDay,
+        data,
+        assignmentsBySection,
+        allDayEvents,
+        linkedSectionIds,
+        instructorById,
+        findBlockedPlacementMessage,
+        formatTime: formatTimeAmPm,
       });
-      if (conflicts.length > 0) {
-        const conflictNames = conflicts
-          .map((c) => calendarEventDisplayLabel(c))
-          .filter(Boolean)
-          .slice(0, 3)
-          .join(", ");
-        return {
-          isValid: false,
-          message: `Invalid: conflicts with ${conflictNames || "another class"} in room ${targetRoomId} at ${formatTimeAmPm(slot.start_time)}-${formatTimeAmPm(slot.end_time)}.`,
-          reasonCode: "conflict",
-        } as PlacementEvaluation;
-      }
-      return {
-        isValid: true,
-        message: `Valid placement: room ${targetRoomId}, ${selectedDay} ${formatTimeAmPm(slot.start_time)}-${formatTimeAmPm(slot.end_time)}.`,
-      } as PlacementEvaluation;
     },
     [
       allDayEvents,
       assignmentsBySection,
       data,
       findBlockedPlacementMessage,
+      instructorById,
       linkedSectionIdsBySection,
       selectedDay,
     ],
@@ -2878,10 +2895,12 @@ type MeetingPatternPlacementOption = {
   const commitPlacementByClick = useCallback(
     (sectionId: string, targetRoomId: string, slot: TimeslotWithMinutes) => {
       const check = evaluatePlacement(sectionId, targetRoomId, slot);
-      if (!check.isValid) {
+      // Hard blocks (blocked time, capacity) never apply the move — matches drag.
+      if (check.severity === "block") {
         setDragFeedback({ status: "invalid", message: check.message });
         return;
       }
+      const isWarning = check.severity === "warn";
       const linkedSectionIds = linkedSectionIdsBySection.get(sectionId) ?? [sectionId];
       const needsPatternSelection = pendingPlacementSectionId === sectionId;
       const patternOptions = needsPatternSelection
@@ -2925,8 +2944,14 @@ type MeetingPatternPlacementOption = {
       }
       setPendingPlacementSectionId(null);
       setPlacementPreview(null);
+      // Warning placements are applied and highlighted (matches drag semantics).
+      if (isWarning && !needsPatternSelection) {
+        setConflictSectionIds(new Set(check.conflictSectionIds));
+      } else {
+        setConflictSectionIds(new Set());
+      }
       setDragFeedback({
-        status: "valid",
+        status: needsPatternSelection ? "valid" : isWarning ? "warning" : "valid",
         message: needsPatternSelection
           ? "Section placed. Choose a meeting pattern to map this section across its additional days."
           : check.message,
@@ -2937,13 +2962,19 @@ type MeetingPatternPlacementOption = {
               type: "success",
               text: "Section placed. Select a meeting pattern to finish multi-day mapping.",
             }
-          : {
-              type: "success",
-              text:
-                linkedSectionIds.length > 1
-                  ? "Cross-listed group placed on the calendar. Click Save to persist this placement."
-                  : "Section placed on the calendar. Click Save to persist this placement.",
-            },
+          : isWarning
+            ? {
+                type: "success",
+                text:
+                  "Placement applied with a conflict — highlighted sections show the overlap. You can still save this placement.",
+              }
+            : {
+                type: "success",
+                text:
+                  linkedSectionIds.length > 1
+                    ? "Cross-listed group placed on the calendar. Click Save to persist this placement."
+                    : "Section placed on the calendar. Click Save to persist this placement.",
+              },
       );
     },
     [
@@ -3336,6 +3367,7 @@ type MeetingPatternPlacementOption = {
         onDismiss={() => {
           setDragFeedback({ status: "neutral", message: null });
           setDragError(null);
+          setConflictSectionIds(new Set());
         }}
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -3738,16 +3770,23 @@ type MeetingPatternPlacementOption = {
                     const slot = selectAnySlotNearMinutes(data.timeslots, selectedDay, mins);
                     if (!slot) return;
                     const check = evaluatePlacement(pendingPlacementSectionId, room.id, slot);
+                    const canPlace = check.severity !== "block";
                     setPlacementPreview({
                       targetRoomId: room.id,
                       slotId: slot.id,
                       startMin: slot.start,
                       endMin: slot.end,
-                      isValid: check.isValid,
+                      isValid: canPlace,
+                      severity: check.severity,
                       message: check.message,
                     });
                     setDragFeedback({
-                      status: check.isValid ? "valid" : "invalid",
+                      status:
+                        check.severity === "block"
+                          ? "invalid"
+                          : check.severity === "warn"
+                            ? "warning"
+                            : "valid",
                       message: check.message,
                     });
                   }}
@@ -3923,12 +3962,18 @@ type MeetingPatternPlacementOption = {
                         (clamp(placementPreview.endMin, axisStart, axisEnd) -
                           clamp(placementPreview.startMin, axisStart, axisEnd)) /
                         axisRange;
-                      const bg = placementPreview.isValid
-                        ? "rgba(16, 185, 129, 0.16)"
-                        : "rgba(239, 68, 68, 0.16)";
-                      const border = placementPreview.isValid
-                        ? "rgba(5, 150, 105, 0.75)"
-                        : "rgba(220, 38, 38, 0.75)";
+                      const bg =
+                        placementPreview.severity === "warn"
+                          ? "rgba(245, 158, 11, 0.16)"
+                          : placementPreview.isValid
+                            ? "rgba(16, 185, 129, 0.16)"
+                            : "rgba(239, 68, 68, 0.16)";
+                      const border =
+                        placementPreview.severity === "warn"
+                          ? "rgba(217, 119, 6, 0.75)"
+                          : placementPreview.isValid
+                            ? "rgba(5, 150, 105, 0.75)"
+                            : "rgba(220, 38, 38, 0.75)";
                       const color =
                         departmentPaletteByKey.get(departmentColorKey(section)) ?? solidPaletteAt(0);
                       return (
@@ -3950,7 +3995,11 @@ type MeetingPatternPlacementOption = {
                             {(section.department ? `${section.department} ` : "") + section.course_id}
                           </div>
                           <div className="text-[8px] font-bold text-slate-700 uppercase">
-                            {placementPreview.isValid ? "Click to place" : "Cannot place here"}
+                            {placementPreview.isValid
+                              ? placementPreview.severity === "warn"
+                                ? "Click to place (conflict)"
+                                : "Click to place"
+                              : "Cannot place here"}
                           </div>
                         </div>
                       );
@@ -4003,6 +4052,7 @@ type MeetingPatternPlacementOption = {
                         const targetEl = e.currentTarget;
                         targetEl.setPointerCapture(e.pointerId);
                         setDragError(null);
+                        setConflictSectionIds(new Set());
                         setBackendSaveMessage(null);
                         setCalendarDrag({
                           sectionId: dragSectionId,
@@ -4109,6 +4159,9 @@ type MeetingPatternPlacementOption = {
                           hasDragMoved={Boolean(calendarDrag?.hasMoved)}
                           placementLocked={placementLocked}
                           draggable={Boolean(solverInput)}
+                          isConflicting={event.crosslistMembers.some((member) =>
+                            conflictSectionIds.has(member.id),
+                          )}
                           style={{
                             left: `${leftPct * 100}%`,
                             width: `${Math.max(widthPct * 100, 0.5)}%`,
@@ -4132,6 +4185,7 @@ type MeetingPatternPlacementOption = {
                     const inst = instructorById.get(section.instructor_id);
                     const professor = inst?.name ?? section.instructor_id ?? "—";
                     const title = section.department + " " + section.course_id;
+                    const isConflicting = conflictSectionIds.has(section.id);
 
                     return (
                       <div
@@ -4147,6 +4201,8 @@ type MeetingPatternPlacementOption = {
                           activeLegendDepartmentKeys.size > 0 &&
                             matchesHoveredDepartment &&
                             "ring-2 ring-slate-300/80 shadow-md",
+                          isConflicting &&
+                            "ring-2 ring-red-500 ring-offset-1 z-20 shadow-md",
                         )}
                         style={{
                           left: `${leftPct * 100}%`,
