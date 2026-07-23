@@ -17,7 +17,6 @@ import {
   Save,
   Share2,
   Shuffle,
-  Table2,
   Undo2,
   Unlock,
   X,
