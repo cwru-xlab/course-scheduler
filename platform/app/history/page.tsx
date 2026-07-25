@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Archive, CalendarDays, Download, FolderOpen, Pencil, Trash2 } from "lucide-react";
+import { Archive, CalendarDays, Download, FolderOpen, Pencil, Trash2, User } from "lucide-react";
 
 import {
   deleteSavedSchedule,
@@ -152,16 +152,29 @@ export default function HistoryPage() {
               className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
             >
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="space-y-1 min-w-0">
+                <div className="space-y-1.5 min-w-0">
                   <h2 className="text-lg font-bold text-slate-900 truncate">{item.name}</h2>
-                  <div className="text-xs text-slate-500">
-                    Term date: {item.scheduleDate} • Saved: {fmtDate(item.savedAt)}
-                    {item.savedBy ? (
-                      <>
-                        {" • "}Saved by:{" "}
-                        <span className="font-semibold text-slate-700">{item.savedBy}</span>
-                      </>
-                    ) : null}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                    <span>
+                      Term date:{" "}
+                      <span className="font-semibold text-slate-700">{item.scheduleDate}</span>
+                    </span>
+                    <span className="hidden sm:inline text-slate-300" aria-hidden>
+                      •
+                    </span>
+                    <span>
+                      Saved:{" "}
+                      <span className="font-semibold text-slate-700">{fmtDate(item.savedAt)}</span>
+                    </span>
+                  </div>
+                  <div className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700">
+                    <User className="size-3.5 shrink-0 text-slate-500" aria-hidden />
+                    <span>
+                      Saved by{" "}
+                      <span className="font-semibold text-slate-900">
+                        {item.savedBy?.trim() || "Unknown user"}
+                      </span>
+                    </span>
                   </div>
                   <div className="text-xs text-slate-600">
                     Assignments:{" "}

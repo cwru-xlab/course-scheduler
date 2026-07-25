@@ -78,12 +78,16 @@ export function LiveUsersIndicator() {
   const sendHeartbeat = useCallback(async (opts?: { leaving?: boolean }) => {
     if (!user) return;
     try {
+      const tabVisible =
+        typeof document !== "undefined"
+          ? document.visibilityState === "visible"
+          : true;
       const response = await fetch("/api/presence", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           lastActivityAt: lastActivityAtRef.current,
-          tabVisible: typeof document !== "undefined" ? !document.hidden : true,
+          tabVisible,
           leaving: opts?.leaving ?? false,
         }),
       });
@@ -144,10 +148,16 @@ export function LiveUsersIndicator() {
     }
 
     const onVisibility = () => {
-      // Debounce visibility changes to avoid flicker when quickly switching windows
       if (visibilityDebounceRef.current) {
         clearTimeout(visibilityDebounceRef.current);
+        visibilityDebounceRef.current = null;
       }
+      // Becoming visible again: report immediately so peers see "active" fast.
+      if (document.visibilityState === "visible") {
+        void sendHeartbeat();
+        return;
+      }
+      // Becoming hidden: debounce so brief alt-tabs don't flicker idle.
       visibilityDebounceRef.current = setTimeout(() => {
         void sendHeartbeat();
       }, VISIBILITY_DEBOUNCE_MS);
@@ -220,11 +230,11 @@ export function LiveUsersIndicator() {
           <p className="text-sm font-bold text-slate-900">Live now</p>
           <p className="text-xs text-slate-500 mt-0.5">
             <span className="inline-flex items-center gap-1">
-              <StatusDot status="active" /> Active
+              <StatusDot status="active" /> Active (viewing)
             </span>
             <span className="mx-1.5">·</span>
             <span className="inline-flex items-center gap-1">
-              <StatusDot status="idle" /> Idle / tab in background
+              <StatusDot status="idle" /> Idle (tab in background)
             </span>
           </p>
         </div>

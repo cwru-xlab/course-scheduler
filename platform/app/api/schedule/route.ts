@@ -5,10 +5,10 @@ import { verifyToken } from "@/lib/auth";
 import { mockSchedulingInput } from "@/lib/scheduling/mockData";
 import type { SchedulingInput } from "@/lib/scheduling/types";
 import {
-  acquireSolverLock,
-  readSolverLock,
-  releaseSolverLock,
-} from "@/lib/solver-lock";
+  beginSolverRun,
+  finishSession,
+  readSolverSession,
+} from "@/lib/solver-session";
 import { tryRecordActivity } from "@/lib/record-activity";
 import { fetchSolver, solverErrorsFromBody } from "@/lib/api/solverFetch";
 import { enrichSolverErrors, normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
@@ -34,8 +34,13 @@ export async function POST(request: NextRequest) {
   } catch {
     // best-effort attribution
   }
-  if (!acquireSolverLock(userLabel, userNetworkId)) {
-    const state = readSolverLock();
+
+  const started = beginSolverRun({
+    startedBy: userLabel,
+    startedByNetworkId: userNetworkId,
+  });
+  if (!started) {
+    const state = readSolverSession();
     return NextResponse.json(
       {
         status: "error",
@@ -51,20 +56,27 @@ export async function POST(request: NextRequest) {
       { status: 409 },
     );
   }
+
+  let finished = false;
+  const finish = (opts: Parameters<typeof finishSession>[0]) => {
+    if (finished) return;
+    finished = true;
+    finishSession(opts);
+  };
+
   try {
-    // Use request body if provided, otherwise fall back to mock data
     let input: SchedulingInput;
     let removeInstructors: string[] | undefined;
     try {
       const body = await request.json();
       input = body as SchedulingInput;
-      removeInstructors = (body as Record<string, unknown>).remove_instructors as string[] | undefined;
-      // Basic validation - check if it has the required fields
+      removeInstructors = (body as Record<string, unknown>).remove_instructors as
+        | string[]
+        | undefined;
       if (!input.sections || !input.rooms || !input.timeslots) {
         input = mockSchedulingInput;
       }
     } catch {
-      // If no body or invalid JSON, use mock data
       input = mockSchedulingInput;
     }
 
@@ -78,8 +90,20 @@ export async function POST(request: NextRequest) {
           ...(removeInstructors?.length ? { remove_instructors: removeInstructors } : {}),
         }),
       },
-      { timeoutMs: 150_000 },
+      { timeoutMs: 150_000, signal: started.signal },
     );
+
+    // If cancelled while waiting, do not publish or treat as success.
+    if (started.signal.aborted) {
+      finish({ status: "cancelled", progress: 0 });
+      return NextResponse.json(
+        {
+          status: "error",
+          errors: [{ code: "solver_cancelled", message: "Solver run was cancelled." }],
+        },
+        { status: 499 },
+      );
+    }
 
     if (!response.ok) {
       const errors = enrichSolverErrors(
@@ -88,6 +112,10 @@ export async function POST(request: NextRequest) {
           message: string;
         }>,
       );
+      finish({
+        status: "failed",
+        error: errors[0]?.message ?? "Solver returned an error.",
+      });
       return NextResponse.json(
         {
           status: "error",
@@ -105,6 +133,10 @@ export async function POST(request: NextRequest) {
           message: string;
         }>,
       );
+      finish({
+        status: "failed",
+        error: errors[0]?.message ?? "No feasible schedule found.",
+      });
       return NextResponse.json({
         status: "error",
         errors,
@@ -114,9 +146,6 @@ export async function POST(request: NextRequest) {
 
     await tryRecordActivity(request, "solver_run");
 
-    // Publish the result as the shared "latest schedule" so other live users can
-    // see it on their calendar. Skip hypothetical preview runs (e.g. the
-    // "Test without these instructors" retry) so they don't overwrite everyone.
     let sharedRevision: number | undefined;
     if (!removeInstructors?.length) {
       try {
@@ -144,27 +173,60 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    finish({ status: "completed", progress: 100 });
+
     return NextResponse.json(
       sharedRevision !== undefined ? { ...data, shared_revision: sharedRevision } : data,
     );
   } catch (error) {
-    const isTimeout = error instanceof DOMException && error.name === "AbortError";
-    const rawMessage = isTimeout
-      ? "Solver request timed out. Use Check Data in the editor to find row-level issues, or try again after relaxing constraints."
-      : error instanceof Error
-        ? error.message
-        : "Failed to reach scheduling service.";
-    const message = isTimeout ? rawMessage : normalizeNetworkError(rawMessage, "solver");
+    const isAbort = error instanceof DOMException && error.name === "AbortError";
+    if (isAbort || started.signal.aborted) {
+      // Cancel or max-runtime abort — finishSession may already have been called
+      // by cancelSolverSession / max-runtime timer.
+      const current = readSolverSession();
+      if (current.locked) {
+        finish({
+          status: current.status === "cancelled" ? "cancelled" : "failed",
+          error:
+            current.status === "cancelled"
+              ? null
+              : "Solver request was aborted before completion.",
+          progress: 0,
+        });
+      }
+      return NextResponse.json(
+        {
+          status: "error",
+          errors: [
+            {
+              code: "solver_cancelled",
+              message: "Solver run was cancelled.",
+            },
+          ],
+        },
+        { status: 499 },
+      );
+    }
+
+    const rawMessage =
+      error instanceof Error ? error.message : "Failed to reach scheduling service.";
+    const message = normalizeNetworkError(rawMessage, "solver");
+    finish({ status: "failed", error: message });
     return NextResponse.json(
       {
         status: "error",
-        errors: enrichSolverErrors([
-          { code: isTimeout ? "solver_timeout" : "network_error", message },
-        ]),
+        errors: enrichSolverErrors([{ code: "network_error", message }]),
       },
       { status: 502 },
     );
   } finally {
-    releaseSolverLock();
+    // Safety: never leave the session locked if we forgot to finish.
+    const current = readSolverSession();
+    if (current.locked && current.runId === started.runId) {
+      finish({
+        status: "failed",
+        error: "Solver run ended unexpectedly.",
+      });
+    }
   }
 }

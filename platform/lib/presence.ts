@@ -25,9 +25,10 @@ const globalRef = globalThis as unknown as {
 
 /** Drop sessions without a heartbeat longer than this. */
 const PRESENCE_TTL_MS = 90_000;
-/** Recent interaction within this window counts as active (when tab is visible). */
-const ACTIVE_WINDOW_MS = 60_000;
-/** Grace period before marking user as idle when tab becomes hidden. */
+/**
+ * After the tab is hidden this long, the user is idle.
+ * Short alt-tabs / focus flickers within this window stay "active".
+ */
 const TAB_HIDDEN_GRACE_MS = 15_000;
 
 const getRecords = (): Map<string, PresenceRecord> => {
@@ -37,18 +38,20 @@ const getRecords = (): Map<string, PresenceRecord> => {
   return globalRef.__presenceRecords;
 };
 
+/**
+ * Active = tab is visible (user is looking at the app), including a short
+ * grace after the tab is hidden so quick window switches don't flicker idle.
+ * Idle = tab has been in the background longer than the grace period.
+ *
+ * We intentionally do NOT require mouse/keyboard activity: reading, watching
+ * the solver progress bar, etc. should still count as active.
+ */
 function deriveStatus(record: PresenceRecord, now: number): PresenceStatus {
-  // If tab is visible, check for recent activity
-  if (record.tabVisible) {
-    if (now - record.lastActivityAt <= ACTIVE_WINDOW_MS) return "active";
-    return "idle";
-  }
-  // Tab is hidden — apply grace period before marking idle
-  // If tab was hidden recently (within grace period), still show as active if there was recent activity
+  if (record.tabVisible) return "active";
+
   if (
     record.tabHiddenSince !== null &&
-    now - record.tabHiddenSince <= TAB_HIDDEN_GRACE_MS &&
-    now - record.lastActivityAt <= ACTIVE_WINDOW_MS
+    now - record.tabHiddenSince <= TAB_HIDDEN_GRACE_MS
   ) {
     return "active";
   }
@@ -76,10 +79,9 @@ export function upsertPresence(
   // Track when tab became hidden for grace period logic
   let tabHiddenSince: number | null = null;
   if (!payload.tabVisible) {
-    // Tab is now hidden — preserve existing timestamp or set new one
+    // Preserve the original hidden timestamp across heartbeats while still hidden
     tabHiddenSince = existing?.tabHiddenSince ?? now;
   }
-  // If tab is visible, tabHiddenSince stays null
 
   records.set(user.networkId, {
     networkId: user.networkId,

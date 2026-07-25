@@ -20,6 +20,7 @@ import {
   Undo2,
   Unlock,
   X,
+  XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -1097,12 +1098,16 @@ export default function CalendarPage() {
 
   const router = useRouter();
   const { user } = useAuth();
-  const { begin: beginSolverProgress, succeed: succeedSolverProgress, fail: failSolverProgress } =
+  const { begin: beginSolverProgress, succeed: succeedSolverProgress, fail: failSolverProgress, cancelRun } =
     useSolverProgress();
   const [lockedSectionIds, setLockedSectionIds] = useState<string[]>([]);
   const [solverRunStatus, setSolverRunStatus] = useState<"idle" | "loading">("idle");
   const solverLock = useSolverLock();
-  const solverBusyRemote = solverLock.active && solverRunStatus !== "loading";
+  const isMySolverRun =
+    solverLock.active &&
+    solverLock.startedByNetworkId !== null &&
+    user?.networkId === solverLock.startedByNetworkId;
+  const solverBusyRemote = solverLock.active && !isMySolverRun;
   const { autoSaveEnabled, recordOwnServerWrite } = useSchedulingData();
   const [solverRunError, setSolverRunError] = useState<string | null>(null);
   // Cross-user shared schedule: newest solver result published by any live user.
@@ -1286,7 +1291,10 @@ type PatternDayApplySeverity = "ok" | "warn" | "block" | "none";
 type PatternDayApplyRow = {
   day: Day;
   targetSlotId: string | null;
+  /** Proposed time (same as the anchor day move). */
   timeLabel: string;
+  /** Current time on this day before applying, if any. */
+  currentTimeLabel: string | null;
   severity: PatternDayApplySeverity;
   message: string;
   selected: boolean;
@@ -2884,7 +2892,19 @@ type PatternDayApplyRow = {
         setSolverRunStatus("idle");
         return;
       }
+      if (response.status === 499) {
+        // Cancelled — progress bar disappears via SSE; do not treat as an error page.
+        setSolverRunStatus("idle");
+        return;
+      }
       if (!response.ok || result.status === "error") {
+        const cancelled = (result.errors ?? []).some(
+          (e) => (e as ValidationError).code === "solver_cancelled",
+        );
+        if (cancelled) {
+          setSolverRunStatus("idle");
+          return;
+        }
         const errors = (result.errors ?? []) as ValidationError[];
         storeSolverErrorSnapshot(nextInput, errors, result.diagnostics);
         failSolverProgress();
@@ -3370,13 +3390,18 @@ type PatternDayApplyRow = {
       baseAssignments: AssignmentMap,
     ): PatternDayApplyRow[] => {
       const timeLabel = `${formatTimeAmPm(anchorSlot.start_time)}-${formatTimeAmPm(anchorSlot.end_time)}`;
+      const currentByDay = new Map(
+        sectionDayTimes(sectionId).map((entry) => [entry.day, entry.timeLabel] as const),
+      );
       return otherDays.map((day) => {
+        const currentTimeLabel = currentByDay.get(day) ?? null;
         const slot = findSlotOnDayAtTime(day, anchorSlot.start_time, anchorSlot.end_time);
         if (!slot) {
           return {
             day,
             targetSlotId: null,
             timeLabel,
+            currentTimeLabel,
             severity: "none" as const,
             message: `No timeslot exists at ${timeLabel} on ${day}. Stagger this day or pick a different time.`,
             selected: false,
@@ -3393,6 +3418,7 @@ type PatternDayApplyRow = {
           day,
           targetSlotId: slot.id,
           timeLabel,
+          currentTimeLabel,
           severity: result.severity,
           message: result.message,
           // Pre-check clean days; leave conflicting/impossible days for the user.
@@ -3400,7 +3426,7 @@ type PatternDayApplyRow = {
         };
       });
     },
-    [evaluatePatternDayPlacement, findSlotOnDayAtTime],
+    [evaluatePatternDayPlacement, findSlotOnDayAtTime, sectionDayTimes],
   );
 
   const openPatternApplyModal = useCallback(() => {
@@ -3447,6 +3473,31 @@ type PatternDayApplyRow = {
   const dismissPatternApplyModal = useCallback(() => {
     setPatternApplyModal(null);
   }, []);
+
+  /** User chose to leave other pattern days alone — confirm that choice with feedback. */
+  const keepStaggeredSchedule = useCallback(() => {
+    if (!patternApplyModal) {
+      setPatternApplyModal(null);
+      return;
+    }
+    const { sectionId, courseLabel, anchorDay, anchorTimeLabel, rows } = patternApplyModal;
+    const otherSummary = rows
+      .map((row) => {
+        const current = sectionDayTimes(sectionId).find((entry) => entry.day === row.day);
+        return `${row.day} ${current?.timeLabel ?? row.timeLabel}`;
+      })
+      .join("; ");
+    const message = otherSummary
+      ? `Kept staggered: ${courseLabel} is at ${anchorTimeLabel} on ${anchorDay}; other days unchanged (${otherSummary}). Look for the shuffle icon on the top-left of the card.`
+      : `Kept staggered: only ${anchorDay} was moved to ${anchorTimeLabel}. Other pattern days were left as-is.`;
+
+    setPatternApplyModal(null);
+    setPatternApplyPrompt(null);
+    setDragFeedback({
+      status: "warning",
+      message,
+    });
+  }, [patternApplyModal, sectionDayTimes]);
 
   const applyPatternDays = useCallback(() => {
     if (!patternApplyModal || !data) return;
@@ -4145,7 +4196,7 @@ type PatternDayApplyRow = {
       saveScheduleToHistory({
         name: trimmedName,
         scheduleDate: saveScheduleModal.draft.scheduleDate,
-        savedBy: user?.name,
+        savedBy: user?.name?.trim() || user?.email?.trim() || undefined,
         snapshot,
       });
       if (typeof window !== "undefined") {
@@ -4168,7 +4219,7 @@ type PatternDayApplyRow = {
         error: e instanceof Error ? e.message : "Failed to save schedule history.",
       }));
     }
-  }, [assignmentsBySection, buildSnapshotFromCurrentView, saveScheduleModal.draft.name, saveScheduleModal.draft.scheduleDate, user?.name]);
+  }, [assignmentsBySection, buildSnapshotFromCurrentView, saveScheduleModal.draft.name, saveScheduleModal.draft.scheduleDate, user?.email, user?.name]);
 
   if (error) {
     return (
@@ -4238,49 +4289,67 @@ type PatternDayApplyRow = {
             <div
               onMouseEnter={() =>
                 setToolbarActionHint(
-                  solverBusyRemote
-                    ? solverLock.startedBy
-                      ? `Solver is running (started by ${solverLock.startedBy}). Please wait.`
-                      : "Solver is running. Please wait."
-                    : "Run solver using current data and placement locks.",
+                  isMySolverRun
+                    ? "Cancel the solver run you started."
+                    : solverBusyRemote
+                      ? solverLock.startedBy
+                        ? `Solver is running (started by ${solverLock.startedBy}). Please wait.`
+                        : "Solver is running. Please wait."
+                      : "Run solver using current data and placement locks.",
                 )
               }
               onMouseLeave={() => setToolbarActionHint(null)}
               onFocus={() =>
                 setToolbarActionHint(
-                  solverBusyRemote
-                    ? solverLock.startedBy
-                      ? `Solver is running (started by ${solverLock.startedBy}). Please wait.`
-                      : "Solver is running. Please wait."
-                    : "Run solver using current data and placement locks.",
+                  isMySolverRun
+                    ? "Cancel the solver run you started."
+                    : solverBusyRemote
+                      ? solverLock.startedBy
+                        ? `Solver is running (started by ${solverLock.startedBy}). Please wait.`
+                        : "Solver is running. Please wait."
+                      : "Run solver using current data and placement locks.",
                 )
               }
               onBlur={() => setToolbarActionHint(null)}
               className="contents"
             >
-              <button
-                type="button"
-                disabled={
-                  solverRunStatus === "loading" || !data || solverBusyRemote
-                }
-                onClick={() => void handleRunSolverFromCalendar()}
-                className={clsx(
-                  "flex items-center justify-center rounded-lg size-10 font-bold border transition-colors",
-                  solverRunStatus !== "loading" && data && !solverBusyRemote
-                    ? "bg-[#137fec] text-white border-[#137fec] shadow-lg shadow-[#137fec]/20 hover:bg-[#0f6dca]"
-                    : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
-                )}
-                title={
-                  solverBusyRemote
-                    ? solverLock.startedBy
-                      ? `Solver is running (started by ${solverLock.startedBy})`
-                      : "Solver is running"
-                    : "Run the solver using backend scheduling data and locks from this page"
-                }
-                aria-label="Run solver"
-              >
-                <Play className="size-4" />
-              </button>
+              {isMySolverRun ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void cancelRun().then(() => setSolverRunStatus("idle"));
+                  }}
+                  className="flex items-center justify-center rounded-lg size-10 font-bold border transition-colors bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
+                  title="Cancel solver"
+                  aria-label="Cancel solver"
+                >
+                  <XCircle className="size-4" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={
+                    solverRunStatus === "loading" || !data || solverBusyRemote
+                  }
+                  onClick={() => void handleRunSolverFromCalendar()}
+                  className={clsx(
+                    "flex items-center justify-center rounded-lg size-10 font-bold border transition-colors",
+                    solverRunStatus !== "loading" && data && !solverBusyRemote
+                      ? "bg-[#137fec] text-white border-[#137fec] shadow-lg shadow-[#137fec]/20 hover:bg-[#0f6dca]"
+                      : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
+                  )}
+                  title={
+                    solverBusyRemote
+                      ? solverLock.startedBy
+                        ? `Solver is running (started by ${solverLock.startedBy})`
+                        : "Solver is running"
+                      : "Run the solver using backend scheduling data and locks from this page"
+                  }
+                  aria-label="Run solver"
+                >
+                  <Play className="size-4" />
+                </button>
+              )}
             </div>
             {!autoSaveEnabled && hasValidUnsavedEdit && (
               <div
@@ -4945,6 +5014,17 @@ type PatternDayApplyRow = {
                         if (!solverInput || e.button !== 0) return;
                         e.stopPropagation();
                         e.preventDefault();
+                        // Freeze calendar edits while any user is running the solver.
+                        if (solverLock.active) {
+                          setCalendarDrag(null);
+                          setDragFeedback({
+                            status: "invalid",
+                            message: solverLock.startedBy
+                              ? `Solver is running (started by ${solverLock.startedBy}). Wait for it to finish before editing.`
+                              : "Solver is running. Wait for it to finish before editing.",
+                          });
+                          return;
+                        }
                         // Locked placements (or any locked cross-list peer) must not
                         // start a drag — corruption guard for solver-pinned sections.
                         if (placementLocked) {
@@ -5136,9 +5216,6 @@ type PatternDayApplyRow = {
                           activeLegendDepartmentKeys.size > 0 &&
                             matchesHoveredDepartment &&
                             "ring-2 ring-slate-300/80 shadow-md",
-                          isStaggered &&
-                            !isConflicting &&
-                            "ring-1 ring-inset ring-indigo-400/70",
                           isConflicting &&
                             "ring-2 ring-red-500 ring-offset-1 z-20 shadow-md",
                         )}
@@ -5151,7 +5228,9 @@ type PatternDayApplyRow = {
                           backgroundImage: color.cardPattern,
                           borderLeftColor: color.cardBorder,
                         }}
-                        title={`${title} • ${professor} • ${timeLabel} • Room ${room.id}`}
+                        title={`${title} • ${professor} • ${timeLabel} • Room ${room.id}${
+                          isStaggered ? " • Staggered across days" : ""
+                        }`}
                         {...sharedPointerHandlers}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -5167,13 +5246,16 @@ type PatternDayApplyRow = {
                           });
                         }}
                       >
+                        {isStaggered && (
+                          <span
+                            className="absolute left-1 top-1 z-[3] flex size-5 items-center justify-center rounded-md border border-indigo-200 bg-indigo-50/95 text-indigo-700 shadow-sm"
+                            title="Staggered: different times on different days"
+                            aria-label="Staggered across days"
+                          >
+                            <Shuffle className="size-3" aria-hidden />
+                          </span>
+                        )}
                         <div className="absolute right-1 top-1 z-[3] flex items-center gap-1">
-                          {isStaggered && (
-                            <Shuffle
-                              className="pointer-events-none size-3.5 text-indigo-600 drop-shadow-sm"
-                              aria-label="Staggered across days"
-                            />
-                          )}
                           {solverInput && (
                             <button
                               type="button"
@@ -5204,7 +5286,12 @@ type PatternDayApplyRow = {
                             </button>
                           )}
                         </div>
-                        <div className="font-black text-[10px] truncate text-slate-900 pr-9">
+                        <div
+                          className={clsx(
+                            "font-black text-[10px] truncate text-slate-900 pr-9",
+                            isStaggered && "pl-6",
+                          )}
+                        >
                           {title}
                         </div>
                         <div className="text-[9px] font-bold leading-tight text-slate-700">
@@ -6093,7 +6180,9 @@ type PatternDayApplyRow = {
                     <span className="font-semibold">{patternApplyModal.anchorDay}</span> in room{" "}
                     <span className="font-semibold">{patternApplyModal.roomId}</span>. Choose which of
                     its other pattern days should move to the same time. Clean days are pre-selected;
-                    days with a conflict or no matching timeslot are called out below.
+                    days with a conflict or no matching timeslot are called out below. Or choose{" "}
+                    <span className="font-semibold">Keep staggered</span> to leave other days
+                    unchanged.
                   </div>
                   <ul className="space-y-2">
                     {patternApplyModal.rows.map((row) => {
@@ -6127,7 +6216,11 @@ type PatternDayApplyRow = {
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
                               <span className="font-semibold text-slate-900">{row.day}</span>
-                              <span className="text-xs text-slate-500">{row.timeLabel}</span>
+                              <span className="text-xs text-slate-500">
+                                {row.currentTimeLabel && row.currentTimeLabel !== row.timeLabel
+                                  ? `${row.currentTimeLabel} → ${row.timeLabel}`
+                                  : row.timeLabel}
+                              </span>
                               <span
                                 className={clsx(
                                   "ml-auto shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold",
@@ -6155,7 +6248,7 @@ type PatternDayApplyRow = {
                     <button
                       type="button"
                       className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
-                      onClick={dismissPatternApplyModal}
+                      onClick={keepStaggeredSchedule}
                     >
                       Keep staggered
                     </button>
