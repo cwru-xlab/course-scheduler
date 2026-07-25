@@ -24,6 +24,8 @@ type ActivityEvent = {
 
 const HEARTBEAT_MS = 20_000;
 const POLL_MS = 15_000;
+/** Debounce visibility change heartbeats to avoid flicker. */
+const VISIBILITY_DEBOUNCE_MS = 2_000;
 
 function StatusDot({ status }: { status: LiveUser["status"] }) {
   return (
@@ -67,6 +69,7 @@ export function LiveUsersIndicator() {
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [open, setOpen] = useState(false);
   const lastActivityAtRef = useRef(Date.now());
+  const visibilityDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const touchActivity = useCallback(() => {
     lastActivityAtRef.current = Date.now();
@@ -141,7 +144,13 @@ export function LiveUsersIndicator() {
     }
 
     const onVisibility = () => {
-      void sendHeartbeat();
+      // Debounce visibility changes to avoid flicker when quickly switching windows
+      if (visibilityDebounceRef.current) {
+        clearTimeout(visibilityDebounceRef.current);
+      }
+      visibilityDebounceRef.current = setTimeout(() => {
+        void sendHeartbeat();
+      }, VISIBILITY_DEBOUNCE_MS);
     };
     document.addEventListener("visibilitychange", onVisibility);
 
@@ -173,6 +182,9 @@ export function LiveUsersIndicator() {
       window.removeEventListener("pagehide", onLeave);
       window.clearInterval(heartbeatId);
       window.clearInterval(pollId);
+      if (visibilityDebounceRef.current) {
+        clearTimeout(visibilityDebounceRef.current);
+      }
       void sendHeartbeat({ leaving: true });
     };
   }, [fetchActivity, fetchUsers, sendHeartbeat, touchActivity, user]);

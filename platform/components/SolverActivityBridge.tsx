@@ -11,14 +11,26 @@ import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
  *  - drives the shared progress bar in "observer" mode while the solver lock
  *    is held by someone else, and
  *  - shows a top banner naming who started the run.
+ *  - syncs progress from the server so all users see the same progress.
  *
  * The user who actually started the run drives progress via begin()/succeed()
  * themselves; `isRunningLocally` prevents this bridge from interfering.
  */
 export function SolverActivityBridge() {
   const lock = useSolverLock();
-  const { isRunningLocally, beginObserved, endObserved } = useSolverProgress();
+  const {
+    isRunningLocally,
+    beginObserved,
+    endObserved,
+    syncFromServer,
+    setProgressPusher,
+  } = useSolverProgress();
   const observingRef = useRef(false);
+
+  // Provide the progress pusher to the context so local runs can push to server
+  useEffect(() => {
+    setProgressPusher(lock.updateProgress);
+  }, [lock.updateProgress, setProgressPusher]);
 
   useEffect(() => {
     const othersRunning = lock.active && !isRunningLocally;
@@ -29,7 +41,20 @@ export function SolverActivityBridge() {
       observingRef.current = false;
       endObserved();
     }
-  }, [lock.active, lock.startedAt, isRunningLocally, beginObserved, endObserved]);
+
+    // Sync progress from server for observers
+    if (othersRunning && lock.progress > 0) {
+      syncFromServer(lock.progress);
+    }
+  }, [
+    lock.active,
+    lock.startedAt,
+    lock.progress,
+    isRunningLocally,
+    beginObserved,
+    endObserved,
+    syncFromServer,
+  ]);
 
   if (!lock.active || isRunningLocally) return null;
 

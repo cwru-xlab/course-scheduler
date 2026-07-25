@@ -89,6 +89,15 @@ export const deleteSavedSchedule = (id: string): void => {
   window.localStorage.setItem(SCHEDULE_HISTORY_STORAGE_KEY, JSON.stringify(next));
 };
 
+export const renameSavedSchedule = (id: string, newName: string): void => {
+  if (typeof window === "undefined") return;
+  const schedules = listSavedSchedules();
+  const updated = schedules.map((s) =>
+    s.id === id ? { ...s, name: newName.trim() } : s,
+  );
+  window.localStorage.setItem(SCHEDULE_HISTORY_STORAGE_KEY, JSON.stringify(updated));
+};
+
 export const loadSavedScheduleToCurrentView = (entry: SavedScheduleEntry): void => {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(

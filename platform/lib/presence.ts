@@ -15,6 +15,8 @@ type PresenceRecord = {
   lastHeartbeatAt: number;
   lastActivityAt: number;
   tabVisible: boolean;
+  /** Timestamp when tab became hidden (for grace period). */
+  tabHiddenSince: number | null;
 };
 
 const globalRef = globalThis as unknown as {
@@ -25,6 +27,8 @@ const globalRef = globalThis as unknown as {
 const PRESENCE_TTL_MS = 90_000;
 /** Recent interaction within this window counts as active (when tab is visible). */
 const ACTIVE_WINDOW_MS = 60_000;
+/** Grace period before marking user as idle when tab becomes hidden. */
+const TAB_HIDDEN_GRACE_MS = 15_000;
 
 const getRecords = (): Map<string, PresenceRecord> => {
   if (!globalRef.__presenceRecords) {
@@ -34,8 +38,20 @@ const getRecords = (): Map<string, PresenceRecord> => {
 };
 
 function deriveStatus(record: PresenceRecord, now: number): PresenceStatus {
-  if (!record.tabVisible) return "idle";
-  if (now - record.lastActivityAt <= ACTIVE_WINDOW_MS) return "active";
+  // If tab is visible, check for recent activity
+  if (record.tabVisible) {
+    if (now - record.lastActivityAt <= ACTIVE_WINDOW_MS) return "active";
+    return "idle";
+  }
+  // Tab is hidden — apply grace period before marking idle
+  // If tab was hidden recently (within grace period), still show as active if there was recent activity
+  if (
+    record.tabHiddenSince !== null &&
+    now - record.tabHiddenSince <= TAB_HIDDEN_GRACE_MS &&
+    now - record.lastActivityAt <= ACTIVE_WINDOW_MS
+  ) {
+    return "active";
+  }
   return "idle";
 }
 
@@ -55,6 +71,16 @@ export function upsertPresence(
   const now = Date.now();
   pruneExpired(now);
   const records = getRecords();
+  const existing = records.get(user.networkId);
+
+  // Track when tab became hidden for grace period logic
+  let tabHiddenSince: number | null = null;
+  if (!payload.tabVisible) {
+    // Tab is now hidden — preserve existing timestamp or set new one
+    tabHiddenSince = existing?.tabHiddenSince ?? now;
+  }
+  // If tab is visible, tabHiddenSince stays null
+
   records.set(user.networkId, {
     networkId: user.networkId,
     name: user.name,
@@ -62,6 +88,7 @@ export function upsertPresence(
     lastHeartbeatAt: now,
     lastActivityAt: payload.lastActivityAt,
     tabVisible: payload.tabVisible,
+    tabHiddenSince,
   });
 }
 

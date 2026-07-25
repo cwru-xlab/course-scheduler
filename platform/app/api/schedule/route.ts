@@ -23,16 +23,18 @@ export async function POST(request: NextRequest) {
   // to fail with generic "fetch failed" (solver crash / timeout). Reject
   // overlapping requests with 409 so the client can present a clear message.
   let userLabel: string | null = null;
+  let userNetworkId: string | null = null;
   try {
     const token = request.cookies.get(siteConfig.auth.cookie.name)?.value;
     if (token) {
       const user = await verifyToken(token);
       userLabel = user?.name ?? user?.email ?? null;
+      userNetworkId = user?.networkId ?? null;
     }
   } catch {
     // best-effort attribution
   }
-  if (!acquireSolverLock(userLabel)) {
+  if (!acquireSolverLock(userLabel, userNetworkId)) {
     const state = readSolverLock();
     return NextResponse.json(
       {

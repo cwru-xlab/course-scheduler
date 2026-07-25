@@ -4216,6 +4216,22 @@ type PatternDayApplyRow = {
           <p className="mt-1 text-base leading-6 text-slate-500">
             Click through Monday–Friday to view scheduled sections.
           </p>
+          {sharedScheduleMeta.ranAt ? (
+            <p className="mt-1 text-xs text-slate-400">
+              Last generated
+              {sharedScheduleMeta.ranBy ? ` by ${sharedScheduleMeta.ranBy}` : ""} on{" "}
+              {new Date(sharedScheduleMeta.ranAt).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })}{" "}
+              at{" "}
+              {new Date(sharedScheduleMeta.ranAt).toLocaleTimeString(undefined, {
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-col items-stretch gap-2 w-full md:w-auto">
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2">

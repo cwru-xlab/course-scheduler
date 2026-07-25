@@ -3,18 +3,20 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Archive, CalendarDays, Download, FolderOpen, Trash2 } from "lucide-react";
+import { Archive, CalendarDays, Download, FolderOpen, Pencil, Trash2 } from "lucide-react";
 
 import {
   deleteSavedSchedule,
   exportSavedSchedule,
   listSavedSchedules,
   loadSavedScheduleToCurrentView,
+  renameSavedSchedule,
   type SavedScheduleEntry,
 } from "@/lib/scheduling/history";
 import type { ValidationError } from "@/lib/scheduling/types";
 import { ValidationIssuesTable } from "@/components/scheduler/ValidationIssuesTable";
 import { SpreadsheetFormatHelp } from "@/components/scheduler/SpreadsheetFormatHelp";
+import { ViewportModal } from "@/components/scheduler/ViewportModal";
 import {
   appNativeBtnPrimary,
   appNativeBtnSecondary,
@@ -38,6 +40,15 @@ export default function HistoryPage() {
     detail: string;
   } | null>(null);
 
+  // Rename modal state
+  const [renameModal, setRenameModal] = useState<{
+    entry: SavedScheduleEntry;
+    newName: string;
+  } | null>(null);
+
+  // Delete confirmation modal state
+  const [deleteConfirm, setDeleteConfirm] = useState<SavedScheduleEntry | null>(null);
+
   const refresh = () => {
     setItems(listSavedSchedules());
   };
@@ -45,6 +56,20 @@ export default function HistoryPage() {
   useEffect(() => {
     refresh();
   }, []);
+
+  const handleRename = () => {
+    if (!renameModal || !renameModal.newName.trim()) return;
+    renameSavedSchedule(renameModal.entry.id, renameModal.newName);
+    setRenameModal(null);
+    refresh();
+  };
+
+  const handleDelete = () => {
+    if (!deleteConfirm) return;
+    deleteSavedSchedule(deleteConfirm.id);
+    setDeleteConfirm(null);
+    refresh();
+  };
 
   const totalAssignments = useMemo(
     () =>
@@ -183,10 +208,15 @@ export default function HistoryPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      deleteSavedSchedule(item.id);
-                      refresh();
-                    }}
+                    onClick={() => setRenameModal({ entry: item, newName: item.name })}
+                    className={appNativeBtnSecondary}
+                  >
+                    <Pencil className="size-4" />
+                    Rename
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteConfirm(item)}
                     className={appNativeBtnDanger}
                   >
                     <Trash2 className="size-4" />
@@ -198,6 +228,118 @@ export default function HistoryPage() {
           ))}
         </div>
       )}
+
+      {/* Rename Modal */}
+      <ViewportModal isOpen={Boolean(renameModal)} onClose={() => setRenameModal(null)}>
+        {renameModal ? (
+          <div
+            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="rename-modal-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <h3 id="rename-modal-title" className="text-lg font-bold text-slate-900">
+                Rename Schedule
+              </h3>
+              <button
+                type="button"
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                onClick={() => setRenameModal(null)}
+              >
+                Cancel
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label
+                  htmlFor="rename-input"
+                  className="block text-sm font-semibold text-slate-700 mb-1"
+                >
+                  Schedule Name
+                </label>
+                <input
+                  id="rename-input"
+                  type="text"
+                  value={renameModal.newName}
+                  onChange={(e) =>
+                    setRenameModal({ ...renameModal, newName: e.target.value })
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleRename();
+                  }}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                  autoFocus
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRenameModal(null)}
+                  className={appNativeBtnSecondary}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRename}
+                  disabled={!renameModal.newName.trim()}
+                  className={appNativeBtnPrimary}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </ViewportModal>
+
+      {/* Delete Confirmation Modal */}
+      <ViewportModal isOpen={Boolean(deleteConfirm)} onClose={() => setDeleteConfirm(null)}>
+        {deleteConfirm ? (
+          <div
+            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-modal-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <h3 id="delete-modal-title" className="text-lg font-bold text-slate-900">
+                Delete Schedule?
+              </h3>
+              <button
+                type="button"
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                onClick={() => setDeleteConfirm(null)}
+              >
+                Cancel
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <p className="text-sm text-slate-700">
+                Are you sure you want to delete{" "}
+                <span className="font-semibold">&quot;{deleteConfirm.name}&quot;</span>?
+              </p>
+              <p className="text-sm text-slate-500">This action cannot be undone.</p>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirm(null)}
+                  className={appNativeBtnSecondary}
+                >
+                  Cancel
+                </button>
+                <button type="button" onClick={handleDelete} className={appNativeBtnDanger}>
+                  <Trash2 className="size-4" />
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </ViewportModal>
     </div>
   );
 }

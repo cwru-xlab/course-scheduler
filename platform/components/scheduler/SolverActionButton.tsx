@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@heroui/button";
-import { Rocket } from "lucide-react";
+import { Rocket, XCircle } from "lucide-react";
 
 import { ViewportModal } from "@/components/scheduler/ViewportModal";
 import { editorToolbarBtnAccent } from "@/components/scheduler/editors/editorToolbarStyles";
 import { humanizedSummary } from "@/lib/errors/humanizeError";
+import { useAuth } from "@/lib/auth-client";
 import { isSectionArchived } from "@/lib/scheduling/sectionState";
 import type {
   ScheduleSolution,
@@ -45,14 +46,31 @@ export const SolverActionButton = ({
   onErrorChange?: (message: string | null) => void;
 }) => {
   const router = useRouter();
+  const { user } = useAuth();
   const { begin, succeed, fail } = useSolverProgress();
   const solverLock = useSolverLock();
   const [solverStatus, setSolverStatus] = useState<"idle" | "loading">("idle");
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  // Another user is running the solver (single-worker solver, one run at a time).
-  const solverBusyRemote = solverLock.active && solverStatus !== "loading";
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  // Determine button state based on lock ownership
+  const isMyRun =
+    solverLock.active &&
+    solverLock.startedByNetworkId !== null &&
+    user?.networkId === solverLock.startedByNetworkId;
+  const solverBusyRemote = solverLock.active && !isMyRun && solverStatus !== "loading";
   const archivedSectionCount =
     data?.sections.filter((section) => isSectionArchived(section)).length ?? 0;
+
+  const handleCancelSolver = async () => {
+    setIsCancelling(true);
+    const cancelled = await solverLock.cancelRun();
+    setIsCancelling(false);
+    if (cancelled) {
+      fail();
+      setSolverStatus("idle");
+    }
+  };
 
   const runSolverConfirmed = async () => {
     setIsConfirmOpen(false);
@@ -164,29 +182,44 @@ export const SolverActionButton = ({
 
   return (
     <>
-      <Button
-        size="sm"
-        radius="md"
-        variant="light"
-        className={editorToolbarBtnAccent}
-        startContent={solverStatus === "idle" ? <Rocket className="size-3.5" aria-hidden /> : undefined}
-        isLoading={solverStatus === "loading"}
-        onPress={() => setIsConfirmOpen(true)}
-        isDisabled={!data || solverStatus === "loading" || solverBusyRemote}
-        title={
-          solverBusyRemote
+      {/* Show Cancel button if this user started the run */}
+      {isMyRun || solverStatus === "loading" ? (
+        <Button
+          size="sm"
+          radius="md"
+          variant="light"
+          className="h-8 min-h-8 min-w-0 gap-1.5 px-3 text-xs font-semibold tracking-tight shadow-none bg-rose-50 text-rose-700 border border-rose-200 data-[hover=true]:bg-rose-100"
+          startContent={<XCircle className="size-3.5" aria-hidden />}
+          isLoading={isCancelling}
+          onPress={handleCancelSolver}
+          isDisabled={isCancelling}
+        >
+          Cancel Solver
+        </Button>
+      ) : (
+        <Button
+          size="sm"
+          radius="md"
+          variant="light"
+          className={editorToolbarBtnAccent}
+          startContent={<Rocket className="size-3.5" aria-hidden />}
+          onPress={() => setIsConfirmOpen(true)}
+          isDisabled={!data || solverBusyRemote}
+          title={
+            solverBusyRemote
+              ? solverLock.startedBy
+                ? `Solver is running (started by ${solverLock.startedBy}). Please wait.`
+                : "Solver is running. Please wait."
+              : undefined
+          }
+        >
+          {solverBusyRemote
             ? solverLock.startedBy
-              ? `Solver is running (started by ${solverLock.startedBy}). Please wait.`
-              : "Solver is running. Please wait."
-            : undefined
-        }
-      >
-        {solverBusyRemote
-          ? solverLock.startedBy
-            ? `Running (${solverLock.startedBy})…`
-            : "Solver running…"
-          : "Run Solver"}
-      </Button>
+              ? `Running (${solverLock.startedBy})…`
+              : "Solver running…"
+            : "Run Solver"}
+        </Button>
+      )}
 
       <ViewportModal isOpen={isConfirmOpen} onClose={() => setIsConfirmOpen(false)} zIndex={1000}>
         {isConfirmOpen ? (
