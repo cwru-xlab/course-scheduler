@@ -156,7 +156,6 @@ export function CrosslistCalendarEventCard({
           isDragSource && hasDragMoved && "opacity-[0.12] pointer-events-none",
           !matchesHoveredDepartment && "opacity-35",
           matchesHoveredDepartment && "ring-2 ring-slate-300/80 shadow-md",
-          isStaggered && !isConflicting && "ring-1 ring-inset ring-indigo-400/70",
           isConflicting && "ring-2 ring-red-500 ring-offset-1 shadow-md",
         )}
         style={{
@@ -164,7 +163,9 @@ export function CrosslistCalendarEventCard({
           backgroundColor: color.cardBg,
           borderLeftColor: color.cardBorder,
         }}
-        title={`Cross-list ${crosslistGroupId} • ${members.length} sections • ${timeLabel}`}
+        title={`Cross-list ${crosslistGroupId} • ${members.length} sections • ${timeLabel}${
+          isStaggered ? " • Staggered across days" : ""
+        }`}
         onContextMenu={onContextMenu}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -173,13 +174,16 @@ export function CrosslistCalendarEventCard({
         onClick={onClick}
       >
         <CrosslistXOverlay />
+        {isStaggered && (
+          <span
+            className="absolute left-1 top-1 z-[4] flex size-5 items-center justify-center rounded-md border border-indigo-200 bg-indigo-50/95 text-indigo-700 shadow-sm"
+            title="Staggered: different times on different days"
+            aria-label="Staggered across days"
+          >
+            <Shuffle className="size-3" aria-hidden />
+          </span>
+        )}
         <div className="absolute right-1 top-1 z-[4] flex items-center gap-1">
-          {isStaggered && (
-            <Shuffle
-              className="pointer-events-none size-3.5 text-indigo-600 drop-shadow-sm"
-              aria-label="Staggered across days"
-            />
-          )}
           {lockable && onToggleLock && (
             <button
               type="button"
@@ -206,7 +210,12 @@ export function CrosslistCalendarEventCard({
             </button>
           )}
         </div>
-        <div className="relative z-[1] font-black text-[10px] truncate text-slate-900 pr-9">
+        <div
+          className={clsx(
+            "relative z-[1] font-black text-[10px] truncate text-slate-900 pr-9",
+            isStaggered && "pl-6",
+          )}
+        >
           {crosslistGroupId}
         </div>
         <div className="relative z-[1] text-[9px] font-bold leading-tight text-slate-700">

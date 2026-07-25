@@ -24,6 +24,8 @@ type ActivityEvent = {
 
 const HEARTBEAT_MS = 20_000;
 const POLL_MS = 15_000;
+/** Debounce visibility change heartbeats to avoid flicker. */
+const VISIBILITY_DEBOUNCE_MS = 2_000;
 
 function StatusDot({ status }: { status: LiveUser["status"] }) {
   return (
@@ -67,6 +69,7 @@ export function LiveUsersIndicator() {
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [open, setOpen] = useState(false);
   const lastActivityAtRef = useRef(Date.now());
+  const visibilityDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const touchActivity = useCallback(() => {
     lastActivityAtRef.current = Date.now();
@@ -75,12 +78,16 @@ export function LiveUsersIndicator() {
   const sendHeartbeat = useCallback(async (opts?: { leaving?: boolean }) => {
     if (!user) return;
     try {
+      const tabVisible =
+        typeof document !== "undefined"
+          ? document.visibilityState === "visible"
+          : true;
       const response = await fetch("/api/presence", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           lastActivityAt: lastActivityAtRef.current,
-          tabVisible: typeof document !== "undefined" ? !document.hidden : true,
+          tabVisible,
           leaving: opts?.leaving ?? false,
         }),
       });
@@ -141,7 +148,19 @@ export function LiveUsersIndicator() {
     }
 
     const onVisibility = () => {
-      void sendHeartbeat();
+      if (visibilityDebounceRef.current) {
+        clearTimeout(visibilityDebounceRef.current);
+        visibilityDebounceRef.current = null;
+      }
+      // Becoming visible again: report immediately so peers see "active" fast.
+      if (document.visibilityState === "visible") {
+        void sendHeartbeat();
+        return;
+      }
+      // Becoming hidden: debounce so brief alt-tabs don't flicker idle.
+      visibilityDebounceRef.current = setTimeout(() => {
+        void sendHeartbeat();
+      }, VISIBILITY_DEBOUNCE_MS);
     };
     document.addEventListener("visibilitychange", onVisibility);
 
@@ -173,6 +192,9 @@ export function LiveUsersIndicator() {
       window.removeEventListener("pagehide", onLeave);
       window.clearInterval(heartbeatId);
       window.clearInterval(pollId);
+      if (visibilityDebounceRef.current) {
+        clearTimeout(visibilityDebounceRef.current);
+      }
       void sendHeartbeat({ leaving: true });
     };
   }, [fetchActivity, fetchUsers, sendHeartbeat, touchActivity, user]);
@@ -208,11 +230,11 @@ export function LiveUsersIndicator() {
           <p className="text-sm font-bold text-slate-900">Live now</p>
           <p className="text-xs text-slate-500 mt-0.5">
             <span className="inline-flex items-center gap-1">
-              <StatusDot status="active" /> Active
+              <StatusDot status="active" /> Active (viewing)
             </span>
             <span className="mx-1.5">·</span>
             <span className="inline-flex items-center gap-1">
-              <StatusDot status="idle" /> Idle / tab in background
+              <StatusDot status="idle" /> Idle (tab in background)
             </span>
           </p>
         </div>

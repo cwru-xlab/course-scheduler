@@ -439,7 +439,7 @@ export const SectionsEditor = ({
           const highlighted = getRowHighlightClass(base, "sections", String(section.id));
           if (highlighted !== base) return highlighted;
           if (isSectionArchived(section)) return `${base} opacity-60`;
-          if (isSectionNew(section)) return `${base} bg-primary-50/40`;
+          if (isSectionNew(section)) return `${base} bg-violet-50/70`;
           return base;
         }}
         renderCell={renderCell}
