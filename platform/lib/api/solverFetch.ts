@@ -36,11 +36,11 @@ type FetchSolverResult = {
   baseUrl: string;
 };
 
-/** POST/GET the solver with URL fallbacks and optional timeout. */
+/** POST/GET the solver with URL fallbacks and optional timeout / external abort. */
 export async function fetchSolver(
   path: string,
   init?: RequestInit,
-  options?: { timeoutMs?: number },
+  options?: { timeoutMs?: number; signal?: AbortSignal },
 ): Promise<FetchSolverResult> {
   const candidateUrls = [SOLVER_URL, ...SOLVER_FALLBACK_URLS].filter(
     (url, idx, arr) => arr.indexOf(url) === idx,
@@ -50,32 +50,52 @@ export async function fetchSolver(
 
   for (const baseUrl of candidateUrls) {
     try {
-      const controller = options?.timeoutMs ? new AbortController() : null;
+      const controller = new AbortController();
+      const onExternalAbort = () => controller.abort();
+      const external = options?.signal ?? init?.signal;
+      if (external) {
+        if (external.aborted) {
+          controller.abort();
+        } else {
+          external.addEventListener("abort", onExternalAbort, { once: true });
+        }
+      }
       const timeoutId =
-        controller && options?.timeoutMs
+        options?.timeoutMs != null
           ? setTimeout(() => controller.abort(), options.timeoutMs)
           : null;
 
-      const response = await fetch(`${baseUrl}${path}`, {
-        ...init,
-        signal: controller?.signal ?? init?.signal,
-      });
+      try {
+        const response = await fetch(`${baseUrl}${path}`, {
+          ...init,
+          signal: controller.signal,
+        });
 
-      if (timeoutId) clearTimeout(timeoutId);
+        if (timeoutId) clearTimeout(timeoutId);
+        external?.removeEventListener("abort", onExternalAbort);
 
-      if (response.status === 404 || response.status === 405) {
-        continue;
+        if (response.status === 404 || response.status === 405) {
+          continue;
+        }
+
+        const data = await parseSolverResponse(response);
+        return { response, data, baseUrl };
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+        external?.removeEventListener("abort", onExternalAbort);
       }
-
-      const data = await parseSolverResponse(response);
-      return { response, data, baseUrl };
     } catch (error) {
       lastError = error;
+      // Don't try fallback URLs if the caller cancelled / timed out.
+      if (error instanceof DOMException && error.name === "AbortError") {
+        break;
+      }
     }
   }
 
   if (lastError instanceof DOMException && lastError.name === "AbortError") {
-    throw new Error("Scheduling service request timed out.");
+    // Preserve AbortError so callers can distinguish cancel vs other failures.
+    throw lastError;
   }
 
   throw lastError instanceof Error

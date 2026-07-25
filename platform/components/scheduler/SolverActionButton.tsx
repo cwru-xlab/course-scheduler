@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@heroui/button";
-import { Rocket } from "lucide-react";
+import { Rocket, XCircle } from "lucide-react";
 
 import { ViewportModal } from "@/components/scheduler/ViewportModal";
 import { editorToolbarBtnAccent } from "@/components/scheduler/editors/editorToolbarStyles";
 import { humanizedSummary } from "@/lib/errors/humanizeError";
+import { useAuth } from "@/lib/auth-client";
 import { isSectionArchived } from "@/lib/scheduling/sectionState";
 import type {
   ScheduleSolution,
@@ -45,14 +46,32 @@ export const SolverActionButton = ({
   onErrorChange?: (message: string | null) => void;
 }) => {
   const router = useRouter();
-  const { begin, succeed, fail } = useSolverProgress();
+  const { user } = useAuth();
   const solverLock = useSolverLock();
+  const { cancelRun } = useSolverProgress();
   const [solverStatus, setSolverStatus] = useState<"idle" | "loading">("idle");
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  // Another user is running the solver (single-worker solver, one run at a time).
-  const solverBusyRemote = solverLock.active && solverStatus !== "loading";
+  const [isCancelling, setIsCancelling] = useState(false);
+  const clientAbortRef = useRef<AbortController | null>(null);
+
+  const isMyRun =
+    solverLock.active &&
+    solverLock.startedByNetworkId !== null &&
+    user?.networkId === solverLock.startedByNetworkId;
+  const solverBusyRemote = solverLock.active && !isMyRun;
   const archivedSectionCount =
     data?.sections.filter((section) => isSectionArchived(section)).length ?? 0;
+
+  const handleCancelSolver = async () => {
+    setIsCancelling(true);
+    try {
+      clientAbortRef.current?.abort();
+      await cancelRun();
+    } finally {
+      setIsCancelling(false);
+      setSolverStatus("idle");
+    }
+  };
 
   const runSolverConfirmed = async () => {
     setIsConfirmOpen(false);
@@ -61,9 +80,9 @@ export const SolverActionButton = ({
 
   const runSolver = async () => {
     if (!data) return;
+    if (solverLock.active) return;
     setSolverStatus("loading");
     onErrorChange?.(null);
-    begin();
 
     try {
       const validation = await validateSchedulingInput(data);
@@ -78,27 +97,37 @@ export const SolverActionButton = ({
             error_codes: Array.from(new Set(validation.issues.map((issue) => issue.code))),
           });
         }
-        fail();
         onErrorChange?.(summary);
         router.push("/solver-errors");
         return;
       }
 
       const controller = new AbortController();
+      clientAbortRef.current = controller;
       const timeoutId = setTimeout(() => controller.abort(), 180_000);
-      const response = await fetch("/api/schedule", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
+      let response: Response;
+      try {
+        response = await fetch("/api/schedule", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+        clientAbortRef.current = null;
+      }
+
+      // Cancelled on server (or client abort after cancel)
+      if (response.status === 499) {
+        return;
+      }
+
       const raw = await response.text();
       let result: ApiSuccess | ApiError | null = null;
       try {
         result = JSON.parse(raw) as ApiSuccess | ApiError;
       } catch {
-        fail();
         const errors = enrichSolverErrors([
           {
             code: "solver_response_invalid",
@@ -108,6 +137,10 @@ export const SolverActionButton = ({
           },
         ]);
         onErrorChange?.(humanizedSummary(errors, "solver"));
+        return;
+      }
+
+      if (result.status === "error" && result.errors?.some((e) => e.code === "solver_cancelled")) {
         return;
       }
 
@@ -121,9 +154,12 @@ export const SolverActionButton = ({
         const nextError = formatErrorsSummary(enrichedErrors, "solver");
 
         if (typeof window !== "undefined") {
-          storeSolverErrorSnapshot(data, enrichedErrors, result?.status === "error" ? result.diagnostics : undefined);
+          storeSolverErrorSnapshot(
+            data,
+            enrichedErrors,
+            result?.status === "error" ? result.diagnostics : undefined,
+          );
         }
-        fail();
         onErrorChange?.(nextError);
         router.push("/solver-errors");
         return;
@@ -139,20 +175,17 @@ export const SolverActionButton = ({
           }),
         );
       }
-      succeed();
       router.push("/calendar");
     } catch (error) {
-      fail();
-      const isTimeout = error instanceof DOMException && error.name === "AbortError";
-      const rawMessage = isTimeout
-        ? "Solver request timed out. Use Check Data to find row-level issues, or try again after relaxing constraints."
-        : error instanceof Error
-          ? error.message
-          : "Failed to reach solver API.";
-      const message = isTimeout ? rawMessage : normalizeNetworkError(rawMessage, "solver");
-      const enrichedErrors = enrichSolverErrors([
-        { code: isTimeout ? "solver_timeout" : "network_error", message },
-      ]);
+      const isAbort = error instanceof DOMException && error.name === "AbortError";
+      if (isAbort) {
+        // Cancel or timeout after cancel — don't treat as a user-facing solver failure.
+        return;
+      }
+      const rawMessage =
+        error instanceof Error ? error.message : "Failed to reach solver API.";
+      const message = normalizeNetworkError(rawMessage, "solver");
+      const enrichedErrors = enrichSolverErrors([{ code: "network_error", message }]);
       if (typeof window !== "undefined" && data) {
         storeSolverErrorSnapshot(data, enrichedErrors);
       }
@@ -162,31 +195,51 @@ export const SolverActionButton = ({
     }
   };
 
+  const showCancel = isMyRun;
+  const showLoadingRun = solverStatus === "loading" && !isMyRun && !solverBusyRemote;
+
   return (
     <>
-      <Button
-        size="sm"
-        radius="md"
-        variant="light"
-        className={editorToolbarBtnAccent}
-        startContent={solverStatus === "idle" ? <Rocket className="size-3.5" aria-hidden /> : undefined}
-        isLoading={solverStatus === "loading"}
-        onPress={() => setIsConfirmOpen(true)}
-        isDisabled={!data || solverStatus === "loading" || solverBusyRemote}
-        title={
-          solverBusyRemote
+      {showCancel ? (
+        <Button
+          size="sm"
+          radius="md"
+          variant="light"
+          className="h-8 min-h-8 min-w-0 gap-1.5 px-3 text-xs font-semibold tracking-tight shadow-none bg-rose-50 text-rose-700 border border-rose-200 data-[hover=true]:bg-rose-100"
+          startContent={<XCircle className="size-3.5" aria-hidden />}
+          isLoading={isCancelling}
+          onPress={handleCancelSolver}
+          isDisabled={isCancelling}
+        >
+          Cancel Solver
+        </Button>
+      ) : (
+        <Button
+          size="sm"
+          radius="md"
+          variant="light"
+          className={editorToolbarBtnAccent}
+          startContent={
+            showLoadingRun ? undefined : <Rocket className="size-3.5" aria-hidden />
+          }
+          isLoading={showLoadingRun}
+          onPress={() => setIsConfirmOpen(true)}
+          isDisabled={!data || solverBusyRemote || solverStatus === "loading"}
+          title={
+            solverBusyRemote
+              ? solverLock.startedBy
+                ? `Solver is running (started by ${solverLock.startedBy}). Please wait.`
+                : "Solver is running. Please wait."
+              : undefined
+          }
+        >
+          {solverBusyRemote
             ? solverLock.startedBy
-              ? `Solver is running (started by ${solverLock.startedBy}). Please wait.`
-              : "Solver is running. Please wait."
-            : undefined
-        }
-      >
-        {solverBusyRemote
-          ? solverLock.startedBy
-            ? `Running (${solverLock.startedBy})…`
-            : "Solver running…"
-          : "Run Solver"}
-      </Button>
+              ? `Running (${solverLock.startedBy})…`
+              : "Solver running…"
+            : "Run Solver"}
+        </Button>
+      )}
 
       <ViewportModal isOpen={isConfirmOpen} onClose={() => setIsConfirmOpen(false)} zIndex={1000}>
         {isConfirmOpen ? (
@@ -231,7 +284,7 @@ export const SolverActionButton = ({
                   color="primary"
                   className="font-bold"
                   onPress={runSolverConfirmed}
-                  isDisabled={solverStatus === "loading"}
+                  isDisabled={solverStatus === "loading" || solverLock.active}
                   isLoading={solverStatus === "loading"}
                 >
                   Run Solver
