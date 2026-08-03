@@ -7,8 +7,6 @@ import {
   CrossListGroupsEditor,
   NoOverlapGroupsEditor,
   BlockedTimesEditor,
-  LockedAssignmentsEditor,
-  SoftLocksEditor,
 } from "@/components/scheduler/editors/ConstraintsEditors";
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 
@@ -75,20 +73,6 @@ export default function ConstraintsPage() {
           instructorOptions={instructorOptions}
           roomOptions={roomOptions}
           onUpdate={(blocked) => updateField("blocked_times", blocked)}
-        />
-        <LockedAssignmentsEditor
-          lockedAssignments={data.locked_assignments}
-          sectionOptions={sectionOptions}
-          timeslotOptions={timeslotOptions}
-          roomOptions={roomOptions}
-          onUpdate={(locks) => updateField("locked_assignments", locks)}
-        />
-        <SoftLocksEditor
-          softLocks={data.soft_locks}
-          sectionOptions={sectionOptions}
-          timeslotOptions={timeslotOptions}
-          roomOptions={roomOptions}
-          onUpdate={(locks) => updateField("soft_locks", locks)}
         />
       </div>
     </div>

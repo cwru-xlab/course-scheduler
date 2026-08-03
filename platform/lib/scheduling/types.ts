@@ -95,6 +95,12 @@ export type SoftLock = {
   weight: number; // Higher = stronger preference (e.g., 1-100)
 };
 
+export type SectionLockState = "none" | "soft" | "hard";
+
+export type SectionLocksMap = Record<string, SectionLockState>;
+
+export const DEFAULT_SOFT_WEIGHT = 20;
+
 export type ScheduleAssignment = {
   section_id: Id;
   meeting_pattern_id: Id;

@@ -237,12 +237,18 @@ Minimize total penalty:
 
 ```
 Σ instructor_preference_penalties
-+ Σ room_waste_penalties
++ Σ room_fit_penalties
 + Σ section_clustering_penalties
 + Σ program_balance_penalties
 ```
 
 Hard constraints enforced strictly.
+
+Room-fit is not a raw per-seat waste penalty: assignments get a free-fit buffer
+of `max(ROOM_FIT_BUFFER_FLOOR, ROOM_FIT_RATIO × required_capacity)` seats (see
+`ROOM_FIT_RATIO` / `ROOM_FIT_BUFFER_FLOOR` in `solver/app.py`), and only wasted
+seats beyond that buffer are penalized. This prevents the solver from avoiding
+all larger rooms purely because of linear per-seat waste.
 
 ---
 
