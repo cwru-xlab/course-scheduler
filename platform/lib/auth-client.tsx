@@ -7,6 +7,7 @@ export interface AuthUser {
   name: string;
   networkId: string;
   authProvider: "cwru_sso" | "dev";
+  accessTier?: "active" | "developer" | null;
 }
 
 interface AuthContextValue {
@@ -30,6 +31,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       if (!res.ok) {
         setUser(null);
+        if (res.status === 403) {
+          window.location.href = "/login?error=access_denied";
+        }
         return;
       }
       const data = await res.json();

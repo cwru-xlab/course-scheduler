@@ -44,6 +44,7 @@ DIAGNOSE_MAX_SECONDS = 60.0
 DIAGNOSE_RELAX_BUDGET_SECONDS = 15.0
 
 from model import (
+    AppAccessUser,
     BlockedTime,
     Course,
     CrossListGroup,
@@ -274,6 +275,31 @@ def _ensure_schema_migrations() -> None:
                     )
                     conn.execute(text("DROP TABLE crosslist_groups"))
                     conn.execute(text("ALTER TABLE crosslist_groups_new RENAME TO crosslist_groups"))
+            # Access allowlist table (create_all usually handles this; keep for older DBs).
+            if "app_access_users" not in tables:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE app_access_users (
+                            network_id VARCHAR(64) PRIMARY KEY,
+                            access_tier VARCHAR(16) NOT NULL,
+                            display_name VARCHAR(256),
+                            added_by VARCHAR(64),
+                            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    )
+                )
+                try:
+                    conn.execute(
+                        text(
+                            "CREATE INDEX IF NOT EXISTS ix_app_access_users_tier "
+                            "ON app_access_users (access_tier)"
+                        )
+                    )
+                except Exception:  # pylint: disable=broad-except
+                    pass
     except Exception:  # pylint: disable=broad-except
         pass
 
@@ -2291,6 +2317,231 @@ def _solve_schedule(input_data: SchedulingInput):
 @app.route("/", methods=["GET"])
 def read_root():
     return jsonify({"service": "weatherhead-solver", "status": "ok"})
+
+
+# ---------------------------------------------------------------------------
+# App access allowlist (CWRU caseIDs)
+# ---------------------------------------------------------------------------
+
+_CASE_ID_RE = re.compile(r"^[a-z][a-z0-9]{2,31}$")
+_ACCESS_TIERS = frozenset({"active", "developer"})
+
+
+def _normalize_case_id(raw: Any) -> Optional[str]:
+    if raw is None:
+        return None
+    value = str(raw).strip().lower()
+    if not _CASE_ID_RE.match(value):
+        return None
+    return value
+
+
+def _require_solver_access_key() -> Optional[Any]:
+    """When SOLVER_ACCESS_KEY is set, require matching X-Solver-Access-Key header."""
+    expected = (os.environ.get("SOLVER_ACCESS_KEY") or "").strip()
+    if not expected:
+        return None
+    provided = (request.headers.get("X-Solver-Access-Key") or "").strip()
+    if provided != expected:
+        return jsonify({"status": "error", "error": "unauthorized"}), 401
+    return None
+
+
+@app.route("/access/check", methods=["GET"])
+def access_check():
+    """Return whether a caseID is allowlisted (and which tier)."""
+    denied = _require_solver_access_key()
+    if denied is not None:
+        return denied
+
+    network_id = _normalize_case_id(request.args.get("network_id"))
+    if not network_id:
+        return jsonify({"allowed": False, "tier": None, "error": "invalid_network_id"}), 400
+
+    row = AppAccessUser.query.filter_by(network_id=network_id).first()
+    if not row or row.access_tier not in _ACCESS_TIERS:
+        return jsonify({"allowed": False, "tier": None})
+    return jsonify({"allowed": True, "tier": row.access_tier})
+
+
+@app.route("/access/users", methods=["GET"])
+def access_list_users():
+    """List active-tier users only (for in-app handoff management)."""
+    denied = _require_solver_access_key()
+    if denied is not None:
+        return denied
+
+    rows = (
+        AppAccessUser.query.filter_by(access_tier="active")
+        .order_by(AppAccessUser.network_id.asc())
+        .all()
+    )
+    return jsonify({"status": "ok", "users": [r.to_dict() for r in rows]})
+
+
+@app.route("/access/users", methods=["POST"])
+def access_add_user():
+    """Add an active-tier user. Developer tier cannot be created via this API."""
+    denied = _require_solver_access_key()
+    if denied is not None:
+        return denied
+
+    body = request.get_json(silent=True) or {}
+    network_id = _normalize_case_id(body.get("network_id"))
+    if not network_id:
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "invalid_network_id",
+                            "message": "caseID must be lowercase letters/digits starting with a letter (e.g. aja193).",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    # Never allow creating developer rows from the API.
+    requested_tier = str(body.get("access_tier") or "active").strip().lower()
+    if requested_tier != "active":
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "tier_not_allowed",
+                            "message": "Only active users can be added from the app.",
+                        }
+                    ],
+                }
+            ),
+            403,
+        )
+
+    display_name = body.get("display_name")
+    if display_name is not None:
+        display_name = str(display_name).strip()[:256] or None
+    added_by = _normalize_case_id(body.get("added_by"))
+
+    existing = AppAccessUser.query.filter_by(network_id=network_id).first()
+    if existing:
+        if existing.access_tier == "developer":
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "errors": [
+                            {
+                                "code": "developer_protected",
+                                "message": "That caseID is on the developer list and cannot be changed from the app.",
+                            }
+                        ],
+                    }
+                ),
+                403,
+            )
+        if existing.access_tier == "active":
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "errors": [
+                            {
+                                "code": "already_exists",
+                                "message": f"{network_id} is already allowlisted.",
+                            }
+                        ],
+                    }
+                ),
+                409,
+            )
+
+    row = AppAccessUser(
+        network_id=network_id,
+        access_tier="active",
+        display_name=display_name,
+        added_by=added_by,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
+    db.session.add(row)
+    db.session.commit()
+    return jsonify({"status": "ok", "user": row.to_dict()}), 201
+
+
+@app.route("/access/users/<network_id>", methods=["DELETE"])
+def access_remove_user(network_id: str):
+    """Remove an active-tier user. Developers and the last active user are protected."""
+    denied = _require_solver_access_key()
+    if denied is not None:
+        return denied
+
+    normalized = _normalize_case_id(network_id)
+    if not normalized:
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {"code": "invalid_network_id", "message": "Invalid caseID."}
+                    ],
+                }
+            ),
+            400,
+        )
+
+    row = AppAccessUser.query.filter_by(network_id=normalized).first()
+    if not row:
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [{"code": "not_found", "message": "User not found."}],
+                }
+            ),
+            404,
+        )
+
+    if row.access_tier != "active":
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "developer_protected",
+                            "message": "Developer access can only be changed via database/ops.",
+                        }
+                    ],
+                }
+            ),
+            403,
+        )
+
+    active_count = AppAccessUser.query.filter_by(access_tier="active").count()
+    if active_count <= 1:
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "last_active_user",
+                            "message": "Cannot remove the last active user.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+
+    db.session.delete(row)
+    db.session.commit()
+    return jsonify({"status": "ok", "removed": normalized})
 
 
 @app.route("/data", methods=["GET"])
