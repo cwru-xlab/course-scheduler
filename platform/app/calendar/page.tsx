@@ -1131,16 +1131,22 @@ export default function CalendarPage() {
 
   const router = useRouter();
   const { user } = useAuth();
-  const { begin: beginSolverProgress, succeed: succeedSolverProgress, fail: failSolverProgress, cancelRun } =
-    useSolverProgress();
+  const {
+    begin: beginSolverProgress,
+    succeed: succeedSolverProgress,
+    fail: failSolverProgress,
+    cancelRun,
+    isRunningLocally,
+  } = useSolverProgress();
   const [sectionLocks, setSectionLocks] = useState<Record<string, SectionLockState>>({});
   const [solverRunStatus, setSolverRunStatus] = useState<"idle" | "loading">("idle");
   const solverLock = useSolverLock();
   const isMySolverRun =
-    solverLock.active &&
-    solverLock.startedByNetworkId !== null &&
-    user?.networkId === solverLock.startedByNetworkId;
-  const solverBusyRemote = solverLock.active && !isMySolverRun;
+    isRunningLocally ||
+    (solverLock.active &&
+      solverLock.startedByNetworkId !== null &&
+      user?.networkId === solverLock.startedByNetworkId);
+  const solverBusyRemote = solverLock.active && !isMySolverRun && solverRunStatus !== "loading";
   const { autoSaveEnabled, recordOwnServerWrite } = useSchedulingData();
   const [solverRunError, setSolverRunError] = useState<string | null>(null);
   // Cross-user shared schedule: newest solver result published by any live user.
@@ -2999,7 +3005,8 @@ type PatternDayApplyRow = {
         return;
       }
       if (response.status === 499) {
-        // Cancelled — progress bar disappears via SSE; do not treat as an error page.
+        // Cancelled — clear local progress; do not treat as an error page.
+        failSolverProgress();
         setSolverRunStatus("idle");
         return;
       }
@@ -3008,6 +3015,7 @@ type PatternDayApplyRow = {
           (e) => (e as ValidationError).code === "solver_cancelled",
         );
         if (cancelled) {
+          failSolverProgress();
           setSolverRunStatus("idle");
           return;
         }
