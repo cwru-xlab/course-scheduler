@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { siteConfig } from "@/config/site";
 import {
+  checkAccessAllowlist,
+  shouldBypassAllowlist,
+} from "@/lib/access-allowlist";
+import {
   buildAuthUserFromCAS,
   getCallbackUrl,
   signToken,
@@ -42,6 +46,17 @@ export async function GET(request: NextRequest) {
     }
 
     const user = buildAuthUserFromCAS(result.userInfo);
+
+    if (!shouldBypassAllowlist(user.authProvider)) {
+      const access = await checkAccessAllowlist(user.networkId, { skipCache: true });
+      if (!access.allowed || !access.tier) {
+        return NextResponse.redirect(
+          new URL("/login?error=access_denied", request.url),
+        );
+      }
+      user.accessTier = access.tier;
+    }
+
     const token = await signToken(user);
 
     const response = NextResponse.redirect(new URL("/", request.url));
