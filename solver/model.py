@@ -706,3 +706,32 @@ class ScheduleSolution(db.Model):
             "penalty_breakdown": self.penalty_breakdown or {},
             "explanations": self.explanations or [],
         }
+
+
+class AppAccessUser(db.Model):
+    """
+    Allowlisted CWRU caseIDs permitted to use the web app.
+
+    access_tier:
+      - active: dean's-office users; can manage other active users in-app
+      - developer: eng access; seed/SQL only (not creatable from the app UI)
+    """
+
+    __tablename__ = "app_access_users"
+
+    network_id = Column(String(64), primary_key=True)
+    access_tier = Column(String(16), nullable=False)  # 'active' | 'developer'
+    display_name = Column(String(256), nullable=True)
+    added_by = Column(String(64), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    def to_dict(self):
+        return {
+            "network_id": self.network_id,
+            "access_tier": self.access_tier,
+            "display_name": self.display_name,
+            "added_by": self.added_by,
+            "created_at": self.created_at.isoformat() + "Z" if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() + "Z" if self.updated_at else None,
+        }

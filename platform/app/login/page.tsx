@@ -9,6 +9,8 @@ export const dynamic = "force-dynamic";
 const ERROR_MESSAGES: Record<string, string> = {
   missing_ticket: "SSO did not return a ticket. Please try again.",
   session_expired: "Your session expired. Please sign in again.",
+  access_denied:
+    "Your CWRU account is not authorized for this app. Contact a Weatherhead scheduler administrator if you need access.",
   server_misconfigured:
     "Server is missing APP_BASE_URL or JWT_SECRET. Contact an administrator.",
   sso_error: "An error occurred during SSO. Please try again.",

@@ -10,7 +10,7 @@ import {
   DropdownTrigger,
   DropdownSection,
 } from "@heroui/dropdown";
-import { LogOut } from "lucide-react";
+import { LogOut, Shield } from "lucide-react";
 
 import { useAuth } from "@/lib/auth-client";
 import { LOGOUT_UNSAVED_CONFIRM_MESSAGE } from "@/lib/scheduling/unsavedChanges";
@@ -49,6 +49,8 @@ export function UserMenu() {
   }
 
   const initials = initialsOf(user.name);
+  const canManageAccess =
+    user.authProvider === "dev" || user.accessTier === "active";
 
   return (
     <Dropdown placement="bottom-end">
@@ -83,10 +85,24 @@ export function UserMenu() {
                 <span className="text-[10px] mt-1 uppercase tracking-wide text-warning-600 font-semibold">
                   Dev session
                 </span>
+              ) : user.accessTier === "developer" ? (
+                <span className="text-[10px] mt-1 uppercase tracking-wide text-sky-600 font-semibold">
+                  Developer access
+                </span>
               ) : null}
             </div>
           </DropdownItem>
         </DropdownSection>
+        {canManageAccess ? (
+          <DropdownItem
+            key="manage-access"
+            startContent={<Shield className="size-4" />}
+            href="/access"
+            as={Link}
+          >
+            Manage access
+          </DropdownItem>
+        ) : null}
         <DropdownItem
           key="logout"
           color="danger"

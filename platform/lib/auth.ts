@@ -5,6 +5,8 @@ export interface AuthUser {
   name: string;
   networkId: string;
   authProvider: "cwru_sso" | "dev";
+  /** Present after allowlisted SSO; optional for older tokens until re-login. */
+  accessTier?: "active" | "developer" | null;
 }
 
 export interface CWRUUserInfo {
@@ -52,6 +54,7 @@ export async function signToken(user: AuthUser): Promise<string> {
     name: user.name,
     networkId: user.networkId,
     authProvider: user.authProvider,
+    ...(user.accessTier ? { accessTier: user.accessTier } : {}),
   })
     .setProtectedHeader({ alg: JWT_ALG })
     .setIssuedAt()
@@ -73,7 +76,11 @@ export async function verifyToken(token: string): Promise<AuthUser | null> {
         ? payload.authProvider
         : null;
     if (!email || !name || !networkId || !authProvider) return null;
-    return { email, name, networkId, authProvider };
+    const accessTier =
+      payload.accessTier === "active" || payload.accessTier === "developer"
+        ? payload.accessTier
+        : null;
+    return { email, name, networkId, authProvider, accessTier };
   } catch {
     return null;
   }
