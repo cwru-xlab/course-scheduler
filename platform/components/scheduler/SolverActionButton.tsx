@@ -48,17 +48,18 @@ export const SolverActionButton = ({
   const router = useRouter();
   const { user } = useAuth();
   const solverLock = useSolverLock();
-  const { cancelRun } = useSolverProgress();
+  const { begin, succeed, fail, cancelRun, isRunningLocally } = useSolverProgress();
   const [solverStatus, setSolverStatus] = useState<"idle" | "loading">("idle");
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const clientAbortRef = useRef<AbortController | null>(null);
 
   const isMyRun =
-    solverLock.active &&
-    solverLock.startedByNetworkId !== null &&
-    user?.networkId === solverLock.startedByNetworkId;
-  const solverBusyRemote = solverLock.active && !isMyRun;
+    isRunningLocally ||
+    (solverLock.active &&
+      solverLock.startedByNetworkId !== null &&
+      user?.networkId === solverLock.startedByNetworkId);
+  const solverBusyRemote = solverLock.active && !isMyRun && solverStatus !== "loading";
   const archivedSectionCount =
     data?.sections.filter((section) => isSectionArchived(section)).length ?? 0;
 
@@ -80,9 +81,10 @@ export const SolverActionButton = ({
 
   const runSolver = async () => {
     if (!data) return;
-    if (solverLock.active) return;
+    if (solverBusyRemote) return;
     setSolverStatus("loading");
     onErrorChange?.(null);
+    begin();
 
     try {
       const validation = await validateSchedulingInput(data);
@@ -97,6 +99,7 @@ export const SolverActionButton = ({
             error_codes: Array.from(new Set(validation.issues.map((issue) => issue.code))),
           });
         }
+        fail();
         onErrorChange?.(summary);
         router.push("/solver-errors");
         return;
@@ -120,6 +123,7 @@ export const SolverActionButton = ({
 
       // Cancelled on server (or client abort after cancel)
       if (response.status === 499) {
+        fail();
         return;
       }
 
@@ -128,6 +132,7 @@ export const SolverActionButton = ({
       try {
         result = JSON.parse(raw) as ApiSuccess | ApiError;
       } catch {
+        fail();
         const errors = enrichSolverErrors([
           {
             code: "solver_response_invalid",
@@ -141,6 +146,7 @@ export const SolverActionButton = ({
       }
 
       if (result.status === "error" && result.errors?.some((e) => e.code === "solver_cancelled")) {
+        fail();
         return;
       }
 
@@ -160,6 +166,7 @@ export const SolverActionButton = ({
             result?.status === "error" ? result.diagnostics : undefined,
           );
         }
+        fail();
         onErrorChange?.(nextError);
         router.push("/solver-errors");
         return;
@@ -175,13 +182,16 @@ export const SolverActionButton = ({
           }),
         );
       }
+      succeed();
       router.push("/calendar");
     } catch (error) {
       const isAbort = error instanceof DOMException && error.name === "AbortError";
       if (isAbort) {
         // Cancel or timeout after cancel — don't treat as a user-facing solver failure.
+        fail();
         return;
       }
+      fail();
       const rawMessage =
         error instanceof Error ? error.message : "Failed to reach solver API.";
       const message = normalizeNetworkError(rawMessage, "solver");
@@ -195,8 +205,8 @@ export const SolverActionButton = ({
     }
   };
 
-  const showCancel = isMyRun;
-  const showLoadingRun = solverStatus === "loading" && !isMyRun && !solverBusyRemote;
+  const showCancel = isMyRun && (solverStatus === "loading" || isRunningLocally);
+  const showLoadingRun = solverStatus === "loading" && !showCancel && !solverBusyRemote;
 
   return (
     <>
