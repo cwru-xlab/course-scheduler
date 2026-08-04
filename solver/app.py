@@ -120,6 +120,15 @@ ADJUNCT_DAY_EXCESS_WEIGHT = 15  # penalty per day beyond adjunct max for adjunct
 SOFT_LOCK_BASE_WEIGHT = 1       # base multiplier for soft lock penalties
 SECTION_PREF_TIME_WEIGHT = 5    # penalty if section is not assigned to its preferred_time
 
+# Room-fit soft penalty. A linear per-seat waste (capacity - required) makes the
+# solver treat larger rooms as proportionally "worse" and dodge them entirely.
+# Instead, give every assignment a free-fit buffer: up to FIT_RATIO * required
+# (with a FIT_FLOOR floor for small classes) wasted seats cost nothing, and only
+# wasted seats beyond that buffer are penalized linearly. Fit then becomes a
+# tiebreaker instead of the dominant objective term.
+ROOM_FIT_RATIO = 0.25           # fraction of required capacity that may be wasted for free
+ROOM_FIT_BUFFER_FLOOR = 8       # minimum free-fit seats, even for tiny classes
+
 def _seed_if_empty() -> None:
     """Auto-seed timeslots, meeting patterns, rooms, and instructors when DB is empty."""
     import json
@@ -654,6 +663,20 @@ def _required_section_capacity(section: Any) -> int:
     return 0
 
 
+def _room_waste(room_capacity: int, required_capacity: int) -> int:
+    """Soft penalty for assigning a section to a room larger than it needs.
+
+    Seats within the free-fit buffer (max(ROOM_FIT_BUFFER_FLOOR,
+    ROOM_FIT_RATIO * required_capacity)) cost nothing; only wasted seats beyond
+    the buffer are penalized. This stops the solver from avoiding all larger
+    rooms purely because of linear per-seat waste.
+    """
+    if required_capacity <= 0:
+        return 0
+    buffer = max(ROOM_FIT_BUFFER_FLOOR, int(round(ROOM_FIT_RATIO * required_capacity)))
+    return max(0, room_capacity - required_capacity - buffer)
+
+
 def _build_section_to_crosslist_group(crosslists: List, sections: List) -> Dict[str, str]:
     """Build canonical section -> cross-list group mapping.
 
@@ -893,7 +916,7 @@ def _build_options(
                             pattern_id,
                             tuple(timeslot_set),
                             room["id"],
-                            room["capacity"] - required_capacity,
+                            _room_waste(room["capacity"], required_capacity),
                         )
                     )
 

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ScheduleSolution, SchedulingInput, ValidationError } from "./types";
+import type { ScheduleSolution, SchedulingInput, SectionLockState, ValidationError } from "./types";
 import { enrichSpreadsheetErrors, formatErrorsDetail, formatErrorsSummary, normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
 
 export const LAST_SOLVER_RUN_STORAGE_KEY = "wsom-last-solver-run";
@@ -17,7 +17,7 @@ export type LastSolverRunSnapshot = {
   input: SchedulingInput;
   solution: ScheduleSolution;
   createdAt: string;
-  lockedSectionIds?: string[];
+  sectionLocks?: Record<string, SectionLockState>;
 };
 
 export type SavedScheduleEntry = {

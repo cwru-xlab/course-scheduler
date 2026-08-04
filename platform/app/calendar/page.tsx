@@ -10,6 +10,7 @@ import {
   Table2,
   Link2,
   Lock,
+  LockOpen,
   Palette,
   Play,
   Plus,
@@ -45,6 +46,7 @@ import {
   type LastSolverRunSnapshot,
 } from "@/lib/scheduling/history";
 import { isSectionArchived, normalizeSectionState } from "@/lib/scheduling/sectionState";
+import { sectionLocksFromInput } from "@/lib/scheduling/sectionLocks";
 import {
   SCHEDULING_WINDOW_END_HOUR,
   SCHEDULING_WINDOW_START_HOUR,
@@ -54,8 +56,11 @@ import type {
   LockedAssignment,
   ScheduleSolution,
   SchedulingInput,
+  SectionLockState,
+  SoftLock,
   ValidationError,
 } from "@/lib/scheduling/types";
+import { DEFAULT_SOFT_WEIGHT } from "@/lib/scheduling/types";
 import {
   SCHEDULING_DATA_REFRESH_EVENT,
   useSchedulingData,
@@ -166,10 +171,7 @@ type SectionFormDraft = {
   tags: string;
 };
 
-type LastSolverRun = LastSolverRunSnapshot & {
-  // Backward compatibility for older snapshots without optional locks.
-  lockedSectionIds?: string[];
-};
+type LastSolverRun = LastSolverRunSnapshot;
 
 /** Stable signature of an assignment map for cheap equality comparisons. */
 const assignmentsSignature = (map: Record<string, {
@@ -187,6 +189,24 @@ const assignmentsSignature = (map: Record<string, {
         [...(v.timeslot_ids ?? [])].sort(),
       ]),
   );
+
+/** Stable signature of the lock map for cheap equality comparisons. */
+const locksSignature = (locks: Record<string, SectionLockState>): string =>
+  JSON.stringify(
+    Object.entries(locks)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([id, state]) => [id, state]),
+  );
+
+/** Combined signature of the current working view (assignments + locks). */
+const activeViewSignature = (
+  map: Record<string, {
+    timeslot_ids?: string[];
+    room_id?: string | null;
+    meeting_pattern_id?: string | null;
+  }>,
+  locks: Record<string, SectionLockState>,
+): string => `${assignmentsSignature(map)}||${locksSignature(locks)}`;
 
 type SaveScheduleDraft = {
   name: string;
@@ -218,33 +238,46 @@ function crosslistPeerSectionIds(sectionId: string, sections: SectionDto[]): str
   return peers.length ? peers : [sectionId];
 }
 
-function mergePlacementLocks(
-  baseLocks: LockedAssignment[],
-  lockedSectionIds: string[],
+function buildLockPayloads(
+  sectionLocks: Record<string, SectionLockState>,
   assignments: CalendarAssignmentMap,
   sections: SectionDto[],
-): LockedAssignment[] {
-  const lockSet = new Set(lockedSectionIds);
-  const byId = new Map<string, LockedAssignment>();
-  for (const lock of baseLocks) {
-    if (!lockSet.has(lock.section_id)) {
-      byId.set(lock.section_id, lock);
-    }
-  }
-  for (const sectionId of Array.from(lockSet)) {
+): { locked_assignments: LockedAssignment[]; soft_locks: SoftLock[] } {
+  const locked: LockedAssignment[] = [];
+  const soft: SoftLock[] = [];
+  const seenHard = new Set<string>();
+  const seenSoft = new Set<string>();
+
+  for (const sectionId of Object.keys(sectionLocks)) {
+    const lockState = sectionLocks[sectionId];
+    if (lockState === "none") continue;
+
+    const peers = crosslistPeerSectionIds(sectionId, sections);
     const assignment = assignments[sectionId];
     const ts = [...(assignment?.timeslot_ids ?? [])].filter(Boolean).sort();
     const room = (assignment?.room_id ?? "").trim();
     if (!ts.length || !room) continue;
-    for (const sid of crosslistPeerSectionIds(sectionId, sections)) {
-      byId.set(sid, {
-        section_id: sid,
-        fixed_timeslot_set: ts,
-        fixed_room: room,
-      });
+
+    for (const sid of peers) {
+      if (lockState === "hard" && !seenHard.has(sid)) {
+        seenHard.add(sid);
+        locked.push({
+          section_id: sid,
+          fixed_timeslot_set: ts,
+          fixed_room: room,
+        });
+      } else if (lockState === "soft" && !seenSoft.has(sid)) {
+        seenSoft.add(sid);
+        soft.push({
+          section_id: sid,
+          preferred_timeslot_set: ts,
+          preferred_room: room,
+          weight: DEFAULT_SOFT_WEIGHT,
+        });
+      }
     }
   }
-  return Array.from(byId.values());
+  return { locked_assignments: locked, soft_locks: soft };
 }
 
 function normalizeAssignmentMapEntry(
@@ -1100,7 +1133,7 @@ export default function CalendarPage() {
   const { user } = useAuth();
   const { begin: beginSolverProgress, succeed: succeedSolverProgress, fail: failSolverProgress, cancelRun } =
     useSolverProgress();
-  const [lockedSectionIds, setLockedSectionIds] = useState<string[]>([]);
+  const [sectionLocks, setSectionLocks] = useState<Record<string, SectionLockState>>({});
   const [solverRunStatus, setSolverRunStatus] = useState<"idle" | "loading">("idle");
   const solverLock = useSolverLock();
   const isMySolverRun =
@@ -1119,6 +1152,17 @@ export default function CalendarPage() {
   const sharedInitializedRef = useRef(false);
   // True while the current view came from History (protect it from auto-sync).
   const historyViewActiveRef = useRef(false);
+  // Live collaboration: debounce timer + signature of the view we last authored
+  // or applied, so we only publish genuine local edits as the active schedule.
+  const activePublishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activePublishInFlightRef = useRef(false);
+  const lastActiveSignatureRef = useRef<string | null>(null);
+  // Durable lock persistence: debounce timer + in-flight flag + dirty flag set
+  // only by genuine user lock edits (not hydration/apply) so we never
+  // re-persist content that arrived from the server or local storage.
+  const locksPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const locksPersistInFlightRef = useRef(false);
+  const locksDirtyRef = useRef(false);
   // Signature of the assignment map at the last successful "Save to History".
   // Used to tell whether the current iteration is unsaved before a re-run.
   const [lastHistorySavedSignature, setLastHistorySavedSignature] = useState<string | null>(null);
@@ -1493,7 +1537,9 @@ type PatternDayApplyRow = {
     setAssignmentsBySection(nextAssignments);
     setBaselineAssignments(nextAssignments);
     setSolverTimeslotIdsBySection(allTimeslotIdsBySection);
-    setLockedSectionIds(Array.isArray(parsed.lockedSectionIds) ? parsed.lockedSectionIds : []);
+    if (parsed.sectionLocks) {
+      setSectionLocks(parsed.sectionLocks);
+    }
     setUndoStack([]);
     undoStackRef.current = [];
     setRedoStack([]);
@@ -1504,6 +1550,21 @@ type PatternDayApplyRow = {
       instructors: instructorsFromSolver,
       rooms: roomsFromSolver,
     });
+    // This view is now fully represented server-side (it was just authored or
+    // applied), so the live-publish watcher must not echo it back.
+    lastActiveSignatureRef.current = activeViewSignature(
+      Object.fromEntries(
+        parsed.solution.assignments.map((assignment) => [
+          assignment.section_id,
+          {
+            timeslot_ids: assignment.timeslot_ids,
+            room_id: assignment.room_id,
+            meeting_pattern_id: assignment.meeting_pattern_id,
+          },
+        ]),
+      ),
+      parsed.sectionLocks ?? {},
+    );
   }, []);
 
   useEffect(() => {
@@ -1571,7 +1632,13 @@ type PatternDayApplyRow = {
           );
           setAssignmentsBySection(fallbackAssignments);
           setBaselineAssignments(fallbackAssignments);
-          setLockedSectionIds([]);
+          const hydratedLocks = sectionLocksFromInput(
+            json.data as unknown as {
+              locked_assignments?: Array<{ section_id?: string }>;
+              soft_locks?: Array<{ section_id?: string }>;
+            },
+          );
+          setSectionLocks(hydratedLocks);
           setUndoStack([]);
           undoStackRef.current = [];
           setRedoStack([]);
@@ -2428,8 +2495,8 @@ type PatternDayApplyRow = {
   ]);
 
   const updateLastRunStorage = useCallback(
-    (nextInput: SchedulingInput, assignments: AssignmentMap, locks?: string[]) => {
-      const lockList = locks ?? lockedSectionIds;
+    (nextInput: SchedulingInput, assignments: AssignmentMap, locks?: Record<string, SectionLockState>) => {
+      const lockMap = locks ?? sectionLocks;
       if (typeof window === "undefined") return;
       localStorage.setItem(
         LAST_SOLVER_RUN_STORAGE_KEY,
@@ -2447,12 +2514,12 @@ type PatternDayApplyRow = {
             penalty_breakdown: {},
             explanations: [],
           },
-          lockedSectionIds: lockList,
+          sectionLocks: lockMap,
           createdAt: new Date().toISOString(),
         }),
       );
     },
-    [lockedSectionIds],
+    [sectionLocks],
   );
 
   const hasValidUnsavedEdit = useMemo(() => {
@@ -2540,14 +2607,18 @@ type PatternDayApplyRow = {
     [sectionDayTimes],
   );
 
-  const isPlacementLocked = useCallback(
-    (sectionId: string) => {
-      if (!data) return false;
-      return crosslistPeerSectionIds(sectionId, data.sections).some((id) =>
-        lockedSectionIds.includes(id),
-      );
+  const getSectionLockState = useCallback(
+    (sectionId: string): SectionLockState => {
+      if (!data) return "none";
+      const peers = crosslistPeerSectionIds(sectionId, data.sections);
+      for (const id of peers) {
+        const state = sectionLocks[id];
+        if (state === "hard") return "hard";
+        if (state === "soft") return "soft";
+      }
+      return "none";
     },
-    [data, lockedSectionIds],
+    [data, sectionLocks],
   );
 
   const canLockSectionPlacement = useCallback(
@@ -2561,8 +2632,8 @@ type PatternDayApplyRow = {
     [assignmentsBySection, data],
   );
 
-  const togglePlacementLockForSection = useCallback(
-    (sectionId: string) => {
+  const cycleLockForSection = useCallback(
+    (sectionId: string, shiftKey = false, target?: SectionLockState) => {
       if (!data) return;
       if (!canLockSectionPlacement(sectionId)) {
         setDragFeedback({
@@ -2573,30 +2644,43 @@ type PatternDayApplyRow = {
         return;
       }
       const peers = crosslistPeerSectionIds(sectionId, data.sections);
-      const willLock = !peers.some((p) => lockedSectionIds.includes(p));
-      setLockedSectionIds((prev) => {
-        const next = new Set(prev);
-        const anyLocked = peers.some((p) => next.has(p));
-        if (anyLocked) peers.forEach((p) => next.delete(p));
-        else peers.forEach((p) => next.add(p));
-        return Array.from(next);
+      const current = getSectionLockState(sectionId);
+
+      let next: SectionLockState;
+      if (target) {
+        next = target;
+      } else if (shiftKey) {
+        next = "hard";
+      } else {
+        if (current === "none") next = "soft";
+        else if (current === "soft") next = "hard";
+        else next = "none";
+      }
+
+      setSectionLocks((prev) => {
+        const updated = { ...prev };
+        for (const p of peers) {
+          if (next === "none") delete updated[p];
+          else updated[p] = next;
+        }
+        return updated;
       });
-      // Locking must immediately invalidate any in-progress drag so a pointer
-      // sequence started before the lock cannot commit a move.
-      if (willLock && calendarDrag && peers.includes(calendarDrag.sectionId)) {
+      locksDirtyRef.current = true;
+
+      if (next !== "none" && calendarDrag && peers.includes(calendarDrag.sectionId)) {
         setCalendarDrag(null);
       }
       setCalendarContextMenu(null);
     },
-    [calendarDrag, canLockSectionPlacement, data, lockedSectionIds],
+    [calendarDrag, canLockSectionPlacement, data, getSectionLockState],
   );
 
-  // Entry point for the on-card lock button. Unlocking is immediate; locking a
-  // staggered section first surfaces a confirmation so the user reviews its
-  // per-day times. Locking pins every day of the meeting pattern (peers included).
+  // Entry point for the on-card lock button. For staggered sections, locking
+  // first surfaces a confirmation dialog. Shift-click always hard-locks.
   const requestToggleLockFromCalendar = useCallback(
-    (sectionId: string) => {
-      const willLock = !isPlacementLocked(sectionId);
+    (sectionId: string, shiftKey = false) => {
+      const current = getSectionLockState(sectionId);
+      const willLock = current === "none";
       if (willLock && !canLockSectionPlacement(sectionId)) {
         setDragFeedback({
           status: "invalid",
@@ -2604,7 +2688,7 @@ type PatternDayApplyRow = {
         });
         return;
       }
-      if (willLock && sectionIsStaggered(sectionId)) {
+      if (willLock && !shiftKey && sectionIsStaggered(sectionId)) {
         const section = sectionById.get(sectionId);
         const courseLabel =
           [section?.department, String(section?.course_id ?? sectionId)]
@@ -2618,67 +2702,89 @@ type PatternDayApplyRow = {
         });
         return;
       }
-      togglePlacementLockForSection(sectionId);
+      cycleLockForSection(sectionId, shiftKey);
     },
     [
       canLockSectionPlacement,
-      isPlacementLocked,
+      getSectionLockState,
       sectionById,
       sectionDayTimes,
       sectionIsStaggered,
-      togglePlacementLockForSection,
+      cycleLockForSection,
     ],
   );
 
   const confirmStaggeredLock = useCallback(() => {
     if (!staggeredLockConfirm) return;
-    togglePlacementLockForSection(staggeredLockConfirm.sectionId);
+    cycleLockForSection(staggeredLockConfirm.sectionId);
     setStaggeredLockConfirm(null);
-  }, [staggeredLockConfirm, togglePlacementLockForSection]);
+  }, [staggeredLockConfirm, cycleLockForSection]);
 
-  const lockAllPlacementChanges = useCallback(() => {
+  const lockAllSections = useCallback(() => {
     if (!data) return;
-    const norm = (s: SectionDto, m: AssignmentMap) => {
-      const v = normalizeAssignmentMapEntry(s, m);
-      return JSON.stringify({
-        room_id: v.room_id,
-        meeting_pattern_id: v.meeting_pattern_id,
-        timeslot_ids: [...v.timeslot_ids].sort(),
-      });
-    };
-    const next = new Set(lockedSectionIds);
-    let groupsLocked = 0;
+    const next: Record<string, SectionLockState> = {};
+    let lockedCount = 0;
     for (const s of data.sections) {
-      if (norm(s, assignmentsBySection) === norm(s, baselineAssignments)) continue;
-      const cur = normalizeAssignmentMapEntry(s, assignmentsBySection);
-      if (!cur.timeslot_ids.length || !cur.room_id) continue;
+      const a = normalizeAssignmentMapEntry(s, assignmentsBySection);
+      if (!a.timeslot_ids.length || !a.room_id) continue;
       const peers = crosslistPeerSectionIds(s.id, data.sections);
-      const before = next.size;
-      peers.forEach((p) => next.add(p));
-      if (next.size > before) groupsLocked += 1;
+      for (const p of peers) {
+        if (next[p] !== "hard") {
+          next[p] = "hard";
+          lockedCount++;
+        }
+      }
     }
-    setLockedSectionIds(Array.from(next));
-    if (calendarDrag && next.has(calendarDrag.sectionId)) {
+    setSectionLocks(next);
+    locksDirtyRef.current = true;
+    if (calendarDrag && next[calendarDrag.sectionId]) {
       setCalendarDrag(null);
     }
     setDragFeedback({
-      status: groupsLocked > 0 ? "valid" : "neutral",
+      status: lockedCount > 0 ? "valid" : "neutral",
       message:
-        groupsLocked > 0
-          ? `Locked ${groupsLocked} section group(s) that differ from the baseline. Cross-listed peers lock together.`
-          : "No changed sections with both a room and times to lock.",
+        lockedCount > 0
+          ? `${lockedCount} section(s) locked. Cross-listed peers lock together.`
+          : "No sections with both a room and times to lock.",
     });
-  }, [assignmentsBySection, baselineAssignments, calendarDrag, data, lockedSectionIds]);
+  }, [assignmentsBySection, calendarDrag, data]);
 
-  const unlockAllPlacementLocks = useCallback(() => {
-    setLockedSectionIds([]);
+  const unlockAllLocks = useCallback(() => {
+    setSectionLocks({});
+    locksDirtyRef.current = true;
     setDragFeedback({
       status: "valid",
-      message: "Cleared all placement locks for this calendar session.",
+      message: "Cleared all locks for this calendar session.",
     });
   }, []);
 
-  const hasAnyPlacementLock = lockedSectionIds.length > 0;
+  const hasAnyLock = useMemo(
+    () => Object.values(sectionLocks).some((v) => v !== "none"),
+    [sectionLocks],
+  );
+
+  const lockCount = useMemo(
+    () => Object.keys(sectionLocks).length,
+    [sectionLocks],
+  );
+
+  const lockBreakdown = useMemo(() => {
+    let soft = 0;
+    let hard = 0;
+    for (const v of Object.values(sectionLocks)) {
+      if (v === "soft") soft++;
+      else if (v === "hard") hard++;
+    }
+    return { soft, hard };
+  }, [sectionLocks]);
+
+  const toggleAllLocks = useCallback(() => {
+    if (hasAnyLock) {
+      unlockAllLocks();
+    } else {
+      lockAllSections();
+    }
+  }, [hasAnyLock, lockAllSections, unlockAllLocks]);
 
   const tableSectionsFiltered = useMemo(() => {
     if (!data) return [];
@@ -2774,10 +2880,10 @@ type PatternDayApplyRow = {
 
   useEffect(() => {
     if (!solverInput) return;
-    updateLastRunStorage(solverInput, assignmentsBySection, lockedSectionIds);
+    updateLastRunStorage(solverInput, assignmentsBySection, sectionLocks);
     // Intentionally only when locks change — assignment changes persist via other flows.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- assignments read from latest render
-  }, [lockedSectionIds, solverInput, updateLastRunStorage]);
+  }, [sectionLocks, solverInput, updateLastRunStorage]);
 
   useEffect(() => {
     if (!calendarContextMenu) return;
@@ -2835,15 +2941,15 @@ type PatternDayApplyRow = {
         input = json.data;
       }
       const sectionsForLocks = data?.sections ?? [];
-      const mergedLocks = mergePlacementLocks(
-        input.locked_assignments ?? [],
-        lockedSectionIds,
+      const lockPayloads = buildLockPayloads(
+        sectionLocks,
         assignmentsBySection,
         sectionsForLocks,
       );
       const nextInput: SchedulingInput = {
         ...input,
-        locked_assignments: mergedLocks,
+        locked_assignments: lockPayloads.locked_assignments,
+        soft_locks: lockPayloads.soft_locks,
       };
       // Fail fast on spreadsheet row-level data issues before hitting the solver,
       // matching the editor's Run Solver flow (issue C11). Located issues route to
@@ -2929,13 +3035,16 @@ type PatternDayApplyRow = {
       setAssignmentsBySection(nextAssignments);
       setBaselineAssignments(nextAssignments);
       setSolverTimeslotIdsBySection(allTimeslotIdsBySection);
-      updateLastRunStorage(nextInput, nextAssignments, lockedSectionIds);
+      updateLastRunStorage(nextInput, nextAssignments, sectionLocks);
       // This run is the newest shared schedule; adopt its revision so the sync
       // effect doesn't treat our own result as an incoming change, and mark the
       // fresh iteration as not-yet-saved to history.
       if (typeof result.shared_revision === "number") {
         appliedSharedRevisionRef.current = result.shared_revision;
       }
+      // The server already published this run as the active schedule, so the
+      // live-publish watcher must not echo it back.
+      lastActiveSignatureRef.current = activeViewSignature(nextAssignments, sectionLocks);
       historyViewActiveRef.current = false;
       setLastHistorySavedSignature(null);
       setIncomingShared(null);
@@ -2978,7 +3087,7 @@ type PatternDayApplyRow = {
     data,
     failSolverProgress,
     hasValidUnsavedEdit,
-    lockedSectionIds,
+    sectionLocks,
     router,
     solverBusyRemote,
     solverLock.startedBy,
@@ -4151,15 +4260,17 @@ type PatternDayApplyRow = {
         meeting_pattern_id: value.meeting_pattern_id,
       }));
 
+      const lockPayloads = buildLockPayloads(
+        sectionLocks,
+        assignmentsBySection,
+        data?.sections ?? [],
+      );
+
       return {
         input: {
           ...inputForSnapshot,
-          locked_assignments: mergePlacementLocks(
-            inputForSnapshot.locked_assignments ?? [],
-            lockedSectionIds,
-            assignmentsBySection,
-            data?.sections ?? [],
-          ),
+          locked_assignments: lockPayloads.locked_assignments,
+          soft_locks: lockPayloads.soft_locks,
         },
         solution: {
           assignments,
@@ -4168,11 +4279,159 @@ type PatternDayApplyRow = {
           explanations: [],
         },
         createdAt: new Date().toISOString(),
-        lockedSectionIds,
+        sectionLocks,
       };
     },
-    [assignmentsBySection, data?.sections, lockedSectionIds, solverInput],
+    [assignmentsBySection, data?.sections, sectionLocks, solverInput],
   );
+
+  // Publish the current view as the shared "active schedule" (Google-Docs-style
+  // live collaboration). Debounced + signature-gated by the watcher below.
+  const publishActiveSchedule = useCallback(async () => {
+    if (typeof window === "undefined") return;
+    if (activePublishInFlightRef.current) return;
+    activePublishInFlightRef.current = true;
+    try {
+      const snapshot = await buildSnapshotFromCurrentView();
+      const res = await fetch("/api/shared-schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(snapshot),
+      });
+      if (!res.ok) return;
+      const meta = (await res.json()) as { revision?: number };
+      if (typeof meta.revision === "number") {
+        appliedSharedRevisionRef.current = meta.revision;
+      }
+      lastActiveSignatureRef.current = activeViewSignature(
+        assignmentsBySection,
+        sectionLocks,
+      );
+    } catch {
+      // Best-effort: the next edit retriggers the debounced publish.
+    } finally {
+      activePublishInFlightRef.current = false;
+    }
+  }, [assignmentsBySection, buildSnapshotFromCurrentView, sectionLocks]);
+
+  // Watch for real local edits (assignment moves / lock changes) and publish
+  // them as the active schedule. Baseline on mount; never echoes content that
+  // this client already authored or applied (lastActiveSignatureRef).
+  useEffect(() => {
+    if (lastActiveSignatureRef.current === null) {
+      lastActiveSignatureRef.current = activeViewSignature(assignmentsBySection, sectionLocks);
+      return;
+    }
+    if (activeViewSignature(assignmentsBySection, sectionLocks) === lastActiveSignatureRef.current) {
+      return;
+    }
+    if (solverRunStatus === "loading" || solverBusyRemote) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+    if (activePublishTimerRef.current) clearTimeout(activePublishTimerRef.current);
+    activePublishTimerRef.current = setTimeout(() => {
+      activePublishTimerRef.current = null;
+      if (activeViewSignature(assignmentsBySection, sectionLocks) === lastActiveSignatureRef.current) {
+        return;
+      }
+      void publishActiveSchedule();
+    }, 1600);
+    return () => {
+      if (activePublishTimerRef.current) {
+        clearTimeout(activePublishTimerRef.current);
+        activePublishTimerRef.current = null;
+      }
+    };
+  }, [
+    assignmentsBySection,
+    sectionLocks,
+    solverRunStatus,
+    solverBusyRemote,
+    publishActiveSchedule,
+  ]);
+
+  // Persist the current lock set to the solver DB (durable, shared with the
+  // editor + solver) via a read-modify-write of /api/update-all so concurrent
+  // editor edits are not clobbered. Gated on Auto-save, matching how calendar
+  // placements and editor changes are persisted.
+  const persistLocksToBackend = useCallback(async () => {
+    if (typeof window === "undefined") return;
+    if (!autoSaveEnabled) return;
+    if (locksPersistInFlightRef.current) return;
+    if (solverRunStatus === "loading" || solverBusyRemote) return;
+    locksPersistInFlightRef.current = true;
+    try {
+      const res = await fetch("/api/data", { method: "GET" });
+      const json = (await res.json()) as
+        | { status: "ok"; data: SchedulingInput }
+        | { status: "error"; errors?: { message?: string }[] };
+      if (!res.ok || json.status !== "ok") return;
+
+      const lockPayloads = buildLockPayloads(
+        sectionLocks,
+        assignmentsBySection,
+        data?.sections ?? [],
+      );
+      // No-op guard: skip when the DB already reflects this exact lock set.
+      const existing = sectionLocksFromInput(json.data);
+      const next = sectionLocksFromInput(lockPayloads);
+      if (JSON.stringify(existing) === JSON.stringify(next)) {
+        locksDirtyRef.current = false;
+        return;
+      }
+
+      const response = await fetch("/api/update-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...json.data,
+          locked_assignments: lockPayloads.locked_assignments,
+          soft_locks: lockPayloads.soft_locks,
+        }),
+      });
+      const payload = (await response.json()) as
+        | { status: "ok" }
+        | { status: "error"; errors?: { message?: string }[] };
+      if (!response.ok || payload.status === "error") return;
+
+      locksDirtyRef.current = false;
+      await recordOwnServerWrite();
+      window.dispatchEvent(new Event(SCHEDULING_DATA_REFRESH_EVENT));
+    } catch {
+      // Best-effort: the next lock change retries.
+    } finally {
+      locksPersistInFlightRef.current = false;
+    }
+  }, [
+    autoSaveEnabled,
+    assignmentsBySection,
+    data?.sections,
+    recordOwnServerWrite,
+    sectionLocks,
+    solverBusyRemote,
+    solverRunStatus,
+  ]);
+
+  // Watch for genuine user lock edits (flagged by the lock handlers, never by
+  // hydration/apply) and persist them after a debounce. The dirty flag stays
+  // set while blocked (autosave off / solver busy / tab hidden) so the edit is
+  // persisted once unblocked.
+  useEffect(() => {
+    if (!autoSaveEnabled) return;
+    if (solverRunStatus === "loading" || solverBusyRemote) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+    if (!locksDirtyRef.current) return;
+    if (locksPersistTimerRef.current) clearTimeout(locksPersistTimerRef.current);
+    locksPersistTimerRef.current = setTimeout(() => {
+      locksPersistTimerRef.current = null;
+      void persistLocksToBackend();
+    }, 1600);
+    return () => {
+      if (locksPersistTimerRef.current) {
+        clearTimeout(locksPersistTimerRef.current);
+        locksPersistTimerRef.current = null;
+      }
+    };
+  }, [autoSaveEnabled, sectionLocks, solverRunStatus, solverBusyRemote, persistLocksToBackend]);
 
   const handleSaveScheduleToHistory = useCallback(async () => {
     const trimmedName = saveScheduleModal.draft.name.trim();
@@ -4415,9 +4674,9 @@ type PatternDayApplyRow = {
               aria-label="Open schedule table"
             >
               <Table2 className="size-4" />
-              {hasAnyPlacementLock && (
+              {hasAnyLock && (
                 <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold leading-4 text-center">
-                  {lockedSectionIds.length}
+                  {lockCount}
                 </span>
               )}
             </button>
@@ -4994,11 +5253,17 @@ type PatternDayApplyRow = {
                       ? section.id
                       : section.id;
                     const isDragSource = calendarDrag?.sectionId === dragSectionId;
-                    const placementLocked = isCrosslistGroupEvent(event)
+                    const lockState: SectionLockState = isCrosslistGroupEvent(event)
                       ? (event.crosslistMembers ?? []).some((member) =>
-                          isPlacementLocked(member.id),
+                          getSectionLockState(member.id) !== "none",
                         )
-                      : isPlacementLocked(section.id);
+                        ? (event.crosslistMembers ?? []).some((member) =>
+                            getSectionLockState(member.id) === "hard",
+                          )
+                          ? "hard"
+                          : "soft"
+                        : "none"
+                      : getSectionLockState(section.id);
 
                     const sharedPointerHandlers = {
                       onContextMenu: (e: ReactMouseEvent<HTMLDivElement>) => {
@@ -5027,7 +5292,7 @@ type PatternDayApplyRow = {
                         }
                         // Locked placements (or any locked cross-list peer) must not
                         // start a drag — corruption guard for solver-pinned sections.
-                        if (placementLocked) {
+                        if (lockState !== "none") {
                           setCalendarDrag(null);
                           setDragFeedback({
                             status: "invalid",
@@ -5168,11 +5433,11 @@ type PatternDayApplyRow = {
                           matchesHoveredDepartment={matchesHoveredDepartment}
                           isDragSource={isDragSource}
                           hasDragMoved={Boolean(calendarDrag?.hasMoved)}
-                          placementLocked={placementLocked}
+                          placementLocked={lockState}
                           draggable={Boolean(solverInput)}
                           lockable={Boolean(solverInput)}
                           isStaggered={sectionIsStaggered(section.id)}
-                          onToggleLock={() => requestToggleLockFromCalendar(section.id)}
+                          onToggleLock={(e) => requestToggleLockFromCalendar(section.id, e?.shiftKey)}
                           isConflicting={event.crosslistMembers.some((member) =>
                             conflictSectionIds.has(member.id),
                           )}
@@ -5261,25 +5526,37 @@ type PatternDayApplyRow = {
                               type="button"
                               className={clsx(
                                 "flex size-5 shrink-0 items-center justify-center rounded-md border shadow-sm transition-opacity",
-                                placementLocked
-                                  ? "border-amber-300 bg-amber-50 text-amber-900 opacity-100"
-                                  : "border-slate-300 bg-white/90 text-slate-600 opacity-0 hover:bg-white focus-visible:opacity-100 group-hover:opacity-100",
+                                lockState === "hard"
+                                  ? "border-red-300 bg-red-50 text-red-900 opacity-100"
+                                  : lockState === "soft"
+                                    ? "border-amber-300 bg-amber-50 text-amber-900 opacity-100"
+                                    : "border-slate-300 bg-white/90 text-slate-600 opacity-0 hover:bg-white focus-visible:opacity-100 group-hover:opacity-100",
                               )}
                               title={
-                                placementLocked
-                                  ? "Locked for solver — click to unlock (all pattern days)"
-                                  : "Lock for solver (locks every day in the pattern)"
+                                lockState === "hard"
+                                  ? "Hard-locked — click to unlock"
+                                  : lockState === "soft"
+                                    ? "Soft-locked — click to hard-lock"
+                                    : "Lock for solver"
                               }
-                              aria-label={placementLocked ? "Unlock placement" : "Lock placement"}
+                              aria-label={
+                                lockState === "hard"
+                                  ? "Hard-locked"
+                                  : lockState === "soft"
+                                    ? "Soft-locked"
+                                    : "Not locked"
+                              }
                               onPointerDown={(e) => e.stopPropagation()}
                               onPointerUp={(e) => e.stopPropagation()}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                requestToggleLockFromCalendar(section.id);
+                                requestToggleLockFromCalendar(section.id, e.shiftKey);
                               }}
                             >
-                              {placementLocked ? (
+                              {lockState === "hard" ? (
                                 <Lock className="size-3" />
+                              ) : lockState === "soft" ? (
+                                <LockOpen className="size-3" />
                               ) : (
                                 <Unlock className="size-3" />
                               )}
@@ -5404,7 +5681,7 @@ type PatternDayApplyRow = {
           <div className="min-w-0">
             <h3 className="text-sm font-bold text-slate-900">Schedule table</h3>
             <p className="text-[11px] text-slate-500 truncate">
-              Lock keeps a section on its current room and times when you run the solver. Cross-listed sections lock as a group.
+              Click to cycle: soft lock (preferred) → hard lock (required) → none. Cross-listed sections lock as a group. Shift+click hard-locks immediately.
             </p>
           </div>
           <button
@@ -5445,35 +5722,39 @@ type PatternDayApplyRow = {
               <span className="text-slate-400"> of {tableSectionsFiltered.length}</span>
             ) : null}
           </span>
-          {hasAnyPlacementLock && (
+          {hasAnyLock && (
             <span className="text-[10px] font-bold uppercase tracking-wide text-amber-800">
-              · {lockedSectionIds.length} locked
+              ·{" "}
+              {[
+                lockBreakdown.soft > 0 ? `${lockBreakdown.soft} soft locked` : null,
+                lockBreakdown.hard > 0 ? `${lockBreakdown.hard} hard locked` : null,
+              ]
+                .filter(Boolean)
+                .join(" and ")}
             </span>
           )}
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
-              onClick={lockAllPlacementChanges}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-900 hover:bg-amber-100 transition-colors"
-              title="Hard-lock every section whose placement differs from the saved baseline (needs room + times)"
-            >
-              <Lock className="size-3.5" />
-              Lock all changes
-            </button>
-            <button
-              type="button"
-              disabled={!hasAnyPlacementLock}
-              onClick={unlockAllPlacementLocks}
+              onClick={toggleAllLocks}
               className={clsx(
                 "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold transition-colors",
-                hasAnyPlacementLock
+                hasAnyLock
                   ? "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                  : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed",
+                  : "border-red-200 bg-red-50 text-red-900 hover:bg-red-100",
               )}
-              title="Remove all placement locks added from this calendar view"
+              title={
+                hasAnyLock
+                  ? "Remove all locks from this calendar view"
+                  : "Hard-lock every section that has both a room and times (cross-listed groups lock together)"
+              }
             >
-              <Unlock className="size-3.5" />
-              Unlock all
+              {hasAnyLock ? (
+                <Unlock className="size-3.5" />
+              ) : (
+                <Lock className="size-3.5" />
+              )}
+              {hasAnyLock ? "Unlock all" : "Lock all"}
             </button>
           </div>
           </div>
@@ -5499,7 +5780,7 @@ type PatternDayApplyRow = {
               ) : null}
               {drawerSectionsSearched.map((section) => {
                 const a = normalizeAssignmentMapEntry(section, assignmentsBySection);
-                const locked = isPlacementLocked(section.id);
+                const lockState = getSectionLockState(section.id);
                 const canLock = canLockSectionPlacement(section.id);
                 const peerCount = crosslistPeerSectionIds(section.id, data.sections).length;
                 const slotLabels = a.timeslot_ids
@@ -5527,26 +5808,42 @@ type PatternDayApplyRow = {
                     <td className="px-4 py-3 text-center">
                       <button
                         type="button"
-                        disabled={!locked && !canLock}
-                        onClick={() => togglePlacementLockForSection(section.id)}
+                        disabled={lockState === "none" && !canLock}
+                        onClick={(e) => cycleLockForSection(section.id, e.shiftKey)}
                         className={clsx(
                           "inline-flex items-center justify-center rounded-lg border p-2 transition-colors",
-                          locked
-                            ? "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
-                            : canLock
-                              ? "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                              : "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300",
+                          lockState === "hard"
+                            ? "border-red-300 bg-red-50 text-red-900 hover:bg-red-100"
+                            : lockState === "soft"
+                              ? "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
+                              : canLock
+                                ? "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                                : "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300",
                         )}
                         title={
-                          locked
-                            ? "Unlock for solver (cross-listed peers unlock together)"
-                            : canLock
-                              ? "Lock current room and times for solver"
-                              : "Set room and times before locking"
+                          lockState === "hard"
+                            ? "Hard-locked (click to unlock, shift+click for hard)"
+                            : lockState === "soft"
+                              ? "Soft-locked (click to hard-lock, shift+click for hard)"
+                              : canLock
+                                ? "Click to soft-lock, shift+click to hard-lock"
+                                : "Set room and times before locking"
                         }
-                        aria-label={locked ? "Unlock placement" : "Lock placement"}
+                        aria-label={
+                          lockState === "hard"
+                            ? "Hard-locked"
+                            : lockState === "soft"
+                              ? "Soft-locked"
+                              : "Not locked"
+                        }
                       >
-                        {locked ? <Lock className="size-4" /> : <Unlock className="size-4 opacity-40" />}
+                        {lockState === "hard" ? (
+                          <Lock className="size-4" />
+                        ) : lockState === "soft" ? (
+                          <LockOpen className="size-4" />
+                        ) : (
+                          <Unlock className="size-4 opacity-40" />
+                        )}
                       </button>
                     </td>
                   </tr>
@@ -5582,24 +5879,33 @@ type PatternDayApplyRow = {
               type="button"
               role="menuitem"
               className="flex w-full items-center gap-2 px-3 py-2.5 text-left font-semibold text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={
-                !isPlacementLocked(calendarContextMenu.sectionId) &&
-                !canLockSectionPlacement(calendarContextMenu.sectionId)
-              }
-              onClick={() => togglePlacementLockForSection(calendarContextMenu.sectionId)}
+              disabled={!canLockSectionPlacement(calendarContextMenu.sectionId)}
+              onClick={() => cycleLockForSection(calendarContextMenu.sectionId, false)}
             >
-              {isPlacementLocked(calendarContextMenu.sectionId) ? (
-                <>
-                  <Unlock className="size-4 shrink-0" aria-hidden />
-                  Unlock placement for solver
-                </>
-              ) : (
-                <>
-                  <Lock className="size-4 shrink-0" aria-hidden />
-                  Lock placement for solver
-                </>
-              )}
+              <LockOpen className="size-4 shrink-0 text-amber-600" aria-hidden />
+              Soft lock (preferred)
             </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center gap-2 px-3 py-2.5 text-left font-semibold text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={!canLockSectionPlacement(calendarContextMenu.sectionId)}
+              onClick={() => cycleLockForSection(calendarContextMenu.sectionId, true)}
+            >
+              <Lock className="size-4 shrink-0 text-red-600" aria-hidden />
+              Hard lock (required)
+            </button>
+            {getSectionLockState(calendarContextMenu.sectionId) !== "none" ? (
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left font-semibold text-slate-800 hover:bg-slate-50"
+                onClick={() => cycleLockForSection(calendarContextMenu.sectionId, false, "none")}
+              >
+                <Unlock className="size-4 shrink-0" aria-hidden />
+                Remove lock
+              </button>
+            ) : null}
             {data &&
             crosslistPeerSectionIds(calendarContextMenu.sectionId, data.sections).length > 1 ? (
               <p className="border-t border-slate-100 px-3 py-2 text-[10px] leading-relaxed text-slate-500">

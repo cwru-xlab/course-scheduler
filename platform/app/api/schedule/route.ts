@@ -12,6 +12,7 @@ import {
 import { tryRecordActivity } from "@/lib/record-activity";
 import { fetchSolver, solverErrorsFromBody } from "@/lib/api/solverFetch";
 import { enrichSolverErrors, normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
+import { sectionLocksFromInput } from "@/lib/scheduling/sectionLocks";
 import { publishSharedSchedule } from "@/lib/shared-schedule";
 
 // The CP-SAT solver may take up to 120s; give extra headroom.
@@ -158,12 +159,14 @@ export async function POST(request: NextRequest) {
               ),
             )
           : [];
+        const sectionLocks = sectionLocksFromInput(input);
         const meta = publishSharedSchedule({
           ranBy: userLabel,
           snapshot: {
             input,
             solution: data,
             lockedSectionIds,
+            sectionLocks,
             createdAt: new Date().toISOString(),
           },
         });

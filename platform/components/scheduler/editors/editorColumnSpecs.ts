@@ -66,15 +66,4 @@ export const BLOCKED_TIME_COLUMN_SPECS = allVisible([
   { id: "reason", label: "Reason", weight: 14 },
 ]);
 
-export const LOCKED_ASSIGNMENT_COLUMN_SPECS = allVisible([
-  { id: "section", label: "Section", weight: 18 },
-  { id: "timeslots", label: "Fixed Timeslots", weight: 42 },
-  { id: "room", label: "Fixed Room", weight: 18 },
-]);
 
-export const SOFT_LOCK_COLUMN_SPECS = allVisible([
-  { id: "section", label: "Section", weight: 16 },
-  { id: "timeslots", label: "Preferred Timeslots", weight: 36 },
-  { id: "room", label: "Preferred Room", weight: 16 },
-  { id: "weight", label: "Weight", weight: 10 },
-]);

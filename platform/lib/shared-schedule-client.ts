@@ -1,17 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+import type { SchedulingDataRevision } from "@/lib/scheduling/dataRevision";
+import type { SectionLockState } from "@/lib/scheduling/types";
 
 export type SharedScheduleMeta = {
   revision: number;
   ranBy: string | null;
   ranAt: number | null;
+  dataRevision: SchedulingDataRevision | null;
 };
 
 export type SharedScheduleSnapshot = {
   input: unknown;
   solution: unknown;
   lockedSectionIds: string[];
+  sectionLocks?: Record<string, SectionLockState>;
   createdAt: string;
 };
 
@@ -38,6 +43,7 @@ export const useSharedScheduleMeta = (): SharedScheduleMeta => {
     revision: 0,
     ranBy: null,
     ranAt: null,
+    dataRevision: null,
   });
 
   useEffect(() => {
@@ -55,7 +61,9 @@ export const useSharedScheduleMeta = (): SharedScheduleMeta => {
         setState((prev) =>
           prev.revision === next.revision &&
           prev.ranBy === next.ranBy &&
-          prev.ranAt === next.ranAt
+          prev.ranAt === next.ranAt &&
+          prev.dataRevision?.lastModifiedAt === next.dataRevision?.lastModifiedAt &&
+          prev.dataRevision?.lastModifiedByName === next.dataRevision?.lastModifiedByName
             ? prev
             : next,
         );
@@ -78,4 +86,54 @@ export const useSharedScheduleMeta = (): SharedScheduleMeta => {
   }, []);
 
   return state;
+};
+
+export type SharedScheduleFullResult = SharedScheduleFull & {
+  loading: boolean;
+};
+
+/** Poll the cheap meta and fetch the full snapshot whenever the revision bumps. */
+export const useSharedScheduleFull = (): SharedScheduleFullResult => {
+  const meta = useSharedScheduleMeta();
+  const [full, setFull] = useState<SharedScheduleFull | null>(null);
+  const [loading, setLoading] = useState(false);
+  const lastRevisionRef = useRef(0);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (meta.revision === 0) {
+      setFull(null);
+      lastRevisionRef.current = 0;
+      return;
+    }
+    if (meta.revision === lastRevisionRef.current) return;
+    let cancelled = false;
+    setLoading(true);
+    fetchSharedScheduleFull()
+      .then((next) => {
+        if (cancelled) return;
+        setFull(next);
+        lastRevisionRef.current = meta.revision;
+      })
+      .catch(() => {
+        // keep the previous snapshot; retry on the next poll tick
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [meta.revision]);
+
+  return {
+    ...(full ?? {
+      revision: meta.revision,
+      ranBy: null,
+      ranAt: null,
+      snapshot: null,
+    }),
+    dataRevision: meta.dataRevision,
+    loading,
+  };
 };

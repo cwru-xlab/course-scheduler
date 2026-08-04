@@ -2,9 +2,10 @@
 
 import { useState, type MouseEvent, type PointerEvent } from "react";
 import clsx from "clsx";
-import { Lock, Shuffle, Unlock } from "lucide-react";
+import { Lock, LockOpen, Shuffle, Unlock } from "lucide-react";
 
 import type { CalendarSectionLike } from "./calendarEvents";
+import type { SectionLockState } from "@/lib/scheduling/types";
 
 type DepartmentPalette = {
   cardBg: string;
@@ -24,11 +25,11 @@ type CrosslistCalendarEventCardProps = {
   matchesHoveredDepartment: boolean;
   isDragSource: boolean;
   hasDragMoved: boolean;
-  placementLocked: boolean;
+  placementLocked: SectionLockState;
   draggable: boolean;
   lockable?: boolean;
   isStaggered?: boolean;
-  onToggleLock?: () => void;
+  onToggleLock?: (e?: MouseEvent<HTMLButtonElement>) => void;
   isConflicting?: boolean;
   style: {
     left: string;
@@ -189,24 +190,40 @@ export function CrosslistCalendarEventCard({
               type="button"
               className={clsx(
                 "flex size-5 shrink-0 items-center justify-center rounded-md border shadow-sm transition-opacity",
-                placementLocked
-                  ? "border-amber-300 bg-amber-50 text-amber-900 opacity-100"
-                  : "border-slate-300 bg-white/90 text-slate-600 opacity-0 hover:bg-white focus-visible:opacity-100 group-hover:opacity-100",
+                placementLocked === "hard"
+                  ? "border-red-300 bg-red-50 text-red-900 opacity-100"
+                  : placementLocked === "soft"
+                    ? "border-amber-300 bg-amber-50 text-amber-900 opacity-100"
+                    : "border-slate-300 bg-white/90 text-slate-600 opacity-0 hover:bg-white focus-visible:opacity-100 group-hover:opacity-100",
               )}
               title={
-                placementLocked
-                  ? "Locked for solver — click to unlock (all pattern days)"
-                  : "Lock for solver (locks every day in the pattern)"
+                placementLocked === "hard"
+                  ? "Hard-locked — click to unlock"
+                  : placementLocked === "soft"
+                    ? "Soft-locked — click to hard-lock"
+                    : "Lock for solver"
               }
-              aria-label={placementLocked ? "Unlock placement" : "Lock placement"}
+              aria-label={
+                placementLocked === "hard"
+                  ? "Hard-locked"
+                  : placementLocked === "soft"
+                    ? "Soft-locked"
+                    : "Not locked"
+              }
               onPointerDown={(e) => e.stopPropagation()}
               onPointerUp={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
-                onToggleLock();
+                onToggleLock?.(e);
               }}
             >
-              {placementLocked ? <Lock className="size-3" /> : <Unlock className="size-3" />}
+              {placementLocked === "hard" ? (
+                <Lock className="size-3" />
+              ) : placementLocked === "soft" ? (
+                <LockOpen className="size-3" />
+              ) : (
+                <Unlock className="size-3" />
+              )}
             </button>
           )}
         </div>

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Archive, CalendarDays, Download, FolderOpen, Pencil, Trash2, User } from "lucide-react";
+import { Activity, Archive, CalendarDays, Download, FolderOpen, Pencil, Trash2, User } from "lucide-react";
 
 import {
   deleteSavedSchedule,
@@ -13,6 +13,7 @@ import {
   renameSavedSchedule,
   type SavedScheduleEntry,
 } from "@/lib/scheduling/history";
+import { useSharedScheduleFull } from "@/lib/shared-schedule-client";
 import type { ValidationError } from "@/lib/scheduling/types";
 import { ValidationIssuesTable } from "@/components/scheduler/ValidationIssuesTable";
 import { SpreadsheetFormatHelp } from "@/components/scheduler/SpreadsheetFormatHelp";
@@ -56,6 +57,23 @@ export default function HistoryPage() {
   useEffect(() => {
     refresh();
   }, []);
+
+  // Live shared "active schedule": the current working document, shown to
+  // everyone identically. Read-only by design.
+  const active = useSharedScheduleFull();
+  const activeSnapshot = active.snapshot;
+  const activeAssignments = (() => {
+    const solution = activeSnapshot?.solution as
+      | { assignments?: unknown[] }
+      | undefined;
+    return solution?.assignments?.length ?? 0;
+  })();
+  const dataEditedAfterPublish = useMemo(() => {
+    if (!activeSnapshot || !active.dataRevision) return false;
+    const editedAt = new Date(active.dataRevision.lastModifiedAt).getTime();
+    const publishedAt = new Date(activeSnapshot.createdAt).getTime();
+    return !Number.isNaN(editedAt) && !Number.isNaN(publishedAt) && editedAt > publishedAt;
+  }, [active.dataRevision, activeSnapshot]);
 
   const handleRename = () => {
     if (!renameModal || !renameModal.newName.trim()) return;
@@ -120,6 +138,74 @@ export default function HistoryPage() {
         </div>
       ) : null}
 
+      <div
+        className="rounded-xl border border-sky-200 bg-sky-50/60 p-4 shadow-sm ring-1 ring-sky-100"
+        aria-label="Active schedule"
+      >
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-1.5 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-lg font-bold text-slate-900">Active schedule</h2>
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                <Activity className="size-3" aria-hidden />
+                Live
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+              <span className="hidden sm:inline text-slate-300" aria-hidden>
+                •
+              </span>
+              <span>
+                {active.dataRevision
+                  ? `Data edited ${
+                      active.dataRevision.lastModifiedByName
+                        ? `by ${active.dataRevision.lastModifiedByName}`
+                        : ""
+                    } at ${new Date(active.dataRevision.lastModifiedAt).toLocaleString(undefined, {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}`
+                  : "Data not saved to the server yet"}
+              </span>
+              {activeSnapshot ? (
+                <>
+                  <span className="hidden sm:inline text-slate-300" aria-hidden>
+                    •
+                  </span>
+                  <span>
+                    Last solved/published {active.ranBy ? `by ${active.ranBy}` : ""}
+                    {active.ranAt
+                      ? ` at ${new Date(active.ranAt).toLocaleString(undefined, {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })}`
+                      : ""}
+                  </span>
+                </>
+              ) : null}
+            </div>
+            {activeSnapshot ? (
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                <span>
+                  Assignments:{" "}
+                  <span className="font-semibold text-slate-900">{activeAssignments}</span>
+                </span>
+                {dataEditedAfterPublish ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
+                    View predates latest data edit — rerun the solver to refresh
+                  </span>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500">
+                The current working schedule is shown here for everyone. Run the solver or edit
+                the calendar to create one.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-slate-600">
           <span>
@@ -183,7 +269,7 @@ export default function HistoryPage() {
                     </span>
                     {" • "}Locked sections:{" "}
                     <span className="font-semibold text-slate-900">
-                      {item.snapshot.lockedSectionIds?.length ?? 0}
+                      {Object.keys(item.snapshot.sectionLocks ?? {}).length}
                     </span>
                   </div>
                 </div>

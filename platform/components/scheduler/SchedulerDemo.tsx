@@ -16,8 +16,6 @@ import {
   CrossListGroupsEditor,
   NoOverlapGroupsEditor,
   BlockedTimesEditor,
-  LockedAssignmentsEditor,
-  SoftLocksEditor,
 } from "./editors/ConstraintsEditors";
 
 import { ImportSpreadsheetWarningModal } from "@/components/scheduler/ImportSpreadsheetWarningModal";
@@ -499,20 +497,6 @@ export const SchedulerDemo = () => {
               instructorOptions={instructorOptions}
               roomOptions={roomOptions}
               onUpdate={(blockedTimes) => markDirtyAndUpdateField("blocked_times", blockedTimes)}
-            />
-            <LockedAssignmentsEditor
-              lockedAssignments={data.locked_assignments}
-              sectionOptions={sectionOptions}
-              timeslotOptions={timeslotOptions}
-              roomOptions={roomOptions}
-              onUpdate={(locks) => markDirtyAndUpdateField("locked_assignments", locks)}
-            />
-            <SoftLocksEditor
-              softLocks={data.soft_locks}
-              sectionOptions={sectionOptions}
-              timeslotOptions={timeslotOptions}
-              roomOptions={roomOptions}
-              onUpdate={(locks) => markDirtyAndUpdateField("soft_locks", locks)}
             />
           </div>
         </Tab>
