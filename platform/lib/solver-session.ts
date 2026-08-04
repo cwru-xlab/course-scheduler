@@ -106,10 +106,10 @@ function publicSnapshot(state: InternalState = getInternal()): SolverSessionStat
 
 function estimateProgress(startedAt: number, now = Date.now()): number {
   const elapsed = Math.max(0, now - startedAt);
-  const t = Math.min(elapsed / ESTIMATED_MAX_MS, 1);
+  // Keep in sync with client SolverProgressContext: linear vs ESTIMATED_MAX_MS.
   return Math.min(
     PROGRESS_CAP,
-    Math.max(1, Math.floor((1 - Math.exp(-2.8 * t)) * PROGRESS_CAP)),
+    Math.max(1, Math.floor((elapsed / ESTIMATED_MAX_MS) * PROGRESS_CAP)),
   );
 }
 
