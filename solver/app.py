@@ -32,6 +32,7 @@ except ModuleNotFoundError:
 from spreadsheet_io.format_errors import format_import_parse_error
 from spreadsheet_io.validate_scheduling_input import validate_scheduling_input
 from spreadsheet_io.import_from_spreadsheet import parse_scheduling_input_from_excel_bytes
+from spreadsheet_io.export_to_spreadsheet import scheduling_input_to_excel_bytes
 from spreadsheet_io.spreadsheet_utils import (
     build_template_bytes,
     normalize_section_state,
