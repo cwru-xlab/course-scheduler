@@ -283,7 +283,26 @@ function naturalCompare(a: string, b: string): number {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 }
 
-function hourColumnLabels(): string[] {
+const QUARTER_MINUTES = 15;
+
+function windowStartMinutes(): number {
+  return SCHEDULING_WINDOW_START_HOUR * 60;
+}
+
+function windowEndMinutes(): number {
+  return SCHEDULING_WINDOW_END_HOUR * 60;
+}
+
+/** Number of 15-minute columns in the scheduling window (e.g. 8:00–22:00 → 56). */
+function quarterColumnCount(): number {
+  return Math.max(
+    0,
+    Math.floor((windowEndMinutes() - windowStartMinutes()) / QUARTER_MINUTES),
+  );
+}
+
+/** Hour labels for header merges (one per clock hour in the window). */
+function hourHeaderLabels(): string[] {
   return Array.from(
     { length: Math.max(SCHEDULING_WINDOW_END_HOUR - SCHEDULING_WINDOW_START_HOUR, 0) },
     (_, idx) => {
@@ -295,19 +314,23 @@ function hourColumnLabels(): string[] {
   );
 }
 
-function hourSpanColumns(startMin: number, endMin: number): { startCol: number; endCol: number } | null {
-  const hourCount = SCHEDULING_WINDOW_END_HOUR - SCHEDULING_WINDOW_START_HOUR;
-  if (hourCount <= 0) return null;
+/**
+ * Map [startMin, endMin) onto 15-minute grid columns.
+ * Floors the start and ceils the end so off-grid times still occupy a contiguous block.
+ */
+function quarterSpanColumns(
+  startMin: number,
+  endMin: number,
+): { startCol: number; endCol: number } | null {
+  const colCount = quarterColumnCount();
+  if (colCount <= 0 || endMin <= startMin) return null;
 
-  let startIdx = Math.floor(startMin / 60) - SCHEDULING_WINDOW_START_HOUR;
-  let endIdx = Math.ceil(endMin / 60) - SCHEDULING_WINDOW_START_HOUR - 1;
-  if (endMin % 60 === 0) {
-    endIdx = Math.floor(endMin / 60) - SCHEDULING_WINDOW_START_HOUR - 1;
-  }
+  const origin = windowStartMinutes();
+  let startIdx = Math.floor((startMin - origin) / QUARTER_MINUTES);
+  let endIdx = Math.ceil((endMin - origin) / QUARTER_MINUTES) - 1;
 
-  startIdx = Math.max(0, Math.min(hourCount - 1, startIdx));
-  endIdx = Math.max(startIdx, Math.min(hourCount - 1, endIdx));
-  if (startIdx < 0 || endIdx < 0) return null;
+  startIdx = Math.max(0, Math.min(colCount - 1, startIdx));
+  endIdx = Math.max(startIdx, Math.min(colCount - 1, endIdx));
   return { startCol: startIdx, endCol: endIdx };
 }
 
@@ -329,7 +352,10 @@ function paletteForDepartment(key: string, indexByKey: Map<string, number>): {
   return DEPARTMENT_PALETTE[index % DEPARTMENT_PALETTE.length];
 }
 
-function eventCellLabel(section: RoomAssignmentSection, peers?: RoomAssignmentSection[]): string {
+function courseLinesForEvent(
+  section: RoomAssignmentSection,
+  peers?: RoomAssignmentSection[],
+): string {
   if (peers && peers.length >= 2) {
     const lines = peers.map((peer) => {
       const cols = resolveAssignmentColumns(peer);
@@ -347,6 +373,27 @@ function eventCellLabel(section: RoomAssignmentSection, peers?: RoomAssignmentSe
     return `${head}\n${cols.classTitle}`.trim();
   }
   return head || cols.classTitle;
+}
+
+/** Course lines + actual clock range + instructor for the Excel card. */
+function eventCellLabel(input: {
+  section: RoomAssignmentSection;
+  peers?: RoomAssignmentSection[];
+  startTime: string;
+  endTime: string;
+  instructor: string;
+  crosslistGroupId?: string;
+}): string {
+  const isCrosslist = (input.peers?.length ?? 0) >= 2;
+  const course = courseLinesForEvent(input.section, input.peers);
+  const timePart = `${formatTimeAmPmCompact(input.startTime)} - ${formatTimeAmPmCompact(input.endTime)}`;
+  const instructor = input.instructor.trim();
+  const crosslistHeader = isCrosslist
+    ? input.crosslistGroupId
+      ? `✕ Cross-list ${input.crosslistGroupId}`
+      : "✕ Cross-list"
+    : null;
+  return [crosslistHeader, course, timePart, instructor].filter(Boolean).join("\n");
 }
 
 export function buildAssignmentRows(input: RoomAssignmentWorkbookInput): string[][] {
@@ -413,6 +460,7 @@ type GridEvent = {
   label: string;
   departmentKey: string;
   groupKey: string;
+  isCrosslist: boolean;
 };
 
 function collectDayEvents(
@@ -420,6 +468,7 @@ function collectDayEvents(
   input: RoomAssignmentWorkbookInput,
 ): GridEvent[] {
   const timeslotById = new Map(input.timeslots.map((t) => [t.id, t]));
+  const instructorById = new Map(input.instructors.map((i) => [i.id, i]));
 
   const membersByGroup = new Map<string, RoomAssignmentSection[]>();
   for (const section of input.sections) {
@@ -455,6 +504,11 @@ function collectDayEvents(
     const endMin = parseMinutes(slot.end_time);
     const groupId = String(section.crosslist_group_id ?? "").trim();
     const peers = groupId ? membersByGroup.get(groupId) : undefined;
+    const labelSection = peers?.[0] ?? section;
+    const instructor =
+      instructorById.get(labelSection.instructor_id)?.name?.trim() ||
+      labelSection.instructor_id ||
+      "";
 
     const groupKey =
       peers && peers.length >= 2
@@ -464,13 +518,23 @@ function collectDayEvents(
     if (seenGroupKeys.has(groupKey)) continue;
     seenGroupKeys.add(groupKey);
 
+    const isCrosslist = Boolean(peers && peers.length >= 2);
+
     events.push({
       roomId,
       startMin,
       endMin,
-      label: eventCellLabel(section, peers),
-      departmentKey: departmentKey(peers?.[0] ?? section),
+      label: eventCellLabel({
+        section,
+        peers,
+        startTime: slot.start_time,
+        endTime: slot.end_time,
+        instructor,
+        crosslistGroupId: isCrosslist ? groupId : undefined,
+      }),
+      departmentKey: departmentKey(labelSection),
       groupKey,
+      isCrosslist,
     });
   }
 
@@ -531,7 +595,8 @@ function applyDayGridSheet(
   input: RoomAssignmentWorkbookInput,
   deptIndexByKey: Map<string, number>,
 ): void {
-  const hourLabels = hourColumnLabels();
+  const colCount = quarterColumnCount();
+  const hourLabels = hourHeaderLabels();
   const events = collectDayEvents(day, input);
   const roomById = new Map(input.rooms.map((r) => [r.id, r]));
 
@@ -556,8 +621,8 @@ function applyDayGridSheet(
   });
 
   sheet.getColumn(1).width = 18;
-  for (let i = 0; i < hourLabels.length; i += 1) {
-    sheet.getColumn(i + 2).width = 14;
+  for (let i = 0; i < colCount; i += 1) {
+    sheet.getColumn(i + 2).width = 3.5;
   }
 
   const header = sheet.getRow(1);
@@ -573,10 +638,29 @@ function applyDayGridSheet(
   roomHeader.alignment = { vertical: "middle", horizontal: "center" };
   roomHeader.border = thinBorder("334155");
 
-  hourLabels.forEach((label, idx) => {
-    const cell = header.getCell(idx + 2);
+  // Style all quarter cells, then merge each hour group (4 × 15 min) under one label.
+  for (let c = 0; c < colCount; c += 1) {
+    const cell = header.getCell(c + 2);
+    cell.font = { bold: true, color: { argb: `FF${GRID_HEADER_FONT}` }, size: 9 };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: `FF${GRID_HEADER_FILL}` },
+    };
+    cell.alignment = { vertical: "middle", horizontal: "center" };
+    cell.border = thinBorder("334155");
+  }
+
+  hourLabels.forEach((label, hourIdx) => {
+    const startCol = hourIdx * 4 + 2;
+    const endCol = Math.min(startCol + 3, colCount + 1);
+    if (endCol < startCol) return;
+    if (endCol > startCol) {
+      sheet.mergeCells(1, startCol, 1, endCol);
+    }
+    const cell = header.getCell(startCol);
     cell.value = label;
-    cell.font = { bold: true, color: { argb: `FF${GRID_HEADER_FONT}` }, size: 10 };
+    cell.font = { bold: true, color: { argb: `FF${GRID_HEADER_FONT}` }, size: 9 };
     cell.fill = {
       type: "pattern",
       pattern: "solid",
@@ -589,7 +673,7 @@ function applyDayGridSheet(
   rooms.forEach((room, roomIndex) => {
     const excelRow = roomIndex + 2;
     const row = sheet.getRow(excelRow);
-    row.height = 48;
+    row.height = 56;
 
     const roomCell = row.getCell(1);
     roomCell.value = room.label;
@@ -602,7 +686,7 @@ function applyDayGridSheet(
     roomCell.alignment = { vertical: "middle", horizontal: "left", wrapText: true };
     roomCell.border = thinBorder();
 
-    for (let c = 0; c < hourLabels.length; c += 1) {
+    for (let c = 0; c < colCount; c += 1) {
       const cell = row.getCell(c + 2);
       cell.fill = {
         type: "pattern",
@@ -622,23 +706,20 @@ function applyDayGridSheet(
       .filter((e) => e.roomId === room.id)
       .sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
 
-    // Track occupied hour columns so overlaps stack in the same cell instead of clobbering merges.
-    const occupied = new Array(hourLabels.length).fill(false);
+    // Track occupied quarter columns (defensive; rooms normally have ≥15 min gaps).
+    const occupied = new Array(colCount).fill(false);
 
     for (const event of roomEvents) {
-      const span = hourSpanColumns(event.startMin, event.endMin);
+      const span = quarterSpanColumns(event.startMin, event.endMin);
       if (!span) continue;
 
       let startCol = span.startCol;
       let endCol = span.endCol;
 
-      // If the preferred start is taken, find the first free column in the span.
       while (startCol <= endCol && occupied[startCol]) startCol += 1;
       if (startCol > endCol) {
-        // Fully overlapped — append into the original start cell.
-        startCol = span.startCol;
-        endCol = span.startCol;
-        const cell = row.getCell(startCol + 2);
+        // Rare collision — append into the original start cell.
+        const cell = row.getCell(span.startCol + 2);
         const existing = cell.value != null ? String(cell.value) : "";
         cell.value = existing ? `${existing}\n\n${event.label}` : event.label;
         cell.alignment = {
@@ -646,11 +727,10 @@ function applyDayGridSheet(
           horizontal: "left",
           wrapText: true,
         };
-        row.height = Math.max(row.height ?? 48, 72);
+        row.height = Math.max(row.height ?? 56, 84);
         continue;
       }
 
-      // Shrink end so we don't overwrite later occupied cells.
       let mergeEnd = startCol;
       while (mergeEnd + 1 <= endCol && !occupied[mergeEnd + 1]) mergeEnd += 1;
 
@@ -664,28 +744,38 @@ function applyDayGridSheet(
 
       const cell = row.getCell(excelStartCol);
       const palette = paletteForDepartment(event.departmentKey, deptIndexByKey);
-      const existing = cell.value != null ? String(cell.value) : "";
-      cell.value = existing ? `${existing}\n\n${event.label}` : event.label;
+      cell.value = event.label;
       cell.fill = {
         type: "pattern",
         pattern: "solid",
         fgColor: { argb: `FF${palette.bg}` },
       };
-      cell.font = { size: 8, bold: true, color: { argb: "FF0F172A" } };
+      cell.font = { size: 7, bold: true, color: { argb: "FF0F172A" } };
       cell.alignment = {
         vertical: "top",
         horizontal: "left",
         wrapText: true,
       };
+      // Cross-lists get a thick left bar (matches calendar X affordance at a glance).
+      const leftStyle = event.isCrosslist ? "thick" : "medium";
       cell.border = {
-        top: { style: "thin", color: { argb: `FF${palette.border}` } },
-        left: { style: "medium", color: { argb: `FF${palette.border}` } },
-        bottom: { style: "thin", color: { argb: `FF${palette.border}` } },
-        right: { style: "thin", color: { argb: `FF${palette.border}` } },
+        top: {
+          style: event.isCrosslist ? "medium" : "thin",
+          color: { argb: `FF${palette.border}` },
+        },
+        left: { style: leftStyle, color: { argb: `FF${palette.border}` } },
+        bottom: {
+          style: event.isCrosslist ? "medium" : "thin",
+          color: { argb: `FF${palette.border}` },
+        },
+        right: {
+          style: event.isCrosslist ? "medium" : "thin",
+          color: { argb: `FF${palette.border}` },
+        },
       };
 
       const lineCount = String(cell.value).split("\n").length;
-      row.height = Math.max(row.height ?? 48, Math.min(120, 28 + lineCount * 12));
+      row.height = Math.max(row.height ?? 56, Math.min(140, 24 + lineCount * 11));
     }
   });
 
@@ -719,6 +809,13 @@ function applyDayGridSheet(
     swatch.alignment = { vertical: "middle", horizontal: "left" };
     legendRow.height = 18;
   });
+
+  if (events.some((e) => e.isCrosslist)) {
+    const noteRow = sheet.getRow(legendStart + 1 + usedDepts.length + 1);
+    noteRow.getCell(1).value =
+      "✕ Cross-list cards list every linked course and use a thicker border.";
+    noteRow.getCell(1).font = { size: 9, italic: true, color: { argb: "FF64748B" } };
+  }
 }
 
 export async function buildRoomAssignmentWorkbook(
