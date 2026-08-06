@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   CloudBackup,
+  FileSpreadsheet,
   Filter,
   Table2,
   Link2,
@@ -45,6 +46,7 @@ import {
   saveScheduleToHistory,
   type LastSolverRunSnapshot,
 } from "@/lib/scheduling/history";
+import { downloadRoomAssignmentWorkbook } from "@/lib/export/roomAssignmentWorkbook";
 import { isSectionArchived, normalizeSectionState } from "@/lib/scheduling/sectionState";
 import { sectionLocksFromInput } from "@/lib/scheduling/sectionLocks";
 import {
@@ -1295,6 +1297,7 @@ export default function CalendarPage() {
   const conflictRescanRef = useRef(false);
   const [conflictRescanNonce, setConflictRescanNonce] = useState(0);
   const [scheduleDrawerOpen, setScheduleDrawerOpen] = useState<boolean>(false);
+  const [isExportingRoomAssignments, setIsExportingRoomAssignments] = useState(false);
   // Mount/enter states drive a smooth slide: `drawerRender` keeps the panel in the
   // DOM through the exit animation; `drawerEntered` toggles the transform.
   const [drawerRender, setDrawerRender] = useState<boolean>(false);
@@ -2417,6 +2420,24 @@ type PatternDayApplyRow = {
   const handleExportPdf = () => {
     window.print();
   };
+
+  const handleExportRoomAssignments = useCallback(() => {
+    if (!data || isExportingRoomAssignments) return;
+    setIsExportingRoomAssignments(true);
+    void downloadRoomAssignmentWorkbook({
+      sections: data.sections,
+      instructors: data.instructors,
+      rooms: data.rooms,
+      timeslots: data.timeslots,
+      assignments: assignmentsBySection,
+    })
+      .catch((err) => {
+        console.error("Room assignment export failed", err);
+      })
+      .finally(() => {
+        setIsExportingRoomAssignments(false);
+      });
+  }, [assignmentsBySection, data, isExportingRoomAssignments]);
 
   // Restore a snapshot's feedback (toast + conflict rings) directly when it was
   // captured with enriched history; otherwise fall back to the day re-scan so
@@ -4668,6 +4689,34 @@ type PatternDayApplyRow = {
               aria-label="Export PDF"
             >
               <Share2 className="size-4" />
+            </button>
+            <button
+              type="button"
+              disabled={!data || isExportingRoomAssignments}
+              onClick={handleExportRoomAssignments}
+              onMouseEnter={() =>
+                setToolbarActionHint(
+                  "Download room assignments + calendar grid spreadsheet for paste into the WSOM schedule sheet.",
+                )
+              }
+              onMouseLeave={() => setToolbarActionHint(null)}
+              onFocus={() =>
+                setToolbarActionHint(
+                  "Download room assignments + calendar grid spreadsheet for paste into the WSOM schedule sheet.",
+                )
+              }
+              onBlur={() => setToolbarActionHint(null)}
+              className={clsx(
+                "inline-flex items-center justify-center gap-1.5 rounded-lg h-10 px-3 text-xs font-bold border transition-colors",
+                data && !isExportingRoomAssignments
+                  ? "bg-teal-50 text-teal-900 border-teal-200 hover:bg-teal-100"
+                  : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
+              )}
+              title="Download room assignments + calendar grid spreadsheet"
+              aria-label="Export rooms"
+            >
+              <FileSpreadsheet className="size-4 shrink-0" aria-hidden />
+              {isExportingRoomAssignments ? "Exporting…" : "Export rooms"}
             </button>
             <div className="hidden lg:block h-7 w-px bg-slate-200 mx-1" />
             <button
