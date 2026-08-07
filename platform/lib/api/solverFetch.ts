@@ -36,15 +36,22 @@ type FetchSolverResult = {
   baseUrl: string;
 };
 
+type FetchSolverOptions = {
+  timeoutMs?: number;
+  signal?: AbortSignal;
+  parseBody?: "json" | "none";
+};
+
 /** POST/GET the solver with URL fallbacks and optional timeout / external abort. */
 export async function fetchSolver(
   path: string,
   init?: RequestInit,
-  options?: { timeoutMs?: number; signal?: AbortSignal },
+  options?: FetchSolverOptions,
 ): Promise<FetchSolverResult> {
   const candidateUrls = [SOLVER_URL, ...SOLVER_FALLBACK_URLS].filter(
     (url, idx, arr) => arr.indexOf(url) === idx,
   );
+  const parseBody = options?.parseBody ?? "json";
 
   let lastError: unknown = null;
 
@@ -76,6 +83,11 @@ export async function fetchSolver(
 
         if (response.status === 404 || response.status === 405) {
           continue;
+        }
+
+        // Keep successful binary/file bodies intact for the caller.
+        if (response.ok && parseBody === "none") {
+          return { response, data: {}, baseUrl };
         }
 
         const data = await parseSolverResponse(response);
