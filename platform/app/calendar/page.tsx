@@ -47,6 +47,7 @@ import {
   type LastSolverRunSnapshot,
 } from "@/lib/scheduling/history";
 import { downloadRoomAssignmentWorkbook } from "@/lib/export/roomAssignmentWorkbook";
+import { assignSectionDesignations } from "@/lib/scheduling/sectionDesignations";
 import { isSectionArchived, normalizeSectionState } from "@/lib/scheduling/sectionState";
 import { sectionLocksFromInput } from "@/lib/scheduling/sectionLocks";
 import {
@@ -2219,6 +2220,12 @@ type PatternDayApplyRow = {
 
     return map;
   }, [data]);
+
+  /** Display/export section numbers (100/400/800…); not persisted. */
+  const sectionDesignations = useMemo(
+    () => assignSectionDesignations(data?.sections ?? []),
+    [data?.sections],
+  );
 
   /** One swatch per department code (shared across all courses in that dept). */
   const departmentColorLegend = useMemo(() => {
@@ -5494,6 +5501,8 @@ type PatternDayApplyRow = {
                           draggable={Boolean(solverInput)}
                           lockable={Boolean(solverInput)}
                           isStaggered={sectionIsStaggered(section.id)}
+                          sectionDesignation={sectionDesignations.get(section.id)}
+                          designationBySectionId={sectionDesignations}
                           onToggleLock={(e) => requestToggleLockFromCalendar(section.id, e?.shiftKey)}
                           isConflicting={event.crosslistMembers.some((member) =>
                             conflictSectionIds.has(member.id),
@@ -5521,6 +5530,7 @@ type PatternDayApplyRow = {
                     const inst = instructorById.get(section.instructor_id);
                     const professor = inst?.name ?? section.instructor_id ?? "—";
                     const title = section.department + " " + section.course_id;
+                    const designation = sectionDesignations.get(section.id);
                     const isConflicting = conflictSectionIds.has(section.id);
                     const isStaggered = sectionIsStaggered(section.id);
 
@@ -5550,7 +5560,7 @@ type PatternDayApplyRow = {
                           backgroundImage: color.cardPattern,
                           borderLeftColor: color.cardBorder,
                         }}
-                        title={`${title} • ${professor} • ${timeLabel} • Room ${room.id}${
+                        title={`${title}${designation ? ` · ${designation}` : ""} • ${professor} • ${timeLabel} • Room ${room.id}${
                           isStaggered ? " • Staggered across days" : ""
                         }`}
                         {...sharedPointerHandlers}
@@ -5627,6 +5637,11 @@ type PatternDayApplyRow = {
                           )}
                         >
                           {title}
+                          {designation ? (
+                            <span className="ml-1 font-bold text-[9px] text-slate-600 tabular-nums">
+                              · {designation}
+                            </span>
+                          ) : null}
                         </div>
                         <div className="text-[9px] font-bold leading-tight text-slate-700">
                           <div className="truncate">{professor}</div>
@@ -5671,6 +5686,7 @@ type PatternDayApplyRow = {
                   const previewMatchesHoveredDepartment =
                     activeLegendDepartmentKeys.size === 0 ||
                     activeLegendDepartmentKeys.has(departmentColorKey(section));
+                  const designationPv = sectionDesignations.get(section.id);
                   return (
                     <div
                       key="calendar-drag-preview"
@@ -5689,7 +5705,14 @@ type PatternDayApplyRow = {
                         borderLeftColor: colorPv.cardBorder,
                       }}
                     >
-                      <div className="font-black text-[10px] truncate text-slate-900">{ttlPv}</div>
+                      <div className="font-black text-[10px] truncate text-slate-900">
+                        {ttlPv}
+                        {designationPv ? (
+                          <span className="ml-1 font-bold text-[9px] text-slate-600 tabular-nums">
+                            · {designationPv}
+                          </span>
+                        ) : null}
+                      </div>
                       <div className="text-[9px] font-bold leading-tight text-slate-700">
                         <div className="truncate">{professorPv}</div>
                         <div className="text-[8px] leading-snug truncate">{timeLabelPv}</div>

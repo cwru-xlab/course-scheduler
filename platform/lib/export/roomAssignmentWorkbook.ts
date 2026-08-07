@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 
 import { isSectionArchived } from "@/lib/scheduling/sectionState";
+import { assignSectionDesignations } from "@/lib/scheduling/sectionDesignations";
 import {
   SCHEDULING_WINDOW_END_HOUR,
   SCHEDULING_WINDOW_START_HOUR,
@@ -113,9 +114,12 @@ export type RoomAssignmentWorkbookInput = {
  * Subject = department / SUBJ code (e.g. ACCT).
  * Number = catalog number currently stored in section_code (e.g. 306).
  * Class Title = course_id (title text in current imports).
- * Section = section_label when present; otherwise blank.
+ * Section = WSOM designation (100/400/800…) from `sectionDesignation`, else section_label.
  */
-export function resolveAssignmentColumns(section: RoomAssignmentSection): {
+export function resolveAssignmentColumns(
+  section: RoomAssignmentSection,
+  sectionDesignation?: string | null,
+): {
   subject: string;
   number: string;
   classTitle: string;
@@ -126,8 +130,14 @@ export function resolveAssignmentColumns(section: RoomAssignmentSection): {
     .toUpperCase();
   const number = String(section.section_code ?? "").trim();
   const classTitle = String(section.course_id ?? "").trim();
+  const designation = String(sectionDesignation ?? "").trim();
   const sectionLabel = String(section.section_label ?? "").trim();
-  return { subject, number, classTitle, section: sectionLabel };
+  return {
+    subject,
+    number,
+    classTitle,
+    section: designation || sectionLabel,
+  };
 }
 
 /** @deprecated Prefer resolveAssignmentColumns — kept for any callers that split course_id. */
@@ -354,25 +364,29 @@ function paletteForDepartment(key: string, indexByKey: Map<string, number>): {
 
 function courseLinesForEvent(
   section: RoomAssignmentSection,
-  peers?: RoomAssignmentSection[],
+  peers: RoomAssignmentSection[] | undefined,
+  designation: string | undefined,
 ): string {
+  const suffix = designation ? ` · ${designation}` : "";
   if (peers && peers.length >= 2) {
     const lines = peers.map((peer) => {
-      const cols = resolveAssignmentColumns(peer);
+      const cols = resolveAssignmentColumns(peer, designation);
       const head = [cols.subject, cols.number].filter(Boolean).join(" ");
+      const withSec = head ? `${head}${suffix}` : designation ?? "";
       return cols.classTitle && cols.classTitle !== head
-        ? `${head}\n${cols.classTitle}`
-        : head || cols.classTitle;
+        ? `${withSec}\n${cols.classTitle}`
+        : withSec || cols.classTitle;
     });
     return lines.filter(Boolean).join("\n");
   }
 
-  const cols = resolveAssignmentColumns(section);
+  const cols = resolveAssignmentColumns(section, designation);
   const head = [cols.subject, cols.number].filter(Boolean).join(" ");
+  const withSec = head ? `${head}${suffix}` : designation ?? "";
   if (cols.classTitle && cols.classTitle !== head) {
-    return `${head}\n${cols.classTitle}`.trim();
+    return `${withSec}\n${cols.classTitle}`.trim();
   }
-  return head || cols.classTitle;
+  return withSec || cols.classTitle;
 }
 
 /** Course lines + actual clock range + instructor for the Excel card. */
@@ -383,9 +397,10 @@ function eventCellLabel(input: {
   endTime: string;
   instructor: string;
   crosslistGroupId?: string;
+  designation?: string;
 }): string {
   const isCrosslist = (input.peers?.length ?? 0) >= 2;
-  const course = courseLinesForEvent(input.section, input.peers);
+  const course = courseLinesForEvent(input.section, input.peers, input.designation);
   const timePart = `${formatTimeAmPmCompact(input.startTime)} - ${formatTimeAmPmCompact(input.endTime)}`;
   const instructor = input.instructor.trim();
   const crosslistHeader = isCrosslist
@@ -400,6 +415,7 @@ export function buildAssignmentRows(input: RoomAssignmentWorkbookInput): string[
   const instructorById = new Map(input.instructors.map((i) => [i.id, i]));
   const roomById = new Map(input.rooms.map((r) => [r.id, r]));
   const timeslotById = new Map(input.timeslots.map((t) => [t.id, t]));
+  const designations = assignSectionDesignations(input.sections);
 
   const rows = input.sections
     .filter((section) => !isSectionArchived(section))
@@ -417,7 +433,8 @@ export function buildAssignmentRows(input: RoomAssignmentWorkbookInput): string[
 
       const roomId = placement?.room_id ?? section.room_id ?? "";
       const room = roomId ? roomById.get(String(roomId)) : undefined;
-      const cols = resolveAssignmentColumns(section);
+      const designation = designations.get(section.id);
+      const cols = resolveAssignmentColumns(section, designation);
       const instructor =
         instructorById.get(section.instructor_id)?.name?.trim() ||
         section.instructor_id ||
@@ -466,6 +483,7 @@ type GridEvent = {
 function collectDayEvents(
   day: RoomAssignmentDay,
   input: RoomAssignmentWorkbookInput,
+  designations: Map<string, string>,
 ): GridEvent[] {
   const timeslotById = new Map(input.timeslots.map((t) => [t.id, t]));
   const instructorById = new Map(input.instructors.map((i) => [i.id, i]));
@@ -519,6 +537,7 @@ function collectDayEvents(
     seenGroupKeys.add(groupKey);
 
     const isCrosslist = Boolean(peers && peers.length >= 2);
+    const designation = designations.get(section.id) ?? designations.get(labelSection.id);
 
     events.push({
       roomId,
@@ -531,6 +550,7 @@ function collectDayEvents(
         endTime: slot.end_time,
         instructor,
         crosslistGroupId: isCrosslist ? groupId : undefined,
+        designation,
       }),
       departmentKey: departmentKey(labelSection),
       groupKey,
@@ -594,10 +614,11 @@ function applyDayGridSheet(
   day: RoomAssignmentDay,
   input: RoomAssignmentWorkbookInput,
   deptIndexByKey: Map<string, number>,
+  designations: Map<string, string>,
 ): void {
   const colCount = quarterColumnCount();
   const hourLabels = hourHeaderLabels();
-  const events = collectDayEvents(day, input);
+  const events = collectDayEvents(day, input, designations);
   const roomById = new Map(input.rooms.map((r) => [r.id, r]));
 
   const knownRoomIds = new Set(input.rooms.map((r) => r.id));
@@ -828,8 +849,9 @@ export async function buildRoomAssignmentWorkbook(
   applyAssignmentSheet(workbook, input);
 
   const deptIndexByKey = new Map<string, number>();
+  const designations = assignSectionDesignations(input.sections);
   for (const day of ROOM_ASSIGNMENT_DAYS) {
-    applyDayGridSheet(workbook, day, input, deptIndexByKey);
+    applyDayGridSheet(workbook, day, input, deptIndexByKey, designations);
   }
 
   return workbook;
