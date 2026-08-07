@@ -29,6 +29,9 @@ type CrosslistCalendarEventCardProps = {
   draggable: boolean;
   lockable?: boolean;
   isStaggered?: boolean;
+  /** Shared 100/400/800… designation for all crosslist members. */
+  sectionDesignation?: string | null;
+  designationBySectionId?: Map<string, string>;
   onToggleLock?: (e?: MouseEvent<HTMLButtonElement>) => void;
   isConflicting?: boolean;
   style: {
@@ -124,6 +127,8 @@ export function CrosslistCalendarEventCard({
   draggable,
   lockable = false,
   isStaggered = false,
+  sectionDesignation = null,
+  designationBySectionId,
   onToggleLock,
   isConflicting = false,
   style,
@@ -136,6 +141,7 @@ export function CrosslistCalendarEventCard({
   onClick,
 }: CrosslistCalendarEventCardProps) {
   const [hovered, setHovered] = useState(false);
+  const designation = String(sectionDesignation ?? "").trim();
 
   return (
     <div
@@ -234,6 +240,11 @@ export function CrosslistCalendarEventCard({
           )}
         >
           {crosslistGroupId}
+          {designation ? (
+            <span className="ml-1 font-bold text-[9px] text-slate-600 tabular-nums">
+              · {designation}
+            </span>
+          ) : null}
         </div>
         <div className="relative z-[1] text-[9px] font-bold leading-tight text-slate-700">
           <div className="truncate text-slate-800">
@@ -256,6 +267,8 @@ export function CrosslistCalendarEventCard({
                 instructorById.get(member.instructor_id)?.name?.trim() ||
                 member.instructor_id ||
                 "—";
+              const memberDesignation =
+                designationBySectionId?.get(member.id) ?? designation;
               return (
                 <div key={member.id} className="flex flex-col items-center">
                   <div className="h-2 w-px bg-slate-400/90" />
@@ -263,9 +276,11 @@ export function CrosslistCalendarEventCard({
                     <div className="truncate text-[9px] font-black text-slate-900">
                       {memberCourseLabel(member)}
                     </div>
-                    <div className="truncate text-[8px] font-semibold text-slate-600">
-                      Sec {member.section_code}
-                    </div>
+                    {memberDesignation ? (
+                      <div className="truncate text-[8px] font-semibold text-slate-600 tabular-nums">
+                        Sec {memberDesignation}
+                      </div>
+                    ) : null}
                     <div className="truncate text-[8px] text-slate-500">{instructor}</div>
                   </div>
                 </div>

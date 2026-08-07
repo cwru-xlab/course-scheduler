@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   CloudBackup,
+  FileSpreadsheet,
   Filter,
   Table2,
   Link2,
@@ -45,6 +46,8 @@ import {
   saveScheduleToHistory,
   type LastSolverRunSnapshot,
 } from "@/lib/scheduling/history";
+import { downloadRoomAssignmentWorkbook } from "@/lib/export/roomAssignmentWorkbook";
+import { assignSectionDesignations } from "@/lib/scheduling/sectionDesignations";
 import { isSectionArchived, normalizeSectionState } from "@/lib/scheduling/sectionState";
 import { sectionLocksFromInput } from "@/lib/scheduling/sectionLocks";
 import {
@@ -1295,6 +1298,7 @@ export default function CalendarPage() {
   const conflictRescanRef = useRef(false);
   const [conflictRescanNonce, setConflictRescanNonce] = useState(0);
   const [scheduleDrawerOpen, setScheduleDrawerOpen] = useState<boolean>(false);
+  const [isExportingRoomAssignments, setIsExportingRoomAssignments] = useState(false);
   // Mount/enter states drive a smooth slide: `drawerRender` keeps the panel in the
   // DOM through the exit animation; `drawerEntered` toggles the transform.
   const [drawerRender, setDrawerRender] = useState<boolean>(false);
@@ -2217,6 +2221,12 @@ type PatternDayApplyRow = {
     return map;
   }, [data]);
 
+  /** Display/export section numbers (100/400/800…); not persisted. */
+  const sectionDesignations = useMemo(
+    () => assignSectionDesignations(data?.sections ?? []),
+    [data?.sections],
+  );
+
   /** One swatch per department code (shared across all courses in that dept). */
   const departmentColorLegend = useMemo(() => {
     if (!data?.sections.length) return [];
@@ -2417,6 +2427,24 @@ type PatternDayApplyRow = {
   const handleExportPdf = () => {
     window.print();
   };
+
+  const handleExportRoomAssignments = useCallback(() => {
+    if (!data || isExportingRoomAssignments) return;
+    setIsExportingRoomAssignments(true);
+    void downloadRoomAssignmentWorkbook({
+      sections: data.sections,
+      instructors: data.instructors,
+      rooms: data.rooms,
+      timeslots: data.timeslots,
+      assignments: assignmentsBySection,
+    })
+      .catch((err) => {
+        console.error("Room assignment export failed", err);
+      })
+      .finally(() => {
+        setIsExportingRoomAssignments(false);
+      });
+  }, [assignmentsBySection, data, isExportingRoomAssignments]);
 
   // Restore a snapshot's feedback (toast + conflict rings) directly when it was
   // captured with enriched history; otherwise fall back to the day re-scan so
@@ -4669,6 +4697,34 @@ type PatternDayApplyRow = {
             >
               <Share2 className="size-4" />
             </button>
+            <button
+              type="button"
+              disabled={!data || isExportingRoomAssignments}
+              onClick={handleExportRoomAssignments}
+              onMouseEnter={() =>
+                setToolbarActionHint(
+                  "Download room assignments + calendar grid spreadsheet for paste into the WSOM schedule sheet.",
+                )
+              }
+              onMouseLeave={() => setToolbarActionHint(null)}
+              onFocus={() =>
+                setToolbarActionHint(
+                  "Download room assignments + calendar grid spreadsheet for paste into the WSOM schedule sheet.",
+                )
+              }
+              onBlur={() => setToolbarActionHint(null)}
+              className={clsx(
+                "inline-flex items-center justify-center gap-1.5 rounded-lg h-10 px-3 text-xs font-bold border transition-colors",
+                data && !isExportingRoomAssignments
+                  ? "bg-teal-50 text-teal-900 border-teal-200 hover:bg-teal-100"
+                  : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
+              )}
+              title="Download room assignments + calendar grid spreadsheet"
+              aria-label="Export rooms"
+            >
+              <FileSpreadsheet className="size-4 shrink-0" aria-hidden />
+              {isExportingRoomAssignments ? "Exporting…" : "Export rooms"}
+            </button>
             <div className="hidden lg:block h-7 w-px bg-slate-200 mx-1" />
             <button
               type="button"
@@ -5445,6 +5501,8 @@ type PatternDayApplyRow = {
                           draggable={Boolean(solverInput)}
                           lockable={Boolean(solverInput)}
                           isStaggered={sectionIsStaggered(section.id)}
+                          sectionDesignation={sectionDesignations.get(section.id)}
+                          designationBySectionId={sectionDesignations}
                           onToggleLock={(e) => requestToggleLockFromCalendar(section.id, e?.shiftKey)}
                           isConflicting={event.crosslistMembers.some((member) =>
                             conflictSectionIds.has(member.id),
@@ -5472,6 +5530,7 @@ type PatternDayApplyRow = {
                     const inst = instructorById.get(section.instructor_id);
                     const professor = inst?.name ?? section.instructor_id ?? "—";
                     const title = section.department + " " + section.course_id;
+                    const designation = sectionDesignations.get(section.id);
                     const isConflicting = conflictSectionIds.has(section.id);
                     const isStaggered = sectionIsStaggered(section.id);
 
@@ -5501,7 +5560,7 @@ type PatternDayApplyRow = {
                           backgroundImage: color.cardPattern,
                           borderLeftColor: color.cardBorder,
                         }}
-                        title={`${title} • ${professor} • ${timeLabel} • Room ${room.id}${
+                        title={`${title}${designation ? ` · ${designation}` : ""} • ${professor} • ${timeLabel} • Room ${room.id}${
                           isStaggered ? " • Staggered across days" : ""
                         }`}
                         {...sharedPointerHandlers}
@@ -5578,6 +5637,11 @@ type PatternDayApplyRow = {
                           )}
                         >
                           {title}
+                          {designation ? (
+                            <span className="ml-1 font-bold text-[9px] text-slate-600 tabular-nums">
+                              · {designation}
+                            </span>
+                          ) : null}
                         </div>
                         <div className="text-[9px] font-bold leading-tight text-slate-700">
                           <div className="truncate">{professor}</div>
@@ -5622,6 +5686,7 @@ type PatternDayApplyRow = {
                   const previewMatchesHoveredDepartment =
                     activeLegendDepartmentKeys.size === 0 ||
                     activeLegendDepartmentKeys.has(departmentColorKey(section));
+                  const designationPv = sectionDesignations.get(section.id);
                   return (
                     <div
                       key="calendar-drag-preview"
@@ -5640,7 +5705,14 @@ type PatternDayApplyRow = {
                         borderLeftColor: colorPv.cardBorder,
                       }}
                     >
-                      <div className="font-black text-[10px] truncate text-slate-900">{ttlPv}</div>
+                      <div className="font-black text-[10px] truncate text-slate-900">
+                        {ttlPv}
+                        {designationPv ? (
+                          <span className="ml-1 font-bold text-[9px] text-slate-600 tabular-nums">
+                            · {designationPv}
+                          </span>
+                        ) : null}
+                      </div>
                       <div className="text-[9px] font-bold leading-tight text-slate-700">
                         <div className="truncate">{professorPv}</div>
                         <div className="text-[8px] leading-snug truncate">{timeLabelPv}</div>

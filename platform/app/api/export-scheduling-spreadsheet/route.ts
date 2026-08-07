@@ -15,32 +15,28 @@ export async function POST(request: NextRequest) {
       notes?: NotesRowEntry[];
     };
 
-    const { response } = await fetchSolver("/export-scheduling-spreadsheet", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        input: body.input ?? body,
-        notes: Array.isArray(body.notes) ? body.notes : [],
-      }),
-    });
+    const { response, data } = await fetchSolver(
+      "/export-scheduling-spreadsheet",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          input: body.input ?? body,
+          notes: Array.isArray(body.notes) ? body.notes : [],
+        }),
+      },
+      // Spreadsheet bytes must not be consumed by JSON parsing.
+      { parseBody: "none" },
+    );
 
     if (!response.ok) {
-      let errors: ValidationError[] = [
-        { code: "export_failed", message: "Backend failed to export spreadsheet." },
-      ];
-      try {
-        const errorPayload = (await response.json()) as {
-          errors?: ValidationError[];
-          status?: string;
-        };
-        errors = solverErrorsFromBody(
-          errorPayload,
-          "export_failed",
-          "Backend failed to export spreadsheet.",
-        ) as ValidationError[];
-      } catch {
-        // Non-JSON error body — keep default message.
-      }
+      // Error bodies are still JSON-parsed by fetchSolver; use that payload
+      // instead of trying to re-read response.json() (body already consumed).
+      const errors = solverErrorsFromBody(
+        data,
+        "export_failed",
+        "Backend failed to export spreadsheet.",
+      ) as ValidationError[];
 
       return NextResponse.json(
         {

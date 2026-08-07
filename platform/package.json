@@ -54,6 +54,7 @@
     "@react-aria/visually-hidden": "3.8.29",
     "@types/prismjs": "^1.26.5",
     "clsx": "2.1.1",
+    "exceljs": "^4.4.0",
     "framer-motion": "^12.26.2",
     "intl-messageformat": "11.1.0",
     "jose": "^6.2.2",
