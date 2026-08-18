@@ -70,6 +70,7 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
                 "course_id": _str_with_default(row, "course_id", "Sections", default=""),
                 "department": maybe_str(row.get("department")),
                 "section_code": _str_with_default(row, "section_code", "Sections", default=""),
+                "section_number": _str_with_default(row, "section_number", "Sections", default=""),
                 "instructor_id": _str_with_default(row, "instructor_id", "Sections", default=""),
                 "expected_enrollment": _int_with_default(
                     row, "expected_enrollment", "Sections", default=0

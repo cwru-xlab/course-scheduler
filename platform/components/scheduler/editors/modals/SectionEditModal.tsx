@@ -71,6 +71,7 @@ export function SectionEditModal({
       id: draft.id.trim(),
       course_id: draft.course_id.trim(),
       section_code: draft.section_code.trim(),
+      section_number: (draft.section_number ?? "").trim(),
       instructor_id: draft.instructor_id.trim(),
       department: (draft.department ?? "").trim(),
       state: normalizeSectionState(draft.state),
@@ -129,6 +130,15 @@ export function SectionEditModal({
             placeholder={SECTION_CODE_PLACEHOLDER}
             value={draft.section_code}
             onChange={(e) => setDraft((d) => ({ ...d, section_code: e.target.value }))}
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-semibold text-slate-600">Section Number</span>
+          <input
+            className="rounded-lg border border-slate-200 px-3 py-2"
+            placeholder="e.g. 1"
+            value={draft.section_number ?? ""}
+            onChange={(e) => setDraft((d) => ({ ...d, section_number: e.target.value }))}
           />
         </label>
         <label className="flex flex-col gap-1">

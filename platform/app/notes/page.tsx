@@ -241,6 +241,7 @@ export default function NotesFeedPage() {
             { label: "Department", value: String((row as { department?: string }).department ?? "N/A") },
             { label: "Course ID", value: String(row.course_id) },
             { label: "Section Code", value: String(row.section_code) },
+            { label: "Section Number", value: String(row.section_number || "N/A") },
             { label: "Instructor ID", value: String(row.instructor_id) },
             { label: "Enrollment Cap", value: String(row.enrollment_cap ?? "N/A") },
           ],
