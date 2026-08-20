@@ -29,6 +29,7 @@ import { RowNotesButton } from "../RowNotesButton";
 import type { Instructor } from "@/lib/scheduling/types";
 import { insertAtSortedIdPosition } from "@/lib/scheduling/insertAtSortedIdPosition";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
+import { useStableDataRef } from "./useStableDataRef";
 
 type InstructorRow = { inst: Instructor; index: number };
 
@@ -77,9 +78,11 @@ export const InstructorsEditor = ({
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<Instructor | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
+  const instructorsRef = useStableDataRef(instructors);
 
   const updateInstructor = (index: number, field: string, value: unknown) => {
-    const newInstructors = [...instructors];
+    const current = instructorsRef.current;
+    const newInstructors = [...current];
     if (field.startsWith("preferences.")) {
       const prefField = field.replace("preferences.", "") as keyof Instructor["preferences"];
       newInstructors[index] = {
@@ -93,11 +96,11 @@ export const InstructorsEditor = ({
   };
 
   const addInstructor = () => {
-    setAddDraft(createEmptyInstructor(instructors));
+    setAddDraft(createEmptyInstructor(instructorsRef.current));
   };
 
   const deleteInstructor = (index: number) => {
-    onUpdate(instructors.filter((_, i) => i !== index));
+    onUpdate(instructorsRef.current.filter((_, i) => i !== index));
   };
 
   const instructorFilterDefs = useMemo(
@@ -317,7 +320,8 @@ export const InstructorsEditor = ({
           timeslotOptions={timeslotOptions}
           onClose={() => setEditIndex(null)}
           onSave={(updated) => {
-            const next = [...instructors];
+            const current = instructorsRef.current;
+            const next = [...current];
             next[editIndex] = updated;
             onUpdate(next);
           }}
@@ -332,7 +336,7 @@ export const InstructorsEditor = ({
           timeslotOptions={timeslotOptions}
           onClose={() => setAddDraft(null)}
           onSave={(created) => {
-            onUpdate(insertAtSortedIdPosition(instructors, created));
+            onUpdate(insertAtSortedIdPosition(instructorsRef.current, created));
             setAddDraft(null);
             confirmRowAdded({
               rowKey: editorRowKey("instructors", String(created.id)),

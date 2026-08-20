@@ -43,6 +43,7 @@ import {
   SCHEDULING_WINDOW_END_HOUR,
   SCHEDULING_WINDOW_START_HOUR,
 } from "@/lib/scheduling/timeWindow";
+import { useStableDataRef } from "./useStableDataRef";
 
 // CrossList Groups Editor
 type CrossListGroupsEditorProps = {
@@ -63,15 +64,17 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<CrossListGroup | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
+  const groupsRef = useStableDataRef(groups);
 
   const updateGroup = (index: number, field: keyof CrossListGroup, value: unknown) => {
-    const newGroups = [...groups];
+    const current = groupsRef.current;
+    const newGroups = [...current];
     newGroups[index] = { ...newGroups[index], [field]: value };
     onUpdate(newGroups);
   };
 
-  const addGroup = () => setAddDraft(createEmptyCrossListGroup(groups));
-  const deleteGroup = (index: number) => onUpdate(groups.filter((_, i) => i !== index));
+  const addGroup = () => setAddDraft(createEmptyCrossListGroup(groupsRef.current));
+  const deleteGroup = (index: number) => onUpdate(groupsRef.current.filter((_, i) => i !== index));
 
   type CrossListRow = { group: CrossListGroup; index: number };
 
@@ -222,7 +225,8 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
           sectionOptions={sectionOptions}
           onClose={() => setEditIndex(null)}
           onSave={(updated) => {
-            const next = [...groups];
+            const current = groupsRef.current;
+            const next = [...current];
             next[editIndex] = updated;
             onUpdate(next);
           }}
@@ -236,7 +240,7 @@ export const CrossListGroupsEditor = ({ groups, sectionOptions, onUpdate }: Cros
           sectionOptions={sectionOptions}
           onClose={() => setAddDraft(null)}
           onSave={(created) => {
-            onUpdate(insertAtSortedIdPosition(groups, created));
+            onUpdate(insertAtSortedIdPosition(groupsRef.current, created));
             setAddDraft(null);
             confirmRowAdded({
               rowKey: editorRowKey("constraints-crosslist-groups", String(created.id)),
@@ -269,15 +273,17 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<NoOverlapGroup | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
+  const groupsRef = useStableDataRef(groups);
 
   const updateGroup = (index: number, field: keyof NoOverlapGroup, value: unknown) => {
-    const newGroups = [...groups];
+    const current = groupsRef.current;
+    const newGroups = [...current];
     newGroups[index] = { ...newGroups[index], [field]: value };
     onUpdate(newGroups);
   };
 
-  const addGroup = () => setAddDraft(createEmptyNoOverlapGroup(groups));
-  const deleteGroup = (index: number) => onUpdate(groups.filter((_, i) => i !== index));
+  const addGroup = () => setAddDraft(createEmptyNoOverlapGroup(groupsRef.current));
+  const deleteGroup = (index: number) => onUpdate(groupsRef.current.filter((_, i) => i !== index));
 
   type NoOverlapRow = { group: NoOverlapGroup; index: number };
 
@@ -442,7 +448,8 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
           sectionOptions={sectionOptions}
           onClose={() => setEditIndex(null)}
           onSave={(updated) => {
-            const next = [...groups];
+            const current = groupsRef.current;
+            const next = [...current];
             next[editIndex] = updated;
             onUpdate(next);
           }}
@@ -456,7 +463,7 @@ export const NoOverlapGroupsEditor = ({ groups, sectionOptions, onUpdate }: NoOv
           sectionOptions={sectionOptions}
           onClose={() => setAddDraft(null)}
           onSave={(created) => {
-            onUpdate(insertAtSortedIdPosition(groups, created));
+            onUpdate(insertAtSortedIdPosition(groupsRef.current, created));
             setAddDraft(null);
             confirmRowAdded({
               rowKey: editorRowKey("constraints-no-overlap-groups", String(created.id)),
@@ -538,15 +545,17 @@ export const BlockedTimesEditor = ({
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<BlockedTime | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
+  const blockedTimesRef = useStableDataRef(blockedTimes);
 
   const updateBlockedTime = (index: number, field: keyof BlockedTime, value: unknown) => {
-    const newBlockedTimes = [...blockedTimes];
+    const current = blockedTimesRef.current;
+    const newBlockedTimes = [...current];
     newBlockedTimes[index] = { ...newBlockedTimes[index], [field]: value };
     onUpdate(newBlockedTimes);
   };
 
   const addBlockedTime = () => setAddDraft(createEmptyBlockedTime());
-  const deleteBlockedTime = (index: number) => onUpdate(blockedTimes.filter((_, i) => i !== index));
+  const deleteBlockedTime = (index: number) => onUpdate(blockedTimesRef.current.filter((_, i) => i !== index));
   const instructorOptionsWithNone = [{ key: "__none__", label: "(Any instructor)" }, ...instructorOptions];
   const roomOptionsWithNone = [{ key: "__none__", label: "(Any room)" }, ...roomOptions];
 
@@ -677,14 +686,15 @@ export const BlockedTimesEditor = ({
             options={SCOPE_OPTIONS}
             onChange={(v) => {
               const nextScope = v as BlockedTime["scope"];
-              const newBlockedTimes = [...blockedTimes];
-              const current = newBlockedTimes[idx];
-              if (!current) return;
+              const allCurrent = blockedTimesRef.current;
+              const newBlockedTimes = [...allCurrent];
+              const row = newBlockedTimes[idx];
+              if (!row) return;
               newBlockedTimes[idx] = {
-                ...current,
+                ...row,
                 scope: nextScope,
-                instructor_id: nextScope === "instructor" ? current.instructor_id : undefined,
-                room_id: nextScope === "room" ? current.room_id : undefined,
+                instructor_id: nextScope === "instructor" ? row.instructor_id : undefined,
+                room_id: nextScope === "room" ? row.room_id : undefined,
               };
               onUpdate(newBlockedTimes);
             }}
@@ -843,7 +853,8 @@ export const BlockedTimesEditor = ({
           roomOptions={roomOptions}
           onClose={() => setEditIndex(null)}
           onSave={(updated) => {
-            const next = [...blockedTimes];
+            const current = blockedTimesRef.current;
+            const next = [...current];
             next[editIndex] = updated;
             onUpdate(next);
           }}
@@ -858,8 +869,9 @@ export const BlockedTimesEditor = ({
           roomOptions={roomOptions}
           onClose={() => setAddDraft(null)}
           onSave={(created) => {
-            const newIndex = blockedTimes.length;
-            onUpdate([...blockedTimes, created]);
+            const current = blockedTimesRef.current;
+            const newIndex = current.length;
+            onUpdate([...current, created]);
             setAddDraft(null);
             confirmRowAdded({
               rowKey: editorRowKey("constraints-blocked-times", String(newIndex)),

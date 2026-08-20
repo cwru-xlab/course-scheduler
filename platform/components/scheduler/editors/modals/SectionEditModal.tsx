@@ -5,6 +5,7 @@ import { Button } from "@heroui/button";
 
 import { EditorModalShell } from "../EditorModalShell";
 import { MultiSelect } from "../../MultiSelect";
+import { TagInput } from "../../TagInput";
 import { joinCsv, splitCsv } from "@/lib/scheduling/csvFields";
 import type { Section, SectionState } from "@/lib/scheduling/types";
 import {
@@ -27,6 +28,7 @@ type SectionEditModalProps = {
   instructorOptions: { key: string; label: string }[];
   meetingPatternOptions: { key: string; label: string }[];
   crosslistGroupOptions: { key: string; label: string }[];
+  featureSuggestions?: string[];
   onClose: () => void;
   onSave: (section: Section) => void;
 };
@@ -38,6 +40,7 @@ export function SectionEditModal({
   instructorOptions,
   meetingPatternOptions,
   crosslistGroupOptions,
+  featureSuggestions = [],
   onClose,
   onSave,
 }: SectionEditModalProps) {
@@ -101,7 +104,10 @@ export function SectionEditModal({
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-slate-600">Section ID</span>
           <input
-            className="rounded-lg border border-slate-200 px-3 py-2"
+            className={`rounded-lg border border-slate-200 px-3 py-2 ${
+              mode === "edit" ? "cursor-not-allowed bg-slate-100 text-slate-400" : ""
+            }`}
+            readOnly={mode === "edit"}
             value={draft.id}
             onChange={(e) => setDraft((d) => ({ ...d, id: e.target.value }))}
           />
@@ -228,14 +234,13 @@ export function SectionEditModal({
         </label>
         <label className="flex flex-col gap-1 sm:col-span-2">
           <span className="text-xs font-semibold text-slate-600">
-            Room requirements (comma-separated)
+            Room requirements
           </span>
-          <input
-            className="rounded-lg border border-slate-200 px-3 py-2"
-            value={joinCsv(draft.room_requirements)}
-            onChange={(e) =>
-              setDraft((d) => ({ ...d, room_requirements: splitCsv(e.target.value) }))
-            }
+          <TagInput
+            value={draft.room_requirements}
+            onChange={(v) => setDraft((d) => ({ ...d, room_requirements: v }))}
+            suggestions={featureSuggestions}
+            placeholder="Type a feature name..."
           />
         </label>
         <label className="flex flex-col gap-1">

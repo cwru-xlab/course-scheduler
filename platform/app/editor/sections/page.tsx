@@ -45,6 +45,7 @@ export default function SectionsPage() {
 
       <SectionsEditor
         sections={data.sections}
+        rooms={data.rooms}
         instructorOptions={instructorOptions}
         meetingPatternOptions={meetingPatternOptions}
         crosslistGroupOptions={crosslistGroupOptions}

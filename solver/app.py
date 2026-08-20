@@ -239,6 +239,12 @@ def _ensure_schema_migrations() -> None:
                             "ALTER TABLE sections ADD COLUMN state VARCHAR(16) NOT NULL DEFAULT 'active'"
                         )
                     )
+                if "section_number" not in section_cols:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE sections ADD COLUMN section_number VARCHAR(16) NOT NULL DEFAULT ''"
+                        )
+                    )
             if "blocked_times" in tables:
                 blocked_cols = {c["name"] for c in inspector.get_columns("blocked_times")}
                 if "days" not in blocked_cols:

@@ -15,6 +15,7 @@ import { MeetingPatternEditModal } from "./modals/MeetingPatternEditModal";
 import type { MeetingPattern } from "@/lib/scheduling/types";
 import { insertAtSortedIdPosition } from "@/lib/scheduling/insertAtSortedIdPosition";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
+import { useStableDataRef } from "./useStableDataRef";
 
 type MeetingPatternsEditorProps = {
   meetingPatterns: MeetingPattern[];
@@ -48,23 +49,26 @@ export const MeetingPatternsEditor = ({
     useEditorActions();
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<MeetingPattern | null>(null);
+  const meetingPatternsRef = useStableDataRef(meetingPatterns);
 
   const updatePattern = (index: number, field: keyof MeetingPattern, value: unknown) => {
-    const newPatterns = [...meetingPatterns];
+    const current = meetingPatternsRef.current;
+    const newPatterns = [...current];
     newPatterns[index] = { ...newPatterns[index], [field]: value };
     onUpdate(newPatterns);
   };
 
   const addPattern = () => {
-    setAddDraft(createEmptyMeetingPattern(meetingPatterns));
+    setAddDraft(createEmptyMeetingPattern(meetingPatternsRef.current));
   };
 
   const deletePattern = (index: number) => {
-    onUpdate(meetingPatterns.filter((_, i) => i !== index));
+    onUpdate(meetingPatternsRef.current.filter((_, i) => i !== index));
   };
 
   const addTimeslotSet = (patternIndex: number) => {
-    const newPatterns = [...meetingPatterns];
+    const current = meetingPatternsRef.current;
+    const newPatterns = [...current];
     newPatterns[patternIndex] = {
       ...newPatterns[patternIndex],
       compatible_timeslot_sets: [...newPatterns[patternIndex].compatible_timeslot_sets, []],
@@ -73,7 +77,8 @@ export const MeetingPatternsEditor = ({
   };
 
   const updateTimeslotSet = (patternIndex: number, setIndex: number, value: string[]) => {
-    const newPatterns = [...meetingPatterns];
+    const current = meetingPatternsRef.current;
+    const newPatterns = [...current];
     const newSets = [...newPatterns[patternIndex].compatible_timeslot_sets];
     newSets[setIndex] = value;
     newPatterns[patternIndex] = { ...newPatterns[patternIndex], compatible_timeslot_sets: newSets };
@@ -81,7 +86,8 @@ export const MeetingPatternsEditor = ({
   };
 
   const deleteTimeslotSet = (patternIndex: number, setIndex: number) => {
-    const newPatterns = [...meetingPatterns];
+    const current = meetingPatternsRef.current;
+    const newPatterns = [...current];
     newPatterns[patternIndex] = {
       ...newPatterns[patternIndex],
       compatible_timeslot_sets: newPatterns[patternIndex].compatible_timeslot_sets.filter((_, i) => i !== setIndex),
@@ -220,7 +226,8 @@ export const MeetingPatternsEditor = ({
           timeslotOptions={timeslotOptions}
           onClose={() => setEditIndex(null)}
           onSave={(updated) => {
-            const next = [...meetingPatterns];
+            const current = meetingPatternsRef.current;
+            const next = [...current];
             next[editIndex] = updated;
             onUpdate(next);
           }}
@@ -234,7 +241,7 @@ export const MeetingPatternsEditor = ({
           timeslotOptions={timeslotOptions}
           onClose={() => setAddDraft(null)}
           onSave={(created) => {
-            onUpdate(insertAtSortedIdPosition(meetingPatterns, created));
+            onUpdate(insertAtSortedIdPosition(meetingPatternsRef.current, created));
             setAddDraft(null);
             confirmRowAdded({
               rowKey: editorRowKey("meeting-patterns", String(created.id)),

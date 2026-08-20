@@ -64,6 +64,7 @@ import type {
   ValidationError,
 } from "@/lib/scheduling/types";
 import { DEFAULT_SOFT_WEIGHT } from "@/lib/scheduling/types";
+import type { SchedulingDataRevision } from "@/lib/scheduling/dataRevision";
 import {
   SCHEDULING_DATA_REFRESH_EVENT,
   useSchedulingData,
@@ -1157,6 +1158,15 @@ export default function CalendarPage() {
   const [solverRunError, setSolverRunError] = useState<string | null>(null);
   // Cross-user shared schedule: newest solver result published by any live user.
   const sharedScheduleMeta = useSharedScheduleMeta();
+  // Timestamp (ISO) of the schedule currently displayed on screen. Updated by
+  // applyRunSnapshot so the header can show accurate metadata even when the
+  // displayed schedule differs from the live shared schedule (e.g. loaded from
+  // history).
+  const displayedScheduleCreatedAtRef = useRef<string | null>(null);
+  // Data revision in effect when the displayed schedule was created. Used to
+  // show accurate "Data edited" info instead of always using the live server
+  // revision. State (not ref) so changes trigger a re-render of the header.
+  const [displayedDataRevision, setDisplayedDataRevision] = useState<SchedulingDataRevision | null>(null);
   // Highest shared revision already reflected on this page (applied or authored).
   const appliedSharedRevisionRef = useRef(0);
   // Adopt the current shared revision as baseline on first poll so we only react
@@ -1579,6 +1589,8 @@ type PatternDayApplyRow = {
       ),
       parsed.sectionLocks ?? {},
     );
+    displayedScheduleCreatedAtRef.current = parsed.createdAt;
+    setDisplayedDataRevision(parsed.dataRevision ?? null);
   }, []);
 
   useEffect(() => {
@@ -1613,6 +1625,10 @@ type PatternDayApplyRow = {
                     ),
                   );
                   setLastHistorySavedSignature(sig);
+                  setDragFeedback({
+                    status: "valid",
+                    message: "Saved schedule loaded.",
+                  });
                 }
                 return;
               }
@@ -2538,6 +2554,16 @@ type PatternDayApplyRow = {
     (nextInput: SchedulingInput, assignments: AssignmentMap, locks?: Record<string, SectionLockState>) => {
       const lockMap = locks ?? sectionLocks;
       if (typeof window === "undefined") return;
+      const existingRaw = localStorage.getItem(LAST_SOLVER_RUN_STORAGE_KEY);
+      let createdAt = new Date().toISOString();
+      let name: string | undefined;
+      try {
+        if (existingRaw) {
+          const existing = JSON.parse(existingRaw) as { createdAt?: string; name?: string };
+          if (existing.createdAt) createdAt = existing.createdAt;
+          if (existing.name) name = existing.name;
+        }
+      } catch { /* ignore */ }
       localStorage.setItem(
         LAST_SOLVER_RUN_STORAGE_KEY,
         JSON.stringify({
@@ -2555,11 +2581,14 @@ type PatternDayApplyRow = {
             explanations: [],
           },
           sectionLocks: lockMap,
-          createdAt: new Date().toISOString(),
+          createdAt,
+          dataRevision: sharedScheduleMeta.dataRevision ?? displayedDataRevision ?? undefined,
+          ...(name ? { name } : {}),
         }),
       );
+      window.dispatchEvent(new Event("lastSolverRunUpdated"));
     },
-    [sectionLocks],
+    [sectionLocks, displayedDataRevision, sharedScheduleMeta.dataRevision],
   );
 
   const hasValidUnsavedEdit = useMemo(() => {
@@ -2590,8 +2619,10 @@ type PatternDayApplyRow = {
   useEffect(() => {
     const rev = sharedScheduleMeta.revision;
     if (!sharedInitializedRef.current) {
-      sharedInitializedRef.current = true;
-      appliedSharedRevisionRef.current = rev;
+      if (rev > 0) {
+        sharedInitializedRef.current = true;
+        appliedSharedRevisionRef.current = rev;
+      }
       return;
     }
     if (rev <= 0 || rev <= appliedSharedRevisionRef.current) return;
@@ -4323,9 +4354,10 @@ type PatternDayApplyRow = {
         },
         createdAt: new Date().toISOString(),
         sectionLocks,
+        dataRevision: sharedScheduleMeta.dataRevision ?? undefined,
       };
     },
-    [assignmentsBySection, data?.sections, sectionLocks, solverInput],
+    [assignmentsBySection, data?.sections, sectionLocks, solverInput, sharedScheduleMeta.dataRevision],
   );
 
   // Publish the current view as the shared "active schedule" (Google-Docs-style
@@ -4504,7 +4536,7 @@ type PatternDayApplyRow = {
       if (typeof window !== "undefined") {
         window.localStorage.setItem(
           LAST_SOLVER_RUN_STORAGE_KEY,
-          JSON.stringify(snapshot),
+          JSON.stringify({ ...snapshot, name: trimmedName }),
         );
       }
       // The current iteration is now saved, so a re-run won't be flagged unsaved.
@@ -4569,22 +4601,54 @@ type PatternDayApplyRow = {
           <p className="mt-1 text-base leading-6 text-slate-500">
             Click through Monday–Friday to view scheduled sections.
           </p>
-          {sharedScheduleMeta.ranAt ? (
-            <p className="mt-1 text-xs text-slate-400">
-              Last generated
-              {sharedScheduleMeta.ranBy ? ` by ${sharedScheduleMeta.ranBy}` : ""} on{" "}
-              {new Date(sharedScheduleMeta.ranAt).toLocaleDateString(undefined, {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })}{" "}
-              at{" "}
-              {new Date(sharedScheduleMeta.ranAt).toLocaleTimeString(undefined, {
-                hour: "numeric",
-                minute: "2-digit",
-              })}
-            </p>
-          ) : null}
+          {(() => {
+            const scheduleCreatedAt = displayedScheduleCreatedAtRef.current;
+            const dataRev = displayedDataRevision ?? sharedScheduleMeta.dataRevision;
+            const viewPredatesDataEdit =
+              !!scheduleCreatedAt &&
+              !!dataRev &&
+              !Number.isNaN(new Date(dataRev.lastModifiedAt).getTime()) &&
+              !Number.isNaN(new Date(scheduleCreatedAt).getTime()) &&
+              new Date(dataRev.lastModifiedAt).getTime() > new Date(scheduleCreatedAt).getTime();
+            return (
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+                {dataRev ? (
+                  <span>
+                    Data edited{dataRev.lastModifiedByName ? ` by ${dataRev.lastModifiedByName}` : ""}{" "}
+                    at{" "}
+                    {new Date(dataRev.lastModifiedAt).toLocaleString(undefined, {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}
+                  </span>
+                ) : null}
+                {scheduleCreatedAt ? (
+                  <>
+                    <span className="hidden sm:inline text-slate-300" aria-hidden>
+                      •
+                    </span>
+                    <span>
+                      Last solved at{" "}
+                      {new Date(scheduleCreatedAt).toLocaleString(undefined, {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                    </span>
+                  </>
+                ) : null}
+                {viewPredatesDataEdit ? (
+                  <>
+                    <span className="hidden sm:inline text-slate-300" aria-hidden>
+                      •
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
+                      View predates latest data edit — rerun the solver to refresh
+                    </span>
+                  </>
+                ) : null}
+              </div>
+            );
+          })()}
         </div>
         <div className="flex flex-col items-stretch gap-2 w-full md:w-auto">
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2">
@@ -4721,7 +4785,7 @@ type PatternDayApplyRow = {
               }
               onBlur={() => setToolbarActionHint(null)}
               className={clsx(
-                "inline-flex items-center justify-center gap-1.5 rounded-lg h-10 px-3 text-xs font-bold border transition-colors",
+                "flex items-center justify-center rounded-lg size-10 border transition-colors",
                 data && !isExportingRoomAssignments
                   ? "bg-teal-50 text-teal-900 border-teal-200 hover:bg-teal-100"
                   : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
@@ -4730,7 +4794,6 @@ type PatternDayApplyRow = {
               aria-label="Export rooms"
             >
               <FileSpreadsheet className="size-4 shrink-0" aria-hidden />
-              {isExportingRoomAssignments ? "Exporting…" : "Export rooms"}
             </button>
             <div className="hidden lg:block h-7 w-px bg-slate-200 mx-1" />
             <button

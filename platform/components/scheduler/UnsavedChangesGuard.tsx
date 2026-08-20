@@ -26,7 +26,8 @@ export function UnsavedChangesGuard() {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [hasUnsavedChanges]);
 
-  const showBanner = hasUnsavedChanges || saveFeedback?.type === "error";
+  const showError = saveFeedback?.type === "error";
+  const showBanner = showError || (hasUnsavedChanges && !autoSaveEnabled);
 
   if (!showBanner) return null;
 

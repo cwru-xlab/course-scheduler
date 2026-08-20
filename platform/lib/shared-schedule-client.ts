@@ -18,6 +18,7 @@ export type SharedScheduleSnapshot = {
   lockedSectionIds: string[];
   sectionLocks?: Record<string, SectionLockState>;
   createdAt: string;
+  dataRevision?: SchedulingDataRevision;
 };
 
 export type SharedScheduleFull = SharedScheduleMeta & {
