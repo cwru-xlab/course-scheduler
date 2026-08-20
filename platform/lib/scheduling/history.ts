@@ -1,6 +1,7 @@
 "use client";
 
 import type { ScheduleSolution, SchedulingInput, SectionLockState, ValidationError } from "./types";
+import type { SchedulingDataRevision } from "@/lib/scheduling/dataRevision";
 import { enrichSpreadsheetErrors, formatErrorsDetail, formatErrorsSummary, normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
 
 export const LAST_SOLVER_RUN_STORAGE_KEY = "wsom-last-solver-run";
@@ -18,6 +19,10 @@ export type LastSolverRunSnapshot = {
   solution: ScheduleSolution;
   createdAt: string;
   sectionLocks?: Record<string, SectionLockState>;
+  /** Data revision (last editor save) in effect when this snapshot was created. */
+  dataRevision?: SchedulingDataRevision;
+  /** Name of the saved schedule this snapshot was loaded from (when applicable). */
+  name?: string;
 };
 
 export type SavedScheduleEntry = {
@@ -102,7 +107,7 @@ export const loadSavedScheduleToCurrentView = (entry: SavedScheduleEntry): void 
   if (typeof window === "undefined") return;
   window.localStorage.setItem(
     LAST_SOLVER_RUN_STORAGE_KEY,
-    JSON.stringify(entry.snapshot),
+    JSON.stringify({ ...entry.snapshot, name: entry.name }),
   );
   try {
     window.sessionStorage.setItem(VIEW_FROM_HISTORY_KEY, "1");

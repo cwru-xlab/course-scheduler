@@ -22,17 +22,19 @@ import { RoomEditModal } from "./modals/RoomEditModal";
 
 import { ReadOnlyIdCell } from "./ReadOnlyIdCell";
 import { EditableCell } from "../EditableCell";
-import { EditableArrayCell } from "../EditableArrayCell";
+import { TagInput } from "../TagInput";
 import { RowNotesButton } from "../RowNotesButton";
 
-import type { Room } from "@/lib/scheduling/types";
+import type { Room, Section } from "@/lib/scheduling/types";
 import { insertAtSortedIdPosition } from "@/lib/scheduling/insertAtSortedIdPosition";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
+import { useStableDataRef } from "./useStableDataRef";
 
 type RoomRow = { room: Room; index: number };
 
 type RoomsEditorProps = {
   rooms: Room[];
+  sections: Section[];
   onUpdate: (rooms: Room[]) => void;
 };
 
@@ -44,26 +46,28 @@ const createEmptyRoom = (existing: Room[]): Room => ({
   features: [],
 });
 
-export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
+export const RoomsEditor = ({ rooms, sections, onUpdate }: RoomsEditorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const columnVisibility = useEditorColumnVisibility("rooms", ROOM_COLUMN_SPECS);
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<Room | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
+  const roomsRef = useStableDataRef(rooms);
 
   const updateRoom = (index: number, field: keyof Room, value: unknown) => {
-    const newRooms = [...rooms];
+    const current = roomsRef.current;
+    const newRooms = [...current];
     newRooms[index] = { ...newRooms[index], [field]: value };
     onUpdate(newRooms);
   };
 
   const addRoom = () => {
-    setAddDraft(createEmptyRoom(rooms));
+    setAddDraft(createEmptyRoom(roomsRef.current));
   };
 
   const deleteRoom = (index: number) => {
-    onUpdate(rooms.filter((_, i) => i !== index));
+    onUpdate(roomsRef.current.filter((_, i) => i !== index));
   };
 
   const roomFilterDefs = useMemo(
@@ -104,6 +108,17 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
   );
 
   const roomSortDefs = useMemo(() => sortDefsFromFilterDefs(roomFilterDefs), [roomFilterDefs]);
+
+  const featureSuggestions = useMemo(() => {
+    const set = new Set<string>();
+    for (const room of rooms) {
+      for (const f of room.features) set.add(f);
+    }
+    for (const s of sections) {
+      for (const r of s.room_requirements) set.add(r);
+    }
+    return Array.from(set).sort();
+  }, [rooms, sections]);
 
   const buildRoomRow = useCallback(
     (room: Room, index: number): RoomRow => ({ room, index }),
@@ -158,9 +173,10 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
         );
       case "features":
         return (
-          <EditableArrayCell
+          <TagInput
             value={room.features}
             onChange={(v) => updateRoom(idx, "features", v)}
+            suggestions={featureSuggestions}
             placeholder="projector, etc"
           />
         );
@@ -234,9 +250,11 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
         <RoomEditModal
           isOpen
           room={rooms[editIndex]}
+          featureSuggestions={featureSuggestions}
           onClose={() => setEditIndex(null)}
           onSave={(updated) => {
-            const next = [...rooms];
+            const current = roomsRef.current;
+            const next = [...current];
             next[editIndex] = updated;
             onUpdate(next);
           }}
@@ -247,9 +265,10 @@ export const RoomsEditor = ({ rooms, onUpdate }: RoomsEditorProps) => {
           isOpen
           mode="create"
           room={addDraft}
+          featureSuggestions={featureSuggestions}
           onClose={() => setAddDraft(null)}
           onSave={(created) => {
-            onUpdate(insertAtSortedIdPosition(rooms, created));
+            onUpdate(insertAtSortedIdPosition(roomsRef.current, created));
             setAddDraft(null);
             confirmRowAdded({
               rowKey: editorRowKey("rooms", String(created.id)),

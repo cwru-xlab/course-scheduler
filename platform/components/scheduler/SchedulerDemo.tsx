@@ -446,6 +446,7 @@ export const SchedulerDemo = () => {
           <div className="flex flex-col gap-4">
             <SectionsEditor
               sections={data.sections}
+              rooms={data.rooms}
               instructorOptions={instructorOptions}
               meetingPatternOptions={meetingPatternOptions}
               crosslistGroupOptions={crosslistGroupOptions}
@@ -464,6 +465,7 @@ export const SchedulerDemo = () => {
         <Tab key="rooms" title="Rooms">
           <RoomsEditor
             rooms={data.rooms}
+            sections={data.sections}
             onUpdate={(rooms) => markDirtyAndUpdateField("rooms", rooms)}
           />
         </Tab>

@@ -7,6 +7,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
+import type { SchedulingDataRevision } from "@/lib/scheduling/dataRevision";
 import type { SectionLockState } from "@/lib/scheduling/types";
 
 /** Full snapshot needed for another user's calendar to reconstruct the view. */
@@ -17,6 +18,8 @@ export type SharedScheduleSnapshot = {
   /** Live lock state so the calendar can reconstruct soft/hard locks on apply. */
   sectionLocks?: Record<string, SectionLockState>;
   createdAt: string;
+  /** Data revision in effect when this snapshot was created. */
+  dataRevision?: SchedulingDataRevision;
 };
 
 export type SharedScheduleState = {

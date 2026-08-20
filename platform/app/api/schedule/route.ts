@@ -10,6 +10,7 @@ import {
   readSolverSession,
 } from "@/lib/solver-session";
 import { tryRecordActivity } from "@/lib/record-activity";
+import { getSchedulingDataRevision, tryRecordSchedulingDataRevision } from "@/lib/scheduling/dataRevisionStore";
 import { fetchSolver, solverErrorsFromBody } from "@/lib/api/solverFetch";
 import { enrichSolverErrors, normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
 import { sectionLocksFromInput } from "@/lib/scheduling/sectionLocks";
@@ -160,6 +161,7 @@ export async function POST(request: NextRequest) {
             )
           : [];
         const sectionLocks = sectionLocksFromInput(input);
+        const currentDataRevision = getSchedulingDataRevision();
         const meta = publishSharedSchedule({
           ranBy: userLabel,
           snapshot: {
@@ -168,6 +170,7 @@ export async function POST(request: NextRequest) {
             lockedSectionIds,
             sectionLocks,
             createdAt: new Date().toISOString(),
+            dataRevision: currentDataRevision ?? undefined,
           },
         });
         sharedRevision = meta.revision;
@@ -175,6 +178,8 @@ export async function POST(request: NextRequest) {
         // Publishing is best-effort; never fail the solve because of it.
       }
     }
+
+    await tryRecordSchedulingDataRevision(request);
 
     finish({ status: "completed", progress: 100 });
 

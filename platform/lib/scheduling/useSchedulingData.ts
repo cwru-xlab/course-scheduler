@@ -406,7 +406,7 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
   );
 
   const checkForRemoteChanges = useCallback(async () => {
-    if (isSaving) return;
+    if (saveInFlightRef.current) return;
     try {
       const remote = await fetchRemoteSnapshot();
       if (!remote) return;
@@ -495,14 +495,13 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const handleRefresh = () => {
-      if (isSaving) return;
       void checkForRemoteChanges();
     };
     window.addEventListener(SCHEDULING_DATA_REFRESH_EVENT, handleRefresh);
     return () => {
       window.removeEventListener(SCHEDULING_DATA_REFRESH_EVENT, handleRefresh);
     };
-  }, [checkForRemoteChanges, isSaving]);
+  }, [checkForRemoteChanges]);
 
   useEffect(() => {
     const poll = () => {
@@ -574,12 +573,14 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
       dismissedRemoteFingerprintRef.current = null;
       markRecentChanges(savedKeys, "local");
 
-      setSaveFeedback({
-        type: "success",
-        message: "Changes saved successfully.",
-        warnings: result.warnings.length > 0 ? result.warnings : undefined,
-      });
-      clearSaveFeedbackSoon();
+      if (options?.manual || !autoSaveEnabledRef.current) {
+        setSaveFeedback({
+          type: "success",
+          message: "Changes saved successfully.",
+          warnings: result.warnings.length > 0 ? result.warnings : undefined,
+        });
+        clearSaveFeedbackSoon();
+      }
       return true;
     } catch (err) {
       setSaveFeedback({
@@ -615,6 +616,7 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
   const saveToLocalStorage = useCallback(() => {}, []);
 
   const updateData = useCallback((newData: SchedulingInput) => {
+    hasUnsavedChangesRef.current = true;
     setData(normalizeCrosslistData(newData));
     setHasUnsavedChanges(true);
     setSaveFeedback(null);
@@ -622,6 +624,7 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
 
   const updateField = useCallback(
     <K extends keyof SchedulingInput>(field: K, value: SchedulingInput[K]) => {
+      hasUnsavedChangesRef.current = true;
       setData((prev) => {
         if (!prev) return prev;
         return normalizeCrosslistData({ ...prev, [field]: value });

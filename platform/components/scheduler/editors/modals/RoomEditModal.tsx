@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
 import { Button } from "@heroui/button";
 
 import { EditorModalShell } from "../EditorModalShell";
-import { joinCsv, splitCsv } from "@/lib/scheduling/csvFields";
+import { TagInput } from "../../TagInput";
 import type { Room } from "@/lib/scheduling/types";
 
 type RoomEditModalProps = {
   isOpen: boolean;
   room: Room;
   mode?: "create" | "edit";
+  featureSuggestions?: string[];
   onClose: () => void;
   onSave: (room: Room) => void;
 };
@@ -19,6 +20,7 @@ export function RoomEditModal({
   isOpen,
   room,
   mode = "edit",
+  featureSuggestions = [],
   onClose,
   onSave,
 }: RoomEditModalProps) {
@@ -100,11 +102,12 @@ export function RoomEditModal({
           />
         </label>
         <label className="flex flex-col gap-1 sm:col-span-2">
-          <span className="text-xs font-semibold text-slate-600">Features (comma-separated)</span>
-          <input
-            className="rounded-lg border border-slate-200 px-3 py-2"
-            value={joinCsv(draft.features)}
-            onChange={(e) => setDraft((d) => ({ ...d, features: splitCsv(e.target.value) }))}
+          <span className="text-xs font-semibold text-slate-600">Features</span>
+          <TagInput
+            value={draft.features}
+            onChange={(v) => setDraft((d) => ({ ...d, features: v }))}
+            suggestions={featureSuggestions}
+            placeholder="Type a feature name..."
           />
         </label>
       </div>

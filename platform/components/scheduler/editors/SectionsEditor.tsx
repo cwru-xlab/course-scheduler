@@ -25,12 +25,14 @@ import { EditableCell } from "../EditableCell";
 import { EditableArrayCell } from "../EditableArrayCell";
 import { EditableSelectCell } from "../EditableSelectCell";
 import { MultiSelect } from "../MultiSelect";
+import { TagInput } from "../TagInput";
 import { RowNotesButton } from "../RowNotesButton";
 
-import type { Section, SectionState } from "@/lib/scheduling/types";
+import type { Room, Section, SectionState } from "@/lib/scheduling/types";
 import { useHideArchivedSections } from "@/lib/editor-ui-preferences";
 import { insertAtSortedIdPosition } from "@/lib/scheduling/insertAtSortedIdPosition";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
+import { useStableDataRef } from "./useStableDataRef";
 import {
   isSectionArchived,
   isSectionNew,
@@ -45,6 +47,7 @@ const STATE_OPTIONS: { key: SectionState; label: string }[] = [
 
 type SectionsEditorProps = {
   sections: Section[];
+  rooms: Room[];
   instructorOptions: { key: string; label: string }[];
   meetingPatternOptions: { key: string; label: string }[];
   crosslistGroupOptions: { key: string; label: string }[];
@@ -78,6 +81,7 @@ const createEmptySection = (existing: Section[]): Section => ({
 
 export const SectionsEditor = ({
   sections,
+  rooms,
   instructorOptions,
   meetingPatternOptions,
   crosslistGroupOptions,
@@ -90,6 +94,7 @@ export const SectionsEditor = ({
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<Section | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
+  const sectionsRef = useStableDataRef(sections);
 
   useLayoutEffect(() => {
     if (typeof window === "undefined") return;
@@ -119,17 +124,18 @@ export const SectionsEditor = ({
   }, [sections, hideArchived, setHideArchived]);
 
   const updateSection = (index: number, field: keyof Section, value: unknown) => {
-    const newSections = [...sections];
+    const current = sectionsRef.current;
+    const newSections = [...current];
     newSections[index] = { ...newSections[index], [field]: value };
     onUpdate(newSections);
   };
 
   const addSection = () => {
-    setAddDraft(createEmptySection(sections));
+    setAddDraft(createEmptySection(sectionsRef.current));
   };
 
   const deleteSection = (index: number) => {
-    onUpdate(sections.filter((_, i) => i !== index));
+    onUpdate(sectionsRef.current.filter((_, i) => i !== index));
   };
 
   const crosslistOptionsWithNone = useMemo(
@@ -146,6 +152,17 @@ export const SectionsEditor = ({
     () => [{ key: "__none__", label: "(None)" }, ...meetingPatternOptions],
     [meetingPatternOptions],
   );
+
+  const featureSuggestions = useMemo(() => {
+    const set = new Set<string>();
+    for (const room of rooms) {
+      for (const f of room.features) set.add(f);
+    }
+    for (const s of sections) {
+      for (const r of s.room_requirements) set.add(r);
+    }
+    return Array.from(set).sort();
+  }, [rooms, sections]);
 
   const sectionFilterDefs = useMemo((): EditorColumnFilterDef<SectionRow>[] => [
     {
@@ -368,11 +385,11 @@ export const SectionsEditor = ({
         );
       case "room_req":
         return (
-          <EditableArrayCell
+          <TagInput
             value={section.room_requirements}
             onChange={(v) => updateSection(idx, "room_requirements", v)}
+            suggestions={featureSuggestions}
             placeholder="features"
-            nowrapPlaceholder
           />
         );
       case "crosslist":
@@ -481,9 +498,11 @@ export const SectionsEditor = ({
           instructorOptions={instructorOptions}
           meetingPatternOptions={meetingPatternOptions}
           crosslistGroupOptions={crosslistGroupOptions}
+          featureSuggestions={featureSuggestions}
           onClose={() => setEditIndex(null)}
           onSave={(updated) => {
-            const next = [...sections];
+            const current = sectionsRef.current;
+            const next = [...current];
             next[editIndex] = updated;
             onUpdate(next);
           }}
@@ -497,9 +516,10 @@ export const SectionsEditor = ({
           instructorOptions={instructorOptions}
           meetingPatternOptions={meetingPatternOptions}
           crosslistGroupOptions={crosslistGroupOptions}
+          featureSuggestions={featureSuggestions}
           onClose={() => setAddDraft(null)}
           onSave={(created) => {
-            onUpdate(insertAtSortedIdPosition(sections, created));
+            onUpdate(insertAtSortedIdPosition(sectionsRef.current, created));
             setAddDraft(null);
             confirmRowAdded({
               rowKey: editorRowKey("sections", String(created.id)),

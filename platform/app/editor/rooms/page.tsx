@@ -22,6 +22,7 @@ export default function RoomsPage() {
 
       <RoomsEditor
         rooms={data.rooms}
+        sections={data.sections}
         onUpdate={(rooms) => updateField("rooms", rooms)}
       />
     </div>

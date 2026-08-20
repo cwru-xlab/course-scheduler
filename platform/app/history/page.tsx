@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Activity, Archive, CalendarDays, Download, FolderOpen, Pencil, Trash2, User } from "lucide-react";
 
 import {
@@ -11,9 +10,12 @@ import {
   listSavedSchedules,
   loadSavedScheduleToCurrentView,
   renameSavedSchedule,
+  LAST_SOLVER_RUN_STORAGE_KEY,
   type SavedScheduleEntry,
 } from "@/lib/scheduling/history";
-import { useSharedScheduleFull } from "@/lib/shared-schedule-client";
+import type { LastSolverRunSnapshot } from "@/lib/scheduling/history";
+import type { SchedulingDataRevision } from "@/lib/scheduling/dataRevision";
+import { useSharedScheduleMeta } from "@/lib/shared-schedule-client";
 import type { ValidationError } from "@/lib/scheduling/types";
 import { ValidationIssuesTable } from "@/components/scheduler/ValidationIssuesTable";
 import { SpreadsheetFormatHelp } from "@/components/scheduler/SpreadsheetFormatHelp";
@@ -32,7 +34,6 @@ const fmtDate = (iso: string): string => {
 };
 
 export default function HistoryPage() {
-  const router = useRouter();
   const [items, setItems] = useState<SavedScheduleEntry[]>([]);
   const [exportFeedback, setExportFeedback] = useState<{
     entryId: string;
@@ -58,22 +59,63 @@ export default function HistoryPage() {
     refresh();
   }, []);
 
-  // Live shared "active schedule": the current working document, shown to
-  // everyone identically. Read-only by design.
-  const active = useSharedScheduleFull();
-  const activeSnapshot = active.snapshot;
-  const activeAssignments = (() => {
-    const solution = activeSnapshot?.solution as
+  // Read the currently displayed snapshot from localStorage (same one the calendar uses).
+  // This lets us show the loaded schedule's metadata rather than only the live shared schedule.
+  const [displayedSnapshot, setDisplayedSnapshot] = useState<LastSolverRunSnapshot | null>(null);
+
+  const readDisplayedSnapshot = () => {
+    try {
+      const raw = localStorage.getItem(LAST_SOLVER_RUN_STORAGE_KEY);
+      if (raw) {
+        setDisplayedSnapshot(JSON.parse(raw) as LastSolverRunSnapshot);
+      }
+    } catch {
+      // ignore malformed data
+    }
+  };
+
+  useEffect(() => {
+    readDisplayedSnapshot();
+    const handler = () => readDisplayedSnapshot();
+    window.addEventListener("lastSolverRunUpdated", handler);
+    window.addEventListener("storage", handler);
+    return () => {
+      window.removeEventListener("lastSolverRunUpdated", handler);
+      window.removeEventListener("storage", handler);
+    };
+  }, []);
+
+  // Live data revision from the server (polls every 4s).
+  const liveMeta = useSharedScheduleMeta();
+
+  // "Data edited" display revision: starts from the localStorage snapshot (what was loaded),
+  // then overridden by the live server value whenever it changes.
+  const snapshotRevisionIdRef = useRef<string | null>(null);
+  const [displayedDataRevision, setDisplayedDataRevision] = useState<SchedulingDataRevision | null>(null);
+  useEffect(() => {
+    const snapRev = displayedSnapshot?.dataRevision;
+    if (snapRev && snapRev.lastModifiedAt !== snapshotRevisionIdRef.current) {
+      snapshotRevisionIdRef.current = snapRev.lastModifiedAt;
+      setDisplayedDataRevision(snapRev);
+    }
+  }, [displayedSnapshot?.dataRevision]);
+  useEffect(() => {
+    if (liveMeta.dataRevision && snapshotRevisionIdRef.current) {
+      setDisplayedDataRevision(liveMeta.dataRevision);
+    }
+  }, [liveMeta.dataRevision]);
+  const displayedAssignments = (() => {
+    const solution = displayedSnapshot?.solution as
       | { assignments?: unknown[] }
       | undefined;
     return solution?.assignments?.length ?? 0;
   })();
   const dataEditedAfterPublish = useMemo(() => {
-    if (!activeSnapshot || !active.dataRevision) return false;
-    const editedAt = new Date(active.dataRevision.lastModifiedAt).getTime();
-    const publishedAt = new Date(activeSnapshot.createdAt).getTime();
+    if (!displayedSnapshot || !displayedDataRevision) return false;
+    const editedAt = new Date(displayedDataRevision.lastModifiedAt).getTime();
+    const publishedAt = new Date(displayedSnapshot.createdAt).getTime();
     return !Number.isNaN(editedAt) && !Number.isNaN(publishedAt) && editedAt > publishedAt;
-  }, [active.dataRevision, activeSnapshot]);
+  }, [displayedDataRevision, displayedSnapshot]);
 
   const handleRename = () => {
     if (!renameModal || !renameModal.newName.trim()) return;
@@ -139,43 +181,39 @@ export default function HistoryPage() {
       ) : null}
 
       <div
-        className="rounded-xl border border-sky-200 bg-sky-50/60 p-4 shadow-sm ring-1 ring-sky-100"
+        className="sticky top-[calc(4rem+1rem)] z-40 rounded-xl border border-sky-200 bg-sky-50/80 backdrop-blur-md p-4 shadow-sm ring-1 ring-sky-100"
         aria-label="Active schedule"
       >
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-1.5 min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-lg font-bold text-slate-900">Active schedule</h2>
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-                <Activity className="size-3" aria-hidden />
-                Live
-              </span>
+              <h2 className="text-lg font-bold text-slate-900">{displayedSnapshot?.name || "Active schedule"}</h2>
             </div>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
               <span className="hidden sm:inline text-slate-300" aria-hidden>
                 •
               </span>
               <span>
-                {active.dataRevision
+                {displayedDataRevision
                   ? `Data edited ${
-                      active.dataRevision.lastModifiedByName
-                        ? `by ${active.dataRevision.lastModifiedByName}`
+                      displayedDataRevision.lastModifiedByName
+                        ? `by ${displayedDataRevision.lastModifiedByName}`
                         : ""
-                    } at ${new Date(active.dataRevision.lastModifiedAt).toLocaleString(undefined, {
+                    } at ${new Date(displayedDataRevision.lastModifiedAt).toLocaleString(undefined, {
                       dateStyle: "medium",
                       timeStyle: "short",
                     })}`
                   : "Data not saved to the server yet"}
               </span>
-              {activeSnapshot ? (
+              {displayedSnapshot ? (
                 <>
                   <span className="hidden sm:inline text-slate-300" aria-hidden>
                     •
                   </span>
                   <span>
-                    Last solved/published {active.ranBy ? `by ${active.ranBy}` : ""}
-                    {active.ranAt
-                      ? ` at ${new Date(active.ranAt).toLocaleString(undefined, {
+                    Last solved/published
+                    {displayedSnapshot.createdAt
+                      ? ` at ${new Date(displayedSnapshot.createdAt).toLocaleString(undefined, {
                           dateStyle: "medium",
                           timeStyle: "short",
                         })}`
@@ -184,11 +222,11 @@ export default function HistoryPage() {
                 </>
               ) : null}
             </div>
-            {activeSnapshot ? (
+            {displayedSnapshot ? (
               <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
                 <span>
                   Assignments:{" "}
-                  <span className="font-semibold text-slate-900">{activeAssignments}</span>
+                  <span className="font-semibold text-slate-900">{displayedAssignments}</span>
                 </span>
                 {dataEditedAfterPublish ? (
                   <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
@@ -279,7 +317,7 @@ export default function HistoryPage() {
                     type="button"
                     onClick={() => {
                       loadSavedScheduleToCurrentView(item);
-                      router.push("/calendar");
+                      window.dispatchEvent(new Event("lastSolverRunUpdated"));
                     }}
                     className={appNativeBtnPrimary}
                   >

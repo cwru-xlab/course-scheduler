@@ -38,6 +38,7 @@ import type { Timeslot } from "@/lib/scheduling/types";
 import { insertAtSortedIdPosition } from "@/lib/scheduling/insertAtSortedIdPosition";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
 import { SCHEDULING_WINDOW_START_TIME } from "@/lib/scheduling/timeWindow";
+import { useStableDataRef } from "./useStableDataRef";
 
 type TimeslotRow = { slot: Timeslot; index: number };
 
@@ -61,19 +62,21 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<Timeslot | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
+  const timeslotsRef = useStableDataRef(timeslots);
 
   const updateTimeslot = (index: number, field: keyof Timeslot, value: unknown) => {
-    const newTimeslots = [...timeslots];
+    const current = timeslotsRef.current;
+    const newTimeslots = [...current];
     newTimeslots[index] = { ...newTimeslots[index], [field]: value };
     onUpdate(newTimeslots);
   };
 
   const addTimeslot = () => {
-    setAddDraft(createEmptyTimeslot(timeslots));
+    setAddDraft(createEmptyTimeslot(timeslotsRef.current));
   };
 
   const deleteTimeslot = (index: number) => {
-    onUpdate(timeslots.filter((_, i) => i !== index));
+    onUpdate(timeslotsRef.current.filter((_, i) => i !== index));
   };
 
   const timeslotFilterDefs = useMemo(
@@ -267,7 +270,8 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
           timeslot={timeslots[editIndex]}
           onClose={() => setEditIndex(null)}
           onSave={(updated) => {
-            const next = [...timeslots];
+            const current = timeslotsRef.current;
+            const next = [...current];
             next[editIndex] = updated;
             onUpdate(next);
           }}
@@ -280,7 +284,7 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
           timeslot={addDraft}
           onClose={() => setAddDraft(null)}
           onSave={(created) => {
-            onUpdate(insertAtSortedIdPosition(timeslots, created));
+            onUpdate(insertAtSortedIdPosition(timeslotsRef.current, created));
             setAddDraft(null);
             confirmRowAdded({
               rowKey: editorRowKey("timeslots", String(created.id)),
