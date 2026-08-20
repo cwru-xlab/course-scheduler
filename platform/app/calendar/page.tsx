@@ -5057,7 +5057,7 @@ type PatternDayApplyRow = {
       {/* Main calendar grid */}
       <div
         className={clsx(
-          "rounded-xl border shadow-lg overflow-hidden flex flex-col min-h-[600px]",
+          "rounded-xl border shadow-lg overflow-hidden flex flex-col min-h-[600px] max-h-[calc(100dvh-10rem)]",
           dragFeedback.status === "invalid"
             ? "bg-red-50/40 border-red-200"
             : dragFeedback.status === "valid"
