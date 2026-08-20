@@ -380,6 +380,7 @@ class Section(db.Model):
     # ForeignKey("table.column"): Creates database foreign key constraint
     course_id = Column(String, ForeignKey("courses.id"), nullable=False)
     section_code = Column(String(16), nullable=False)
+    section_number = Column(String(16), nullable=False, default="")
     instructor_id = Column(String, ForeignKey("instructors.id"), nullable=False)
     
     # Assigned values (nullable because assignment happens during scheduling)
@@ -442,6 +443,7 @@ class Section(db.Model):
             "id": self.id,
             "course_id": self.course_id,
             "section_code": self.section_code,
+            "section_number": self.section_number or "",
             "instructor_id": self.instructor_id,
             "room_id": self.room_id,
             "timeslot_id": self.timeslot_id,

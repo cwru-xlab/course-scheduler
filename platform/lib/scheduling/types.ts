@@ -8,6 +8,7 @@ export type Section = {
   /** Department code or name; used for calendar color-coding */
   department?: string;
   section_code: string;
+  section_number: string;
   instructor_id: Id;
   expected_enrollment: number;
   enrollment_cap: number;

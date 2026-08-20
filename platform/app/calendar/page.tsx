@@ -133,6 +133,7 @@ type SectionDto = {
   /** Calendar colors use this explicit department value. */
   department?: string | null;
   section_code: string;
+  section_number?: string;
   instructor_id: string;
   timeslot_id?: string | null;
   room_id?: string | null;
@@ -165,6 +166,7 @@ type SectionFormDraft = {
   department: string;
   course_id: string;
   section_code: string;
+  section_number: string;
   instructor_id: string;
   expected_enrollment: number;
   enrollment_cap: number;
@@ -686,6 +688,7 @@ function toSectionFormDraft(section: SectionDto): SectionFormDraft {
     department: String(section.department ?? "").trim(),
     course_id: String(section.course_id ?? "").trim(),
     section_code: String(section.section_code ?? "").trim(),
+    section_number: String(section.section_number ?? "").trim(),
     instructor_id: String(section.instructor_id ?? "").trim(),
     expected_enrollment: Number(section.expected_enrollment ?? 0),
     enrollment_cap: Number(section.enrollment_cap ?? 0),
@@ -1489,6 +1492,7 @@ type PatternDayApplyRow = {
         course_id: section.course_id,
         department: section.department ?? "",
         section_code: section.section_code,
+        section_number: section.section_number ?? "",
         instructor_id: section.instructor_id,
         expected_enrollment: section.expected_enrollment,
         enrollment_cap: section.enrollment_cap,
@@ -1903,6 +1907,7 @@ type PatternDayApplyRow = {
         department: "",
         course_id: "",
         section_code: "A",
+        section_number: "",
         instructor_id: "",
         expected_enrollment: 20,
         enrollment_cap: 30,
@@ -2005,6 +2010,7 @@ type PatternDayApplyRow = {
         course_id: String(section.course_id),
         department: (section.department ?? "").trim(),
         section_code: section.section_code,
+        section_number: section.section_number ?? "",
         instructor_id: section.instructor_id,
         expected_enrollment: section.expected_enrollment ?? 0,
         enrollment_cap: section.enrollment_cap ?? section.expected_enrollment ?? 0,
@@ -4145,6 +4151,7 @@ type PatternDayApplyRow = {
       course_id: draft.course_id.trim(),
       department: draft.department.trim(),
       section_code: draft.section_code.trim(),
+      section_number: draft.section_number.trim(),
       instructor_id: draft.instructor_id.trim(),
       expected_enrollment: Number(draft.expected_enrollment),
       enrollment_cap: Number(draft.enrollment_cap),
@@ -6324,6 +6331,16 @@ type PatternDayApplyRow = {
                     className="rounded-lg border border-slate-200 px-3 py-2"
                     value={sectionModal.draft.section_code}
                     onChange={(e) => updateSectionModalDraft("section_code", e.target.value)}
+                    disabled={isSavingSection}
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-slate-600">Section Number</span>
+                  <input
+                    className="rounded-lg border border-slate-200 px-3 py-2"
+                    placeholder="e.g. 1"
+                    value={sectionModal.draft.section_number}
+                    onChange={(e) => updateSectionModalDraft("section_number", e.target.value)}
                     disabled={isSavingSection}
                   />
                 </label>

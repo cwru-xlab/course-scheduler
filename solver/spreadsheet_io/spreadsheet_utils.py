@@ -25,6 +25,7 @@ SPREADSHEET_SPECS: List[SheetSpec] = [
             "course_id",
             "department",
             "section_code",
+            "section_number",
             "instructor_id",
             "expected_enrollment",
             "enrollment_cap",
@@ -135,6 +136,26 @@ SPREADSHEET_SPECS: List[SheetSpec] = [
 
 SHEET_NAME_TO_SPEC: Dict[str, SheetSpec] = {spec.name: spec for spec in SPREADSHEET_SPECS}
 
+# Sections schema before the `section_number` column was introduced. Still accepted
+# on import so spreadsheets exported by older versions of this app keep working.
+LEGACY_SHEET_COLUMNS_V2: Dict[str, List[str]] = {
+    "Sections": [
+        "id",
+        "course_id",
+        "department",
+        "section_code",
+        "instructor_id",
+        "expected_enrollment",
+        "enrollment_cap",
+        "allowed_meeting_patterns",
+        "room_requirements",
+        "crosslist_group_id",
+        "tags",
+        "previous_meeting_pattern",
+        "state",
+    ],
+}
+
 LEGACY_SHEET_COLUMNS: Dict[str, List[str]] = {
     "Sections": [
         "id",
@@ -178,13 +199,19 @@ def normalize_sheet_headers(sheet_name: str, headers: List[str]) -> List[str]:
     spec = SHEET_NAME_TO_SPEC[sheet_name]
     expected = spec.columns
 
+    candidate_schemas = [expected]
+    v2_legacy = LEGACY_SHEET_COLUMNS_V2.get(sheet_name)
+    if v2_legacy:
+        candidate_schemas.append(v2_legacy)
+
     if sheet_name in _ENTITY_SHEETS_WITH_NOTES:
-        scheduling_only = [c for c in expected if c not in _NOTE_SUFFIX]
-        with_notes = scheduling_only + list(_NOTE_SUFFIX)
-        if headers[: len(with_notes)] == with_notes:
-            return scheduling_only
-        if headers[: len(scheduling_only)] == scheduling_only:
-            return scheduling_only
+        for schema in candidate_schemas:
+            scheduling_only = [c for c in schema if c not in _NOTE_SUFFIX]
+            with_notes = scheduling_only + list(_NOTE_SUFFIX)
+            if headers[: len(with_notes)] == with_notes:
+                return scheduling_only
+            if headers[: len(scheduling_only)] == scheduling_only:
+                return scheduling_only
 
     if headers[: len(expected)] == expected:
         return expected

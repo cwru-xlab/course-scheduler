@@ -64,6 +64,7 @@ const createEmptySection = (existing: Section[]): Section => ({
   course_id: "",
   department: "",
   section_code: "",
+  section_number: "",
   instructor_id: "",
   expected_enrollment: 20,
   enrollment_cap: 30,
@@ -172,6 +173,12 @@ export const SectionsEditor = ({
       getValue: ({ section }) => section.section_code,
     },
     {
+      columnId: "section_number",
+      label: "Section Number",
+      control: { kind: "multiSearch", textMatch: "startsWith" },
+      getValue: ({ section }) => section.section_number,
+    },
+    {
       columnId: "state",
       label: "State",
       control: { kind: "multiSelect" },
@@ -256,6 +263,7 @@ export const SectionsEditor = ({
           section.department ?? "",
           section.course_id,
           section.section_code,
+          section.section_number ?? "",
           section.instructor_id,
           instructorLabel,
         ]
@@ -293,6 +301,14 @@ export const SectionsEditor = ({
             value={section.section_code}
             onChange={(v) => updateSection(idx, "section_code", v)}
             placeholder={SECTION_CODE_PLACEHOLDER}
+          />
+        );
+      case "section_number":
+        return (
+          <EditableCell
+            value={section.section_number}
+            onChange={(v) => updateSection(idx, "section_number", v)}
+            placeholder="e.g. 1"
           />
         );
       case "state":
@@ -390,7 +406,7 @@ export const SectionsEditor = ({
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
       searchPlaceholder="Search sections..."
-      searchHint="Search by ID, department, course, code, or instructor."
+      searchHint="Search by ID, department, course, code, section number, or instructor."
       filterBar={
         <div className="flex flex-wrap items-center gap-2">
           <EditorColumnFilters
