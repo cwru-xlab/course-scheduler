@@ -4541,10 +4541,9 @@ type PatternDayApplyRow = {
     setSaveScheduleModal((prev) => ({ ...prev, isSaving: true, error: null }));
     try {
       const snapshot = await buildSnapshotFromCurrentView();
-      saveScheduleToHistory({
+      await saveScheduleToHistory({
         name: trimmedName,
         scheduleDate: saveScheduleModal.draft.scheduleDate,
-        savedBy: user?.name?.trim() || user?.email?.trim() || undefined,
         snapshot,
       });
       if (typeof window !== "undefined") {
