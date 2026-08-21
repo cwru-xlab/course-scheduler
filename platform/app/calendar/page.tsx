@@ -38,6 +38,7 @@ import {
 import { createPortal } from "react-dom";
 
 import { MultiSelect } from "@/components/scheduler/MultiSelect";
+import { TagInput } from "@/components/scheduler/TagInput";
 import { ViewportModal } from "@/components/scheduler/ViewportModal";
 import { useAuth } from "@/lib/auth-client";
 import {
@@ -153,6 +154,7 @@ type RoomDto = {
   building?: string;
   room_number?: string;
   capacity?: number;
+  features?: string[];
 };
 
 type SolverDataDto = {
@@ -172,7 +174,7 @@ type SectionFormDraft = {
   expected_enrollment: number;
   enrollment_cap: number;
   allowed_meeting_patterns: string;
-  room_requirements: string;
+  room_requirements: string[];
   crosslist_group_id: string;
   tags: string;
 };
@@ -694,7 +696,7 @@ function toSectionFormDraft(section: SectionDto): SectionFormDraft {
     expected_enrollment: Number(section.expected_enrollment ?? 0),
     enrollment_cap: Number(section.enrollment_cap ?? 0),
     allowed_meeting_patterns: (section.allowed_meeting_patterns ?? []).join(", "),
-    room_requirements: (section.room_requirements ?? []).join(", "),
+    room_requirements: section.room_requirements ?? [],
     crosslist_group_id: String(section.crosslist_group_id ?? "").trim(),
     tags: (section.tags ?? []).join(", "),
   };
@@ -1907,6 +1909,18 @@ type PatternDayApplyRow = {
       .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
   }, [data, instructorById]);
 
+  const featureSuggestions = useMemo(() => {
+    if (!data) return [];
+    const set = new Set<string>();
+    for (const room of data.rooms) {
+      for (const f of room.features ?? []) set.add(f);
+    }
+    for (const s of data.sections) {
+      for (const r of s.room_requirements ?? []) set.add(r);
+    }
+    return Array.from(set).sort();
+  }, [data]);
+
   const updateSectionModalDraft = useCallback(
     <K extends keyof SectionFormDraft>(field: K, value: SectionFormDraft[K]) => {
       setSectionModal((prev) => (prev ? { ...prev, draft: { ...prev.draft, [field]: value } } : prev));
@@ -1928,7 +1942,7 @@ type PatternDayApplyRow = {
         expected_enrollment: 20,
         enrollment_cap: 30,
         allowed_meeting_patterns: "",
-        room_requirements: "",
+        room_requirements: [],
         crosslist_group_id: "",
         tags: "",
       },
@@ -4187,7 +4201,7 @@ type PatternDayApplyRow = {
       expected_enrollment: Number(draft.expected_enrollment),
       enrollment_cap: Number(draft.enrollment_cap),
       allowed_meeting_patterns: splitCsv(draft.allowed_meeting_patterns),
-      room_requirements: splitCsv(draft.room_requirements),
+      room_requirements: draft.room_requirements,
       crosslist_group_id: draft.crosslist_group_id.trim() || null,
       tags: splitCsv(draft.tags),
       room_id: preservedRoomId || null,
@@ -5942,7 +5956,18 @@ type PatternDayApplyRow = {
                   })
                   .join("; ");
                 return (
-                  <tr key={section.id} className="hover:bg-slate-50/80">
+                  <tr
+                    key={section.id}
+                    className="hover:bg-slate-50/80 cursor-pointer"
+                    onClick={() => {
+                      setSectionModalError(null);
+                      setSectionModal({
+                        mode: "edit",
+                        initialSectionId: section.id,
+                        draft: toSectionFormDraft(section),
+                      });
+                    }}
+                  >
                     <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-900">
                       {section.id}
                       {peerCount > 1 ? (
@@ -5955,7 +5980,7 @@ type PatternDayApplyRow = {
                     </td>
                     <td className="px-4 py-3 font-medium text-slate-800">{a.room_id || "—"}</td>
                     <td className="px-4 py-3 text-xs text-slate-600 max-w-md">{slotLabels || "—"}</td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
                         disabled={lockState === "none" && !canLock}
@@ -6364,7 +6389,9 @@ type PatternDayApplyRow = {
                 <label className="flex flex-col gap-1">
                   <span className="text-xs font-semibold text-slate-600">Section ID *</span>
                   <input
-                    className="rounded-lg border border-slate-200 px-3 py-2"
+                    className={`rounded-lg border border-slate-200 px-3 py-2 ${
+                      sectionModal.mode === "edit" ? "cursor-not-allowed bg-slate-100 text-slate-400" : ""
+                    }`}
                     value={sectionModal.draft.id}
                     onChange={(e) => updateSectionModalDraft("id", e.target.value)}
                     disabled={sectionModal.mode === "edit" || isSavingSection}
@@ -6465,12 +6492,12 @@ type PatternDayApplyRow = {
                   </div>
                 )}
                 <label className="flex flex-col gap-1 sm:col-span-2">
-                  <span className="text-xs font-semibold text-slate-600">Room Requirements (comma-separated)</span>
-                  <input
-                    className="rounded-lg border border-slate-200 px-3 py-2"
+                  <span className="text-xs font-semibold text-slate-600">Room Requirements</span>
+                  <TagInput
                     value={sectionModal.draft.room_requirements}
-                    onChange={(e) => updateSectionModalDraft("room_requirements", e.target.value)}
-                    disabled={isSavingSection}
+                    onChange={(v) => updateSectionModalDraft("room_requirements", v)}
+                    suggestions={featureSuggestions}
+                    placeholder="Type a feature name..."
                   />
                 </label>
                 <label className="flex flex-col gap-1">
