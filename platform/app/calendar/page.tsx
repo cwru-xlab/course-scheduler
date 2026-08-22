@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
   ArrowLeft,
+  ChevronDown,
   CloudBackup,
   FileSpreadsheet,
   Filter,
@@ -37,9 +38,22 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { Button } from "@heroui/button";
+
+import { PageHeader } from "@/components/layout/PageHeader";
 import { MultiSelect } from "@/components/scheduler/MultiSelect";
 import { TagInput } from "@/components/scheduler/TagInput";
 import { ViewportModal } from "@/components/scheduler/ViewportModal";
+import {
+  editorToolbarShellClass,
+  editorToolbarBtnPrimary,
+  editorToolbarBtnSecondary,
+  editorToolbarDivider,
+  editorInfoStripClass,
+  editorFilterBtnClass,
+  editorFilterClearBtnClass,
+} from "@/components/scheduler/editors/editorToolbarStyles";
+import { EditorModalShell } from "@/components/scheduler/editors/EditorModalShell";
 import { useAuth } from "@/lib/auth-client";
 import {
   LAST_SOLVER_RUN_STORAGE_KEY,
@@ -1387,8 +1401,12 @@ type PatternDayApplyRow = {
   } | null>(null);
   const [selectedDepartmentKeys, setSelectedDepartmentKeys] = useState<string[]>([]);
   const [selectedInstructorIds, setSelectedInstructorIds] = useState<string[]>([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeFilterCount = selectedDepartmentKeys.length + selectedInstructorIds.length;
   const [hoveredDepartmentKey, setHoveredDepartmentKey] = useState<string | null>(null);
   const [selectedLegendDepartmentKeys, setSelectedLegendDepartmentKeys] = useState<string[]>([]);
+  const [colorsExpanded, setColorsExpanded] = useState(false);
+  const [crosslistExpanded, setCrosslistExpanded] = useState(false);
   const [crosslistPickerModal, setCrosslistPickerModal] = useState<{
     crosslistGroupId: string;
     memberSections: SectionDto[];
@@ -1443,7 +1461,6 @@ type PatternDayApplyRow = {
     courseLabel: string;
     dayTimes: { day: Day; timeLabel: string }[];
   } | null>(null);
-  const [toolbarActionHint, setToolbarActionHint] = useState<string | null>(null);
   // Keep multiple pinned highlights; hovering adds a temporary highlight.
   const activeLegendDepartmentKeys = useMemo(() => {
     const keys = new Set(selectedLegendDepartmentKeys);
@@ -4585,7 +4602,7 @@ type PatternDayApplyRow = {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
+    <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500">
       <CalendarHistoryNavbarPortal
         canUndo={undoStack.length > 0}
         canRedo={redoStack.length > 0}
@@ -4606,25 +4623,119 @@ type PatternDayApplyRow = {
           setPatternApplyPrompt(null);
         }}
       />
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 flex-col justify-start">
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">
-            Schedule Output Calendar
-          </h1>
-          <p className="mt-1 text-base leading-6 text-slate-500">
-            Click through Monday–Friday to view scheduled sections.
-          </p>
-          {(() => {
-            const scheduleCreatedAt = displayedScheduleCreatedAtRef.current;
-            const dataRev = displayedDataRevision ?? sharedScheduleMeta.dataRevision;
-            const viewPredatesDataEdit =
-              !!scheduleCreatedAt &&
-              !!dataRev &&
-              !Number.isNaN(new Date(dataRev.lastModifiedAt).getTime()) &&
-              !Number.isNaN(new Date(scheduleCreatedAt).getTime()) &&
-              new Date(dataRev.lastModifiedAt).getTime() > new Date(scheduleCreatedAt).getTime();
-            return (
-              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+      <div className="space-y-3">
+        <PageHeader
+          title="Schedule Output Calendar"
+          subtitle="Click through Monday–Friday to view scheduled sections."
+          actions={
+            <div className={editorToolbarShellClass}>
+              {isMySolverRun ? (
+                <Button
+                  size="sm"
+                  radius="md"
+                  className="bg-rose-50 text-rose-700 border border-rose-200 data-[hover=true]:bg-rose-100"
+                  startContent={<XCircle className="size-3.5" />}
+                  onPress={() => {
+                    void cancelRun().then(() => setSolverRunStatus("idle"));
+                  }}
+                >
+                  Cancel Solver
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  radius="md"
+                  className={solverRunStatus !== "loading" && data && !solverBusyRemote ? editorToolbarBtnPrimary : "bg-slate-100 text-slate-400 cursor-not-allowed"}
+                  startContent={<Play className="size-3.5" />}
+                  isDisabled={solverRunStatus === "loading" || !data || solverBusyRemote}
+                  onPress={() => void handleRunSolverFromCalendar()}
+                  title={
+                    solverBusyRemote
+                      ? solverLock.startedBy
+                        ? `Solver is running (started by ${solverLock.startedBy})`
+                        : "Solver is running"
+                      : "Run the solver using backend scheduling data and locks from this page"
+                  }
+                >
+                  Run Solver
+                </Button>
+              )}
+              {!autoSaveEnabled && hasValidUnsavedEdit && (
+                <Button
+                  size="sm"
+                  radius="md"
+                  className="bg-emerald-50 text-emerald-800 border border-emerald-200 data-[hover=true]:bg-emerald-100"
+                  startContent={<CloudBackup className="size-3.5" />}
+                  isDisabled={isSavingBackend}
+                  onPress={() => void handleUpdateBackend(false)}
+                  title="Autosave is off — click Save to persist calendar edits."
+                >
+                  Save
+                </Button>
+              )}
+              <span className={editorToolbarDivider} />
+              <Button
+                size="sm"
+                radius="md"
+                className={editorToolbarBtnSecondary}
+                startContent={<Save className="size-3.5" />}
+                onPress={openSaveScheduleModal}
+                title="Save this generated/edited schedule to history"
+              >
+                Save Schedule
+              </Button>
+              <Button
+                size="sm"
+                radius="md"
+                className={editorToolbarBtnSecondary}
+                startContent={<Share2 className="size-3.5" />}
+                onPress={handleExportPdf}
+                title="Export the visible calendar to PDF"
+              >
+                Export PDF
+              </Button>
+              <Button
+                size="sm"
+                radius="md"
+                className={clsx(editorToolbarBtnSecondary, (!data || isExportingRoomAssignments) && "opacity-50 cursor-not-allowed")}
+                startContent={<FileSpreadsheet className="size-3.5" />}
+                isDisabled={!data || isExportingRoomAssignments}
+                onPress={handleExportRoomAssignments}
+                title="Download room assignments + calendar grid spreadsheet"
+              >
+                Export Rooms
+              </Button>
+              <span className={editorToolbarDivider} />
+              <Button
+                size="sm"
+                radius="md"
+                className={editorToolbarBtnSecondary}
+                startContent={<Table2 className="size-3.5" />}
+                onPress={() => setScheduleDrawerOpen(true)}
+                title="Open the schedule table to bulk lock/unlock sections for the solver"
+              >
+                Schedule Table
+                {hasAnyLock && (
+                  <span className="ml-1 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold leading-4 text-center">
+                    {lockCount}
+                  </span>
+                )}
+              </Button>
+            </div>
+          }
+        />
+        {(() => {
+          const scheduleCreatedAt = displayedScheduleCreatedAtRef.current;
+          const dataRev = displayedDataRevision ?? sharedScheduleMeta.dataRevision;
+          const viewPredatesDataEdit =
+            !!scheduleCreatedAt &&
+            !!dataRev &&
+            !Number.isNaN(new Date(dataRev.lastModifiedAt).getTime()) &&
+            !Number.isNaN(new Date(scheduleCreatedAt).getTime()) &&
+            new Date(dataRev.lastModifiedAt).getTime() > new Date(scheduleCreatedAt).getTime();
+          return (
+            <div className={editorInfoStripClass}>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                 {dataRev ? (
                   <span>
                     Data edited{dataRev.lastModifiedByName ? ` by ${dataRev.lastModifiedByName}` : ""}{" "}
@@ -4660,193 +4771,14 @@ type PatternDayApplyRow = {
                   </>
                 ) : null}
               </div>
-            );
-          })()}
-        </div>
-        <div className="flex flex-col items-stretch gap-2 w-full md:w-auto">
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2">
-            <div
-              onMouseEnter={() =>
-                setToolbarActionHint(
-                  isMySolverRun
-                    ? "Cancel the solver run you started."
-                    : solverBusyRemote
-                      ? solverLock.startedBy
-                        ? `Solver is running (started by ${solverLock.startedBy}). Please wait.`
-                        : "Solver is running. Please wait."
-                      : "Run solver using current data and placement locks.",
-                )
-              }
-              onMouseLeave={() => setToolbarActionHint(null)}
-              onFocus={() =>
-                setToolbarActionHint(
-                  isMySolverRun
-                    ? "Cancel the solver run you started."
-                    : solverBusyRemote
-                      ? solverLock.startedBy
-                        ? `Solver is running (started by ${solverLock.startedBy}). Please wait.`
-                        : "Solver is running. Please wait."
-                      : "Run solver using current data and placement locks.",
-                )
-              }
-              onBlur={() => setToolbarActionHint(null)}
-              className="contents"
-            >
-              {isMySolverRun ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    void cancelRun().then(() => setSolverRunStatus("idle"));
-                  }}
-                  className="flex items-center justify-center rounded-lg size-10 font-bold border transition-colors bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
-                  title="Cancel solver"
-                  aria-label="Cancel solver"
-                >
-                  <XCircle className="size-4" />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={
-                    solverRunStatus === "loading" || !data || solverBusyRemote
-                  }
-                  onClick={() => void handleRunSolverFromCalendar()}
-                  className={clsx(
-                    "flex items-center justify-center rounded-lg size-10 font-bold border transition-colors",
-                    solverRunStatus !== "loading" && data && !solverBusyRemote
-                      ? "bg-[#137fec] text-white border-[#137fec] shadow-lg shadow-[#137fec]/20 hover:bg-[#0f6dca]"
-                      : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
-                  )}
-                  title={
-                    solverBusyRemote
-                      ? solverLock.startedBy
-                        ? `Solver is running (started by ${solverLock.startedBy})`
-                        : "Solver is running"
-                      : "Run the solver using backend scheduling data and locks from this page"
-                  }
-                  aria-label="Run solver"
-                >
-                  <Play className="size-4" />
-                </button>
+              {hasValidUnsavedEdit && (
+                <p className="text-[11px] font-semibold text-emerald-700">
+                  Unsaved valid edits are ready to sync.
+                </p>
               )}
             </div>
-            {!autoSaveEnabled && hasValidUnsavedEdit && (
-              <div
-                onMouseEnter={() =>
-                  setToolbarActionHint("Autosave is off — click Save to persist calendar edits.")
-                }
-                onMouseLeave={() => setToolbarActionHint(null)}
-                className="flex items-center pl-1 pr-2"
-              >
-                <button
-                  type="button"
-                  disabled={isSavingBackend}
-                  onClick={() => void handleUpdateBackend(false)}
-                  className={clsx(
-                    "flex items-center justify-center rounded-lg h-8 px-3 text-xs font-bold border transition-colors",
-                    isSavingBackend
-                      ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                      : "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100",
-                  )}
-                  title="Save valid calendar edits"
-                  aria-label="Save"
-                >
-                  <CloudBackup className="size-4 mr-1" />
-                  Save
-                </button>
-              </div>
-            )}
-            <div className="hidden lg:block h-7 w-px bg-slate-200 mx-1" />
-            <button
-              type="button"
-              onClick={openSaveScheduleModal}
-              onMouseEnter={() => setToolbarActionHint("Save this schedule snapshot to history.")}
-              onMouseLeave={() => setToolbarActionHint(null)}
-              onFocus={() => setToolbarActionHint("Save this schedule snapshot to history.")}
-              onBlur={() => setToolbarActionHint(null)}
-              className="flex items-center justify-center rounded-lg size-10 bg-indigo-50 text-indigo-800 font-bold border border-indigo-200 hover:bg-indigo-100 transition-colors"
-              title="Save this generated/edited schedule to history"
-              aria-label="Save schedule"
-            >
-              <Save className="size-4" />
-            </button>
-            <button
-              onMouseEnter={() => setToolbarActionHint("Export the visible calendar to PDF.")}
-              onMouseLeave={() => setToolbarActionHint(null)}
-              onFocus={() => setToolbarActionHint("Export the visible calendar to PDF.")}
-              onBlur={() => setToolbarActionHint(null)}
-              className="flex items-center justify-center rounded-lg size-10 bg-slate-100 text-slate-900 font-bold border border-slate-200 hover:bg-slate-200 transition-colors"
-              onClick={handleExportPdf}
-              aria-label="Export PDF"
-            >
-              <Share2 className="size-4" />
-            </button>
-            <button
-              type="button"
-              disabled={!data || isExportingRoomAssignments}
-              onClick={handleExportRoomAssignments}
-              onMouseEnter={() =>
-                setToolbarActionHint(
-                  "Download room assignments + calendar grid spreadsheet for paste into the WSOM schedule sheet.",
-                )
-              }
-              onMouseLeave={() => setToolbarActionHint(null)}
-              onFocus={() =>
-                setToolbarActionHint(
-                  "Download room assignments + calendar grid spreadsheet for paste into the WSOM schedule sheet.",
-                )
-              }
-              onBlur={() => setToolbarActionHint(null)}
-              className={clsx(
-                "flex items-center justify-center rounded-lg size-10 border transition-colors",
-                data && !isExportingRoomAssignments
-                  ? "bg-teal-50 text-teal-900 border-teal-200 hover:bg-teal-100"
-                  : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
-              )}
-              title="Download room assignments + calendar grid spreadsheet"
-              aria-label="Export rooms"
-            >
-              <FileSpreadsheet className="size-4 shrink-0" aria-hidden />
-            </button>
-            <div className="hidden lg:block h-7 w-px bg-slate-200 mx-1" />
-            <button
-              type="button"
-              onClick={() => setScheduleDrawerOpen(true)}
-              onMouseEnter={() => setToolbarActionHint("Open the schedule table to bulk lock/unlock sections for the solver.")}
-              onMouseLeave={() => setToolbarActionHint(null)}
-              onFocus={() => setToolbarActionHint("Open the schedule table to bulk lock/unlock sections for the solver.")}
-              onBlur={() => setToolbarActionHint(null)}
-              className="relative flex items-center justify-center rounded-lg size-10 bg-slate-100 text-slate-800 font-bold border border-slate-200 hover:bg-slate-200 transition-colors"
-              title="Open schedule table (lock sections for the solver)"
-              aria-label="Open schedule table"
-            >
-              <Table2 className="size-4" />
-              {hasAnyLock && (
-                <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold leading-4 text-center">
-                  {lockCount}
-                </span>
-              )}
-            </button>
-          </div>
-          <div className="relative h-[34px] w-full">
-          <div
-            className={clsx(
-              "rounded-lg px-3 py-2 text-xs font-semibold flex items-center transition-opacity absolute inset-0",
-              toolbarActionHint
-                ? "border border-slate-200 bg-slate-50 text-slate-700 opacity-100"
-                : "opacity-0 pointer-events-none",
-            )}
-            aria-live="polite"
-          >
-            <span>{toolbarActionHint ?? " "}</span>
-          </div>
-          </div>
-          {hasValidUnsavedEdit && (
-            <p className="text-[11px] font-semibold text-emerald-700 px-1">
-              Unsaved valid edits are ready to sync.
-            </p>
-          )}
-        </div>
+          );
+        })()}
       </div>
 
       {backendSaveMessage && (
@@ -4900,139 +4832,208 @@ type PatternDayApplyRow = {
         </div>
       )}
 
-      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-          <div className="flex items-center gap-2 min-w-[9rem]">
-            <Filter className="size-4 text-slate-400" aria-hidden />
-            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest">
-              Filters
-            </span>
-          </div>
-          <div className="flex flex-1 flex-col sm:flex-row gap-3">
-            <MultiSelect
-              placeholder="Departments"
-              options={departmentFilterOptions}
-              value={selectedDepartmentKeys}
-              onChange={setSelectedDepartmentKeys}
-              showSearch
-            />
-            <MultiSelect
-              placeholder="Professors"
-              options={professorFilterOptions}
-              value={selectedInstructorIds}
-              onChange={setSelectedInstructorIds}
-              showSearch
-            />
-          </div>
-          <button
-            type="button"
-            onClick={() => {
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          radius="md"
+          variant="bordered"
+          className={editorFilterBtnClass}
+          startContent={<Filter className="size-3.5" aria-hidden />}
+          onPress={() => setFiltersOpen(true)}
+        >
+          Filters{activeFilterCount > 0 ? ` · ${activeFilterCount}` : ""}
+        </Button>
+        {activeFilterCount > 0 && (
+          <Button
+            size="sm"
+            radius="md"
+            variant="light"
+            className={editorFilterClearBtnClass}
+            onPress={() => {
               setSelectedDepartmentKeys([]);
               setSelectedInstructorIds([]);
             }}
-            disabled={!selectedDepartmentKeys.length && !selectedInstructorIds.length}
-            className={clsx(
-              "rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors self-start lg:self-auto",
-              selectedDepartmentKeys.length || selectedInstructorIds.length
-                ? "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
-                : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed",
-            )}
           >
-            Clear filters
-          </button>
-        </div>
+            Clear all
+          </Button>
+        )}
+        {departmentColorLegend.length > 0 && (
+          <>
+            <span className="mx-0.5 hidden h-5 w-px shrink-0 bg-slate-200 sm:block" aria-hidden />
+            <button
+              type="button"
+              onClick={() => setColorsExpanded((v) => !v)}
+              aria-expanded={colorsExpanded}
+              className="inline-flex items-center gap-1.5 h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <Palette className="size-3.5 text-slate-400" aria-hidden />
+              <span className="uppercase tracking-wider text-[10px] text-slate-500">Colors</span>
+              {selectedLegendDepartmentKeys.length > 0 ? (
+                <span className="text-slate-400">{selectedLegendDepartmentKeys.length}/{departmentColorLegend.length}</span>
+              ) : (
+                <span className="text-slate-400">{departmentColorLegend.length}</span>
+              )}
+              <ChevronDown
+                className={clsx(
+                  "size-3.5 text-slate-400 transition-transform",
+                  colorsExpanded && "rotate-180",
+                )}
+                aria-hidden
+              />
+            </button>
+            {colorsExpanded && (
+              <>
+                {departmentColorLegend.map((item) => {
+                  const isActive = selectedLegendDepartmentKeys.includes(item.colorKey);
+                  const hasFilter = selectedLegendDepartmentKeys.length > 0;
+                  return (
+                    <button
+                      key={item.colorKey}
+                      type="button"
+                      role="checkbox"
+                      aria-checked={isActive}
+                      onMouseEnter={() => setHoveredDepartmentKey(item.colorKey)}
+                      onMouseLeave={() => setHoveredDepartmentKey((prev) => (prev === item.colorKey ? null : prev))}
+                      onClick={() => {
+                        setSelectedLegendDepartmentKeys((prev) =>
+                          prev.includes(item.colorKey)
+                            ? prev.filter((key) => key !== item.colorKey)
+                            : [...prev, item.colorKey],
+                        );
+                      }}
+                      className={clsx(
+                        "inline-flex h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-2 text-[10px] font-medium leading-none transition-colors",
+                        isActive
+                          ? "border-sky-200/90 bg-sky-50 text-weatherhead-primary"
+                          : "border-slate-200/80 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50",
+                      )}
+                    >
+                      <span
+                        className="h-2.5 w-4 shrink-0 rounded border-l-[2px] border border-slate-300/70"
+                        style={{
+                          backgroundColor: item.swatch.cardBg,
+                          backgroundImage: item.swatch.cardPattern,
+                          borderLeftColor: item.swatch.cardBorder,
+                        }}
+                        aria-hidden
+                      />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </>
+            )}
+          </>
+        )}
+        {crosslistGroupLegend.length > 0 && (
+          <>
+            <span className="mx-0.5 hidden h-5 w-px shrink-0 bg-slate-200 sm:block" aria-hidden />
+            <button
+              type="button"
+              onClick={() => setCrosslistExpanded((v) => !v)}
+              aria-expanded={crosslistExpanded}
+              className="inline-flex items-center gap-1.5 h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <Link2 className="size-3.5 text-slate-400" aria-hidden />
+              <span className="uppercase tracking-wider text-[10px] text-slate-500">Crosslist</span>
+              <span className="text-slate-400">{crosslistGroupLegend.length}</span>
+              <ChevronDown
+                className={clsx(
+                  "size-3.5 text-slate-400 transition-transform",
+                  crosslistExpanded && "rotate-180",
+                )}
+                aria-hidden
+              />
+            </button>
+            {crosslistExpanded && (
+              <>
+                {crosslistGroupLegend.map((item) => (
+                  <button
+                    key={item.groupId}
+                    type="button"
+                    onClick={() => openCrosslistGroupPicker(item.groupId, item.members)}
+                    className="inline-flex h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-slate-200/80 bg-white px-2 text-[10px] font-medium leading-none text-slate-500 transition-colors hover:border-slate-300 hover:bg-slate-50"
+                  >
+                    <CrosslistLegendSwatch swatch={item.swatch} />
+                    {item.groupId}
+                    <span className="text-slate-400">({item.members.length})</span>
+                  </button>
+                ))}
+              </>
+            )}
+          </>
+        )}
       </div>
 
-      {/* Department / course color legend */}
-      {departmentColorLegend.length > 0 && (
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex flex-wrap items-center gap-x-1 gap-y-2">
-            <div className="flex items-center gap-2 mb-1 w-full sm:w-auto sm:mb-0 sm:mr-2">
-              <Palette className="size-4 text-slate-400 shrink-0" aria-hidden />
-              <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest">
-                Department colors
-              </span>
+      <EditorModalShell
+        isOpen={filtersOpen}
+        title="Filters"
+        onClose={() => setFiltersOpen(false)}
+        footer={
+          activeFilterCount > 0 ? (
+            <Button
+              size="sm"
+              variant="flat"
+              className="font-semibold"
+              onPress={() => {
+                setSelectedDepartmentKeys([]);
+                setSelectedInstructorIds([]);
+              }}
+            >
+              Clear all
+            </Button>
+          ) : undefined
+        }
+      >
+        <div className="space-y-2">
+          <div className="grid grid-cols-1 items-center gap-2 rounded-lg border border-default-200 bg-default-50/60 px-3 py-2 sm:grid-cols-[7rem_1fr_auto]">
+            <span className="text-xs font-semibold uppercase tracking-wide text-default-600">
+              Departments
+            </span>
+            <div className="min-w-0 overflow-hidden">
+              <MultiSelect
+                placeholder="Any department…"
+                options={departmentFilterOptions}
+                value={selectedDepartmentKeys}
+                onChange={setSelectedDepartmentKeys}
+                showSearch
+              />
             </div>
-            {departmentColorLegend.map((item) => (
-              <div
-                key={item.colorKey}
-                onMouseEnter={() => setHoveredDepartmentKey(item.colorKey)}
-                onMouseLeave={() => setHoveredDepartmentKey((prev) => (prev === item.colorKey ? null : prev))}
-                onClick={() => {
-                  setSelectedLegendDepartmentKeys((prev) =>
-                    prev.includes(item.colorKey)
-                      ? prev.filter((key) => key !== item.colorKey)
-                      : [...prev, item.colorKey],
-                  );
-                }}
-                className={clsx(
-                  "flex items-center gap-2 rounded-lg border px-2.5 py-1.5 mr-1 mb-1 transition-all cursor-pointer",
-                  activeLegendDepartmentKeys.has(item.colorKey)
-                    ? "border-slate-300 bg-slate-100 shadow-sm ring-2 ring-slate-200"
-                    : activeLegendDepartmentKeys.size > 0
-                      ? "border-slate-100 bg-slate-50/60 opacity-70"
-                      : "border-slate-100 bg-slate-50/80",
-                )}
-              >
-                <span
-                  className="h-3.5 w-6 shrink-0 rounded border-l-[3px] shadow-sm border border-slate-300/70"
-                  style={{
-                    backgroundColor: item.swatch.cardBg,
-                    backgroundImage: item.swatch.cardPattern,
-                    borderLeftColor: item.swatch.cardBorder,
-                  }}
-                  aria-hidden
-                />
-                <span
-                  className="text-xs font-semibold text-slate-800 max-w-[12rem] truncate"
-                  title={item.label}
-                >
-                  {item.label}
-                </span>
-              </div>
-            ))}
+            <Button
+              size="sm"
+              variant="light"
+              className="shrink-0 font-semibold"
+              isDisabled={selectedDepartmentKeys.length === 0}
+              onPress={() => setSelectedDepartmentKeys([])}
+            >
+              Clear
+            </Button>
           </div>
-          <p className="mt-2 text-[10px] text-slate-500 leading-relaxed">
-            Colors are per <span className="font-semibold">department</span> only. Populate the
-            department field (e.g. ECON, OPRE, FAFE) to control color grouping.
-          </p>
-        </div>
-      )}
-
-      {crosslistGroupLegend.length > 0 && (
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex flex-wrap items-center gap-x-1 gap-y-2">
-            <div className="flex items-center gap-2 mb-1 w-full sm:w-auto sm:mb-0 sm:mr-2">
-              <Link2 className="size-4 text-slate-400 shrink-0" aria-hidden />
-              <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest">
-                Crosslist groups
-              </span>
+          <div className="grid grid-cols-1 items-center gap-2 rounded-lg border border-default-200 bg-default-50/60 px-3 py-2 sm:grid-cols-[7rem_1fr_auto]">
+            <span className="text-xs font-semibold uppercase tracking-wide text-default-600">
+              Professors
+            </span>
+            <div className="min-w-0 overflow-hidden">
+              <MultiSelect
+                placeholder="Any professor…"
+                options={professorFilterOptions}
+                value={selectedInstructorIds}
+                onChange={setSelectedInstructorIds}
+                showSearch
+              />
             </div>
-            {crosslistGroupLegend.map((item) => (
-              <button
-                key={item.groupId}
-                type="button"
-                onClick={() => openCrosslistGroupPicker(item.groupId, item.members)}
-                className="flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50/80 px-2.5 py-1.5 mr-1 mb-1 transition-all hover:border-slate-300 hover:bg-slate-100 hover:shadow-sm"
-              >
-                <CrosslistLegendSwatch swatch={item.swatch} />
-                <span
-                  className="text-xs font-semibold text-slate-800 max-w-[12rem] truncate"
-                  title={item.groupId}
-                >
-                  {item.groupId}
-                </span>
-                <span className="text-[10px] font-semibold text-slate-500">
-                  ({item.members.length})
-                </span>
-              </button>
-            ))}
+            <Button
+              size="sm"
+              variant="light"
+              className="shrink-0 font-semibold"
+              isDisabled={selectedInstructorIds.length === 0}
+              onPress={() => setSelectedInstructorIds([])}
+            >
+              Clear
+            </Button>
           </div>
-          <p className="mt-2 text-[10px] text-slate-500 leading-relaxed">
-            Click a group to view or edit the sections scheduled together in that cross-list.
-          </p>
         </div>
-      )}
+      </EditorModalShell>
 
       {/* Day selector + quick add section */}
       <div className="flex items-center justify-between gap-3">
@@ -5057,14 +5058,15 @@ type PatternDayApplyRow = {
             ))}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={openCreateSectionModal}
-          className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-weatherhead-primary px-4 text-sm font-bold text-white shadow-sm shadow-weatherhead-primary/20 transition-colors hover:bg-[#0f6fd0]"
+        <Button
+          size="sm"
+          radius="md"
+          className="h-8 min-h-8 gap-1 px-3 text-xs font-semibold text-weatherhead-primary bg-sky-50/60 border border-sky-200/50 data-[hover=true]:bg-sky-100/80 shadow-none"
+          startContent={<Plus className="size-3.5" aria-hidden />}
+          onPress={openCreateSectionModal}
         >
-          <Plus className="size-4" aria-hidden />
           Add Section
-        </button>
+        </Button>
       </div>
 
       {/* Main calendar grid */}
