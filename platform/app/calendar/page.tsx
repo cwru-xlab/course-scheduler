@@ -39,6 +39,7 @@ import {
 import { createPortal } from "react-dom";
 
 import { Button } from "@heroui/button";
+import { Input } from "@heroui/input";
 
 import { PageHeader } from "@/components/layout/PageHeader";
 import { MultiSelect } from "@/components/scheduler/MultiSelect";
@@ -1403,6 +1404,7 @@ type PatternDayApplyRow = {
   const [selectedInstructorIds, setSelectedInstructorIds] = useState<string[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const activeFilterCount = selectedDepartmentKeys.length + selectedInstructorIds.length;
+  const [searchQuery, setSearchQuery] = useState("");
   const [hoveredDepartmentKey, setHoveredDepartmentKey] = useState<string | null>(null);
   const [selectedLegendDepartmentKeys, setSelectedLegendDepartmentKeys] = useState<string[]>([]);
   const [colorsExpanded, setColorsExpanded] = useState(false);
@@ -1753,6 +1755,28 @@ type PatternDayApplyRow = {
     data?.instructors.forEach((i) => map.set(i.id, i));
     return map;
   }, [data]);
+
+  const hasSearch = searchQuery.trim().length > 0;
+  const matchingSectionIds = useMemo(() => {
+    if (!hasSearch) return null;
+    const q = searchQuery.toLowerCase().trim();
+    const matched = new Set<string>();
+    for (const section of data?.sections ?? []) {
+      const fields = [
+        section.id,
+        String(section.course_id),
+        section.department ?? "",
+        section.section_code,
+        section.section_number ?? "",
+        instructorById.get(section.instructor_id)?.name ?? "",
+        section.instructor_id,
+      ];
+      if (fields.some((f) => f.toLowerCase().includes(q))) {
+        matched.add(section.id);
+      }
+    }
+    return matched;
+  }, [hasSearch, searchQuery, data?.sections, instructorById]);
 
   const sectionById = useMemo(() => {
     const map = new Map<string, SectionDto>();
@@ -4627,102 +4651,6 @@ type PatternDayApplyRow = {
         <PageHeader
           title="Schedule Output Calendar"
           subtitle="Click through Monday–Friday to view scheduled sections."
-          actions={
-            <div className={editorToolbarShellClass}>
-              {isMySolverRun ? (
-                <Button
-                  size="sm"
-                  radius="md"
-                  className="bg-rose-50 text-rose-700 border border-rose-200 data-[hover=true]:bg-rose-100"
-                  startContent={<XCircle className="size-3.5" />}
-                  onPress={() => {
-                    void cancelRun().then(() => setSolverRunStatus("idle"));
-                  }}
-                >
-                  Cancel Solver
-                </Button>
-              ) : (
-                <Button
-                  size="sm"
-                  radius="md"
-                  className={solverRunStatus !== "loading" && data && !solverBusyRemote ? editorToolbarBtnPrimary : "bg-slate-100 text-slate-400 cursor-not-allowed"}
-                  startContent={<Play className="size-3.5" />}
-                  isDisabled={solverRunStatus === "loading" || !data || solverBusyRemote}
-                  onPress={() => void handleRunSolverFromCalendar()}
-                  title={
-                    solverBusyRemote
-                      ? solverLock.startedBy
-                        ? `Solver is running (started by ${solverLock.startedBy})`
-                        : "Solver is running"
-                      : "Run the solver using backend scheduling data and locks from this page"
-                  }
-                >
-                  Run Solver
-                </Button>
-              )}
-              {!autoSaveEnabled && hasValidUnsavedEdit && (
-                <Button
-                  size="sm"
-                  radius="md"
-                  className="bg-emerald-50 text-emerald-800 border border-emerald-200 data-[hover=true]:bg-emerald-100"
-                  startContent={<CloudBackup className="size-3.5" />}
-                  isDisabled={isSavingBackend}
-                  onPress={() => void handleUpdateBackend(false)}
-                  title="Autosave is off — click Save to persist calendar edits."
-                >
-                  Save
-                </Button>
-              )}
-              <span className={editorToolbarDivider} />
-              <Button
-                size="sm"
-                radius="md"
-                className={editorToolbarBtnSecondary}
-                startContent={<Save className="size-3.5" />}
-                onPress={openSaveScheduleModal}
-                title="Save this generated/edited schedule to history"
-              >
-                Save Schedule
-              </Button>
-              <Button
-                size="sm"
-                radius="md"
-                className={editorToolbarBtnSecondary}
-                startContent={<Share2 className="size-3.5" />}
-                onPress={handleExportPdf}
-                title="Export the visible calendar to PDF"
-              >
-                Export PDF
-              </Button>
-              <Button
-                size="sm"
-                radius="md"
-                className={clsx(editorToolbarBtnSecondary, (!data || isExportingRoomAssignments) && "opacity-50 cursor-not-allowed")}
-                startContent={<FileSpreadsheet className="size-3.5" />}
-                isDisabled={!data || isExportingRoomAssignments}
-                onPress={handleExportRoomAssignments}
-                title="Download room assignments + calendar grid spreadsheet"
-              >
-                Export Rooms
-              </Button>
-              <span className={editorToolbarDivider} />
-              <Button
-                size="sm"
-                radius="md"
-                className={editorToolbarBtnSecondary}
-                startContent={<Table2 className="size-3.5" />}
-                onPress={() => setScheduleDrawerOpen(true)}
-                title="Open the schedule table to bulk lock/unlock sections for the solver"
-              >
-                Schedule Table
-                {hasAnyLock && (
-                  <span className="ml-1 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold leading-4 text-center">
-                    {lockCount}
-                  </span>
-                )}
-              </Button>
-            </div>
-          }
         />
         {(() => {
           const scheduleCreatedAt = displayedScheduleCreatedAtRef.current;
@@ -4832,7 +4760,137 @@ type PatternDayApplyRow = {
         </div>
       )}
 
+      {/* Day selector */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="inline-flex items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+          <span className="text-[10px] font-bold text-slate-400 uppercase px-2 tracking-widest">
+            Day:
+          </span>
+          {DAYS.map((d) => (
+            <button
+              key={d}
+              onClick={() => setSelectedDay(d)}
+              className={clsx(
+                "px-3 py-1.5 rounded-lg border text-xs font-bold whitespace-nowrap transition-colors",
+                selectedDay === d
+                  ? "bg-[#137fec]/10 border-[#137fec]/20 text-[#137fec]"
+                  : "bg-slate-50 border-slate-200 text-slate-600 hover:text-[#137fec] hover:bg-slate-100",
+              )}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
+      </div>
+        <div className={editorToolbarShellClass}>
+              {isMySolverRun ? (
+                <Button
+                  size="sm"
+                  radius="md"
+                  className="bg-rose-50 text-rose-700 border border-rose-200 data-[hover=true]:bg-rose-100"
+                  startContent={<XCircle className="size-3.5" />}
+                  onPress={() => {
+                    void cancelRun().then(() => setSolverRunStatus("idle"));
+                  }}
+                >
+                  Cancel Solver
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  radius="md"
+                  className={solverRunStatus !== "loading" && data && !solverBusyRemote ? editorToolbarBtnPrimary : "bg-slate-100 text-slate-400 cursor-not-allowed"}
+                  startContent={<Play className="size-3.5" />}
+                  isDisabled={solverRunStatus === "loading" || !data || solverBusyRemote}
+                  onPress={() => void handleRunSolverFromCalendar()}
+                  title={
+                    solverBusyRemote
+                      ? solverLock.startedBy
+                        ? `Solver is running (started by ${solverLock.startedBy})`
+                        : "Solver is running"
+                      : "Run the solver using backend scheduling data and locks from this page"
+                  }
+                >
+                  Run Solver
+                </Button>
+              )}
+              {!autoSaveEnabled && hasValidUnsavedEdit && (
+                <Button
+                  size="sm"
+                  radius="md"
+                  className="bg-emerald-50 text-emerald-800 border border-emerald-200 data-[hover=true]:bg-emerald-100"
+                  startContent={<CloudBackup className="size-3.5" />}
+                  isDisabled={isSavingBackend}
+                  onPress={() => void handleUpdateBackend(false)}
+                  title="Autosave is off — click Save to persist calendar edits."
+                >
+                  Save
+                </Button>
+              )}
+              <span className={editorToolbarDivider} />
+              <Button
+                size="sm"
+                radius="md"
+                className={editorToolbarBtnSecondary}
+                startContent={<Save className="size-3.5" />}
+                onPress={openSaveScheduleModal}
+                title="Save this generated/edited schedule to history"
+              >
+                Save Schedule
+              </Button>
+              <Button
+                size="sm"
+                radius="md"
+                className={editorToolbarBtnSecondary}
+                startContent={<Share2 className="size-3.5" />}
+                onPress={handleExportPdf}
+                title="Export the visible calendar to PDF"
+              >
+                Export PDF
+              </Button>
+              <Button
+                size="sm"
+                radius="md"
+                className={clsx(editorToolbarBtnSecondary, (!data || isExportingRoomAssignments) && "opacity-50 cursor-not-allowed")}
+                startContent={<FileSpreadsheet className="size-3.5" />}
+                isDisabled={!data || isExportingRoomAssignments}
+                onPress={handleExportRoomAssignments}
+                title="Download room assignments + calendar grid spreadsheet"
+              >
+                Export Rooms
+              </Button>
+              <span className={editorToolbarDivider} />
+              <Button
+                size="sm"
+                radius="md"
+                className={editorToolbarBtnSecondary}
+                startContent={<Table2 className="size-3.5" />}
+                onPress={() => setScheduleDrawerOpen(true)}
+                title="Open the schedule table to bulk lock/unlock sections for the solver"
+              >
+                Schedule Table
+                {hasAnyLock && (
+                  <span className="ml-1 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold leading-4 text-center">
+                    {lockCount}
+                  </span>
+                )}
+              </Button>
+            
+        </div>
+      </div>
+
+      {/* Search, filters, colors, crosslist, add section */}
       <div className="flex flex-wrap items-center gap-2">
+        <Input
+          value={searchQuery}
+          onValueChange={setSearchQuery}
+          placeholder="Search sections…"
+          size="sm"
+          isClearable
+          className="w-full max-w-[14rem]"
+        />
+        <span className="mx-0.5 hidden h-5 w-px shrink-0 bg-slate-200 sm:block" aria-hidden />
         <Button
           size="sm"
           radius="md"
@@ -4963,6 +5021,18 @@ type PatternDayApplyRow = {
             )}
           </>
         )}
+        <span className="mx-0.5 hidden h-5 w-px shrink-0 bg-slate-200 sm:block" aria-hidden />
+        <div className="ml-auto shrink-0">
+          <Button
+            size="sm"
+            radius="md"
+            className="h-8 min-h-8 gap-1 px-3 text-xs font-semibold text-weatherhead-primary bg-sky-50/60 border border-sky-200/50 data-[hover=true]:bg-sky-100/80 shadow-none"
+            startContent={<Plus className="size-3.5" aria-hidden />}
+            onPress={openCreateSectionModal}
+          >
+            Add Section
+          </Button>
+        </div>
       </div>
 
       <EditorModalShell
@@ -5035,39 +5105,7 @@ type PatternDayApplyRow = {
         </div>
       </EditorModalShell>
 
-      {/* Day selector + quick add section */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="inline-flex items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-            <span className="text-[10px] font-bold text-slate-400 uppercase px-2 tracking-widest">
-              Day:
-            </span>
-            {DAYS.map((d) => (
-              <button
-                key={d}
-                onClick={() => setSelectedDay(d)}
-                className={clsx(
-                  "px-3 py-1.5 rounded-lg border text-xs font-bold whitespace-nowrap transition-colors",
-                  selectedDay === d
-                    ? "bg-[#137fec]/10 border-[#137fec]/20 text-[#137fec]"
-                    : "bg-slate-50 border-slate-200 text-slate-600 hover:text-[#137fec] hover:bg-slate-100",
-                )}
-              >
-                {d}
-              </button>
-            ))}
-          </div>
-        </div>
-        <Button
-          size="sm"
-          radius="md"
-          className="h-8 min-h-8 gap-1 px-3 text-xs font-semibold text-weatherhead-primary bg-sky-50/60 border border-sky-200/50 data-[hover=true]:bg-sky-100/80 shadow-none"
-          startContent={<Plus className="size-3.5" aria-hidden />}
-          onPress={openCreateSectionModal}
-        >
-          Add Section
-        </Button>
-      </div>
+
 
       {/* Main calendar grid */}
       <div
@@ -5255,16 +5293,18 @@ type PatternDayApplyRow = {
                     const matchesHoveredDepartment =
                       activeLegendDepartmentKeys.size === 0 ||
                       activeLegendDepartmentKeys.has(departmentColorKey(section));
+                    const matchesSearch = !hasSearch || (matchingSectionIds?.has(section.id) ?? true);
+                    const matchesAllFilters = matchesHoveredDepartment && matchesSearch;
                     return (
                       <div
                         key={`${room.id}-${section.id}-occupied`}
                         className={clsx(
                           "absolute z-[6] rounded-lg border border-dashed pointer-events-none transition-all",
-                          matchesHoveredDepartment
+                          matchesAllFilters
                             ? "border-slate-300 bg-slate-100/70"
                             : "border-slate-200 bg-slate-100/35 opacity-45",
-                          activeLegendDepartmentKeys.size > 0 &&
-                            matchesHoveredDepartment &&
+                          (activeLegendDepartmentKeys.size > 0 || hasSearch) &&
+                            matchesAllFilters &&
                             "ring-2 ring-slate-300/80",
                         )}
                         style={{
@@ -5398,6 +5438,8 @@ type PatternDayApplyRow = {
                           )
                         : activeLegendDepartmentKeys.size === 0 ||
                           activeLegendDepartmentKeys.has(departmentColorKey(section));
+                    const matchesSearch = !hasSearch || (matchingSectionIds?.has(section.id) ?? true);
+                    const matchesAllFilters = matchesHoveredDepartment && matchesSearch;
                     const dragSectionId = isCrosslistGroupEvent(event)
                       ? section.id
                       : section.id;
@@ -5579,7 +5621,8 @@ type PatternDayApplyRow = {
                           members={event.crosslistMembers}
                           timeLabel={timeLabel}
                           color={color}
-                          matchesHoveredDepartment={matchesHoveredDepartment}
+                          matchesHoveredDepartment={matchesAllFilters}
+                          hasActiveFilter={activeLegendDepartmentKeys.size > 0 || hasSearch}
                           isDragSource={isDragSource}
                           hasDragMoved={Boolean(calendarDrag?.hasMoved)}
                           placementLocked={lockState}
@@ -5629,9 +5672,9 @@ type PatternDayApplyRow = {
                           isDragSource &&
                             calendarDrag?.hasMoved &&
                             "opacity-[0.12] pointer-events-none",
-                          !matchesHoveredDepartment && "opacity-35",
-                          activeLegendDepartmentKeys.size > 0 &&
-                            matchesHoveredDepartment &&
+                          !matchesAllFilters && "opacity-35",
+                          (activeLegendDepartmentKeys.size > 0 || hasSearch) &&
+                            matchesAllFilters &&
                             "ring-2 ring-slate-300/80 shadow-md",
                           isConflicting &&
                             "ring-2 ring-red-500 ring-offset-1 z-20 shadow-md",
@@ -5771,6 +5814,8 @@ type PatternDayApplyRow = {
                   const previewMatchesHoveredDepartment =
                     activeLegendDepartmentKeys.size === 0 ||
                     activeLegendDepartmentKeys.has(departmentColorKey(section));
+                  const previewMatchesSearch = !hasSearch || (matchingSectionIds?.has(section.id) ?? true);
+                  const previewMatchesAllFilters = previewMatchesHoveredDepartment && previewMatchesSearch;
                   const designationPv = sectionDesignations.get(section.id);
                   return (
                     <div
@@ -5778,7 +5823,7 @@ type PatternDayApplyRow = {
                       className={clsx(
                         "absolute pointer-events-none z-[25] border-l-4 rounded-lg p-2.5 flex flex-col justify-between shadow-sm ring-2 ring-inset",
                         previewBlocked ? "ring-red-500/65" : "ring-[#137fec]/40",
-                        !previewMatchesHoveredDepartment && "opacity-35",
+                        !previewMatchesAllFilters && "opacity-35",
                       )}
                       style={{
                         left: `${leftPct}%`,
