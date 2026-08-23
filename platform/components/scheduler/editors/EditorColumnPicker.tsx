@@ -4,7 +4,7 @@ import { useState } from "react";
 import clsx from "clsx";
 import { ChevronDown } from "lucide-react";
 
-import type { EditorColumnSpec } from "./useEditorColumnVisibility";
+import type { EditorColumnPreset, EditorColumnSpec } from "./useEditorColumnVisibility";
 
 type EditorColumnPickerProps = {
   specs: EditorColumnSpec[];
@@ -12,6 +12,9 @@ type EditorColumnPickerProps = {
   onToggle: (id: string, checked: boolean) => void;
   onShowAll: () => void;
   onHideAll: () => void;
+  /** When set, show Essentials / Scheduling / All style presets instead of only All/None. */
+  presets?: EditorColumnPreset[];
+  onApplyPreset?: (presetId: string) => void;
 };
 
 export function EditorColumnPicker({
@@ -20,9 +23,12 @@ export function EditorColumnPicker({
   onToggle,
   onShowAll,
   onHideAll,
+  presets,
+  onApplyPreset,
 }: EditorColumnPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const visibleCount = specs.filter((spec) => visibleIds.has(spec.id)).length;
+  const hasPresets = Boolean(presets && presets.length > 0 && onApplyPreset);
 
   return (
     <div className="inline-flex flex-wrap items-center gap-1">
@@ -46,21 +52,36 @@ export function EditorColumnPicker({
       </button>
       {isOpen && (
         <>
-          <button
-            type="button"
-            className="h-6 shrink-0 rounded-md px-2 text-[10px] font-semibold text-slate-600 transition-colors hover:bg-slate-100"
-            onClick={onShowAll}
-          >
-            All
-          </button>
-          <button
-            type="button"
-            title="Hide optional columns (keeps ID visible)"
-            className="h-6 shrink-0 rounded-md px-2 text-[10px] font-semibold text-slate-600 transition-colors hover:bg-slate-100"
-            onClick={onHideAll}
-          >
-            None
-          </button>
+          {hasPresets ? (
+            presets!.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                className="h-6 shrink-0 rounded-md px-2 text-[10px] font-semibold text-slate-600 transition-colors hover:bg-slate-100"
+                onClick={() => onApplyPreset!(preset.id)}
+              >
+                {preset.label}
+              </button>
+            ))
+          ) : (
+            <>
+              <button
+                type="button"
+                className="h-6 shrink-0 rounded-md px-2 text-[10px] font-semibold text-slate-600 transition-colors hover:bg-slate-100"
+                onClick={onShowAll}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                title="Hide optional columns (keeps ID visible)"
+                className="h-6 shrink-0 rounded-md px-2 text-[10px] font-semibold text-slate-600 transition-colors hover:bg-slate-100"
+                onClick={onHideAll}
+              >
+                None
+              </button>
+            </>
+          )}
           <span className="mx-0.5 h-4 w-px shrink-0 bg-slate-200" aria-hidden />
           {specs.map((spec) => {
             const isVisible = visibleIds.has(spec.id);

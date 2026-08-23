@@ -15,7 +15,7 @@ import {
   type EditorFiltersState,
 } from "./editorFilters";
 import { sortDefsFromFilterDefs, type EditorColumnSortDef } from "./editorSort";
-import { SECTION_COLUMN_SPECS } from "./editorColumnSpecs";
+import { SECTION_COLUMN_PRESETS, SECTION_COLUMN_SPECS } from "./editorColumnSpecs";
 import { useEditorActions } from "./EditorActionProvider";
 import { editorRowKey } from "./editorRowHighlight";
 import { SectionEditModal } from "./modals/SectionEditModal";
@@ -90,7 +90,11 @@ export const SectionsEditor = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [hideArchived, setHideArchived] = useHideArchivedSections();
-  const columnVisibility = useEditorColumnVisibility("sections", SECTION_COLUMN_SPECS);
+  const columnVisibility = useEditorColumnVisibility(
+    "sections",
+    SECTION_COLUMN_SPECS,
+    SECTION_COLUMN_PRESETS,
+  );
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<Section | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
@@ -449,6 +453,8 @@ export const SectionsEditor = ({
             onToggle={columnVisibility.toggleColumn}
             onShowAll={columnVisibility.showAllColumns}
             onHideAll={columnVisibility.hideAllColumns}
+            presets={columnVisibility.presets}
+            onApplyPreset={columnVisibility.applyPreset}
           />
         </div>
       }

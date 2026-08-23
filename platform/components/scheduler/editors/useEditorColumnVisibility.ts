@@ -8,6 +8,17 @@ export type EditorColumnSpec = {
   defaultVisible: boolean;
   /** Relative width when column is visible (normalized with other visible columns). */
   weight: number;
+  /** Freeze this column on the left while the table scrolls horizontally. */
+  pinned?: "left";
+  /** Preferred minimum width in px (horizontal scroll when mins exceed card). */
+  minWidthPx?: number;
+};
+
+export type EditorColumnPreset = {
+  id: string;
+  label: string;
+  /** Column ids to show. Unknown ids are ignored. */
+  columnIds: string[];
 };
 
 function defaultVisibleSet(specs: EditorColumnSpec[]): Set<string> {
@@ -31,7 +42,11 @@ function loadVisibleIds(storageKey: string, specs: EditorColumnSpec[]): Set<stri
   }
 }
 
-export function useEditorColumnVisibility(editorKey: string, specs: EditorColumnSpec[]) {
+export function useEditorColumnVisibility(
+  editorKey: string,
+  specs: EditorColumnSpec[],
+  presets?: EditorColumnPreset[],
+) {
   const storageKey = `wsom-editor-columns-${editorKey}`;
   const [visibleIds, setVisibleIds] = useState<Set<string>>(() => defaultVisibleSet(specs));
 
@@ -75,6 +90,19 @@ export function useEditorColumnVisibility(editorKey: string, specs: EditorColumn
     persist(new Set([keep.id]));
   }, [persist, specs]);
 
+  const applyPreset = useCallback(
+    (presetId: string) => {
+      const preset = presets?.find((p) => p.id === presetId);
+      if (!preset) return;
+      const next = new Set(
+        preset.columnIds.filter((id) => specs.some((s) => s.id === id)),
+      );
+      if (next.size === 0) return;
+      persist(next);
+    },
+    [presets, persist, specs],
+  );
+
   const visibleSpecs = useMemo(
     () => specs.filter((s) => visibleIds.has(s.id)),
     [specs, visibleIds],
@@ -93,9 +121,11 @@ export function useEditorColumnVisibility(editorKey: string, specs: EditorColumn
     specs,
     visibleSpecs,
     visibleIds,
+    presets: presets ?? [],
     toggleColumn,
     showAllColumns,
     hideAllColumns,
+    applyPreset,
     widthFor,
     isVisible: (id: string) => visibleIds.has(id),
   };

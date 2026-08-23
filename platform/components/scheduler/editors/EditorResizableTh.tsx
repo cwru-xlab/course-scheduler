@@ -1,9 +1,13 @@
 "use client";
 
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import clsx from "clsx";
+import type { CSSProperties } from "react";
 
-import { editorTh } from "./EditorTableShell";
 import type { SortDirection } from "./editorSort";
+
+/** Must match HEADER_HEIGHT_PX in EditorConfigurableTable (freeze-pane alignment). */
+export const EDITOR_HEADER_HEIGHT_PX = 36;
 
 type EditorResizableThProps = {
   label: string;
@@ -48,6 +52,9 @@ function ColumnRightEdge({
   );
 }
 
+const headerThClass =
+  "relative box-border overflow-hidden bg-content1 px-0 text-xs font-semibold uppercase tracking-wide text-default-500";
+
 export function EditorResizableTh({
   label,
   widthPx,
@@ -65,17 +72,22 @@ export function EditorResizableTh({
         : `Click to sort A→Z`
     : undefined;
 
+  const style: CSSProperties = {
+    width: widthPx,
+    minWidth: widthPx,
+    maxWidth: widthPx,
+    height: EDITOR_HEADER_HEIGHT_PX,
+    maxHeight: EDITOR_HEADER_HEIGHT_PX,
+  };
+
   return (
-    <th
-      className={`${editorTh} relative overflow-hidden`}
-      style={{ width: widthPx, minWidth: widthPx, maxWidth: widthPx }}
-    >
+    <th className={headerThClass} style={style} title={label}>
       {sortable ? (
         <button
           type="button"
-          className="flex w-full min-w-0 items-center gap-1 pl-2.5 pr-3 text-left hover:text-slate-900"
+          className="flex h-full w-full min-w-0 items-center gap-1 pl-2.5 pr-3 text-left hover:text-slate-900"
           onClick={onSortToggle}
-          title={sortTitle}
+          title={sortTitle ?? label}
           aria-label={`${label}${sortDirection ? `, sorted ${sortDirection === "asc" ? "A to Z" : "Z to A"}` : ""}`}
         >
           <span className="min-w-0 truncate">{label}</span>
@@ -90,7 +102,9 @@ export function EditorResizableTh({
           </span>
         </button>
       ) : (
-        <span className="block truncate pl-2.5 pr-3">{label}</span>
+        <span className="flex h-full items-center truncate pl-2.5 pr-3" title={label}>
+          {label}
+        </span>
       )}
       <ColumnRightEdge
         resizable={resizable}
@@ -105,14 +119,16 @@ export function EditorResizableTh({
 export function EditorActionsTh({ widthPx }: { widthPx: number }) {
   return (
     <th
-      className={`${editorTh} relative overflow-hidden`}
+      className={clsx(headerThClass)}
       style={{
         width: widthPx,
         minWidth: widthPx,
         maxWidth: widthPx,
+        height: EDITOR_HEADER_HEIGHT_PX,
+        maxHeight: EDITOR_HEADER_HEIGHT_PX,
       }}
     >
-      <span className="block truncate pl-2.5 pr-1">Actions</span>
+      <span className="flex h-full items-center truncate pl-3.5 pr-1">Actions</span>
     </th>
   );
 }

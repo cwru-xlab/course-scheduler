@@ -4,14 +4,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   applyColumnWidthsToTable,
+  columnMinWidthPx,
   computeResizedWidths,
   EDITOR_ACTIONS_COLUMN_PX,
   fitWidthsToContainer,
   MIN_COLUMN_PX,
+  sumDataWidths,
+  tableWidthPx,
 } from "./columnResizeDom";
 import type { EditorColumnSpec } from "./useEditorColumnVisibility";
 
 export { EDITOR_ACTIONS_COLUMN_PX };
+
+/** Ignore sub-pixel / scrollbar noise that fires ResizeObserver during fast scroll. */
+const CONTAINER_WIDTH_EPSILON_PX = 4;
 
 function loadSavedWidths(storageKey: string): Record<string, number> | null {
   if (typeof window === "undefined") return null;
@@ -40,21 +46,24 @@ function proportionalWidths(
   const budget =
     containerWidth > 0
       ? Math.max(
-          visibleSpecs.length * MIN_COLUMN_PX,
+          visibleSpecs.reduce((sum, s) => sum + columnMinWidthPx(s), 0),
           containerWidth - EDITOR_ACTIONS_COLUMN_PX,
         )
-      : 0;
+      : visibleSpecs.reduce((sum, s) => sum + columnMinWidthPx(s), 0);
 
   const totalWeight = visibleSpecs.reduce((sum, s) => sum + s.weight, 0);
   const raw: Record<string, number> = {};
 
   for (const spec of visibleSpecs) {
     if (saved?.[spec.id] != null) {
-      raw[spec.id] = saved[spec.id];
+      raw[spec.id] = Math.max(columnMinWidthPx(spec), saved[spec.id]);
     } else if (totalWeight > 0 && budget > 0) {
-      raw[spec.id] = Math.round((spec.weight / totalWeight) * budget);
+      raw[spec.id] = Math.max(
+        columnMinWidthPx(spec),
+        Math.round((spec.weight / totalWeight) * budget),
+      );
     } else {
-      raw[spec.id] = MIN_COLUMN_PX;
+      raw[spec.id] = columnMinWidthPx(spec);
     }
   }
 
@@ -77,7 +86,7 @@ export function useEditorColumnWidths(
     startX: number;
     startWidth: number;
     baselineWidths: Record<string, number>;
-    table: HTMLTableElement;
+    tables: HTMLTableElement[];
   } | null>(null);
 
   useEffect(() => {
@@ -87,7 +96,12 @@ export function useEditorColumnWidths(
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const measure = () => setContainerWidth(el.clientWidth);
+    const measure = () => {
+      const next = el.clientWidth;
+      setContainerWidth((prev) =>
+        Math.abs(prev - next) < CONTAINER_WIDTH_EPSILON_PX ? prev : next,
+      );
+    };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
@@ -100,10 +114,24 @@ export function useEditorColumnWidths(
   );
 
   const refitWidths = useCallback(
-    (raw: Record<string, number>) =>
-      containerWidth > 0
-        ? fitWidthsToContainer(raw, visibleSpecs, containerWidth)
-        : raw,
+    (raw: Record<string, number>) => {
+      if (containerWidth <= 0) return raw;
+      const dataSum = sumDataWidths(raw, visibleSpecs);
+      const budget = Math.max(0, containerWidth - EDITOR_ACTIONS_COLUMN_PX);
+      // Already wider than the card: keep exact widths so sticky offsets do not jump
+      // when ResizeObserver flickers during horizontal scroll.
+      if (dataSum >= budget) {
+        const next: Record<string, number> = {};
+        for (const spec of visibleSpecs) {
+          next[spec.id] = Math.max(
+            columnMinWidthPx(spec),
+            Math.round(raw[spec.id] ?? columnMinWidthPx(spec)),
+          );
+        }
+        return next;
+      }
+      return fitWidthsToContainer(raw, visibleSpecs, containerWidth);
+    },
     [containerWidth, visibleSpecs],
   );
 
@@ -123,6 +151,8 @@ export function useEditorColumnWidths(
 
   const persistWidths = useCallback(
     (next: Record<string, number>) => {
+      // Clamp to mins; expand into leftover container space if under budget.
+      // Do not shrink below preferred widths when wider than the card.
       const fitted =
         containerWidth > 0 ? fitWidthsToContainer(next, visibleSpecs, containerWidth) : next;
       savedRef.current = fitted;
@@ -137,9 +167,16 @@ export function useEditorColumnWidths(
   );
 
   const startResize = useCallback(
-    (columnId: string, clientX: number, table: HTMLTableElement | null) => {
+    (
+      columnId: string,
+      clientX: number,
+      tables: HTMLTableElement | Array<HTMLTableElement | null> | null,
+    ) => {
       const startWidth = widthsPx[columnId];
-      if (startWidth == null || !table || containerWidth <= 0) return;
+      const tableList = (Array.isArray(tables) ? tables : [tables]).filter(
+        (t): t is HTMLTableElement => t != null,
+      );
+      if (startWidth == null || tableList.length === 0 || containerWidth <= 0) return;
 
       const baselineWidths = { ...widthsPx };
       draftWidthsRef.current = baselineWidths;
@@ -148,7 +185,7 @@ export function useEditorColumnWidths(
         startX: clientX,
         startWidth,
         baselineWidths,
-        table,
+        tables: tableList,
       };
 
       const prevUserSelect = document.body.style.userSelect;
@@ -172,13 +209,15 @@ export function useEditorColumnWidths(
             delta,
           );
           draftWidthsRef.current = resized;
-          applyColumnWidthsToTable(
-            session.table,
-            draftWidthsRef.current,
-            visibleSpecs,
-            containerWidth,
-            { fit: false },
-          );
+          for (const table of session.tables) {
+            applyColumnWidthsToTable(
+              table,
+              draftWidthsRef.current,
+              visibleSpecs,
+              containerWidth,
+              { fit: false, paneSumOnly: true },
+            );
+          }
         });
       };
 
@@ -203,15 +242,26 @@ export function useEditorColumnWidths(
 
   const getWidthPx = useCallback(
     (columnId: string) => {
-      return widthsPx[columnId] ?? MIN_COLUMN_PX;
+      if (widthsPx[columnId] != null) return widthsPx[columnId];
+      const spec = visibleSpecs.find((s) => s.id === columnId);
+      return spec ? columnMinWidthPx(spec) : MIN_COLUMN_PX;
     },
-    [widthsPx],
+    [widthsPx, visibleSpecs],
+  );
+
+  const totalTableWidthPx = useMemo(
+    () =>
+      Object.keys(widthsPx).length > 0
+        ? tableWidthPx(widthsPx, visibleSpecs)
+        : 0,
+    [widthsPx, visibleSpecs],
   );
 
   return {
     containerRef,
     containerWidth,
     getWidthPx,
+    tableWidthPx: totalTableWidthPx,
     actionsWidthPx: EDITOR_ACTIONS_COLUMN_PX,
     startResize,
   };
