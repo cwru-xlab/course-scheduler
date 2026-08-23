@@ -110,7 +110,9 @@ function PaneRowInner<TRow>({
     <tr id={rowId} className={className} style={BODY_TR_STYLE}>
       {specs.map((spec) => (
         <td key={spec.id} className={BODY_TD_CLASS}>
-          {renderCell(spec.id, row, rowIndex)}
+          <div className="flex h-full max-h-11 min-w-0 items-center overflow-hidden">
+            {renderCell(spec.id, row, rowIndex)}
+          </div>
         </td>
       ))}
       {renderActions && actionsWidthPx != null ? (
@@ -122,7 +124,9 @@ function PaneRowInner<TRow>({
             maxWidth: actionsWidthPx,
           }}
         >
-          {renderActions(row, rowIndex)}
+          <div className="flex h-full max-h-11 min-w-0 items-center overflow-hidden">
+            {renderActions(row, rowIndex)}
+          </div>
         </td>
       ) : null}
     </tr>

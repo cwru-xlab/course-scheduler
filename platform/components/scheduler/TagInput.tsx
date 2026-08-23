@@ -170,7 +170,7 @@ export const TagInput = ({
   return (
     <div ref={wrapperRef} className={`relative ${className}`}>
       <div
-        className="flex min-h-[36px] flex-wrap items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 cursor-text"
+        className="flex min-h-[36px] cursor-text flex-wrap items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1"
         onClick={() => inputRef.current?.focus()}
       >
         {value.map((tag) => (
@@ -178,7 +178,7 @@ export const TagInput = ({
             key={tag}
             size="sm"
             variant="flat"
-            className="bg-slate-100 text-slate-700 text-xs h-6"
+            className="h-6 bg-slate-100 text-xs text-slate-700"
             onClose={() => removeTag(tag)}
           >
             {tag}
