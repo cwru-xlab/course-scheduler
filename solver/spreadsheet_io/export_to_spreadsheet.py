@@ -63,15 +63,21 @@ def scheduling_input_to_excel_bytes(
     instructor_lookup = _build_instructor_name_lookup(payload)
     instructor_names = sorted(set(instructor_lookup.values()))
 
+    sheets: Dict[str, Any] = {}
     for spec in SPREADSHEET_SPECS:
         ws = workbook.create_sheet(spec.name)
+        sheets[spec.name] = ws
         ws.append(spec.columns)
         rows = _rows_for_sheet(spec.name, payload, instructor_lookup)
         for row in rows:
             ws.append([row.get(column, "") for column in spec.columns])
 
+    instructor_ws = sheets.get("Instructors")
+    for spec in SPREADSHEET_SPECS:
         if instructor_names and spec.name in ("Sections", "BlockedTimes"):
-            _apply_instructor_dropdown(ws, spec.columns, instructor_names)
+            _apply_instructor_dropdown(
+                sheets[spec.name], spec.columns, instructor_names, instructor_ws,
+            )
 
     populated_notes = [
         entry
@@ -92,8 +98,13 @@ def _apply_instructor_dropdown(
     ws: Any,
     columns: List[str],
     names: List[str],
+    instructor_ws: Any = None,
 ) -> None:
-    """Add a dropdown data validation to the instructor_id column."""
+    """Add a dropdown data validation to the instructor_id column.
+
+    If *instructor_ws* is provided, the dropdown references the Name column
+    on that sheet (avoids comma-in-name splitting in the formula string).
+    """
     try:
         col_idx = columns.index("instructor_id") + 1  # 1-based
     except ValueError:
@@ -104,10 +115,20 @@ def _apply_instructor_dropdown(
     max_row = ws.max_row
     if max_row < 2:
         return
-    formula = ",".join(names)
+
+    if instructor_ws is not None and names:
+        # Write names into a hidden helper column on the Instructors sheet
+        # so the dropdown references cells (handles commas in names).
+        helper_col_letter = get_column_letter(instructor_ws.max_column + 1)
+        for i, name in enumerate(names, start=1):
+            instructor_ws[f"{helper_col_letter}{i}"] = name
+        formula = f"={instructor_ws.title}!${helper_col_letter}$1:${helper_col_letter}${len(names)}"
+    else:
+        formula = ",".join(names)
+
     dv = DataValidation(
         type="list",
-        formula1=f'"{formula}"',
+        formula1=f'"{formula}"' if not formula.startswith("=") else formula,
         allow_blank=True,
         showErrorMessage=True,
         errorTitle="Invalid Instructor",

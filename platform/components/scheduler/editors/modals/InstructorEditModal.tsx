@@ -84,8 +84,11 @@ export function InstructorEditModal({
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-slate-600">ID</span>
           <input
-            className="rounded-lg border border-slate-200 px-3 py-2"
+            className={`rounded-lg border border-slate-200 px-3 py-2 ${
+              mode === "edit" ? "cursor-not-allowed bg-slate-100 text-slate-400" : ""
+            }`}
             value={draft.id}
+            disabled={mode === "edit"}
             onChange={(e) => setDraft((d) => ({ ...d, id: e.target.value }))}
           />
         </label>
