@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@heroui/button";
 import { CloudUpload } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/PageHeader";
+import { useIslandNotify } from "@/components/GlobalStatusBar";
 import { SpreadsheetFormatHelp } from "@/components/scheduler/SpreadsheetFormatHelp";
 import { ValidationIssuesTable } from "@/components/scheduler/ValidationIssuesTable";
 import { humanizeError } from "@/lib/errors/humanizeError";
@@ -20,7 +21,6 @@ import { SolverActionButton } from "./SolverActionButton";
 import { CheckDataButton } from "./CheckDataButton";
 import {
   editorFeedbackErrorClass,
-  editorFeedbackSuccessClass,
   editorToolbarBtnPrimary,
   editorToolbarDivider,
   editorToolbarShellClass,
@@ -42,12 +42,30 @@ type EditorPageHeaderProps = {
 };
 
 export function EditorPageHeader({ current, title, subtitle, data }: EditorPageHeaderProps) {
-  const { saveToBackend, isSaving, saveFeedback } =
-    useSchedulingData();
+  const { saveToBackend, isSaving } = useSchedulingData();
+  const { flash } = useIslandNotify();
   const [spreadsheetFeedback, setSpreadsheetFeedback] = useState<SpreadsheetFeedback | null>(
     null,
   );
   const [solverError, setSolverError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!spreadsheetFeedback) return;
+    if (spreadsheetFeedback.type === "success") {
+      flash({ tone: "success", message: spreadsheetFeedback.message });
+      return;
+    }
+    flash({
+      tone: "error",
+      message: spreadsheetFeedback.message || "Import failed — see details below.",
+      durationMs: 4500,
+    });
+  }, [spreadsheetFeedback, flash]);
+
+  useEffect(() => {
+    if (!solverError) return;
+    flash({ tone: "error", message: solverError, durationMs: 4500 });
+  }, [solverError, flash]);
 
   return (
     <div className="space-y-3">
@@ -83,15 +101,6 @@ export function EditorPageHeader({ current, title, subtitle, data }: EditorPageH
         <SolverActionButton data={data} onErrorChange={setSolverError} />
       </div>
 
-      {solverError ? (
-        <p className={editorFeedbackErrorClass}>{solverError}</p>
-      ) : null}
-
-      {spreadsheetFeedback?.type === "success" && (
-        <div className={editorFeedbackSuccessClass} role="status">
-          {spreadsheetFeedback.message}
-        </div>
-      )}
       {spreadsheetFeedback?.type === "error" && (
         <div className={editorFeedbackErrorClass} role="alert">
           <p className="font-medium">{spreadsheetFeedback.message}</p>
@@ -125,20 +134,6 @@ export function EditorPageHeader({ current, title, subtitle, data }: EditorPageH
             <SpreadsheetFormatHelp compact />
           </div>
         </div>
-      )}
-
-      {saveFeedback?.type === "success" && (
-        <div className={`${editorFeedbackSuccessClass} space-y-1`}>
-          <p>{saveFeedback.message}</p>
-          {saveFeedback.warnings?.map((warning) => (
-            <p key={warning} className="text-amber-800">
-              Warning: {warning}
-            </p>
-          ))}
-        </div>
-      )}
-      {saveFeedback?.type === "error" && (
-        <p className={editorFeedbackErrorClass}>Save failed. {saveFeedback.message}</p>
       )}
       </div>
     </div>

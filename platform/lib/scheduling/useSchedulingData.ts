@@ -573,14 +573,13 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
       dismissedRemoteFingerprintRef.current = null;
       markRecentChanges(savedKeys, "local");
 
-      if (options?.manual || !autoSaveEnabledRef.current) {
-        setSaveFeedback({
-          type: "success",
-          message: "Changes saved successfully.",
-          warnings: result.warnings.length > 0 ? result.warnings : undefined,
-        });
-        clearSaveFeedbackSoon();
-      }
+      const isManualOrAutosaveOff = options?.manual || !autoSaveEnabledRef.current;
+      setSaveFeedback({
+        type: "success",
+        message: isManualOrAutosaveOff ? "Changes saved successfully." : "Saved.",
+        warnings: result.warnings.length > 0 ? result.warnings : undefined,
+      });
+      clearSaveFeedbackSoon(isManualOrAutosaveOff ? 5000 : 2500);
       return true;
     } catch (err) {
       setSaveFeedback({

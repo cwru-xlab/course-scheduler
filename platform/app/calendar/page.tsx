@@ -1,7 +1,6 @@
 "use client";
 
 import clsx from "clsx";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -43,7 +42,7 @@ import { Input } from "@heroui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@heroui/popover";
 
 import { PageHeader } from "@/components/layout/PageHeader";
-import { useSetStatusBarContent } from "@/components/GlobalStatusBar";
+import { useIslandNotify, useSetStatusBarContent } from "@/components/GlobalStatusBar";
 import { MultiSelect } from "@/components/scheduler/MultiSelect";
 import { appToolbarShellClass, appNavLinkClass } from "@/lib/ui/appChromeStyles";
 import { navbarPopoverProps, toolbarChipPopoverChipClass, toolbarChipPopoverContentClass, toolbarChipPopoverGridClass, toolbarChipPopoverGridStyle } from "@/lib/ui/navbarPopoverProps";
@@ -1063,101 +1062,12 @@ function computeCalendarDayConflicts(events: CalendarEvent[]): {
   return { sectionIds, hasRoomConflict, hasInstructorConflict };
 }
 
-/** Fixed below the navbar so valid/invalid drag messages stay visible while the calendar scrolls. */
-function CalendarDragFeedbackToastPortal({
-  mountedOn,
-  dragFeedback,
-  onDismiss,
-  action,
-}: {
-  mountedOn: HTMLElement | null;
-  dragFeedback: CalendarDragFeedbackState;
-  onDismiss: () => void;
-  action?: { label: string; onClick: () => void } | null;
-}) {
-  if (!mountedOn) return null;
-  const line = dragFeedback.message;
-  const isError = dragFeedback.status === "invalid";
-  const isWarning = dragFeedback.status === "warning";
-  const isValid = dragFeedback.status === "valid";
-  const toastKey = `${dragFeedback.status}\u001f${dragFeedback.message ?? ""}`;
-
-  return createPortal(
-    <AnimatePresence>
-      {line ? (
-        <motion.div
-          key={toastKey}
-          role="status"
-          aria-live="polite"
-          className="pointer-events-none fixed inset-x-0 top-16 z-[45] flex justify-center px-4 sm:px-6 pt-2"
-          initial={{ opacity: 0, y: -12 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -12 }}
-          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <div
-            className={clsx(
-              "pointer-events-auto flex w-full max-w-3xl items-start gap-2 rounded-xl border px-4 py-3 text-sm font-medium shadow-lg backdrop-blur-md",
-              isError &&
-                "border-red-200 bg-red-50/95 text-red-800 dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-200",
-              isWarning &&
-                "border-amber-200 bg-amber-50/95 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-100",
-              isValid &&
-                "border-emerald-200 bg-emerald-50/95 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-100",
-              !isError &&
-                !isWarning &&
-                !isValid &&
-                "border-slate-200 bg-white/95 text-slate-800 dark:border-default-200 dark:bg-default-100/95 dark:text-foreground",
-            )}
-          >
-            <span className="min-w-0 flex-1 leading-snug">{line}</span>
-            {action ? (
-              <button
-                type="button"
-                className={clsx(
-                  "shrink-0 rounded-md border px-2.5 py-1 text-xs font-bold transition-colors",
-                  isWarning
-                    ? "border-amber-300 bg-amber-100/70 text-amber-900 hover:bg-amber-200/70 dark:border-amber-500/50 dark:bg-amber-500/20 dark:text-amber-100 dark:hover:bg-amber-500/30"
-                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-default-200 dark:bg-default-100 dark:text-foreground",
-                )}
-                onClick={action.onClick}
-              >
-                {action.label}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className={clsx(
-                "shrink-0 rounded-md p-0.5",
-                isError &&
-                  "text-red-700/80 hover:bg-red-100/80 hover:text-red-900 dark:text-red-200 dark:hover:bg-red-500/20",
-                isWarning &&
-                  "text-amber-700/80 hover:bg-amber-100/80 hover:text-amber-900 dark:text-amber-200 dark:hover:bg-amber-500/20",
-                isValid &&
-                  "text-emerald-700/80 hover:bg-emerald-100/80 hover:text-emerald-900 dark:text-emerald-200 dark:hover:bg-emerald-500/20",
-                !isError &&
-                  !isWarning &&
-                  !isValid &&
-                  "text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-default-400 dark:hover:bg-default-200/40",
-              )}
-              onClick={onDismiss}
-              aria-label="Dismiss message"
-            >
-              <X className="size-4" aria-hidden />
-            </button>
-          </div>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>,
-    mountedOn,
-  );
-}
-
 export default function CalendarPage() {
   type AssignmentMap = CalendarAssignmentMap;
 
   const router = useRouter();
   const { user } = useAuth();
+  const { flash } = useIslandNotify();
   const {
     begin: beginSolverProgress,
     succeed: succeedSolverProgress,
@@ -2681,8 +2591,8 @@ type PatternDayApplyRow = {
       !Number.isNaN(new Date(scheduleCreatedAt).getTime()) &&
       new Date(dataRev.lastModifiedAt).getTime() > new Date(scheduleCreatedAt).getTime();
     setStatusBarContent(
-      <div className="flex flex-col gap-1">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+      <div className="flex flex-col items-center justify-center gap-1 text-center">
+        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
           {dataRev ? (
             <span>
               Data edited{dataRev.lastModifiedByName ? ` by ${dataRev.lastModifiedByName}` : ""}{" "}
@@ -2707,17 +2617,12 @@ type PatternDayApplyRow = {
               </span>
             </>
           ) : null}
-          {viewPredatesDataEdit ? (
-            <>
-              <span className="hidden sm:inline text-slate-300" aria-hidden>
-                •
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
-                View predates latest data edit — rerun the solver to refresh
-              </span>
-            </>
-          ) : null}
         </div>
+        {viewPredatesDataEdit ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
+            View predates latest data edit — rerun the solver to refresh
+          </span>
+        ) : null}
         {hasValidUnsavedEdit && (
           <p className="text-[11px] font-semibold text-emerald-700">
             Unsaved valid edits are ready to sync.
@@ -3755,6 +3660,50 @@ type PatternDayApplyRow = {
     });
   }, [assignmentsBySection, buildPatternApplyRows, patternApplyPrompt, sectionById, timeslotById]);
 
+  // Push calendar transient messages into the Dynamic Island.
+  useEffect(() => {
+    if (!dragFeedback.message) return;
+    const tone =
+      dragFeedback.status === "invalid"
+        ? "error"
+        : dragFeedback.status === "warning"
+          ? "warn"
+          : dragFeedback.status === "valid"
+            ? "success"
+            : "neutral";
+    flash({
+      tone,
+      message: dragFeedback.message,
+      durationMs: tone === "success" ? 2000 : 4500,
+      action:
+        patternApplyPrompt && dragFeedback.status === "warning"
+          ? {
+              label: "Apply to all pattern days",
+              onPress: () => openPatternApplyModal(),
+            }
+          : undefined,
+    });
+  }, [
+    dragFeedback.message,
+    dragFeedback.status,
+    patternApplyPrompt,
+    flash,
+    openPatternApplyModal,
+  ]);
+
+  useEffect(() => {
+    if (!backendSaveMessage) return;
+    flash({
+      tone: backendSaveMessage.type === "success" ? "success" : "error",
+      message: backendSaveMessage.text,
+    });
+  }, [backendSaveMessage, flash]);
+
+  useEffect(() => {
+    if (!solverRunError) return;
+    flash({ tone: "error", message: solverRunError, durationMs: 5000 });
+  }, [solverRunError, flash]);
+
   const togglePatternApplyRow = useCallback((day: Day) => {
     setPatternApplyModal((prev) => {
       if (!prev) return prev;
@@ -4695,45 +4644,12 @@ type PatternDayApplyRow = {
         onUndo={handleUndo}
         onRedo={handleRedo}
       />
-      <CalendarDragFeedbackToastPortal
-        mountedOn={dragFeedbackToastMount}
-        dragFeedback={dragFeedback}
-        action={
-          patternApplyPrompt && dragFeedback.status === "warning"
-            ? { label: "Apply to all pattern days", onClick: openPatternApplyModal }
-            : null
-        }
-        onDismiss={() => {
-          setDragFeedback({ status: "neutral", message: null });
-          setConflictSectionIds(new Set());
-          setPatternApplyPrompt(null);
-        }}
-      />
       <div className="space-y-3">
         <PageHeader
           title="Schedule Output Calendar"
           subtitle="Click through Monday–Friday to view scheduled sections."
         />
       </div>
-
-      {backendSaveMessage && (
-        <div
-          className={clsx(
-            "rounded-lg border px-4 py-2 text-sm font-medium",
-            backendSaveMessage.type === "success"
-              ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-              : "bg-rose-50 border-rose-200 text-rose-800",
-          )}
-        >
-          {backendSaveMessage.text}
-        </div>
-      )}
-
-      {solverRunError && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-800">
-          {solverRunError}
-        </div>
-      )}
 
       {incomingShared && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-2.5">

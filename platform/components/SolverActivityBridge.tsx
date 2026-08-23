@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Loader2 } from "lucide-react";
 
+import { useIslandNotify } from "@/components/GlobalStatusBar";
 import { useSolverLock } from "@/lib/solver-lock-client";
 import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
+
+const STICKY_ID = "solver-remote";
 
 /**
  * App-wide bridge that reflects another user's solver run when the lock poll
  * sees it (best-effort on multi-instance hosts):
  *  - drives the shared progress bar in observer mode, and
- *  - shows a top banner naming who started the run.
+ *  - shows an island sticky naming who started the run.
  *
  * The user who started the run drives progress via begin()/succeed()/fail();
  * `isRunningLocally` prevents this bridge from interfering.
@@ -18,6 +20,7 @@ import { useSolverProgress } from "@/lib/solver-progress/SolverProgressContext";
 export function SolverActivityBridge() {
   const lock = useSolverLock();
   const { isRunningLocally, beginObserved, endObserved } = useSolverProgress();
+  const { setSticky, clearSticky } = useIslandNotify();
   const observingRef = useRef(false);
 
   useEffect(() => {
@@ -31,21 +34,33 @@ export function SolverActivityBridge() {
     }
   }, [lock.active, lock.startedAt, isRunningLocally, beginObserved, endObserved]);
 
-  if (!lock.active || isRunningLocally) return null;
+  useEffect(() => {
+    if (!lock.active || isRunningLocally) {
+      clearSticky(STICKY_ID);
+      return;
+    }
 
-  return (
-    <div className="fixed inset-x-0 top-16 z-40 border-b border-sky-200/80 bg-sky-50/95 px-4 py-2 backdrop-blur-sm sm:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-7xl items-center gap-2 text-sm text-sky-950">
-        <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
-        <span className="font-medium">
+    setSticky({
+      id: STICKY_ID,
+      tone: "info",
+      priority: 60,
+      icon: "loader",
+      message: (
+        <span>
           {lock.startedBy
             ? `${lock.startedBy} is running the solver…`
             : "Someone is running the solver…"}{" "}
-          <span className="font-normal text-sky-800">
+          <span className="font-normal opacity-80">
             The schedule will update for everyone when it finishes.
           </span>
         </span>
-      </div>
-    </div>
-  );
+      ),
+    });
+  }, [lock.active, lock.startedBy, isRunningLocally, setSticky, clearSticky]);
+
+  useEffect(() => {
+    return () => clearSticky(STICKY_ID);
+  }, [clearSticky]);
+
+  return null;
 }
