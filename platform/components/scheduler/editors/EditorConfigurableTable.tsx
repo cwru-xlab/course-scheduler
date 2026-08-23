@@ -68,6 +68,12 @@ const MID_HEAD_SCROLL_CLASS =
   "min-w-0 flex-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden";
 const MID_BODY_SCROLL_CLASS =
   "min-w-0 flex-1 overflow-x-auto overscroll-x-contain [overflow-anchor:none]";
+/** Dotted seam between locked left columns and the scrollable middle. */
+const FREEZE_EDGE_LEFT_CLASS =
+  "shrink-0 bg-content1 border-r border-dotted border-slate-300";
+/** Dotted seam between the scrollable middle and locked Actions. */
+const FREEZE_EDGE_RIGHT_CLASS =
+  "shrink-0 bg-content1 border-l border-dotted border-slate-300";
 
 function useLatestRef<T>(value: T) {
   const ref = useRef(value);
@@ -460,7 +466,7 @@ export function EditorConfigurableTable<TRow>({
           {/* Sticky header strip — outside overflow-x so vertical stickiness works */}
           <div className={HEADER_BAR_CLASS}>
             {pinnedSpecs.length > 0 ? (
-              <div className="shrink-0 bg-content1" style={leftStyle}>
+              <div className={FREEZE_EDGE_LEFT_CLASS} style={leftStyle}>
                 <table
                   ref={leftHeadTableRef}
                   className={TABLE_CLASS}
@@ -495,7 +501,7 @@ export function EditorConfigurableTable<TRow>({
               )}
             </div>
 
-            <div className="shrink-0 bg-content1" style={rightStyle}>
+            <div className={FREEZE_EDGE_RIGHT_CLASS} style={rightStyle}>
               <table
                 ref={rightHeadTableRef}
                 className={TABLE_CLASS}
@@ -514,7 +520,7 @@ export function EditorConfigurableTable<TRow>({
           {/* Body strip */}
           <div className="flex w-full min-w-0 items-start">
             {pinnedSpecs.length > 0 ? (
-              <div className="shrink-0 bg-content1" style={leftStyle}>
+              <div className={FREEZE_EDGE_LEFT_CLASS} style={leftStyle}>
                 <table
                   ref={leftBodyTableRef}
                   className={TABLE_CLASS}
@@ -555,7 +561,7 @@ export function EditorConfigurableTable<TRow>({
               )}
             </div>
 
-            <div className="shrink-0 bg-content1" style={rightStyle}>
+            <div className={FREEZE_EDGE_RIGHT_CLASS} style={rightStyle}>
               <table
                 ref={rightBodyTableRef}
                 className={TABLE_CLASS}
