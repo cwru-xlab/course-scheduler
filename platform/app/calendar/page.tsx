@@ -42,7 +42,9 @@ import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 
 import { PageHeader } from "@/components/layout/PageHeader";
+import { useSetStatusBarContent } from "@/components/GlobalStatusBar";
 import { MultiSelect } from "@/components/scheduler/MultiSelect";
+import { appToolbarShellClass, appNavLinkClass } from "@/lib/ui/appChromeStyles";
 import { TagInput } from "@/components/scheduler/TagInput";
 import { ViewportModal } from "@/components/scheduler/ViewportModal";
 import {
@@ -50,7 +52,6 @@ import {
   editorToolbarBtnPrimary,
   editorToolbarBtnSecondary,
   editorToolbarDivider,
-  editorInfoStripClass,
   editorFilterBtnClass,
   editorFilterClearBtnClass,
 } from "@/components/scheduler/editors/editorToolbarStyles";
@@ -2666,6 +2667,65 @@ type PatternDayApplyRow = {
     return changed && saveableStatus;
   }, [assignmentsBySection, baselineAssignments, dragFeedback.status]);
 
+  const setStatusBarContent = useSetStatusBarContent();
+  useEffect(() => {
+    if (!setStatusBarContent) return;
+    const scheduleCreatedAt = displayedScheduleCreatedAtRef.current;
+    const dataRev = displayedDataRevision ?? sharedScheduleMeta.dataRevision;
+    const viewPredatesDataEdit =
+      !!scheduleCreatedAt &&
+      !!dataRev &&
+      !Number.isNaN(new Date(dataRev.lastModifiedAt).getTime()) &&
+      !Number.isNaN(new Date(scheduleCreatedAt).getTime()) &&
+      new Date(dataRev.lastModifiedAt).getTime() > new Date(scheduleCreatedAt).getTime();
+    setStatusBarContent(
+      <div className="flex flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+          {dataRev ? (
+            <span>
+              Data edited{dataRev.lastModifiedByName ? ` by ${dataRev.lastModifiedByName}` : ""}{" "}
+              at{" "}
+              {new Date(dataRev.lastModifiedAt).toLocaleString(undefined, {
+                dateStyle: "medium",
+                timeStyle: "short",
+              })}
+            </span>
+          ) : null}
+          {scheduleCreatedAt ? (
+            <>
+              <span className="hidden sm:inline text-slate-300" aria-hidden>
+                •
+              </span>
+              <span>
+                Last solved at{" "}
+                {new Date(scheduleCreatedAt).toLocaleString(undefined, {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })}
+              </span>
+            </>
+          ) : null}
+          {viewPredatesDataEdit ? (
+            <>
+              <span className="hidden sm:inline text-slate-300" aria-hidden>
+                •
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
+                View predates latest data edit — rerun the solver to refresh
+              </span>
+            </>
+          ) : null}
+        </div>
+        {hasValidUnsavedEdit && (
+          <p className="text-[11px] font-semibold text-emerald-700">
+            Unsaved valid edits are ready to sync.
+          </p>
+        )}
+      </div>,
+    );
+    return () => { setStatusBarContent(null); };
+  }, [setStatusBarContent, displayedDataRevision, sharedScheduleMeta.dataRevision, hasValidUnsavedEdit]);
+
   // React to solver runs published by other live users. On first poll we adopt
   // the current revision as a baseline so we only react to runs that happen
   // while this user is present. Newer revisions auto-apply when the page is
@@ -4652,61 +4712,6 @@ type PatternDayApplyRow = {
           title="Schedule Output Calendar"
           subtitle="Click through Monday–Friday to view scheduled sections."
         />
-        {(() => {
-          const scheduleCreatedAt = displayedScheduleCreatedAtRef.current;
-          const dataRev = displayedDataRevision ?? sharedScheduleMeta.dataRevision;
-          const viewPredatesDataEdit =
-            !!scheduleCreatedAt &&
-            !!dataRev &&
-            !Number.isNaN(new Date(dataRev.lastModifiedAt).getTime()) &&
-            !Number.isNaN(new Date(scheduleCreatedAt).getTime()) &&
-            new Date(dataRev.lastModifiedAt).getTime() > new Date(scheduleCreatedAt).getTime();
-          return (
-            <div className={editorInfoStripClass}>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-                {dataRev ? (
-                  <span>
-                    Data edited{dataRev.lastModifiedByName ? ` by ${dataRev.lastModifiedByName}` : ""}{" "}
-                    at{" "}
-                    {new Date(dataRev.lastModifiedAt).toLocaleString(undefined, {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })}
-                  </span>
-                ) : null}
-                {scheduleCreatedAt ? (
-                  <>
-                    <span className="hidden sm:inline text-slate-300" aria-hidden>
-                      •
-                    </span>
-                    <span>
-                      Last solved at{" "}
-                      {new Date(scheduleCreatedAt).toLocaleString(undefined, {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      })}
-                    </span>
-                  </>
-                ) : null}
-                {viewPredatesDataEdit ? (
-                  <>
-                    <span className="hidden sm:inline text-slate-300" aria-hidden>
-                      •
-                    </span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
-                      View predates latest data edit — rerun the solver to refresh
-                    </span>
-                  </>
-                ) : null}
-              </div>
-              {hasValidUnsavedEdit && (
-                <p className="text-[11px] font-semibold text-emerald-700">
-                  Unsaved valid edits are ready to sync.
-                </p>
-              )}
-            </div>
-          );
-        })()}
       </div>
 
       {backendSaveMessage && (
@@ -4762,27 +4767,18 @@ type PatternDayApplyRow = {
 
       {/* Day selector */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-      <div className="inline-flex items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-          <span className="text-[10px] font-bold text-slate-400 uppercase px-2 tracking-widest">
-            Day:
-          </span>
+      <nav aria-label="Calendar days" className={appToolbarShellClass}>
           {DAYS.map((d) => (
             <button
               key={d}
+              type="button"
               onClick={() => setSelectedDay(d)}
-              className={clsx(
-                "px-3 py-1.5 rounded-lg border text-xs font-bold whitespace-nowrap transition-colors",
-                selectedDay === d
-                  ? "bg-[#137fec]/10 border-[#137fec]/20 text-[#137fec]"
-                  : "bg-slate-50 border-slate-200 text-slate-600 hover:text-[#137fec] hover:bg-slate-100",
-              )}
+              className={`${appNavLinkClass(selectedDay === d)} whitespace-nowrap`}
             >
               {d}
             </button>
           ))}
-        </div>
-      </div>
+        </nav>
         <div className={editorToolbarShellClass}>
               {isMySolverRun ? (
                 <Button
@@ -4881,7 +4877,8 @@ type PatternDayApplyRow = {
       </div>
 
       {/* Search, filters, colors, crosslist, add section */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="rounded-xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] overflow-hidden">
+      <div className="flex flex-wrap items-center gap-2 p-3">
         <Input
           value={searchQuery}
           onValueChange={setSearchQuery}
@@ -5859,6 +5856,7 @@ type PatternDayApplyRow = {
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       {drawerRender &&

@@ -21,9 +21,6 @@ import { CheckDataButton } from "./CheckDataButton";
 import {
   editorFeedbackErrorClass,
   editorFeedbackSuccessClass,
-  editorInfoLegendClass,
-  editorInfoMetaClass,
-  editorInfoStripClass,
   editorToolbarBtnPrimary,
   editorToolbarDivider,
   editorToolbarShellClass,
@@ -44,12 +41,8 @@ type EditorPageHeaderProps = {
   data: SchedulingInput;
 };
 
-function LegendDot({ className }: { className: string }) {
-  return <span className={`inline-block size-2 shrink-0 rounded-full ${className}`} aria-hidden />;
-}
-
 export function EditorPageHeader({ current, title, subtitle, data }: EditorPageHeaderProps) {
-  const { saveToBackend, isSaving, saveFeedback, autoSaveEnabled, autoRefreshEnabled } =
+  const { saveToBackend, isSaving, saveFeedback } =
     useSchedulingData();
   const [spreadsheetFeedback, setSpreadsheetFeedback] = useState<SpreadsheetFeedback | null>(
     null,
@@ -93,26 +86,6 @@ export function EditorPageHeader({ current, title, subtitle, data }: EditorPageH
       {solverError ? (
         <p className={editorFeedbackErrorClass}>{solverError}</p>
       ) : null}
-
-      <div className={editorInfoStripClass}>
-        <div className={editorInfoLegendClass}>
-          <span className="inline-flex items-center gap-1.5">
-            <LegendDot className="bg-emerald-500" />
-            Your recent saves
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <LegendDot className="bg-blue-500" />
-            Server updates
-          </span>
-        </div>
-        <p className={editorInfoMetaClass}>
-          <span className="font-medium text-slate-600">Auto-save</span>{" "}
-          {autoSaveEnabled ? "on" : "off"}
-          <span className="mx-2 text-slate-300">·</span>
-          <span className="font-medium text-slate-600">Auto-refresh</span>{" "}
-          {autoRefreshEnabled ? "on" : "off"}
-        </p>
-      </div>
 
       {spreadsheetFeedback?.type === "success" && (
         <div className={editorFeedbackSuccessClass} role="status">
