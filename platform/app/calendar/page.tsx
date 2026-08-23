@@ -40,11 +40,13 @@ import { createPortal } from "react-dom";
 
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@heroui/popover";
 
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useSetStatusBarContent } from "@/components/GlobalStatusBar";
 import { MultiSelect } from "@/components/scheduler/MultiSelect";
 import { appToolbarShellClass, appNavLinkClass } from "@/lib/ui/appChromeStyles";
+import { navbarPopoverProps, toolbarChipPopoverChipClass, toolbarChipPopoverContentClass, toolbarChipPopoverGridClass, toolbarChipPopoverGridStyle } from "@/lib/ui/navbarPopoverProps";
 import { TagInput } from "@/components/scheduler/TagInput";
 import { ViewportModal } from "@/components/scheduler/ViewportModal";
 import {
@@ -4915,107 +4917,141 @@ type PatternDayApplyRow = {
         {departmentColorLegend.length > 0 && (
           <>
             <span className="mx-0.5 hidden h-5 w-px shrink-0 bg-slate-200 sm:block" aria-hidden />
-            <button
-              type="button"
-              onClick={() => setColorsExpanded((v) => !v)}
-              aria-expanded={colorsExpanded}
-              className="inline-flex items-center gap-1.5 h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            <Popover
+              isOpen={colorsExpanded}
+              onOpenChange={(open) => {
+                setColorsExpanded(open);
+                if (!open) setHoveredDepartmentKey(null);
+              }}
+              placement="bottom-start"
+              {...navbarPopoverProps}
             >
-              <Palette className="size-3.5 text-slate-400" aria-hidden />
-              <span className="uppercase tracking-wider text-[10px] text-slate-500">Colors</span>
-              {selectedLegendDepartmentKeys.length > 0 ? (
-                <span className="text-slate-400">{selectedLegendDepartmentKeys.length}/{departmentColorLegend.length}</span>
-              ) : (
-                <span className="text-slate-400">{departmentColorLegend.length}</span>
-              )}
-              <ChevronDown
-                className={clsx(
-                  "size-3.5 text-slate-400 transition-transform",
-                  colorsExpanded && "rotate-180",
-                )}
-                aria-hidden
-              />
-            </button>
-            {colorsExpanded && (
-              <>
-                {departmentColorLegend.map((item) => {
-                  const isActive = selectedLegendDepartmentKeys.includes(item.colorKey);
-                  const hasFilter = selectedLegendDepartmentKeys.length > 0;
-                  return (
-                    <button
-                      key={item.colorKey}
-                      type="button"
-                      role="checkbox"
-                      aria-checked={isActive}
-                      onMouseEnter={() => setHoveredDepartmentKey(item.colorKey)}
-                      onMouseLeave={() => setHoveredDepartmentKey((prev) => (prev === item.colorKey ? null : prev))}
-                      onClick={() => {
-                        setSelectedLegendDepartmentKeys((prev) =>
-                          prev.includes(item.colorKey)
-                            ? prev.filter((key) => key !== item.colorKey)
-                            : [...prev, item.colorKey],
-                        );
-                      }}
-                      className={clsx(
-                        "inline-flex h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-2 text-[10px] font-medium leading-none transition-colors",
-                        isActive
-                          ? "border-sky-200/90 bg-sky-50 text-weatherhead-primary"
-                          : "border-slate-200/80 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50",
-                      )}
-                    >
-                      <span
-                        className="h-2.5 w-4 shrink-0 rounded border-l-[2px] border border-slate-300/70"
-                        style={{
-                          backgroundColor: item.swatch.cardBg,
-                          backgroundImage: item.swatch.cardPattern,
-                          borderLeftColor: item.swatch.cardBorder,
+              <PopoverTrigger>
+                <button
+                  type="button"
+                  aria-expanded={colorsExpanded}
+                  className="inline-flex items-center gap-1.5 h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  <Palette className="size-3.5 text-slate-400" aria-hidden />
+                  <span className="uppercase tracking-wider text-[10px] text-slate-500">Colors</span>
+                  {selectedLegendDepartmentKeys.length > 0 ? (
+                    <span className="text-slate-400">{selectedLegendDepartmentKeys.length}/{departmentColorLegend.length}</span>
+                  ) : (
+                    <span className="text-slate-400">{departmentColorLegend.length}</span>
+                  )}
+                  <ChevronDown
+                    className={clsx(
+                      "size-3.5 text-slate-400 transition-transform",
+                      colorsExpanded && "rotate-180",
+                    )}
+                    aria-hidden
+                  />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className={toolbarChipPopoverContentClass}>
+                <div
+                  className={clsx(toolbarChipPopoverGridClass, "p-3")}
+                  style={toolbarChipPopoverGridStyle(departmentColorLegend.length)}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  {departmentColorLegend.map((item) => {
+                    const isActive = selectedLegendDepartmentKeys.includes(item.colorKey);
+                    return (
+                      <button
+                        key={item.colorKey}
+                        type="button"
+                        role="checkbox"
+                        aria-checked={isActive}
+                        onMouseEnter={() => setHoveredDepartmentKey(item.colorKey)}
+                        onMouseLeave={() => setHoveredDepartmentKey((prev) => (prev === item.colorKey ? null : prev))}
+                        onClick={() => {
+                          setSelectedLegendDepartmentKeys((prev) =>
+                            prev.includes(item.colorKey)
+                              ? prev.filter((key) => key !== item.colorKey)
+                              : [...prev, item.colorKey],
+                          );
                         }}
-                        aria-hidden
-                      />
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </>
-            )}
+                        className={clsx(
+                          toolbarChipPopoverChipClass,
+                          isActive
+                            ? "border-sky-200/90 bg-sky-50 text-weatherhead-primary"
+                            : "border-slate-200/80 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50",
+                        )}
+                      >
+                        <span
+                          className="h-2.5 w-4 shrink-0 rounded border-l-[2px] border border-slate-300/70"
+                          style={{
+                            backgroundColor: item.swatch.cardBg,
+                            backgroundImage: item.swatch.cardPattern,
+                            borderLeftColor: item.swatch.cardBorder,
+                          }}
+                          aria-hidden
+                        />
+                        <span className="truncate">{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
           </>
         )}
         {crosslistGroupLegend.length > 0 && (
           <>
             <span className="mx-0.5 hidden h-5 w-px shrink-0 bg-slate-200 sm:block" aria-hidden />
-            <button
-              type="button"
-              onClick={() => setCrosslistExpanded((v) => !v)}
-              aria-expanded={crosslistExpanded}
-              className="inline-flex items-center gap-1.5 h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            <Popover
+              isOpen={crosslistExpanded}
+              onOpenChange={setCrosslistExpanded}
+              placement="bottom-start"
+              {...navbarPopoverProps}
             >
-              <Link2 className="size-3.5 text-slate-400" aria-hidden />
-              <span className="uppercase tracking-wider text-[10px] text-slate-500">Crosslist</span>
-              <span className="text-slate-400">{crosslistGroupLegend.length}</span>
-              <ChevronDown
-                className={clsx(
-                  "size-3.5 text-slate-400 transition-transform",
-                  crosslistExpanded && "rotate-180",
-                )}
-                aria-hidden
-              />
-            </button>
-            {crosslistExpanded && (
-              <>
-                {crosslistGroupLegend.map((item) => (
-                  <button
-                    key={item.groupId}
-                    type="button"
-                    onClick={() => openCrosslistGroupPicker(item.groupId, item.members)}
-                    className="inline-flex h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-slate-200/80 bg-white px-2 text-[10px] font-medium leading-none text-slate-500 transition-colors hover:border-slate-300 hover:bg-slate-50"
-                  >
-                    <CrosslistLegendSwatch swatch={item.swatch} />
-                    {item.groupId}
-                    <span className="text-slate-400">({item.members.length})</span>
-                  </button>
-                ))}
-              </>
-            )}
+              <PopoverTrigger>
+                <button
+                  type="button"
+                  aria-expanded={crosslistExpanded}
+                  className="inline-flex items-center gap-1.5 h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  <Link2 className="size-3.5 text-slate-400" aria-hidden />
+                  <span className="uppercase tracking-wider text-[10px] text-slate-500">Crosslist</span>
+                  <span className="text-slate-400">{crosslistGroupLegend.length}</span>
+                  <ChevronDown
+                    className={clsx(
+                      "size-3.5 text-slate-400 transition-transform",
+                      crosslistExpanded && "rotate-180",
+                    )}
+                    aria-hidden
+                  />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className={toolbarChipPopoverContentClass}>
+                <div
+                  className={clsx(toolbarChipPopoverGridClass, "p-3")}
+                  style={toolbarChipPopoverGridStyle(crosslistGroupLegend.length)}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  {crosslistGroupLegend.map((item) => (
+                    <button
+                      key={item.groupId}
+                      type="button"
+                      onClick={() => {
+                        setCrosslistExpanded(false);
+                        openCrosslistGroupPicker(item.groupId, item.members);
+                      }}
+                      className={clsx(
+                        toolbarChipPopoverChipClass,
+                        "border-slate-200/80 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50",
+                      )}
+                    >
+                      <CrosslistLegendSwatch swatch={item.swatch} />
+                      <span className="truncate">
+                        {item.groupId}
+                        <span className="text-slate-400"> ({item.members.length})</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
           </>
         )}
         <span className="mx-0.5 hidden h-5 w-px shrink-0 bg-slate-200 sm:block" aria-hidden />
