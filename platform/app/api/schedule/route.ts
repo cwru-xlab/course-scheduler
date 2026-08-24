@@ -11,7 +11,8 @@ import {
 } from "@/lib/solver-session";
 import { tryRecordActivity } from "@/lib/record-activity";
 import { getSchedulingDataRevision, tryRecordSchedulingDataRevision } from "@/lib/scheduling/dataRevisionStore";
-import { fetchSolver, solverErrorsFromBody } from "@/lib/api/solverFetch";
+import { fetchSolverLong } from "@/lib/api/solverFetchLong";
+import { solverErrorsFromBody } from "@/lib/api/solverFetch";
 import { enrichSolverErrors, normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
 import { sectionLocksFromInput } from "@/lib/scheduling/sectionLocks";
 import { publishSharedSchedule } from "@/lib/shared-schedule";
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
       input = mockSchedulingInput;
     }
 
-    const { response, data } = await fetchSolver(
+    const { response, data } = await fetchSolverLong(
       "/solve",
       {
         method: "POST",

@@ -1,16 +1,5 @@
-import { Agent, fetch as undiciFetch } from "undici";
-
-import { SOLVER_API_TIMEOUT_MS } from "@/lib/solver-timeouts";
-
 const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:5001";
 const SOLVER_FALLBACK_URLS = ["http://localhost:5001", "http://localhost:8000"];
-
-/** Node's fetch defaults to a 300s headers timeout; solver runs can exceed that. */
-const solverFetchDispatcher = new Agent({
-  headersTimeout: SOLVER_API_TIMEOUT_MS,
-  bodyTimeout: SOLVER_API_TIMEOUT_MS,
-  connectTimeout: 30_000,
-});
 
 export type SolverJsonBody = Record<string, unknown> & {
   status?: string;
@@ -84,10 +73,9 @@ export async function fetchSolver(
           : null;
 
       try {
-        const response = await undiciFetch(`${baseUrl}${path}`, {
+        const response = await fetch(`${baseUrl}${path}`, {
           ...init,
           signal: controller.signal,
-          dispatcher: solverFetchDispatcher,
         });
 
         if (timeoutId) clearTimeout(timeoutId);
