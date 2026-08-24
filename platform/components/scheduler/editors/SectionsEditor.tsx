@@ -15,17 +15,16 @@ import {
   type EditorFiltersState,
 } from "./editorFilters";
 import { sortDefsFromFilterDefs, type EditorColumnSortDef } from "./editorSort";
-import { SECTION_COLUMN_SPECS } from "./editorColumnSpecs";
+import { SECTION_COLUMN_PRESETS, SECTION_COLUMN_SPECS } from "./editorColumnSpecs";
 import { useEditorActions } from "./EditorActionProvider";
 import { editorRowKey } from "./editorRowHighlight";
 import { SectionEditModal } from "./modals/SectionEditModal";
 
 import { ReadOnlyIdCell } from "./ReadOnlyIdCell";
 import { EditableCell } from "../EditableCell";
-import { EditableArrayCell } from "../EditableArrayCell";
 import { EditableSelectCell } from "../EditableSelectCell";
+import { CompactChipSelect } from "../CompactChipSelect";
 import { MultiSelect } from "../MultiSelect";
-import { TagInput } from "../TagInput";
 import { RowNotesButton } from "../RowNotesButton";
 
 import type { Room, Section, SectionState } from "@/lib/scheduling/types";
@@ -90,7 +89,11 @@ export const SectionsEditor = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<EditorFiltersState>({});
   const [hideArchived, setHideArchived] = useHideArchivedSections();
-  const columnVisibility = useEditorColumnVisibility("sections", SECTION_COLUMN_SPECS);
+  const columnVisibility = useEditorColumnVisibility(
+    "sections",
+    SECTION_COLUMN_SPECS,
+    SECTION_COLUMN_PRESETS,
+  );
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<Section | null>(null);
   const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
@@ -163,6 +166,14 @@ export const SectionsEditor = ({
     }
     return Array.from(set).sort();
   }, [rooms, sections]);
+
+  const tagSuggestions = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of sections) {
+      for (const t of s.tags) set.add(t);
+    }
+    return Array.from(set).sort();
+  }, [sections]);
 
   const sectionFilterDefs = useMemo((): EditorColumnFilterDef<SectionRow>[] => [
     {
@@ -385,11 +396,12 @@ export const SectionsEditor = ({
         );
       case "room_req":
         return (
-          <TagInput
+          <CompactChipSelect
             value={section.room_requirements}
             onChange={(v) => updateSection(idx, "room_requirements", v)}
             suggestions={featureSuggestions}
             placeholder="features"
+            ariaLabel="Room requirements"
           />
         );
       case "crosslist":
@@ -403,11 +415,12 @@ export const SectionsEditor = ({
         );
       case "tags":
         return (
-          <EditableArrayCell
+          <CompactChipSelect
             value={section.tags}
             onChange={(v) => updateSection(idx, "tags", v)}
+            suggestions={tagSuggestions}
             placeholder="tags"
-            nowrapPlaceholder
+            ariaLabel="Tags"
           />
         );
       default:
@@ -449,6 +462,8 @@ export const SectionsEditor = ({
             onToggle={columnVisibility.toggleColumn}
             onShowAll={columnVisibility.showAllColumns}
             onHideAll={columnVisibility.hideAllColumns}
+            presets={columnVisibility.presets}
+            onApplyPreset={columnVisibility.applyPreset}
           />
         </div>
       }

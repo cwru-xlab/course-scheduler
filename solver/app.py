@@ -39,6 +39,9 @@ from spreadsheet_io.spreadsheet_utils import (
     parse_nested_list_cell,
 )
 
+# CP-SAT search budget. Keep in sync with platform/lib/solver-timeouts.ts.
+SOLVER_MAX_TIME_SECONDS = 600.0
+
 # Cap infeasibility diagnosis so /solve returns before API proxies time out.
 DIAGNOSE_MAX_INSTRUCTOR_STEPS = 20
 DIAGNOSE_MAX_SECONDS = 60.0
@@ -1388,7 +1391,7 @@ def _check_feasible(
                                 )
 
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 120.0
+    solver.parameters.max_time_in_seconds = SOLVER_MAX_TIME_SECONDS
     solver.parameters.num_workers = 2
     solver.parameters.random_seed = 0
     status = solver.Solve(model)
@@ -2178,7 +2181,7 @@ def _solve_schedule(input_data: SchedulingInput):
 
     print("[solve] Model built, starting CP-SAT solver...", flush=True)
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 120.0
+    solver.parameters.max_time_in_seconds = SOLVER_MAX_TIME_SECONDS
     solver.parameters.num_workers = 2
     solver.parameters.random_seed = 0
     status = solver.Solve(model)

@@ -11,13 +11,18 @@ import {
 } from "@/lib/solver-session";
 import { tryRecordActivity } from "@/lib/record-activity";
 import { getSchedulingDataRevision, tryRecordSchedulingDataRevision } from "@/lib/scheduling/dataRevisionStore";
-import { fetchSolver, solverErrorsFromBody } from "@/lib/api/solverFetch";
+import { fetchSolverLong } from "@/lib/api/solverFetchLong";
+import { solverErrorsFromBody } from "@/lib/api/solverFetch";
 import { enrichSolverErrors, normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
 import { sectionLocksFromInput } from "@/lib/scheduling/sectionLocks";
 import { publishSharedSchedule } from "@/lib/shared-schedule";
+import {
+  SOLVER_API_TIMEOUT_MS,
+  SOLVER_ROUTE_MAX_DURATION_SEC,
+} from "@/lib/solver-timeouts";
 
-// The CP-SAT solver may take up to 120s; give extra headroom.
-export const maxDuration = 180;
+// Must exceed CP-SAT search budget (see solver-timeouts.ts).
+export const maxDuration = SOLVER_ROUTE_MAX_DURATION_SEC;
 
 export async function POST(request: NextRequest) {
   // Serialize solver runs across users: the Flask solver is single-worker
@@ -82,7 +87,7 @@ export async function POST(request: NextRequest) {
       input = mockSchedulingInput;
     }
 
-    const { response, data } = await fetchSolver(
+    const { response, data } = await fetchSolverLong(
       "/solve",
       {
         method: "POST",
@@ -92,7 +97,7 @@ export async function POST(request: NextRequest) {
           ...(removeInstructors?.length ? { remove_instructors: removeInstructors } : {}),
         }),
       },
-      { timeoutMs: 150_000, signal: started.signal },
+      { timeoutMs: SOLVER_API_TIMEOUT_MS, signal: started.signal },
     );
 
     // If cancelled while waiting, do not publish or treat as success.

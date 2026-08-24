@@ -13,12 +13,11 @@ import {
 import { Button } from "@heroui/button";
 
 import { ViewportModal } from "../ViewportModal";
-import { EditorFeedbackToast } from "./EditorFeedbackToast";
+import { useIslandNotify } from "@/components/GlobalStatusBar";
 import { editorRowKey, rowHighlightClass } from "./editorRowHighlight";
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 
 const MODAL_Z = 1060;
-const TOAST_AUTO_DISMISS_MS = 8000;
 
 type PendingDelete = {
   rowLabel: string;
@@ -45,8 +44,8 @@ export function useEditorActions(): EditorActionContextValue {
 
 export function EditorActionProvider({ children }: { children: ReactNode }) {
   const { getRowChangeKind } = useSchedulingData();
+  const { flash } = useIslandNotify();
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [highlightedRowKey, setHighlightedRowKey] = useState<string | null>(null);
   const highlightedRowKeyRef = useRef<string | null>(null);
 
@@ -54,13 +53,12 @@ export function EditorActionProvider({ children }: { children: ReactNode }) {
     highlightedRowKeyRef.current = highlightedRowKey;
   }, [highlightedRowKey]);
 
-  const showSuccess = useCallback((message: string) => {
-    setSuccessMessage(message);
-  }, []);
-
-  const clearRowHighlight = useCallback(() => {
-    setHighlightedRowKey(null);
-  }, []);
+  const showSuccess = useCallback(
+    (message: string) => {
+      flash({ tone: "success", message });
+    },
+    [flash],
+  );
 
   const confirmRowAdded = useCallback(
     (opts: { rowKey: string; message: string }) => {
@@ -106,12 +104,6 @@ export function EditorActionProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  useEffect(() => {
-    if (!successMessage) return;
-    const timer = window.setTimeout(() => setSuccessMessage(null), TOAST_AUTO_DISMISS_MS);
-    return () => window.clearTimeout(timer);
-  }, [successMessage]);
-
   const value = useMemo(
     () => ({
       requestDelete,
@@ -131,14 +123,6 @@ export function EditorActionProvider({ children }: { children: ReactNode }) {
 
   return (
     <EditorActionContext.Provider value={value}>
-      <EditorFeedbackToast
-        message={successMessage}
-        variant="success"
-        onDismiss={() => {
-          setSuccessMessage(null);
-          clearRowHighlight();
-        }}
-      />
       <ViewportModal
         isOpen={Boolean(pendingDelete)}
         onClose={() => setPendingDelete(null)}

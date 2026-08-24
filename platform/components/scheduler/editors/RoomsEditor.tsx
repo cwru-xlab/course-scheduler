@@ -22,7 +22,7 @@ import { RoomEditModal } from "./modals/RoomEditModal";
 
 import { ReadOnlyIdCell } from "./ReadOnlyIdCell";
 import { EditableCell } from "../EditableCell";
-import { TagInput } from "../TagInput";
+import { CompactChipSelect } from "../CompactChipSelect";
 import { RowNotesButton } from "../RowNotesButton";
 
 import type { Room, Section } from "@/lib/scheduling/types";
@@ -173,11 +173,12 @@ export const RoomsEditor = ({ rooms, sections, onUpdate }: RoomsEditorProps) => 
         );
       case "features":
         return (
-          <TagInput
+          <CompactChipSelect
             value={room.features}
             onChange={(v) => updateRoom(idx, "features", v)}
             suggestions={featureSuggestions}
-            placeholder="projector, etc"
+            placeholder="features"
+            ariaLabel="Features"
           />
         );
       default:

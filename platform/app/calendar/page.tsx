@@ -1,10 +1,10 @@
 "use client";
 
 import clsx from "clsx";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
   ArrowLeft,
+  ChevronDown,
   CloudBackup,
   FileSpreadsheet,
   Filter,
@@ -37,8 +37,24 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { Button } from "@heroui/button";
+import { Input } from "@heroui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@heroui/popover";
+
+import { PageHeader } from "@/components/layout/PageHeader";
+import { useIslandNotify, useSetStatusBarContent } from "@/components/GlobalStatusBar";
 import { MultiSelect } from "@/components/scheduler/MultiSelect";
+import { appToolbarShellClass, appNavLinkClass } from "@/lib/ui/appChromeStyles";
+import { navbarPopoverProps, toolbarChipPopoverChipClass, toolbarChipPopoverContentClass, toolbarChipPopoverGridClass, toolbarChipPopoverGridStyle, toolbarPanelCloseOnInteractOutside, useOverlayClampedHeight } from "@/lib/ui/navbarPopoverProps";
+import { TagInput } from "@/components/scheduler/TagInput";
 import { ViewportModal } from "@/components/scheduler/ViewportModal";
+import {
+  editorToolbarShellClass,
+  editorToolbarBtnPrimary,
+  editorToolbarBtnSecondary,
+  editorToolbarDivider,
+  editorFilterClearBtnClass,
+} from "@/components/scheduler/editors/editorToolbarStyles";
 import { useAuth } from "@/lib/auth-client";
 import {
   LAST_SOLVER_RUN_STORAGE_KEY,
@@ -153,6 +169,7 @@ type RoomDto = {
   building?: string;
   room_number?: string;
   capacity?: number;
+  features?: string[];
 };
 
 type SolverDataDto = {
@@ -172,7 +189,7 @@ type SectionFormDraft = {
   expected_enrollment: number;
   enrollment_cap: number;
   allowed_meeting_patterns: string;
-  room_requirements: string;
+  room_requirements: string[];
   crosslist_group_id: string;
   tags: string;
 };
@@ -694,7 +711,7 @@ function toSectionFormDraft(section: SectionDto): SectionFormDraft {
     expected_enrollment: Number(section.expected_enrollment ?? 0),
     enrollment_cap: Number(section.enrollment_cap ?? 0),
     allowed_meeting_patterns: (section.allowed_meeting_patterns ?? []).join(", "),
-    room_requirements: (section.room_requirements ?? []).join(", "),
+    room_requirements: section.room_requirements ?? [],
     crosslist_group_id: String(section.crosslist_group_id ?? "").trim(),
     tags: (section.tags ?? []).join(", "),
   };
@@ -1043,101 +1060,12 @@ function computeCalendarDayConflicts(events: CalendarEvent[]): {
   return { sectionIds, hasRoomConflict, hasInstructorConflict };
 }
 
-/** Fixed below the navbar so valid/invalid drag messages stay visible while the calendar scrolls. */
-function CalendarDragFeedbackToastPortal({
-  mountedOn,
-  dragFeedback,
-  onDismiss,
-  action,
-}: {
-  mountedOn: HTMLElement | null;
-  dragFeedback: CalendarDragFeedbackState;
-  onDismiss: () => void;
-  action?: { label: string; onClick: () => void } | null;
-}) {
-  if (!mountedOn) return null;
-  const line = dragFeedback.message;
-  const isError = dragFeedback.status === "invalid";
-  const isWarning = dragFeedback.status === "warning";
-  const isValid = dragFeedback.status === "valid";
-  const toastKey = `${dragFeedback.status}\u001f${dragFeedback.message ?? ""}`;
-
-  return createPortal(
-    <AnimatePresence>
-      {line ? (
-        <motion.div
-          key={toastKey}
-          role="status"
-          aria-live="polite"
-          className="pointer-events-none fixed inset-x-0 top-16 z-[45] flex justify-center px-4 sm:px-6 pt-2"
-          initial={{ opacity: 0, y: -12 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -12 }}
-          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <div
-            className={clsx(
-              "pointer-events-auto flex w-full max-w-3xl items-start gap-2 rounded-xl border px-4 py-3 text-sm font-medium shadow-lg backdrop-blur-md",
-              isError &&
-                "border-red-200 bg-red-50/95 text-red-800 dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-200",
-              isWarning &&
-                "border-amber-200 bg-amber-50/95 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-100",
-              isValid &&
-                "border-emerald-200 bg-emerald-50/95 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-100",
-              !isError &&
-                !isWarning &&
-                !isValid &&
-                "border-slate-200 bg-white/95 text-slate-800 dark:border-default-200 dark:bg-default-100/95 dark:text-foreground",
-            )}
-          >
-            <span className="min-w-0 flex-1 leading-snug">{line}</span>
-            {action ? (
-              <button
-                type="button"
-                className={clsx(
-                  "shrink-0 rounded-md border px-2.5 py-1 text-xs font-bold transition-colors",
-                  isWarning
-                    ? "border-amber-300 bg-amber-100/70 text-amber-900 hover:bg-amber-200/70 dark:border-amber-500/50 dark:bg-amber-500/20 dark:text-amber-100 dark:hover:bg-amber-500/30"
-                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-default-200 dark:bg-default-100 dark:text-foreground",
-                )}
-                onClick={action.onClick}
-              >
-                {action.label}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className={clsx(
-                "shrink-0 rounded-md p-0.5",
-                isError &&
-                  "text-red-700/80 hover:bg-red-100/80 hover:text-red-900 dark:text-red-200 dark:hover:bg-red-500/20",
-                isWarning &&
-                  "text-amber-700/80 hover:bg-amber-100/80 hover:text-amber-900 dark:text-amber-200 dark:hover:bg-amber-500/20",
-                isValid &&
-                  "text-emerald-700/80 hover:bg-emerald-100/80 hover:text-emerald-900 dark:text-emerald-200 dark:hover:bg-emerald-500/20",
-                !isError &&
-                  !isWarning &&
-                  !isValid &&
-                  "text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-default-400 dark:hover:bg-default-200/40",
-              )}
-              onClick={onDismiss}
-              aria-label="Dismiss message"
-            >
-              <X className="size-4" aria-hidden />
-            </button>
-          </div>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>,
-    mountedOn,
-  );
-}
-
 export default function CalendarPage() {
   type AssignmentMap = CalendarAssignmentMap;
 
   const router = useRouter();
   const { user } = useAuth();
+  const { flash } = useIslandNotify();
   const {
     begin: beginSolverProgress,
     succeed: succeedSolverProgress,
@@ -1385,8 +1313,16 @@ type PatternDayApplyRow = {
   } | null>(null);
   const [selectedDepartmentKeys, setSelectedDepartmentKeys] = useState<string[]>([]);
   const [selectedInstructorIds, setSelectedInstructorIds] = useState<string[]>([]);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const filtersPanelRef = useOverlayClampedHeight<HTMLDivElement>(filtersExpanded);
+  const activeFilterCount = selectedDepartmentKeys.length + selectedInstructorIds.length;
+  const [searchQuery, setSearchQuery] = useState("");
   const [hoveredDepartmentKey, setHoveredDepartmentKey] = useState<string | null>(null);
   const [selectedLegendDepartmentKeys, setSelectedLegendDepartmentKeys] = useState<string[]>([]);
+  const [colorsExpanded, setColorsExpanded] = useState(false);
+  const [crosslistExpanded, setCrosslistExpanded] = useState(false);
+  const colorsGridRef = useOverlayClampedHeight<HTMLDivElement>(colorsExpanded);
+  const crosslistGridRef = useOverlayClampedHeight<HTMLDivElement>(crosslistExpanded);
   const [crosslistPickerModal, setCrosslistPickerModal] = useState<{
     crosslistGroupId: string;
     memberSections: SectionDto[];
@@ -1441,7 +1377,6 @@ type PatternDayApplyRow = {
     courseLabel: string;
     dayTimes: { day: Day; timeLabel: string }[];
   } | null>(null);
-  const [toolbarActionHint, setToolbarActionHint] = useState<string | null>(null);
   // Keep multiple pinned highlights; hovering adds a temporary highlight.
   const activeLegendDepartmentKeys = useMemo(() => {
     const keys = new Set(selectedLegendDepartmentKeys);
@@ -1735,6 +1670,28 @@ type PatternDayApplyRow = {
     return map;
   }, [data]);
 
+  const hasSearch = searchQuery.trim().length > 0;
+  const matchingSectionIds = useMemo(() => {
+    if (!hasSearch) return null;
+    const q = searchQuery.toLowerCase().trim();
+    const matched = new Set<string>();
+    for (const section of data?.sections ?? []) {
+      const fields = [
+        section.id,
+        String(section.course_id),
+        section.department ?? "",
+        section.section_code,
+        section.section_number ?? "",
+        instructorById.get(section.instructor_id)?.name ?? "",
+        section.instructor_id,
+      ];
+      if (fields.some((f) => f.toLowerCase().includes(q))) {
+        matched.add(section.id);
+      }
+    }
+    return matched;
+  }, [hasSearch, searchQuery, data?.sections, instructorById]);
+
   const sectionById = useMemo(() => {
     const map = new Map<string, SectionDto>();
     data?.sections.forEach((section) => map.set(section.id, section));
@@ -1907,6 +1864,18 @@ type PatternDayApplyRow = {
       .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
   }, [data, instructorById]);
 
+  const featureSuggestions = useMemo(() => {
+    if (!data) return [];
+    const set = new Set<string>();
+    for (const room of data.rooms) {
+      for (const f of room.features ?? []) set.add(f);
+    }
+    for (const s of data.sections) {
+      for (const r of s.room_requirements ?? []) set.add(r);
+    }
+    return Array.from(set).sort();
+  }, [data]);
+
   const updateSectionModalDraft = useCallback(
     <K extends keyof SectionFormDraft>(field: K, value: SectionFormDraft[K]) => {
       setSectionModal((prev) => (prev ? { ...prev, draft: { ...prev.draft, [field]: value } } : prev));
@@ -1928,7 +1897,7 @@ type PatternDayApplyRow = {
         expected_enrollment: 20,
         enrollment_cap: 30,
         allowed_meeting_patterns: "",
-        room_requirements: "",
+        room_requirements: [],
         crosslist_group_id: "",
         tags: "",
       },
@@ -2610,6 +2579,60 @@ type PatternDayApplyRow = {
       dragFeedback.status === "valid" || dragFeedback.status === "warning";
     return changed && saveableStatus;
   }, [assignmentsBySection, baselineAssignments, dragFeedback.status]);
+
+  const setStatusBarContent = useSetStatusBarContent();
+  useEffect(() => {
+    if (!setStatusBarContent) return;
+    const scheduleCreatedAt = displayedScheduleCreatedAtRef.current;
+    const dataRev = displayedDataRevision ?? sharedScheduleMeta.dataRevision;
+    const viewPredatesDataEdit =
+      !!scheduleCreatedAt &&
+      !!dataRev &&
+      !Number.isNaN(new Date(dataRev.lastModifiedAt).getTime()) &&
+      !Number.isNaN(new Date(scheduleCreatedAt).getTime()) &&
+      new Date(dataRev.lastModifiedAt).getTime() > new Date(scheduleCreatedAt).getTime();
+    setStatusBarContent(
+      <div className="flex flex-col items-center justify-center gap-1 text-center">
+        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+          {dataRev ? (
+            <span>
+              Data edited{dataRev.lastModifiedByName ? ` by ${dataRev.lastModifiedByName}` : ""}{" "}
+              at{" "}
+              {new Date(dataRev.lastModifiedAt).toLocaleString(undefined, {
+                dateStyle: "medium",
+                timeStyle: "short",
+              })}
+            </span>
+          ) : null}
+          {scheduleCreatedAt ? (
+            <>
+              <span className="hidden sm:inline text-slate-300" aria-hidden>
+                •
+              </span>
+              <span>
+                Last solved at{" "}
+                {new Date(scheduleCreatedAt).toLocaleString(undefined, {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })}
+              </span>
+            </>
+          ) : null}
+        </div>
+        {viewPredatesDataEdit ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
+            View predates latest data edit — rerun the solver to refresh
+          </span>
+        ) : null}
+        {hasValidUnsavedEdit && (
+          <p className="text-[11px] font-semibold text-emerald-700">
+            Unsaved valid edits are ready to sync.
+          </p>
+        )}
+      </div>,
+    );
+    return () => { setStatusBarContent(null); };
+  }, [setStatusBarContent, displayedDataRevision, sharedScheduleMeta.dataRevision, hasValidUnsavedEdit]);
 
   // React to solver runs published by other live users. On first poll we adopt
   // the current revision as a baseline so we only react to runs that happen
@@ -3419,7 +3442,7 @@ type PatternDayApplyRow = {
         setPatternApplyPrompt(null);
       }
       const multiDayNotice = canOfferPatternApply
-        ? `Only ${selectedDay} was updated. Use "Apply to all pattern days" to extend this time to its other days (${otherPatternDays.join(", ")}).`
+        ? `Only ${selectedDay} was updated. Other pattern days: ${otherPatternDays.join(", ")}.`
         : `Only ${selectedDay} was updated. This section uses a multi-day pattern — its other days are unchanged. Adjust them from the schedule table or re-place per day.`;
 
       // Warnings (room overlap, instructor double-booking) keep the applied move
@@ -3637,6 +3660,50 @@ type PatternDayApplyRow = {
       rows,
     });
   }, [assignmentsBySection, buildPatternApplyRows, patternApplyPrompt, sectionById, timeslotById]);
+
+  // Push calendar transient messages into the Dynamic Island.
+  useEffect(() => {
+    if (!dragFeedback.message) return;
+    const tone =
+      dragFeedback.status === "invalid"
+        ? "error"
+        : dragFeedback.status === "warning"
+          ? "warn"
+          : dragFeedback.status === "valid"
+            ? "success"
+            : "neutral";
+    flash({
+      tone,
+      message: dragFeedback.message,
+      durationMs: tone === "success" ? 2000 : 4500,
+      action:
+        patternApplyPrompt && dragFeedback.status === "warning"
+          ? {
+              label: "Apply to all pattern days",
+              onPress: () => openPatternApplyModal(),
+            }
+          : undefined,
+    });
+  }, [
+    dragFeedback.message,
+    dragFeedback.status,
+    patternApplyPrompt,
+    flash,
+    openPatternApplyModal,
+  ]);
+
+  useEffect(() => {
+    if (!backendSaveMessage) return;
+    flash({
+      tone: backendSaveMessage.type === "success" ? "success" : "error",
+      message: backendSaveMessage.text,
+    });
+  }, [backendSaveMessage, flash]);
+
+  useEffect(() => {
+    if (!solverRunError) return;
+    flash({ tone: "error", message: solverRunError, durationMs: 5000 });
+  }, [solverRunError, flash]);
 
   const togglePatternApplyRow = useCallback((day: Day) => {
     setPatternApplyModal((prev) => {
@@ -4187,7 +4254,7 @@ type PatternDayApplyRow = {
       expected_enrollment: Number(draft.expected_enrollment),
       enrollment_cap: Number(draft.enrollment_cap),
       allowed_meeting_patterns: splitCsv(draft.allowed_meeting_patterns),
-      room_requirements: splitCsv(draft.room_requirements),
+      room_requirements: draft.room_requirements,
       crosslist_group_id: draft.crosslist_group_id.trim() || null,
       tags: splitCsv(draft.tags),
       room_id: preservedRoomId || null,
@@ -4527,10 +4594,9 @@ type PatternDayApplyRow = {
     setSaveScheduleModal((prev) => ({ ...prev, isSaving: true, error: null }));
     try {
       const snapshot = await buildSnapshotFromCurrentView();
-      saveScheduleToHistory({
+      await saveScheduleToHistory({
         name: trimmedName,
         scheduleDate: saveScheduleModal.draft.scheduleDate,
-        savedBy: user?.name?.trim() || user?.email?.trim() || undefined,
         snapshot,
       });
       if (typeof window !== "undefined") {
@@ -4572,288 +4638,19 @@ type PatternDayApplyRow = {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
+    <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500">
       <CalendarHistoryNavbarPortal
         canUndo={undoStack.length > 0}
         canRedo={redoStack.length > 0}
         onUndo={handleUndo}
         onRedo={handleRedo}
       />
-      <CalendarDragFeedbackToastPortal
-        mountedOn={dragFeedbackToastMount}
-        dragFeedback={dragFeedback}
-        action={
-          patternApplyPrompt && dragFeedback.status === "warning"
-            ? { label: "Apply to all pattern days", onClick: openPatternApplyModal }
-            : null
-        }
-        onDismiss={() => {
-          setDragFeedback({ status: "neutral", message: null });
-          setConflictSectionIds(new Set());
-          setPatternApplyPrompt(null);
-        }}
-      />
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 flex-col justify-start">
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">
-            Schedule Output Calendar
-          </h1>
-          <p className="mt-1 text-base leading-6 text-slate-500">
-            Click through Monday–Friday to view scheduled sections.
-          </p>
-          {(() => {
-            const scheduleCreatedAt = displayedScheduleCreatedAtRef.current;
-            const dataRev = displayedDataRevision ?? sharedScheduleMeta.dataRevision;
-            const viewPredatesDataEdit =
-              !!scheduleCreatedAt &&
-              !!dataRev &&
-              !Number.isNaN(new Date(dataRev.lastModifiedAt).getTime()) &&
-              !Number.isNaN(new Date(scheduleCreatedAt).getTime()) &&
-              new Date(dataRev.lastModifiedAt).getTime() > new Date(scheduleCreatedAt).getTime();
-            return (
-              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
-                {dataRev ? (
-                  <span>
-                    Data edited{dataRev.lastModifiedByName ? ` by ${dataRev.lastModifiedByName}` : ""}{" "}
-                    at{" "}
-                    {new Date(dataRev.lastModifiedAt).toLocaleString(undefined, {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })}
-                  </span>
-                ) : null}
-                {scheduleCreatedAt ? (
-                  <>
-                    <span className="hidden sm:inline text-slate-300" aria-hidden>
-                      •
-                    </span>
-                    <span>
-                      Last solved at{" "}
-                      {new Date(scheduleCreatedAt).toLocaleString(undefined, {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      })}
-                    </span>
-                  </>
-                ) : null}
-                {viewPredatesDataEdit ? (
-                  <>
-                    <span className="hidden sm:inline text-slate-300" aria-hidden>
-                      •
-                    </span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
-                      View predates latest data edit — rerun the solver to refresh
-                    </span>
-                  </>
-                ) : null}
-              </div>
-            );
-          })()}
-        </div>
-        <div className="flex flex-col items-stretch gap-2 w-full md:w-auto">
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2">
-            <div
-              onMouseEnter={() =>
-                setToolbarActionHint(
-                  isMySolverRun
-                    ? "Cancel the solver run you started."
-                    : solverBusyRemote
-                      ? solverLock.startedBy
-                        ? `Solver is running (started by ${solverLock.startedBy}). Please wait.`
-                        : "Solver is running. Please wait."
-                      : "Run solver using current data and placement locks.",
-                )
-              }
-              onMouseLeave={() => setToolbarActionHint(null)}
-              onFocus={() =>
-                setToolbarActionHint(
-                  isMySolverRun
-                    ? "Cancel the solver run you started."
-                    : solverBusyRemote
-                      ? solverLock.startedBy
-                        ? `Solver is running (started by ${solverLock.startedBy}). Please wait.`
-                        : "Solver is running. Please wait."
-                      : "Run solver using current data and placement locks.",
-                )
-              }
-              onBlur={() => setToolbarActionHint(null)}
-              className="contents"
-            >
-              {isMySolverRun ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    void cancelRun().then(() => setSolverRunStatus("idle"));
-                  }}
-                  className="flex items-center justify-center rounded-lg size-10 font-bold border transition-colors bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
-                  title="Cancel solver"
-                  aria-label="Cancel solver"
-                >
-                  <XCircle className="size-4" />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={
-                    solverRunStatus === "loading" || !data || solverBusyRemote
-                  }
-                  onClick={() => void handleRunSolverFromCalendar()}
-                  className={clsx(
-                    "flex items-center justify-center rounded-lg size-10 font-bold border transition-colors",
-                    solverRunStatus !== "loading" && data && !solverBusyRemote
-                      ? "bg-[#137fec] text-white border-[#137fec] shadow-lg shadow-[#137fec]/20 hover:bg-[#0f6dca]"
-                      : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
-                  )}
-                  title={
-                    solverBusyRemote
-                      ? solverLock.startedBy
-                        ? `Solver is running (started by ${solverLock.startedBy})`
-                        : "Solver is running"
-                      : "Run the solver using backend scheduling data and locks from this page"
-                  }
-                  aria-label="Run solver"
-                >
-                  <Play className="size-4" />
-                </button>
-              )}
-            </div>
-            {!autoSaveEnabled && hasValidUnsavedEdit && (
-              <div
-                onMouseEnter={() =>
-                  setToolbarActionHint("Autosave is off — click Save to persist calendar edits.")
-                }
-                onMouseLeave={() => setToolbarActionHint(null)}
-                className="flex items-center pl-1 pr-2"
-              >
-                <button
-                  type="button"
-                  disabled={isSavingBackend}
-                  onClick={() => void handleUpdateBackend(false)}
-                  className={clsx(
-                    "flex items-center justify-center rounded-lg h-8 px-3 text-xs font-bold border transition-colors",
-                    isSavingBackend
-                      ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                      : "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100",
-                  )}
-                  title="Save valid calendar edits"
-                  aria-label="Save"
-                >
-                  <CloudBackup className="size-4 mr-1" />
-                  Save
-                </button>
-              </div>
-            )}
-            <div className="hidden lg:block h-7 w-px bg-slate-200 mx-1" />
-            <button
-              type="button"
-              onClick={openSaveScheduleModal}
-              onMouseEnter={() => setToolbarActionHint("Save this schedule snapshot to history.")}
-              onMouseLeave={() => setToolbarActionHint(null)}
-              onFocus={() => setToolbarActionHint("Save this schedule snapshot to history.")}
-              onBlur={() => setToolbarActionHint(null)}
-              className="flex items-center justify-center rounded-lg size-10 bg-indigo-50 text-indigo-800 font-bold border border-indigo-200 hover:bg-indigo-100 transition-colors"
-              title="Save this generated/edited schedule to history"
-              aria-label="Save schedule"
-            >
-              <Save className="size-4" />
-            </button>
-            <button
-              onMouseEnter={() => setToolbarActionHint("Export the visible calendar to PDF.")}
-              onMouseLeave={() => setToolbarActionHint(null)}
-              onFocus={() => setToolbarActionHint("Export the visible calendar to PDF.")}
-              onBlur={() => setToolbarActionHint(null)}
-              className="flex items-center justify-center rounded-lg size-10 bg-slate-100 text-slate-900 font-bold border border-slate-200 hover:bg-slate-200 transition-colors"
-              onClick={handleExportPdf}
-              aria-label="Export PDF"
-            >
-              <Share2 className="size-4" />
-            </button>
-            <button
-              type="button"
-              disabled={!data || isExportingRoomAssignments}
-              onClick={handleExportRoomAssignments}
-              onMouseEnter={() =>
-                setToolbarActionHint(
-                  "Download room assignments + calendar grid spreadsheet for paste into the WSOM schedule sheet.",
-                )
-              }
-              onMouseLeave={() => setToolbarActionHint(null)}
-              onFocus={() =>
-                setToolbarActionHint(
-                  "Download room assignments + calendar grid spreadsheet for paste into the WSOM schedule sheet.",
-                )
-              }
-              onBlur={() => setToolbarActionHint(null)}
-              className={clsx(
-                "flex items-center justify-center rounded-lg size-10 border transition-colors",
-                data && !isExportingRoomAssignments
-                  ? "bg-teal-50 text-teal-900 border-teal-200 hover:bg-teal-100"
-                  : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed",
-              )}
-              title="Download room assignments + calendar grid spreadsheet"
-              aria-label="Export rooms"
-            >
-              <FileSpreadsheet className="size-4 shrink-0" aria-hidden />
-            </button>
-            <div className="hidden lg:block h-7 w-px bg-slate-200 mx-1" />
-            <button
-              type="button"
-              onClick={() => setScheduleDrawerOpen(true)}
-              onMouseEnter={() => setToolbarActionHint("Open the schedule table to bulk lock/unlock sections for the solver.")}
-              onMouseLeave={() => setToolbarActionHint(null)}
-              onFocus={() => setToolbarActionHint("Open the schedule table to bulk lock/unlock sections for the solver.")}
-              onBlur={() => setToolbarActionHint(null)}
-              className="relative flex items-center justify-center rounded-lg size-10 bg-slate-100 text-slate-800 font-bold border border-slate-200 hover:bg-slate-200 transition-colors"
-              title="Open schedule table (lock sections for the solver)"
-              aria-label="Open schedule table"
-            >
-              <Table2 className="size-4" />
-              {hasAnyLock && (
-                <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold leading-4 text-center">
-                  {lockCount}
-                </span>
-              )}
-            </button>
-          </div>
-          <div className="relative h-[34px] w-full">
-          <div
-            className={clsx(
-              "rounded-lg px-3 py-2 text-xs font-semibold flex items-center transition-opacity absolute inset-0",
-              toolbarActionHint
-                ? "border border-slate-200 bg-slate-50 text-slate-700 opacity-100"
-                : "opacity-0 pointer-events-none",
-            )}
-            aria-live="polite"
-          >
-            <span>{toolbarActionHint ?? " "}</span>
-          </div>
-          </div>
-          {hasValidUnsavedEdit && (
-            <p className="text-[11px] font-semibold text-emerald-700 px-1">
-              Unsaved valid edits are ready to sync.
-            </p>
-          )}
-        </div>
+      <div className="space-y-3">
+        <PageHeader
+          title="Schedule Output Calendar"
+          subtitle="Click through Monday–Friday to view scheduled sections."
+        />
       </div>
-
-      {backendSaveMessage && (
-        <div
-          className={clsx(
-            "rounded-lg border px-4 py-2 text-sm font-medium",
-            backendSaveMessage.type === "success"
-              ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-              : "bg-rose-50 border-rose-200 text-rose-800",
-          )}
-        >
-          {backendSaveMessage.text}
-        </div>
-      )}
-
-      {solverRunError && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-800">
-          {solverRunError}
-        </div>
-      )}
 
       {incomingShared && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-2.5">
@@ -4887,177 +4684,390 @@ type PatternDayApplyRow = {
         </div>
       )}
 
-      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-          <div className="flex items-center gap-2 min-w-[9rem]">
-            <Filter className="size-4 text-slate-400" aria-hidden />
-            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest">
-              Filters
-            </span>
-          </div>
-          <div className="flex flex-1 flex-col sm:flex-row gap-3">
-            <MultiSelect
-              placeholder="Departments"
-              options={departmentFilterOptions}
-              value={selectedDepartmentKeys}
-              onChange={setSelectedDepartmentKeys}
-              showSearch
-            />
-            <MultiSelect
-              placeholder="Professors"
-              options={professorFilterOptions}
-              value={selectedInstructorIds}
-              onChange={setSelectedInstructorIds}
-              showSearch
-            />
-          </div>
-          <button
-            type="button"
-            onClick={() => {
+      {/* Day selector */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <nav aria-label="Calendar days" className={appToolbarShellClass}>
+          {DAYS.map((d) => (
+            <button
+              key={d}
+              type="button"
+              onClick={() => setSelectedDay(d)}
+              className={`${appNavLinkClass(selectedDay === d)} whitespace-nowrap`}
+            >
+              {d}
+            </button>
+          ))}
+        </nav>
+        <div className={editorToolbarShellClass}>
+              {isMySolverRun ? (
+                <Button
+                  size="sm"
+                  radius="md"
+                  className="bg-rose-50 text-rose-700 border border-rose-200 data-[hover=true]:bg-rose-100"
+                  startContent={<XCircle className="size-3.5" />}
+                  onPress={() => {
+                    void cancelRun().then(() => setSolverRunStatus("idle"));
+                  }}
+                >
+                  Cancel Solver
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  radius="md"
+                  className={solverRunStatus !== "loading" && data && !solverBusyRemote ? editorToolbarBtnPrimary : "bg-slate-100 text-slate-400 cursor-not-allowed"}
+                  startContent={<Play className="size-3.5" />}
+                  isDisabled={solverRunStatus === "loading" || !data || solverBusyRemote}
+                  onPress={() => void handleRunSolverFromCalendar()}
+                  title={
+                    solverBusyRemote
+                      ? solverLock.startedBy
+                        ? `Solver is running (started by ${solverLock.startedBy})`
+                        : "Solver is running"
+                      : "Run the solver using backend scheduling data and locks from this page"
+                  }
+                >
+                  Run Solver
+                </Button>
+              )}
+              {!autoSaveEnabled && hasValidUnsavedEdit && (
+                <Button
+                  size="sm"
+                  radius="md"
+                  className="bg-emerald-50 text-emerald-800 border border-emerald-200 data-[hover=true]:bg-emerald-100"
+                  startContent={<CloudBackup className="size-3.5" />}
+                  isDisabled={isSavingBackend}
+                  onPress={() => void handleUpdateBackend(false)}
+                  title="Autosave is off — click Save to persist calendar edits."
+                >
+                  Save
+                </Button>
+              )}
+              <span className={editorToolbarDivider} />
+              <Button
+                size="sm"
+                radius="md"
+                className={editorToolbarBtnSecondary}
+                startContent={<Save className="size-3.5" />}
+                onPress={openSaveScheduleModal}
+                title="Save this generated/edited schedule to history"
+              >
+                Save Schedule
+              </Button>
+              <Button
+                size="sm"
+                radius="md"
+                className={editorToolbarBtnSecondary}
+                startContent={<Share2 className="size-3.5" />}
+                onPress={handleExportPdf}
+                title="Export the visible calendar to PDF"
+              >
+                Export PDF
+              </Button>
+              <Button
+                size="sm"
+                radius="md"
+                className={clsx(editorToolbarBtnSecondary, (!data || isExportingRoomAssignments) && "opacity-50 cursor-not-allowed")}
+                startContent={<FileSpreadsheet className="size-3.5" />}
+                isDisabled={!data || isExportingRoomAssignments}
+                onPress={handleExportRoomAssignments}
+                title="Download room assignments + calendar grid spreadsheet"
+              >
+                Export Rooms
+              </Button>
+              <span className={editorToolbarDivider} />
+              <Button
+                size="sm"
+                radius="md"
+                className={editorToolbarBtnSecondary}
+                startContent={<Table2 className="size-3.5" />}
+                onPress={() => setScheduleDrawerOpen(true)}
+                title="Open the schedule table to bulk lock/unlock sections for the solver"
+              >
+                Schedule Table
+                {hasAnyLock && (
+                  <span className="ml-1 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold leading-4 text-center">
+                    {lockCount}
+                  </span>
+                )}
+              </Button>
+            
+        </div>
+      </div>
+
+      {/* Search, filters, colors, crosslist, add section */}
+      <div className="rounded-xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] overflow-hidden">
+      <div className="flex flex-wrap items-center gap-2 p-3">
+        <Input
+          value={searchQuery}
+          onValueChange={setSearchQuery}
+          placeholder="Search sections…"
+          size="sm"
+          isClearable
+          className="w-full max-w-[14rem]"
+        />
+        <span className="mx-0.5 hidden h-5 w-px shrink-0 bg-slate-200 sm:block" aria-hidden />
+        <Popover
+          isOpen={filtersExpanded}
+          onOpenChange={setFiltersExpanded}
+          placement="bottom-start"
+          {...navbarPopoverProps}
+          shouldCloseOnInteractOutside={toolbarPanelCloseOnInteractOutside}
+        >
+          <PopoverTrigger>
+            <button
+              type="button"
+              aria-expanded={filtersExpanded}
+              className="inline-flex items-center gap-1.5 h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <Filter className="size-3.5 text-slate-400" aria-hidden />
+              <span className="uppercase tracking-wider text-[10px] text-slate-500">Filters</span>
+              {activeFilterCount > 0 ? (
+                <span className="text-slate-400">{activeFilterCount}</span>
+              ) : null}
+              <ChevronDown
+                className={clsx(
+                  "size-3.5 text-slate-400 transition-transform",
+                  filtersExpanded && "rotate-180",
+                )}
+                aria-hidden
+              />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            className={toolbarChipPopoverContentClass}
+            aria-label="Filters"
+          >
+            <div
+              ref={filtersPanelRef}
+              className="max-h-[min(70vh,560px)] space-y-2 overflow-y-auto p-3"
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <div className="grid grid-cols-1 items-center gap-2 rounded-lg border border-default-200 bg-default-50/60 px-3 py-2 sm:grid-cols-[7rem_1fr_auto]">
+                <span className="text-xs font-semibold uppercase tracking-wide text-default-600">
+                  Departments
+                </span>
+                <div className="min-w-0 overflow-hidden">
+                  <MultiSelect
+                    placeholder="Any department…"
+                    options={departmentFilterOptions}
+                    value={selectedDepartmentKeys}
+                    onChange={setSelectedDepartmentKeys}
+                    showSearch
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  variant="light"
+                  className="shrink-0 font-semibold"
+                  isDisabled={selectedDepartmentKeys.length === 0}
+                  onPress={() => setSelectedDepartmentKeys([])}
+                >
+                  Clear
+                </Button>
+              </div>
+              <div className="grid grid-cols-1 items-center gap-2 rounded-lg border border-default-200 bg-default-50/60 px-3 py-2 sm:grid-cols-[7rem_1fr_auto]">
+                <span className="text-xs font-semibold uppercase tracking-wide text-default-600">
+                  Professors
+                </span>
+                <div className="min-w-0 overflow-hidden">
+                  <MultiSelect
+                    placeholder="Any professor…"
+                    options={professorFilterOptions}
+                    value={selectedInstructorIds}
+                    onChange={setSelectedInstructorIds}
+                    showSearch
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  variant="light"
+                  className="shrink-0 font-semibold"
+                  isDisabled={selectedInstructorIds.length === 0}
+                  onPress={() => setSelectedInstructorIds([])}
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+        {activeFilterCount > 0 && (
+          <Button
+            size="sm"
+            radius="md"
+            variant="light"
+            className={editorFilterClearBtnClass}
+            onPress={() => {
               setSelectedDepartmentKeys([]);
               setSelectedInstructorIds([]);
             }}
-            disabled={!selectedDepartmentKeys.length && !selectedInstructorIds.length}
-            className={clsx(
-              "rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors self-start lg:self-auto",
-              selectedDepartmentKeys.length || selectedInstructorIds.length
-                ? "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
-                : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed",
-            )}
           >
-            Clear filters
-          </button>
+            Clear all
+          </Button>
+        )}
+        {departmentColorLegend.length > 0 && (
+          <>
+            <span className="mx-0.5 hidden h-5 w-px shrink-0 bg-slate-200 sm:block" aria-hidden />
+            <Popover
+              isOpen={colorsExpanded}
+              onOpenChange={(open) => {
+                setColorsExpanded(open);
+                if (!open) setHoveredDepartmentKey(null);
+              }}
+              placement="bottom-start"
+              {...navbarPopoverProps}
+            >
+              <PopoverTrigger>
+                <button
+                  type="button"
+                  aria-expanded={colorsExpanded}
+                  className="inline-flex items-center gap-1.5 h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  <Palette className="size-3.5 text-slate-400" aria-hidden />
+                  <span className="uppercase tracking-wider text-[10px] text-slate-500">Colors</span>
+                  {selectedLegendDepartmentKeys.length > 0 ? (
+                    <span className="text-slate-400">{selectedLegendDepartmentKeys.length}/{departmentColorLegend.length}</span>
+                  ) : (
+                    <span className="text-slate-400">{departmentColorLegend.length}</span>
+                  )}
+                  <ChevronDown
+                    className={clsx(
+                      "size-3.5 text-slate-400 transition-transform",
+                      colorsExpanded && "rotate-180",
+                    )}
+                    aria-hidden
+                  />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className={toolbarChipPopoverContentClass}>
+                <div
+                  ref={colorsGridRef}
+                  className={clsx(toolbarChipPopoverGridClass, "p-3")}
+                  style={toolbarChipPopoverGridStyle(departmentColorLegend.length)}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  {departmentColorLegend.map((item) => {
+                    const isActive = selectedLegendDepartmentKeys.includes(item.colorKey);
+                    return (
+                      <button
+                        key={item.colorKey}
+                        type="button"
+                        role="checkbox"
+                        aria-checked={isActive}
+                        onMouseEnter={() => setHoveredDepartmentKey(item.colorKey)}
+                        onMouseLeave={() => setHoveredDepartmentKey((prev) => (prev === item.colorKey ? null : prev))}
+                        onClick={() => {
+                          setSelectedLegendDepartmentKeys((prev) =>
+                            prev.includes(item.colorKey)
+                              ? prev.filter((key) => key !== item.colorKey)
+                              : [...prev, item.colorKey],
+                          );
+                        }}
+                        className={clsx(
+                          toolbarChipPopoverChipClass,
+                          isActive
+                            ? "border-sky-200/90 bg-sky-50 text-weatherhead-primary"
+                            : "border-slate-200/80 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50",
+                        )}
+                      >
+                        <span
+                          className="h-2.5 w-4 shrink-0 rounded border-l-[2px] border border-slate-300/70"
+                          style={{
+                            backgroundColor: item.swatch.cardBg,
+                            backgroundImage: item.swatch.cardPattern,
+                            borderLeftColor: item.swatch.cardBorder,
+                          }}
+                          aria-hidden
+                        />
+                        <span className="truncate">{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </>
+        )}
+        {crosslistGroupLegend.length > 0 && (
+          <>
+            <span className="mx-0.5 hidden h-5 w-px shrink-0 bg-slate-200 sm:block" aria-hidden />
+            <Popover
+              isOpen={crosslistExpanded}
+              onOpenChange={setCrosslistExpanded}
+              placement="bottom-start"
+              {...navbarPopoverProps}
+            >
+              <PopoverTrigger>
+                <button
+                  type="button"
+                  aria-expanded={crosslistExpanded}
+                  className="inline-flex items-center gap-1.5 h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  <Link2 className="size-3.5 text-slate-400" aria-hidden />
+                  <span className="uppercase tracking-wider text-[10px] text-slate-500">Crosslist</span>
+                  <span className="text-slate-400">{crosslistGroupLegend.length}</span>
+                  <ChevronDown
+                    className={clsx(
+                      "size-3.5 text-slate-400 transition-transform",
+                      crosslistExpanded && "rotate-180",
+                    )}
+                    aria-hidden
+                  />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className={toolbarChipPopoverContentClass}>
+                <div
+                  ref={crosslistGridRef}
+                  className={clsx(toolbarChipPopoverGridClass, "p-3")}
+                  style={toolbarChipPopoverGridStyle(crosslistGroupLegend.length)}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  {crosslistGroupLegend.map((item) => (
+                    <button
+                      key={item.groupId}
+                      type="button"
+                      onClick={() => {
+                        setCrosslistExpanded(false);
+                        openCrosslistGroupPicker(item.groupId, item.members);
+                      }}
+                      className={clsx(
+                        toolbarChipPopoverChipClass,
+                        "border-slate-200/80 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50",
+                      )}
+                    >
+                      <CrosslistLegendSwatch swatch={item.swatch} />
+                      <span className="truncate">
+                        {item.groupId}
+                        <span className="text-slate-400"> ({item.members.length})</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </>
+        )}
+        <span className="mx-0.5 hidden h-5 w-px shrink-0 bg-slate-200 sm:block" aria-hidden />
+        <div className="ml-auto shrink-0">
+          <Button
+            size="sm"
+            radius="md"
+            className="h-8 min-h-8 gap-1 px-3 text-xs font-semibold text-weatherhead-primary bg-sky-50/60 border border-sky-200/50 data-[hover=true]:bg-sky-100/80 shadow-none"
+            startContent={<Plus className="size-3.5" aria-hidden />}
+            onPress={openCreateSectionModal}
+          >
+            Add Section
+          </Button>
         </div>
       </div>
 
-      {/* Department / course color legend */}
-      {departmentColorLegend.length > 0 && (
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex flex-wrap items-center gap-x-1 gap-y-2">
-            <div className="flex items-center gap-2 mb-1 w-full sm:w-auto sm:mb-0 sm:mr-2">
-              <Palette className="size-4 text-slate-400 shrink-0" aria-hidden />
-              <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest">
-                Department colors
-              </span>
-            </div>
-            {departmentColorLegend.map((item) => (
-              <div
-                key={item.colorKey}
-                onMouseEnter={() => setHoveredDepartmentKey(item.colorKey)}
-                onMouseLeave={() => setHoveredDepartmentKey((prev) => (prev === item.colorKey ? null : prev))}
-                onClick={() => {
-                  setSelectedLegendDepartmentKeys((prev) =>
-                    prev.includes(item.colorKey)
-                      ? prev.filter((key) => key !== item.colorKey)
-                      : [...prev, item.colorKey],
-                  );
-                }}
-                className={clsx(
-                  "flex items-center gap-2 rounded-lg border px-2.5 py-1.5 mr-1 mb-1 transition-all cursor-pointer",
-                  activeLegendDepartmentKeys.has(item.colorKey)
-                    ? "border-slate-300 bg-slate-100 shadow-sm ring-2 ring-slate-200"
-                    : activeLegendDepartmentKeys.size > 0
-                      ? "border-slate-100 bg-slate-50/60 opacity-70"
-                      : "border-slate-100 bg-slate-50/80",
-                )}
-              >
-                <span
-                  className="h-3.5 w-6 shrink-0 rounded border-l-[3px] shadow-sm border border-slate-300/70"
-                  style={{
-                    backgroundColor: item.swatch.cardBg,
-                    backgroundImage: item.swatch.cardPattern,
-                    borderLeftColor: item.swatch.cardBorder,
-                  }}
-                  aria-hidden
-                />
-                <span
-                  className="text-xs font-semibold text-slate-800 max-w-[12rem] truncate"
-                  title={item.label}
-                >
-                  {item.label}
-                </span>
-              </div>
-            ))}
-          </div>
-          <p className="mt-2 text-[10px] text-slate-500 leading-relaxed">
-            Colors are per <span className="font-semibold">department</span> only. Populate the
-            department field (e.g. ECON, OPRE, FAFE) to control color grouping.
-          </p>
-        </div>
-      )}
 
-      {crosslistGroupLegend.length > 0 && (
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex flex-wrap items-center gap-x-1 gap-y-2">
-            <div className="flex items-center gap-2 mb-1 w-full sm:w-auto sm:mb-0 sm:mr-2">
-              <Link2 className="size-4 text-slate-400 shrink-0" aria-hidden />
-              <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest">
-                Crosslist groups
-              </span>
-            </div>
-            {crosslistGroupLegend.map((item) => (
-              <button
-                key={item.groupId}
-                type="button"
-                onClick={() => openCrosslistGroupPicker(item.groupId, item.members)}
-                className="flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50/80 px-2.5 py-1.5 mr-1 mb-1 transition-all hover:border-slate-300 hover:bg-slate-100 hover:shadow-sm"
-              >
-                <CrosslistLegendSwatch swatch={item.swatch} />
-                <span
-                  className="text-xs font-semibold text-slate-800 max-w-[12rem] truncate"
-                  title={item.groupId}
-                >
-                  {item.groupId}
-                </span>
-                <span className="text-[10px] font-semibold text-slate-500">
-                  ({item.members.length})
-                </span>
-              </button>
-            ))}
-          </div>
-          <p className="mt-2 text-[10px] text-slate-500 leading-relaxed">
-            Click a group to view or edit the sections scheduled together in that cross-list.
-          </p>
-        </div>
-      )}
-
-      {/* Day selector + quick add section */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="inline-flex items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-            <span className="text-[10px] font-bold text-slate-400 uppercase px-2 tracking-widest">
-              Day:
-            </span>
-            {DAYS.map((d) => (
-              <button
-                key={d}
-                onClick={() => setSelectedDay(d)}
-                className={clsx(
-                  "px-3 py-1.5 rounded-lg border text-xs font-bold whitespace-nowrap transition-colors",
-                  selectedDay === d
-                    ? "bg-[#137fec]/10 border-[#137fec]/20 text-[#137fec]"
-                    : "bg-slate-50 border-slate-200 text-slate-600 hover:text-[#137fec] hover:bg-slate-100",
-                )}
-              >
-                {d}
-              </button>
-            ))}
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={openCreateSectionModal}
-          className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-weatherhead-primary px-4 text-sm font-bold text-white shadow-sm shadow-weatherhead-primary/20 transition-colors hover:bg-[#0f6fd0]"
-        >
-          <Plus className="size-4" aria-hidden />
-          Add Section
-        </button>
-      </div>
 
       {/* Main calendar grid */}
       <div
         className={clsx(
-          "rounded-xl border shadow-lg overflow-hidden flex flex-col min-h-[600px]",
+          "rounded-xl border shadow-lg overflow-hidden flex flex-col min-h-[600px] max-h-[calc(100dvh-10rem)]",
           dragFeedback.status === "invalid"
             ? "bg-red-50/40 border-red-200"
             : dragFeedback.status === "valid"
@@ -5240,16 +5250,18 @@ type PatternDayApplyRow = {
                     const matchesHoveredDepartment =
                       activeLegendDepartmentKeys.size === 0 ||
                       activeLegendDepartmentKeys.has(departmentColorKey(section));
+                    const matchesSearch = !hasSearch || (matchingSectionIds?.has(section.id) ?? true);
+                    const matchesAllFilters = matchesHoveredDepartment && matchesSearch;
                     return (
                       <div
                         key={`${room.id}-${section.id}-occupied`}
                         className={clsx(
                           "absolute z-[6] rounded-lg border border-dashed pointer-events-none transition-all",
-                          matchesHoveredDepartment
+                          matchesAllFilters
                             ? "border-slate-300 bg-slate-100/70"
                             : "border-slate-200 bg-slate-100/35 opacity-45",
-                          activeLegendDepartmentKeys.size > 0 &&
-                            matchesHoveredDepartment &&
+                          (activeLegendDepartmentKeys.size > 0 || hasSearch) &&
+                            matchesAllFilters &&
                             "ring-2 ring-slate-300/80",
                         )}
                         style={{
@@ -5383,6 +5395,8 @@ type PatternDayApplyRow = {
                           )
                         : activeLegendDepartmentKeys.size === 0 ||
                           activeLegendDepartmentKeys.has(departmentColorKey(section));
+                    const matchesSearch = !hasSearch || (matchingSectionIds?.has(section.id) ?? true);
+                    const matchesAllFilters = matchesHoveredDepartment && matchesSearch;
                     const dragSectionId = isCrosslistGroupEvent(event)
                       ? section.id
                       : section.id;
@@ -5564,7 +5578,8 @@ type PatternDayApplyRow = {
                           members={event.crosslistMembers}
                           timeLabel={timeLabel}
                           color={color}
-                          matchesHoveredDepartment={matchesHoveredDepartment}
+                          matchesHoveredDepartment={matchesAllFilters}
+                          hasActiveFilter={activeLegendDepartmentKeys.size > 0 || hasSearch}
                           isDragSource={isDragSource}
                           hasDragMoved={Boolean(calendarDrag?.hasMoved)}
                           placementLocked={lockState}
@@ -5614,9 +5629,9 @@ type PatternDayApplyRow = {
                           isDragSource &&
                             calendarDrag?.hasMoved &&
                             "opacity-[0.12] pointer-events-none",
-                          !matchesHoveredDepartment && "opacity-35",
-                          activeLegendDepartmentKeys.size > 0 &&
-                            matchesHoveredDepartment &&
+                          !matchesAllFilters && "opacity-35",
+                          (activeLegendDepartmentKeys.size > 0 || hasSearch) &&
+                            matchesAllFilters &&
                             "ring-2 ring-slate-300/80 shadow-md",
                           isConflicting &&
                             "ring-2 ring-red-500 ring-offset-1 z-20 shadow-md",
@@ -5756,6 +5771,8 @@ type PatternDayApplyRow = {
                   const previewMatchesHoveredDepartment =
                     activeLegendDepartmentKeys.size === 0 ||
                     activeLegendDepartmentKeys.has(departmentColorKey(section));
+                  const previewMatchesSearch = !hasSearch || (matchingSectionIds?.has(section.id) ?? true);
+                  const previewMatchesAllFilters = previewMatchesHoveredDepartment && previewMatchesSearch;
                   const designationPv = sectionDesignations.get(section.id);
                   return (
                     <div
@@ -5763,7 +5780,7 @@ type PatternDayApplyRow = {
                       className={clsx(
                         "absolute pointer-events-none z-[25] border-l-4 rounded-lg p-2.5 flex flex-col justify-between shadow-sm ring-2 ring-inset",
                         previewBlocked ? "ring-red-500/65" : "ring-[#137fec]/40",
-                        !previewMatchesHoveredDepartment && "opacity-35",
+                        !previewMatchesAllFilters && "opacity-35",
                       )}
                       style={{
                         left: `${leftPct}%`,
@@ -5799,6 +5816,7 @@ type PatternDayApplyRow = {
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       {drawerRender &&
@@ -5942,7 +5960,18 @@ type PatternDayApplyRow = {
                   })
                   .join("; ");
                 return (
-                  <tr key={section.id} className="hover:bg-slate-50/80">
+                  <tr
+                    key={section.id}
+                    className="hover:bg-slate-50/80 cursor-pointer"
+                    onClick={() => {
+                      setSectionModalError(null);
+                      setSectionModal({
+                        mode: "edit",
+                        initialSectionId: section.id,
+                        draft: toSectionFormDraft(section),
+                      });
+                    }}
+                  >
                     <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-900">
                       {section.id}
                       {peerCount > 1 ? (
@@ -5955,7 +5984,7 @@ type PatternDayApplyRow = {
                     </td>
                     <td className="px-4 py-3 font-medium text-slate-800">{a.room_id || "—"}</td>
                     <td className="px-4 py-3 text-xs text-slate-600 max-w-md">{slotLabels || "—"}</td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
                         disabled={lockState === "none" && !canLock}
@@ -6364,7 +6393,9 @@ type PatternDayApplyRow = {
                 <label className="flex flex-col gap-1">
                   <span className="text-xs font-semibold text-slate-600">Section ID *</span>
                   <input
-                    className="rounded-lg border border-slate-200 px-3 py-2"
+                    className={`rounded-lg border border-slate-200 px-3 py-2 ${
+                      sectionModal.mode === "edit" ? "cursor-not-allowed bg-slate-100 text-slate-400" : ""
+                    }`}
                     value={sectionModal.draft.id}
                     onChange={(e) => updateSectionModalDraft("id", e.target.value)}
                     disabled={sectionModal.mode === "edit" || isSavingSection}
@@ -6465,12 +6496,12 @@ type PatternDayApplyRow = {
                   </div>
                 )}
                 <label className="flex flex-col gap-1 sm:col-span-2">
-                  <span className="text-xs font-semibold text-slate-600">Room Requirements (comma-separated)</span>
-                  <input
-                    className="rounded-lg border border-slate-200 px-3 py-2"
+                  <span className="text-xs font-semibold text-slate-600">Room Requirements</span>
+                  <TagInput
                     value={sectionModal.draft.room_requirements}
-                    onChange={(e) => updateSectionModalDraft("room_requirements", e.target.value)}
-                    disabled={isSavingSection}
+                    onChange={(v) => updateSectionModalDraft("room_requirements", v)}
+                    suggestions={featureSuggestions}
+                    placeholder="Type a feature name..."
                   />
                 </label>
                 <label className="flex flex-col gap-1">

@@ -51,12 +51,12 @@ export default function HistoryPage() {
   // Delete confirmation modal state
   const [deleteConfirm, setDeleteConfirm] = useState<SavedScheduleEntry | null>(null);
 
-  const refresh = () => {
-    setItems(listSavedSchedules());
+  const refresh = async () => {
+    setItems(await listSavedSchedules());
   };
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, []);
 
   // Read the currently displayed snapshot from localStorage (same one the calendar uses).
@@ -117,18 +117,18 @@ export default function HistoryPage() {
     return !Number.isNaN(editedAt) && !Number.isNaN(publishedAt) && editedAt > publishedAt;
   }, [displayedDataRevision, displayedSnapshot]);
 
-  const handleRename = () => {
+  const handleRename = async () => {
     if (!renameModal || !renameModal.newName.trim()) return;
-    renameSavedSchedule(renameModal.entry.id, renameModal.newName);
+    await renameSavedSchedule(renameModal.entry.id, renameModal.newName);
     setRenameModal(null);
-    refresh();
+    await refresh();
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteConfirm) return;
-    deleteSavedSchedule(deleteConfirm.id);
+    await deleteSavedSchedule(deleteConfirm.id);
     setDeleteConfirm(null);
-    refresh();
+    await refresh();
   };
 
   const totalAssignments = useMemo(

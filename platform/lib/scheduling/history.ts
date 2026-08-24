@@ -6,7 +6,6 @@ import { enrichSpreadsheetErrors, formatErrorsDetail, formatErrorsSummary, norma
 
 export const LAST_SOLVER_RUN_STORAGE_KEY = "wsom-last-solver-run";
 export const LAST_SOLVER_ERROR_STORAGE_KEY = "wsom-last-solver-error";
-const SCHEDULE_HISTORY_STORAGE_KEY = "wsom-schedule-history-v1";
 /**
  * Session flag set when the user loads a schedule from History into the
  * calendar. The calendar reads it once on mount so that an incoming shared
@@ -32,76 +31,72 @@ export type SavedScheduleEntry = {
   savedAt: string;
   /** Display name of the user who saved this schedule (when known). */
   savedBy?: string;
+  /** Network ID of the user who saved this schedule. */
+  savedByUserId?: string;
+  /** Display name of the user who saved this schedule. */
+  savedByName?: string;
   snapshot: LastSolverRunSnapshot;
 };
 
-const parseHistory = (raw: string | null): SavedScheduleEntry[] => {
-  if (!raw) return [];
+// ---------------------------------------------------------------------------
+// Server-backed CRUD — all admin-only active-tier users share the same history
+// ---------------------------------------------------------------------------
+
+export const listSavedSchedules = async (): Promise<SavedScheduleEntry[]> => {
+  if (typeof window === "undefined") return [];
   try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item): item is SavedScheduleEntry => {
-      if (!item || typeof item !== "object") return false;
-      const candidate = item as Partial<SavedScheduleEntry>;
-      return (
-        typeof candidate.id === "string" &&
-        typeof candidate.name === "string" &&
-        typeof candidate.scheduleDate === "string" &&
-        typeof candidate.savedAt === "string" &&
-        (candidate.savedBy === undefined || typeof candidate.savedBy === "string") &&
-        !!candidate.snapshot &&
-        typeof candidate.snapshot === "object"
-      );
-    });
+    const res = await fetch("/api/saved-schedules", { cache: "no-store" });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { entries?: SavedScheduleEntry[] };
+    return (data.entries ?? []).sort((a, b) => b.savedAt.localeCompare(a.savedAt));
   } catch {
     return [];
   }
 };
 
-export const listSavedSchedules = (): SavedScheduleEntry[] => {
-  if (typeof window === "undefined") return [];
-  const raw = window.localStorage.getItem(SCHEDULE_HISTORY_STORAGE_KEY);
-  return parseHistory(raw).sort((a, b) => b.savedAt.localeCompare(a.savedAt));
-};
-
-export const saveScheduleToHistory = (params: {
+export const saveScheduleToHistory = async (params: {
   name: string;
   scheduleDate: string;
-  savedBy?: string;
   snapshot: LastSolverRunSnapshot;
-}): SavedScheduleEntry => {
+}): Promise<SavedScheduleEntry> => {
   if (typeof window === "undefined") {
     throw new Error("Schedule history is only available in the browser.");
   }
-  const existing = listSavedSchedules();
-  const savedBy = params.savedBy?.trim();
-  const entry: SavedScheduleEntry = {
-    id: `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`,
-    name: params.name.trim(),
-    scheduleDate: params.scheduleDate,
-    savedAt: new Date().toISOString(),
-    ...(savedBy ? { savedBy } : {}),
-    snapshot: params.snapshot,
-  };
-  const next = [entry, ...existing];
-  window.localStorage.setItem(SCHEDULE_HISTORY_STORAGE_KEY, JSON.stringify(next));
-  return entry;
+  const res = await fetch("/api/saved-schedules", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: params.name.trim(),
+      scheduleDate: params.scheduleDate,
+      snapshot: params.snapshot,
+    }),
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { errors?: { message?: string }[] } | null;
+    const msg = body?.errors?.[0]?.message ?? "Failed to save schedule.";
+    throw new Error(msg);
+  }
+  const data = (await res.json()) as { entry: SavedScheduleEntry };
+  return data.entry;
 };
 
-export const deleteSavedSchedule = (id: string): void => {
+export const deleteSavedSchedule = async (id: string): Promise<void> => {
   if (typeof window === "undefined") return;
-  const next = listSavedSchedules().filter((item) => item.id !== id);
-  window.localStorage.setItem(SCHEDULE_HISTORY_STORAGE_KEY, JSON.stringify(next));
+  await fetch(`/api/saved-schedules/${encodeURIComponent(id)}`, { method: "DELETE" });
 };
 
-export const renameSavedSchedule = (id: string, newName: string): void => {
+export const renameSavedSchedule = async (id: string, newName: string): Promise<void> => {
   if (typeof window === "undefined") return;
-  const schedules = listSavedSchedules();
-  const updated = schedules.map((s) =>
-    s.id === id ? { ...s, name: newName.trim() } : s,
-  );
-  window.localStorage.setItem(SCHEDULE_HISTORY_STORAGE_KEY, JSON.stringify(updated));
+  await fetch(`/api/saved-schedules/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: newName }),
+  });
 };
+
+// ---------------------------------------------------------------------------
+// Browser-local helpers — these remain in localStorage (per-user calendar view)
+// ---------------------------------------------------------------------------
 
 export const loadSavedScheduleToCurrentView = (entry: SavedScheduleEntry): void => {
   if (typeof window === "undefined") return;

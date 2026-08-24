@@ -23,6 +23,7 @@ type CrosslistCalendarEventCardProps = {
   timeLabel: string;
   color: DepartmentPalette;
   matchesHoveredDepartment: boolean;
+  hasActiveFilter?: boolean;
   isDragSource: boolean;
   hasDragMoved: boolean;
   placementLocked: SectionLockState;
@@ -121,6 +122,7 @@ export function CrosslistCalendarEventCard({
   timeLabel,
   color,
   matchesHoveredDepartment,
+  hasActiveFilter = false,
   isDragSource,
   hasDragMoved,
   placementLocked,
@@ -162,7 +164,9 @@ export function CrosslistCalendarEventCard({
           !isDragSource && "hover:shadow-md",
           isDragSource && hasDragMoved && "opacity-[0.12] pointer-events-none",
           !matchesHoveredDepartment && "opacity-35",
-          matchesHoveredDepartment && "ring-2 ring-slate-300/80 shadow-md",
+          hasActiveFilter &&
+            matchesHoveredDepartment &&
+            "ring-2 ring-slate-300/80 shadow-md",
           isConflicting && "ring-2 ring-red-500 ring-offset-1 shadow-md",
         )}
         style={{

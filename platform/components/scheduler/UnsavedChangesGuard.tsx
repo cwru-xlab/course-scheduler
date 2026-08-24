@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import { AlertTriangle, CloudUpload } from "lucide-react";
-import { Button } from "@heroui/button";
 
+import { useIslandNotify } from "@/components/GlobalStatusBar";
 import { useSchedulingData } from "@/lib/scheduling/useSchedulingData";
 
-/** Global unsaved-changes banner and browser tab-close warning. */
+const STICKY_ID = "unsaved-or-save-error";
+
+/** beforeunload guard + island sticky for unsaved / save failures. */
 export function UnsavedChangesGuard() {
   const {
     hasUnsavedChanges,
@@ -15,6 +16,7 @@ export function UnsavedChangesGuard() {
     autoSaveEnabled,
     saveToBackend,
   } = useSchedulingData();
+  const { setSticky, clearSticky, flash } = useIslandNotify();
 
   useEffect(() => {
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -26,54 +28,77 @@ export function UnsavedChangesGuard() {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [hasUnsavedChanges]);
 
-  const showError = saveFeedback?.type === "error";
-  const showBanner = showError || (hasUnsavedChanges && !autoSaveEnabled);
+  // Transient save success (and warnings) → island flash.
+  useEffect(() => {
+    if (saveFeedback?.type !== "success") return;
+    const warningSuffix =
+      saveFeedback.warnings && saveFeedback.warnings.length > 0
+        ? ` Warning: ${saveFeedback.warnings.join(" ")}`
+        : "";
+    flash({
+      tone: "success",
+      message: `${saveFeedback.message}${warningSuffix}`,
+    });
+  }, [saveFeedback, flash]);
 
-  if (!showBanner) return null;
+  useEffect(() => {
+    if (saveFeedback?.type === "error") {
+      setSticky({
+        id: STICKY_ID,
+        tone: "error",
+        priority: 100,
+        icon: "warn",
+        message: `Save failed: ${saveFeedback.message}`,
+        action: {
+          label: "Retry save",
+          variant: "warning",
+          onPress: () => void saveToBackend({ manual: true }),
+        },
+      });
+      return;
+    }
 
-  return (
-    <div className="fixed inset-x-0 top-16 z-40 border-b border-amber-200 bg-amber-50 px-4 py-2 sm:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm text-amber-900">
-          {saveFeedback?.type === "error" ? (
-            <>
-              <AlertTriangle className="size-4 shrink-0" aria-hidden />
-              <span className="font-medium">Save failed: {saveFeedback.message}</span>
-            </>
-          ) : isSaving ? (
-            <>
-              <CloudUpload className="size-4 shrink-0 animate-pulse" aria-hidden />
-              <span className="font-medium">
-                {autoSaveEnabled ? "Auto-saving changes…" : "Saving changes…"}
-              </span>
-            </>
-          ) : autoSaveEnabled ? (
-            <>
-              <AlertTriangle className="size-4 shrink-0" aria-hidden />
-              <span className="font-medium">
-                Unsaved changes — auto-save will publish them shortly, or click Save now.
-              </span>
-            </>
-          ) : (
-            <>
-              <AlertTriangle className="size-4 shrink-0" aria-hidden />
-              <span className="font-medium">
-                Unsaved changes — auto-save is off. Click Save to publish edits to the server.
-              </span>
-            </>
-          )}
-        </div>
-        {!isSaving && hasUnsavedChanges && saveFeedback?.type !== "error" && (
-          <Button
-            size="sm"
-            color="warning"
-            className="font-semibold"
-            onPress={() => void saveToBackend({ manual: true })}
-          >
-            Save now
-          </Button>
-        )}
-      </div>
-    </div>
-  );
+    if (isSaving && hasUnsavedChanges) {
+      setSticky({
+        id: STICKY_ID,
+        tone: "warn",
+        priority: 80,
+        icon: "upload",
+        message: autoSaveEnabled ? "Auto-saving changes…" : "Saving changes…",
+      });
+      return;
+    }
+
+    if (hasUnsavedChanges && !autoSaveEnabled) {
+      setSticky({
+        id: STICKY_ID,
+        tone: "warn",
+        priority: 80,
+        icon: "warn",
+        message: "Unsaved changes — auto-save is off. Click Save to publish edits.",
+        action: {
+          label: "Save now",
+          variant: "warning",
+          onPress: () => void saveToBackend({ manual: true }),
+        },
+      });
+      return;
+    }
+
+    clearSticky(STICKY_ID);
+  }, [
+    saveFeedback,
+    hasUnsavedChanges,
+    isSaving,
+    autoSaveEnabled,
+    saveToBackend,
+    setSticky,
+    clearSticky,
+  ]);
+
+  useEffect(() => {
+    return () => clearSticky(STICKY_ID);
+  }, [clearSticky]);
+
+  return null;
 }

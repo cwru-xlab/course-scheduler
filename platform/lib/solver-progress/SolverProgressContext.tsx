@@ -10,14 +10,14 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { SOLVER_API_TIMEOUT_MS } from "@/lib/solver-timeouts";
 
 /**
  * Expected wall-clock budget for a run (ms).
- * Matches POST /api/schedule's Flask fetch timeout (CP-SAT itself caps ~120s;
- * 150s includes proxy headroom). Progress is linear against this so the %
- * reads as time-remaining, not a front-loaded cosmetic curve.
+ * Matches POST /api/schedule's Flask fetch timeout. Progress is linear against
+ * this so the % reads as time-remaining, not a front-loaded cosmetic curve.
  */
-const ESTIMATED_MAX_MS = 150_000;
+const ESTIMATED_MAX_MS = SOLVER_API_TIMEOUT_MS;
 /** Hold here until the solver actually returns, then jump to 100%. */
 const PROGRESS_CAP = 92;
 const COMPLETE_HOLD_MS = 500;
@@ -74,7 +74,7 @@ export function SolverProgressProvider({ children }: { children: ReactNode }) {
       setProgress((prev) => (prev > 1 ? prev : 1));
       tickRef.current = window.setInterval(() => {
         const elapsed = Date.now() - startedAtRef.current;
-        // Linear vs ESTIMATED_MAX_MS: at 75s ≈ 46%, at 150s ≈ 92% (then wait for succeed).
+        // Linear vs ESTIMATED_MAX_MS: progress tracks expected wall-clock budget.
         const next = Math.min(
           PROGRESS_CAP,
           Math.max(1, Math.floor((elapsed / ESTIMATED_MAX_MS) * PROGRESS_CAP)),

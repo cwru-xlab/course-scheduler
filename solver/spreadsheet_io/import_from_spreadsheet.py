@@ -55,6 +55,14 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
             elif isinstance(val, str) and ":" in val:
                 row[col] = val.strip()
 
+    # Build name→id lookup so dropdown-selected names resolve back to IDs.
+    _name_to_id: Dict[str, str] = {}
+    for row in instructors_rows:
+        _iid = maybe_str(row.get("id"))
+        _iname = maybe_str(row.get("name"))
+        if _iid and _iname:
+            _name_to_id[_iname] = _iid
+
     sections: List[Dict[str, Any]] = []
     seen_section_ids = set()
     for row in sections_rows:
@@ -71,7 +79,10 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
                 "department": maybe_str(row.get("department")),
                 "section_code": _str_with_default(row, "section_code", "Sections", default=""),
                 "section_number": _str_with_default(row, "section_number", "Sections", default=""),
-                "instructor_id": _str_with_default(row, "instructor_id", "Sections", default=""),
+                "instructor_id": _resolve_instructor_id(
+                    _str_with_default(row, "instructor_id", "Sections", default=""),
+                    _name_to_id,
+                ),
                 "expected_enrollment": _int_with_default(
                     row, "expected_enrollment", "Sections", default=0
                 ),
@@ -182,7 +193,10 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
                 "days": days or "",
                 "start_time": start_time or "",
                 "end_time": end_time or "",
-                "instructor_id": maybe_str(row.get("instructor_id")) or "",
+                "instructor_id": _resolve_instructor_id(
+                    maybe_str(row.get("instructor_id")) or "",
+                    _name_to_id,
+                ),
                 "room_id": maybe_str(row.get("room_id")) or "",
                 "timeslot_ids": parse_list_cell(row.get("timeslot_ids")),
                 "reason": _str_with_default(row, "reason", "BlockedTimes", default="blocked"),
@@ -292,3 +306,10 @@ def _int_with_default(row: Dict[str, Any], key: str, sheet: str, default: int) -
 def _str_with_default(row: Dict[str, Any], key: str, sheet: str, default: str) -> str:
     value = maybe_str(row.get(key))
     return default if value is None else value
+
+
+def _resolve_instructor_id(value: str, name_to_id: Dict[str, str]) -> str:
+    """If *value* is an instructor name, return the corresponding ID; otherwise return as-is."""
+    if not value:
+        return ""
+    return name_to_id.get(value, value)

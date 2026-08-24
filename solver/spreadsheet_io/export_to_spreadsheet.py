@@ -4,6 +4,7 @@ from io import BytesIO
 from typing import Any, Dict, List
 
 from openpyxl import Workbook
+from openpyxl.worksheet.datavalidation import DataValidation
 
 try:
     from spreadsheet_io.beautify import beautify_workbook
@@ -30,6 +31,27 @@ def _export_str(value: Any) -> str:
     return normalize_spreadsheet_string_cell(value)
 
 
+def _build_instructor_name_lookup(
+    payload: Dict[str, Any],
+) -> Dict[str, str]:
+    """Build a mapping of instructor_id → display name."""
+    lookup: Dict[str, str] = {}
+    for inst in payload.get("instructors", []):
+        inst_id = str(inst.get("id", "")).strip()
+        name = str(inst.get("name") or inst.get("id", "")).strip()
+        if inst_id:
+            lookup[inst_id] = name or inst_id
+    return lookup
+
+
+def _instructor_name(
+    instructor_id: str,
+    lookup: Dict[str, str],
+) -> str:
+    """Return the display name for an instructor_id, or the raw id if not found."""
+    return lookup.get(instructor_id, instructor_id)
+
+
 def scheduling_input_to_excel_bytes(
     payload: Dict[str, Any],
     note_entries: List[Dict[str, Any]] | None = None,
@@ -38,12 +60,24 @@ def scheduling_input_to_excel_bytes(
     default_ws = workbook.active
     workbook.remove(default_ws)
 
+    instructor_lookup = _build_instructor_name_lookup(payload)
+    instructor_names = sorted(set(instructor_lookup.values()))
+
+    sheets: Dict[str, Any] = {}
     for spec in SPREADSHEET_SPECS:
         ws = workbook.create_sheet(spec.name)
+        sheets[spec.name] = ws
         ws.append(spec.columns)
-        rows = _rows_for_sheet(spec.name, payload)
+        rows = _rows_for_sheet(spec.name, payload, instructor_lookup)
         for row in rows:
             ws.append([row.get(column, "") for column in spec.columns])
+
+    instructor_ws = sheets.get("Instructors")
+    for spec in SPREADSHEET_SPECS:
+        if instructor_names and spec.name in ("Sections", "BlockedTimes"):
+            _apply_instructor_dropdown(
+                sheets[spec.name], spec.columns, instructor_names, instructor_ws,
+            )
 
     populated_notes = [
         entry
@@ -60,7 +94,55 @@ def scheduling_input_to_excel_bytes(
     return output.getvalue()
 
 
-def _rows_for_sheet(sheet_name: str, payload: Dict[str, Any]) -> list[Dict[str, Any]]:
+def _apply_instructor_dropdown(
+    ws: Any,
+    columns: List[str],
+    names: List[str],
+    instructor_ws: Any = None,
+) -> None:
+    """Add a dropdown data validation to the instructor_id column.
+
+    If *instructor_ws* is provided, the dropdown references the Name column
+    on that sheet (avoids comma-in-name splitting in the formula string).
+    """
+    try:
+        col_idx = columns.index("instructor_id") + 1  # 1-based
+    except ValueError:
+        return
+    from openpyxl.utils import get_column_letter
+
+    col_letter = get_column_letter(col_idx)
+    max_row = ws.max_row
+    if max_row < 2:
+        return
+
+    if instructor_ws is not None and names:
+        # Write names into a hidden helper column on the Instructors sheet
+        # so the dropdown references cells (handles commas in names).
+        helper_col_letter = get_column_letter(instructor_ws.max_column + 1)
+        for i, name in enumerate(names, start=1):
+            instructor_ws[f"{helper_col_letter}{i}"] = name
+        formula = f"={instructor_ws.title}!${helper_col_letter}$1:${helper_col_letter}${len(names)}"
+    else:
+        formula = ",".join(names)
+
+    dv = DataValidation(
+        type="list",
+        formula1=f'"{formula}"' if not formula.startswith("=") else formula,
+        allow_blank=True,
+        showErrorMessage=True,
+        errorTitle="Invalid Instructor",
+        error="Select an instructor from the dropdown list.",
+    )
+    dv.sqref = f"{col_letter}2:{col_letter}{max_row}"
+    ws.add_data_validation(dv)
+
+
+def _rows_for_sheet(
+    sheet_name: str,
+    payload: Dict[str, Any],
+    instructor_lookup: Dict[str, str] | None = None,
+) -> list[Dict[str, Any]]:
     if sheet_name == "Sections":
         return [
             {
@@ -69,7 +151,10 @@ def _rows_for_sheet(sheet_name: str, payload: Dict[str, Any]) -> list[Dict[str, 
                 "department": _export_str(item.get("department") or ""),
                 "section_code": _export_str(item.get("section_code", "")),
                 "section_number": _export_str(item.get("section_number", "")),
-                "instructor_id": _export_str(item.get("instructor_id", "")),
+                "instructor_id": _instructor_name(
+                    _export_str(item.get("instructor_id", "")),
+                    instructor_lookup or {},
+                ),
                 "expected_enrollment": item.get("expected_enrollment", ""),
                 "enrollment_cap": item.get("enrollment_cap", ""),
                 "allowed_meeting_patterns": serialize_list_cell(
@@ -173,7 +258,10 @@ def _rows_for_sheet(sheet_name: str, payload: Dict[str, Any]) -> list[Dict[str, 
                 "days": _export_str(item.get("days", "")),
                 "start_time": _export_str(item.get("start_time", "")),
                 "end_time": _export_str(item.get("end_time", "")),
-                "instructor_id": _export_str(item.get("instructor_id", "")),
+                "instructor_id": _instructor_name(
+                    _export_str(item.get("instructor_id", "")),
+                    instructor_lookup or {},
+                ),
                 "room_id": _export_str(item.get("room_id", "")),
                 "timeslot_ids": serialize_list_cell(item.get("timeslot_ids")),
                 "reason": _export_str(item.get("reason", "")),

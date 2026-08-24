@@ -2,8 +2,17 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { Button } from "@heroui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@heroui/popover";
 import { Select, SelectItem } from "@heroui/select";
+import clsx from "clsx";
+import { ChevronDown } from "lucide-react";
 
+import {
+  toolbarChipPopoverContentClass,
+  navbarPopoverProps,
+  toolbarPanelCloseOnInteractOutside,
+  useOverlayClampedHeight,
+} from "@/lib/ui/navbarPopoverProps";
 import {
   EDITOR_SELECT_ITEM_CLASS_NAMES,
   EDITOR_SELECT_TRIGGER_CLASS_NAMES,
@@ -13,7 +22,6 @@ import {
 } from "../editorDropdownWidth";
 import { EditableSelectCell } from "../EditableSelectCell";
 import { MultiSelect } from "../MultiSelect";
-import { EditorModalShell } from "./EditorModalShell";
 import {
   countActiveColumnFilters,
   getFilterOptionsForDef,
@@ -26,10 +34,7 @@ import {
   type NumberCompareOp,
   type TimeCompareOp,
 } from "./editorFilters";
-import {
-  editorFilterBtnClass,
-  editorFilterClearBtnClass,
-} from "./editorToolbarStyles";
+import { editorFilterClearBtnClass } from "./editorToolbarStyles";
 
 const controlClass =
   "h-8 max-w-full rounded-lg border border-default-200 bg-white px-2 text-xs text-slate-800 outline-none focus:border-primary dark:bg-default-100";
@@ -231,6 +236,7 @@ export function EditorColumnFilters<TRow>({
   extraContent,
 }: EditorColumnFiltersProps<TRow>) {
   const [isOpen, setIsOpen] = useState(false);
+  const panelRef = useOverlayClampedHeight<HTMLDivElement>(isOpen);
 
   const appliedCount = useMemo(
     () => countActiveColumnFilters(defs, filters),
@@ -247,15 +253,50 @@ export function EditorColumnFilters<TRow>({
   return (
     <>
       <div className="flex shrink-0 flex-wrap items-center gap-2">
-        <Button
-          size="sm"
-          radius="md"
-          variant="bordered"
-          className={editorFilterBtnClass}
-          onPress={() => setIsOpen(true)}
+        <Popover
+          isOpen={isOpen}
+          onOpenChange={setIsOpen}
+          placement="bottom-start"
+          {...navbarPopoverProps}
+          shouldCloseOnInteractOutside={toolbarPanelCloseOnInteractOutside}
         >
-          Filters{appliedCount > 0 ? ` · ${appliedCount}` : ""}
-        </Button>
+          <PopoverTrigger>
+            <button
+              type="button"
+              aria-expanded={isOpen}
+              className="inline-flex items-center gap-1.5 h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <span className="uppercase tracking-wider text-[10px] text-slate-500">Filters</span>
+              {appliedCount > 0 ? (
+                <span className="text-slate-400">{appliedCount}</span>
+              ) : null}
+              <ChevronDown
+                className={clsx(
+                  "size-3.5 text-slate-400 transition-transform",
+                  isOpen && "rotate-180",
+                )}
+                aria-hidden
+              />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            className={toolbarChipPopoverContentClass}
+            aria-label="Filters"
+          >
+            <div
+              ref={panelRef}
+              className="max-h-[min(70vh,560px)] space-y-2 overflow-y-auto p-3"
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              {extraContent ? (
+                <div className="rounded-lg border border-default-200 bg-default-50/60 px-3 py-2">
+                  {extraContent}
+                </div>
+              ) : null}
+              <EditorFilterPanel defs={defs} rows={rows} filters={filters} onChange={onChange} />
+            </div>
+          </PopoverContent>
+        </Popover>
         {hasAnyFilter ? (
           <Button
             size="sm"
@@ -268,32 +309,6 @@ export function EditorColumnFilters<TRow>({
           </Button>
         ) : null}
       </div>
-
-      <EditorModalShell
-        isOpen={isOpen}
-        title="Filters"
-        onClose={() => setIsOpen(false)}
-        maxWidthClass="max-w-3xl"
-        footer={
-          hasAnyFilter ? (
-            <Button
-              size="sm"
-              variant="flat"
-              className="font-semibold"
-              onPress={() => onChange({})}
-            >
-              Clear all
-            </Button>
-          ) : undefined
-        }
-      >
-        {extraContent ? (
-          <div className="mb-3 rounded-lg border border-default-200 bg-default-50/60 px-3 py-2">
-            {extraContent}
-          </div>
-        ) : null}
-        <EditorFilterPanel defs={defs} rows={rows} filters={filters} onChange={onChange} />
-      </EditorModalShell>
     </>
   );
 }

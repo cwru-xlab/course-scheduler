@@ -9,6 +9,7 @@ import { ViewportModal } from "@/components/scheduler/ViewportModal";
 import { editorToolbarBtnAccent } from "@/components/scheduler/editors/editorToolbarStyles";
 import { humanizedSummary } from "@/lib/errors/humanizeError";
 import { useAuth } from "@/lib/auth-client";
+import { SOLVER_CLIENT_TIMEOUT_MS } from "@/lib/solver-timeouts";
 import { isSectionArchived } from "@/lib/scheduling/sectionState";
 import type {
   ScheduleSolution,
@@ -107,7 +108,7 @@ export const SolverActionButton = ({
 
       const controller = new AbortController();
       clientAbortRef.current = controller;
-      const timeoutId = setTimeout(() => controller.abort(), 180_000);
+      const timeoutId = setTimeout(() => controller.abort(), SOLVER_CLIENT_TIMEOUT_MS);
       let response: Response;
       try {
         response = await fetch("/api/schedule", {

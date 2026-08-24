@@ -8,14 +8,19 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
+  type UIEvent,
 } from "react";
 
 import { EditorColumnPicker } from "./EditorColumnPicker";
-import { EditorActionsTh, EditorResizableTh } from "./EditorResizableTh";
-import { editorTd } from "./EditorTableShell";
+import {
+  EditorActionsTh,
+  EditorResizableTh,
+  EDITOR_HEADER_HEIGHT_PX,
+} from "./EditorResizableTh";
 import { applyEditorColumnSort, type EditorColumnSortDef } from "./editorSort";
-import type { EditorColumnSpec } from "./useEditorColumnVisibility";
+import type { EditorColumnPreset, EditorColumnSpec } from "./useEditorColumnVisibility";
 import { useEditorColumnVisibility } from "./useEditorColumnVisibility";
 
 export type EditorColumnVisibilityApi = ReturnType<typeof useEditorColumnVisibility>;
@@ -34,17 +39,42 @@ type EditorConfigurableTableProps<TRow> = {
   renderActions: (row: TRow, index: number) => ReactNode;
   /** If provided, parent owns column visibility (and renders the picker itself). */
   visibility?: EditorColumnVisibilityApi;
+  /** Optional presets when the table owns its own column picker. */
+  columnPresets?: EditorColumnPreset[];
 };
 
-/** Fixed row height enables cheap windowing. Chosen to fit compact HeroUI inputs. */
-const VIRT_ROW_HEIGHT = 44;
+/** Fixed row height keeps freeze panes aligned and enables windowing. */
+const ROW_HEIGHT_PX = 44;
 const VIRT_OVERSCAN = 8;
 /** Rows beyond this get virtualized inside a scrollable viewport. */
 const VIRT_THRESHOLD = 60;
 /** Cap on the viewport height for the virtualized scroll area. */
 const VIRT_VIEWPORT_MAX_PX = 720;
 
-/** Ref-stabilized callback: identity is stable, latest closure always used. */
+const TABLE_CLASS = "table-fixed border-separate border-spacing-0";
+const HEADER_BAR_CLASS =
+  "sticky top-0 z-[2] flex w-full min-w-0 items-stretch bg-content1 pr-3 shadow-[0_1px_0_rgba(0,0,0,0.06)]";
+const HEADER_TR_STYLE = { height: EDITOR_HEADER_HEIGHT_PX } as const;
+const BODY_TR_STYLE = {
+  height: ROW_HEIGHT_PX,
+  maxHeight: ROW_HEIGHT_PX,
+} as const;
+const BODY_TD_CLASS =
+  "box-border h-11 max-h-11 overflow-hidden border-t border-default-200 py-0 pl-2.5 pr-1.5 align-middle min-w-0";
+const ACTIONS_TD_CLASS =
+  "box-border h-11 max-h-11 overflow-hidden whitespace-nowrap border-t border-default-200 py-0 pl-3.5 pr-1.5 align-middle min-w-0";
+/** Mid header scrollport: hide scrollbar; body mid owns the visible horizontal scrollbar. */
+const MID_HEAD_SCROLL_CLASS =
+  "min-w-0 flex-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden";
+const MID_BODY_SCROLL_CLASS =
+  "min-w-0 flex-1 overflow-x-auto overscroll-x-contain [overflow-anchor:none]";
+/** Dotted seam between locked left columns and the scrollable middle. */
+const FREEZE_EDGE_LEFT_CLASS =
+  "shrink-0 bg-content1 border-r border-dotted border-slate-300";
+/** Dotted seam between the scrollable middle and locked Actions. */
+const FREEZE_EDGE_RIGHT_CLASS =
+  "shrink-0 bg-content1 border-l border-dotted border-slate-300";
+
 function useLatestRef<T>(value: T) {
   const ref = useRef(value);
   useLayoutEffect(() => {
@@ -53,56 +83,91 @@ function useLatestRef<T>(value: T) {
   return ref;
 }
 
-type RowSpec = { id: string; label: string };
+type ColSpec = { id: string; label: string };
 
-type RowProps<TRow> = {
+type PaneRowProps<TRow> = {
   row: TRow;
   rowIndex: number;
-  rowId: string | undefined;
+  rowId?: string;
   className: string;
-  visibleSpecs: RowSpec[];
-  actionsWidthPx: number;
+  specs: ColSpec[];
   renderCell: (columnId: string, row: TRow, index: number) => ReactNode;
-  renderActions: (row: TRow, index: number) => ReactNode;
-  virtualized: boolean;
+  renderActions?: (row: TRow, index: number) => ReactNode;
+  actionsWidthPx?: number;
 };
 
-function RowInner<TRow>({
+function PaneRowInner<TRow>({
   row,
   rowIndex,
   rowId,
   className,
-  visibleSpecs,
-  actionsWidthPx,
+  specs,
   renderCell,
   renderActions,
-  virtualized,
-}: RowProps<TRow>) {
-  const style = virtualized
-    ? ({ height: VIRT_ROW_HEIGHT, maxHeight: VIRT_ROW_HEIGHT } as const)
-    : undefined;
+  actionsWidthPx,
+}: PaneRowProps<TRow>) {
   return (
-    <tr id={rowId} className={className} style={style}>
-      {visibleSpecs.map((spec) => (
-        <td key={spec.id} className={editorTd}>
-          {renderCell(spec.id, row, rowIndex)}
+    <tr id={rowId} className={className} style={BODY_TR_STYLE}>
+      {specs.map((spec) => (
+        <td key={spec.id} className={BODY_TD_CLASS}>
+          <div className="flex h-full max-h-11 min-w-0 items-center overflow-hidden">
+            {renderCell(spec.id, row, rowIndex)}
+          </div>
         </td>
       ))}
-      <td
-        className={`${editorTd} whitespace-nowrap`}
-        style={{
-          width: actionsWidthPx,
-          minWidth: actionsWidthPx,
-          maxWidth: actionsWidthPx,
-        }}
-      >
-        {renderActions(row, rowIndex)}
-      </td>
+      {renderActions && actionsWidthPx != null ? (
+        <td
+          className={ACTIONS_TD_CLASS}
+          style={{
+            width: actionsWidthPx,
+            minWidth: actionsWidthPx,
+            maxWidth: actionsWidthPx,
+          }}
+        >
+          <div className="flex h-full max-h-11 min-w-0 items-center overflow-hidden">
+            {renderActions(row, rowIndex)}
+          </div>
+        </td>
+      ) : null}
     </tr>
   );
 }
 
-const EditorRow = memo(RowInner) as typeof RowInner;
+const PaneRow = memo(PaneRowInner) as typeof PaneRowInner;
+
+function SpacerRow({ height, colSpan }: { height: number; colSpan: number }) {
+  if (height <= 0) return null;
+  return (
+    <tr style={{ height }} aria-hidden>
+      <td colSpan={colSpan} />
+    </tr>
+  );
+}
+
+function ColGroup({
+  specs,
+  getWidthPx,
+  actionsWidthPx,
+}: {
+  specs: EditorColumnSpec[];
+  getWidthPx: (id: string) => number;
+  actionsWidthPx?: number;
+}) {
+  return (
+    <colgroup>
+      {specs.map((spec) => (
+        <col
+          key={spec.id}
+          data-col-id={spec.id}
+          style={{ width: getWidthPx(spec.id) }}
+        />
+      ))}
+      {actionsWidthPx != null ? (
+        <col data-col-id="__actions__" style={{ width: actionsWidthPx }} />
+      ) : null}
+    </colgroup>
+  );
+}
 
 export function EditorConfigurableTable<TRow>({
   editorKey,
@@ -115,14 +180,36 @@ export function EditorConfigurableTable<TRow>({
   renderCell,
   renderActions,
   visibility,
+  columnPresets,
 }: EditorConfigurableTableProps<TRow>) {
-  const tableRef = useRef<HTMLTableElement>(null);
-  const internalVisibility = useEditorColumnVisibility(editorKey, columnSpecs);
-  const { specs, visibleSpecs, visibleIds, toggleColumn, showAllColumns, hideAllColumns } =
-    visibility ?? internalVisibility;
+  const leftHeadTableRef = useRef<HTMLTableElement>(null);
+  const leftBodyTableRef = useRef<HTMLTableElement>(null);
+  const midHeadTableRef = useRef<HTMLTableElement>(null);
+  const midBodyTableRef = useRef<HTMLTableElement>(null);
+  const rightHeadTableRef = useRef<HTMLTableElement>(null);
+  const rightBodyTableRef = useRef<HTMLTableElement>(null);
+  const midHeadScrollRef = useRef<HTMLDivElement>(null);
+  const midBodyScrollRef = useRef<HTMLDivElement>(null);
+  const vScrollRef = useRef<HTMLDivElement>(null);
+  const syncingMidScroll = useRef(false);
+
+  const internalVisibility = useEditorColumnVisibility(
+    editorKey,
+    columnSpecs,
+    columnPresets,
+  );
+  const {
+    specs,
+    visibleSpecs,
+    visibleIds,
+    presets,
+    toggleColumn,
+    showAllColumns,
+    hideAllColumns,
+    applyPreset,
+  } = visibility ?? internalVisibility;
   const {
     containerRef,
-    containerWidth,
     getWidthPx,
     actionsWidthPx,
     startResize,
@@ -139,15 +226,33 @@ export function EditorConfigurableTable<TRow>({
     return applyEditorColumnSort(rows, sort, sortDefs);
   }, [rows, sort, sortDefs]);
 
-  // Shallow-clone visibleSpecs into a shape stable across renders so memoized
-  // rows can compare `visibleSpecs` by array identity via useMemo.
-  const rowSpecList = useMemo<RowSpec[]>(
-    () => visibleSpecs.map((s) => ({ id: s.id, label: s.label })),
+  const pinnedSpecs = useMemo(
+    () => visibleSpecs.filter((s) => s.pinned === "left"),
+    [visibleSpecs],
+  );
+  const scrollSpecs = useMemo(
+    () => visibleSpecs.filter((s) => s.pinned !== "left"),
     [visibleSpecs],
   );
 
-  // Wrap the user-provided callbacks so React.memo sees a stable identity
-  // even when the caller re-creates closures on each render.
+  const pinnedColList = useMemo<ColSpec[]>(
+    () => pinnedSpecs.map((s) => ({ id: s.id, label: s.label })),
+    [pinnedSpecs],
+  );
+  const scrollColList = useMemo<ColSpec[]>(
+    () => scrollSpecs.map((s) => ({ id: s.id, label: s.label })),
+    [scrollSpecs],
+  );
+
+  const pinnedWidthPx = useMemo(
+    () => pinnedSpecs.reduce((sum, s) => sum + getWidthPx(s.id), 0),
+    [pinnedSpecs, getWidthPx],
+  );
+  const scrollWidthPx = useMemo(
+    () => scrollSpecs.reduce((sum, s) => sum + getWidthPx(s.id), 0),
+    [scrollSpecs, getWidthPx],
+  );
+
   const renderCellRef = useLatestRef(renderCell);
   const renderActionsRef = useLatestRef(renderActions);
   const getRowIdRef = useLatestRef(getRowId);
@@ -163,6 +268,42 @@ export function EditorConfigurableTable<TRow>({
     [renderActionsRef],
   );
 
+  const resizeTables = useCallback(
+    () => [
+      leftHeadTableRef.current,
+      leftBodyTableRef.current,
+      midHeadTableRef.current,
+      midBodyTableRef.current,
+      rightHeadTableRef.current,
+      rightBodyTableRef.current,
+    ],
+    [],
+  );
+
+  const syncMidScroll = useCallback((source: "head" | "body", left: number) => {
+    if (syncingMidScroll.current) return;
+    syncingMidScroll.current = true;
+    const target =
+      source === "head" ? midBodyScrollRef.current : midHeadScrollRef.current;
+    if (target && target.scrollLeft !== left) {
+      target.scrollLeft = left;
+    }
+    syncingMidScroll.current = false;
+  }, []);
+
+  const onMidHeadScroll = useCallback(
+    (e: UIEvent<HTMLDivElement>) => {
+      syncMidScroll("head", e.currentTarget.scrollLeft);
+    },
+    [syncMidScroll],
+  );
+  const onMidBodyScroll = useCallback(
+    (e: UIEvent<HTMLDivElement>) => {
+      syncMidScroll("body", e.currentTarget.scrollLeft);
+    },
+    [syncMidScroll],
+  );
+
   const virtualized = displayRows.length > VIRT_THRESHOLD;
 
   const [scrollTop, setScrollTop] = useState(0);
@@ -173,14 +314,14 @@ export function EditorConfigurableTable<TRow>({
       setScrollTop(0);
       return;
     }
-    const el = containerRef.current;
+    const el = vScrollRef.current;
     if (!el) return;
     const measure = () => setViewportHeight(el.clientHeight);
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [virtualized, containerRef]);
+  }, [virtualized]);
 
   const { startIndex, endIndex, topPad, bottomPad } = useMemo(() => {
     if (!virtualized) {
@@ -192,26 +333,28 @@ export function EditorConfigurableTable<TRow>({
       };
     }
     const vh = viewportHeight > 0 ? viewportHeight : VIRT_VIEWPORT_MAX_PX;
-    const first = Math.max(0, Math.floor(scrollTop / VIRT_ROW_HEIGHT) - VIRT_OVERSCAN);
+    const first = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT_PX) - VIRT_OVERSCAN);
     const last = Math.min(
       displayRows.length,
-      Math.ceil((scrollTop + vh) / VIRT_ROW_HEIGHT) + VIRT_OVERSCAN,
+      Math.ceil((scrollTop + vh) / ROW_HEIGHT_PX) + VIRT_OVERSCAN,
     );
     return {
       startIndex: first,
       endIndex: last,
-      topPad: first * VIRT_ROW_HEIGHT,
-      bottomPad: Math.max(0, (displayRows.length - last) * VIRT_ROW_HEIGHT),
+      topPad: first * ROW_HEIGHT_PX,
+      bottomPad: Math.max(0, (displayRows.length - last) * ROW_HEIGHT_PX),
     };
   }, [virtualized, viewportHeight, scrollTop, displayRows.length]);
 
   const scrollRaf = useRef(0);
-  const handleScroll = useCallback(
-    (e: React.UIEvent<HTMLDivElement>) => {
+  const handleVScroll = useCallback(
+    (e: UIEvent<HTMLDivElement>) => {
       if (!virtualized) return;
       const y = e.currentTarget.scrollTop;
       cancelAnimationFrame(scrollRaf.current);
-      scrollRaf.current = requestAnimationFrame(() => setScrollTop(y));
+      scrollRaf.current = requestAnimationFrame(() => {
+        setScrollTop((prev) => (prev === y ? prev : y));
+      });
     },
     [virtualized],
   );
@@ -223,26 +366,118 @@ export function EditorConfigurableTable<TRow>({
     [],
   );
 
-  const tableStyle =
-    containerWidth > 0
-      ? {
-          width: containerWidth,
-          minWidth: containerWidth,
-          maxWidth: containerWidth,
-        }
-      : { width: "100%" };
+  /**
+   * Let the table use native scrolling. Only take over at the edges so leftover
+   * wheel delta continues the page without trapping the pointer.
+   */
+  useEffect(() => {
+    const el = vScrollRef.current;
+    if (!el) return;
 
-  const scrollWrapperClass = virtualized
-    ? "w-full min-w-0 overflow-auto"
-    : "w-full min-w-0 overflow-hidden";
-  const scrollWrapperStyle = virtualized
-    ? { maxHeight: VIRT_VIEWPORT_MAX_PX }
-    : undefined;
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey) return;
+      if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+
+      const maxScroll = el.scrollHeight - el.clientHeight;
+      if (maxScroll <= 1) return;
+
+      let delta = event.deltaY;
+      if (event.deltaMode === 1) delta *= 16;
+      else if (event.deltaMode === 2) delta *= el.clientHeight;
+
+      const atTop = el.scrollTop <= 1;
+      const atBottom = el.scrollTop >= maxScroll - 1;
+      const leftoverUp = delta < 0 && atTop;
+      const leftoverDown = delta > 0 && atBottom;
+      if (!leftoverUp && !leftoverDown) return;
+
+      event.preventDefault();
+      window.scrollBy(0, delta);
+    };
+
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
 
   const visibleSlice = useMemo(
     () => displayRows.slice(startIndex, endIndex),
     [displayRows, startIndex, endIndex],
   );
+
+  const pickerPresets = visibility?.presets?.length
+    ? visibility.presets
+    : presets;
+
+  const renderHeaderCells = (paneSpecs: EditorColumnSpec[]) =>
+    paneSpecs.map((spec) => {
+      const sortable = sortableColumnIds.has(spec.id);
+      const isActive = sort?.columnId === spec.id;
+      return (
+        <EditorResizableTh
+          key={spec.id}
+          label={spec.label}
+          widthPx={getWidthPx(spec.id)}
+          onResizeStart={(clientX) =>
+            startResize(spec.id, clientX, resizeTables())
+          }
+          sortable={sortable}
+          sortDirection={isActive ? sort!.direction : null}
+          onSortToggle={sortable ? () => toggleSort(spec.id) : undefined}
+        />
+      );
+    });
+
+  const renderBodyRows = (opts: {
+    colList: ColSpec[];
+    withActions?: boolean;
+    attachRowId?: boolean;
+  }) => (
+    <>
+      <SpacerRow
+        height={topPad}
+        colSpan={opts.colList.length + (opts.withActions ? 1 : 0)}
+      />
+      {visibleSlice.map((row, i) => {
+        const rowIndex = startIndex + i;
+        const rowKey = getRowKey(row, rowIndex);
+        const cls =
+          getRowClassNameRef.current?.(row, rowIndex) ?? "border-t border-default-200";
+        const rowId = opts.attachRowId
+          ? getRowIdRef.current?.(row, rowIndex)
+          : undefined;
+        return (
+          <PaneRow
+            key={rowKey}
+            row={row}
+            rowIndex={rowIndex}
+            rowId={rowId}
+            className={cls}
+            specs={opts.colList}
+            renderCell={stableRenderCell}
+            renderActions={opts.withActions ? stableRenderActions : undefined}
+            actionsWidthPx={opts.withActions ? actionsWidthPx : undefined}
+          />
+        );
+      })}
+      <SpacerRow
+        height={bottomPad}
+        colSpan={opts.colList.length + (opts.withActions ? 1 : 0)}
+      />
+    </>
+  );
+
+  const leftStyle: CSSProperties = {
+    width: pinnedWidthPx,
+    minWidth: pinnedWidthPx,
+  };
+  const midStyle: CSSProperties = {
+    width: Math.max(scrollWidthPx, 1),
+    minWidth: Math.max(scrollWidthPx, 1),
+  };
+  const rightStyle: CSSProperties = {
+    width: actionsWidthPx,
+    minWidth: actionsWidthPx,
+  };
 
   return (
     <>
@@ -254,92 +489,149 @@ export function EditorConfigurableTable<TRow>({
             onToggle={toggleColumn}
             onShowAll={showAllColumns}
             onHideAll={hideAllColumns}
+            presets={pickerPresets}
+            onApplyPreset={pickerPresets.length ? applyPreset : undefined}
           />
         </div>
       )}
-      <div
-        ref={containerRef}
-        className={scrollWrapperClass}
-        style={scrollWrapperStyle}
-        onScroll={virtualized ? handleScroll : undefined}
-      >
-        <table
-          ref={tableRef}
-          className="table-fixed border-collapse"
-          style={tableStyle}
+      <div ref={containerRef} className="w-full min-w-0">
+        <div
+          ref={vScrollRef}
+          className="w-full min-w-0 max-h-[min(720px,calc(100dvh-14rem))] overflow-y-auto overscroll-none pr-3 [overflow-anchor:none] [scrollbar-gutter:stable]"
+          onScroll={virtualized ? handleVScroll : undefined}
         >
-          <colgroup>
-            {visibleSpecs.map((spec) => (
-              <col
-                key={spec.id}
-                data-col-id={spec.id}
-                style={{ width: getWidthPx(spec.id) }}
-              />
-            ))}
-            <col data-col-id="__actions__" style={{ width: actionsWidthPx }} />
-          </colgroup>
-          <thead
-            className={
-              virtualized
-                ? "sticky top-0 z-[1] bg-content1 shadow-[0_1px_0_rgba(0,0,0,0.06)]"
-                : undefined
-            }
-          >
-            <tr>
-              {visibleSpecs.map((spec) => {
-                const sortable = sortableColumnIds.has(spec.id);
-                const isActive = sort?.columnId === spec.id;
-                return (
-                  <EditorResizableTh
-                    key={spec.id}
-                    label={spec.label}
-                    widthPx={getWidthPx(spec.id)}
-                    onResizeStart={(clientX) =>
-                      startResize(spec.id, clientX, tableRef.current)
-                    }
-                    sortable={sortable}
-                    sortDirection={isActive ? sort!.direction : null}
-                    onSortToggle={sortable ? () => toggleSort(spec.id) : undefined}
-                  />
-                );
-              })}
-              <EditorActionsTh widthPx={actionsWidthPx} />
-            </tr>
-          </thead>
-          <tbody>
-            {virtualized && topPad > 0 ? (
-              <tr style={{ height: topPad }} aria-hidden>
-                <td colSpan={visibleSpecs.length + 1} />
-              </tr>
+          {/* Sticky header strip — outside overflow-x so vertical stickiness works */}
+          <div className={HEADER_BAR_CLASS}>
+            {pinnedSpecs.length > 0 ? (
+              <div className={FREEZE_EDGE_LEFT_CLASS} style={leftStyle}>
+                <table
+                  ref={leftHeadTableRef}
+                  className={TABLE_CLASS}
+                  style={leftStyle}
+                >
+                  <ColGroup specs={pinnedSpecs} getWidthPx={getWidthPx} />
+                  <thead>
+                    <tr style={HEADER_TR_STYLE}>{renderHeaderCells(pinnedSpecs)}</tr>
+                  </thead>
+                </table>
+              </div>
             ) : null}
-            {visibleSlice.map((row, i) => {
-              const rowIndex = startIndex + i;
-              const rowKey = getRowKey(row, rowIndex);
-              const cls =
-                getRowClassNameRef.current?.(row, rowIndex) ?? "border-t border-default-200";
-              const rowId = getRowIdRef.current?.(row, rowIndex);
-              return (
-                <EditorRow
-                  key={rowKey}
-                  row={row}
-                  rowIndex={rowIndex}
-                  rowId={rowId}
-                  className={cls}
-                  visibleSpecs={rowSpecList}
-                  actionsWidthPx={actionsWidthPx}
-                  renderCell={stableRenderCell}
-                  renderActions={stableRenderActions}
-                  virtualized={virtualized}
-                />
-              );
-            })}
-            {virtualized && bottomPad > 0 ? (
-              <tr style={{ height: bottomPad }} aria-hidden>
-                <td colSpan={visibleSpecs.length + 1} />
-              </tr>
+
+            <div
+              ref={midHeadScrollRef}
+              className={MID_HEAD_SCROLL_CLASS}
+              onScroll={onMidHeadScroll}
+            >
+              {scrollSpecs.length > 0 ? (
+                <table
+                  ref={midHeadTableRef}
+                  className={TABLE_CLASS}
+                  style={midStyle}
+                >
+                  <ColGroup specs={scrollSpecs} getWidthPx={getWidthPx} />
+                  <thead>
+                    <tr style={HEADER_TR_STYLE}>{renderHeaderCells(scrollSpecs)}</tr>
+                  </thead>
+                </table>
+              ) : (
+                <div style={{ height: EDITOR_HEADER_HEIGHT_PX }} aria-hidden />
+              )}
+            </div>
+
+            <div className={FREEZE_EDGE_RIGHT_CLASS} style={rightStyle}>
+              <table
+                ref={rightHeadTableRef}
+                className={TABLE_CLASS}
+                style={rightStyle}
+              >
+                <ColGroup specs={[]} getWidthPx={getWidthPx} actionsWidthPx={actionsWidthPx} />
+                <thead>
+                  <tr style={HEADER_TR_STYLE}>
+                    <EditorActionsTh widthPx={actionsWidthPx} />
+                  </tr>
+                </thead>
+              </table>
+            </div>
+          </div>
+
+          {/* Body strip */}
+          <div className="flex w-full min-w-0 items-start pr-3">
+            {pinnedSpecs.length > 0 ? (
+              <div className={FREEZE_EDGE_LEFT_CLASS} style={leftStyle}>
+                <table
+                  ref={leftBodyTableRef}
+                  className={TABLE_CLASS}
+                  style={leftStyle}
+                >
+                  <ColGroup specs={pinnedSpecs} getWidthPx={getWidthPx} />
+                  <tbody>
+                    {renderBodyRows({
+                      colList: pinnedColList,
+                      attachRowId: true,
+                    })}
+                  </tbody>
+                </table>
+              </div>
             ) : null}
-          </tbody>
-        </table>
+
+            <div
+              ref={midBodyScrollRef}
+              className={MID_BODY_SCROLL_CLASS}
+              onScroll={onMidBodyScroll}
+            >
+              {scrollSpecs.length > 0 ? (
+                <table
+                  ref={midBodyTableRef}
+                  className={TABLE_CLASS}
+                  style={midStyle}
+                >
+                  <ColGroup specs={scrollSpecs} getWidthPx={getWidthPx} />
+                  <tbody>
+                    {renderBodyRows({
+                      colList: scrollColList,
+                      attachRowId: pinnedSpecs.length === 0,
+                    })}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="h-[1px] w-full" aria-hidden />
+              )}
+            </div>
+
+            <div className={FREEZE_EDGE_RIGHT_CLASS} style={rightStyle}>
+              <table
+                ref={rightBodyTableRef}
+                className={TABLE_CLASS}
+                style={rightStyle}
+              >
+                <ColGroup specs={[]} getWidthPx={getWidthPx} actionsWidthPx={actionsWidthPx} />
+                <tbody>
+                  <SpacerRow height={topPad} colSpan={1} />
+                  {visibleSlice.map((row, i) => {
+                    const rowIndex = startIndex + i;
+                    const rowKey = getRowKey(row, rowIndex);
+                    const cls =
+                      getRowClassNameRef.current?.(row, rowIndex) ??
+                      "border-t border-default-200";
+                    return (
+                      <PaneRow
+                        key={rowKey}
+                        row={row}
+                        rowIndex={rowIndex}
+                        className={cls}
+                        specs={[]}
+                        renderCell={stableRenderCell}
+                        renderActions={stableRenderActions}
+                        actionsWidthPx={actionsWidthPx}
+                      />
+                    );
+                  })}
+                  <SpacerRow height={bottomPad} colSpan={1} />
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
     </>
   );

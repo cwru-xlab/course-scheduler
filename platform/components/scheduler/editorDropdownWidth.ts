@@ -77,7 +77,9 @@ export function editorSelectPopoverProps(menuMinWidth: number) {
       maxWidth: EDITOR_DROPDOWN_MAX_WIDTH_PX,
     },
     classNames: {
-      content: "max-w-[min(420px,90vw)] overflow-x-hidden",
+      // `editor-select-menu` marks portal'd dropdowns so wrapping toolbar
+      // popovers (e.g. floating Filters panels) can ignore presses inside them.
+      content: "editor-select-menu max-w-[min(420px,90vw)] overflow-x-hidden",
     },
   };
 }
