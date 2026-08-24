@@ -73,7 +73,7 @@ export const ROOM_COLUMN_SPECS = allVisible([
   { id: "building", label: "Building", weight: 18, pinned: "left", minWidthPx: 140 },
   { id: "room_number", label: "Room #", weight: 12, minWidthPx: 88 },
   { id: "capacity", label: "Capacity", weight: 10, minWidthPx: 88 },
-  { id: "features", label: "Features", weight: 38, minWidthPx: 200 },
+  { id: "features", label: "Features", weight: 38, minWidthPx: 120 },
 ]);
 
 export const TIMESLOT_COLUMN_SPECS = allVisible([
