@@ -107,7 +107,15 @@ function StickyIcon({ icon }: { icon: IslandStickyInput["icon"] }) {
   return null;
 }
 
-function ActionButton({ action, tone }: { action: IslandAction; tone: IslandTone }) {
+function ActionButton({
+  action,
+  tone,
+  compact = false,
+}: {
+  action: IslandAction;
+  tone: IslandTone;
+  compact?: boolean;
+}) {
   const color =
     action.variant === "warning"
       ? "warning"
@@ -121,12 +129,19 @@ function ActionButton({ action, tone }: { action: IslandAction; tone: IslandTone
               ? "danger"
               : "primary";
 
+  const useFlat = compact || action.variant === "flat" || action.variant === "secondary";
+
   return (
     <Button
       size="sm"
       color={color}
-      variant={action.variant === "flat" || action.variant === "secondary" ? "flat" : "solid"}
-      className="h-7 min-h-7 px-2.5 text-[11px] font-semibold"
+      variant={useFlat ? "flat" : "solid"}
+      className={clsx(
+        "h-7 min-h-7 px-2.5 text-[11px] font-semibold",
+        compact &&
+          tone === "warn" &&
+          "border border-amber-300/80 bg-amber-100/60 text-amber-950 data-[hover=true]:bg-amber-200/70",
+      )}
       isLoading={action.isLoading}
       isDisabled={action.isDisabled}
       onPress={action.onPress}
@@ -358,6 +373,7 @@ function GlobalStatusBar({
   const showFlash = mode === "flash" && flash;
   const showSticky = mode === "sticky" && sticky;
   const showIdle = mode === "idle" && expanded;
+  const flashHasAction = Boolean(showFlash && flash.action);
 
   return (
     <div className="pointer-events-none fixed top-16 inset-x-0 z-40 flex justify-center px-4 pt-1.5 sm:px-6 lg:px-8">
@@ -366,10 +382,13 @@ function GlobalStatusBar({
           "pointer-events-auto overflow-hidden border shadow-md backdrop-blur-md transition-[background-color,border-color,border-radius,padding,max-width] duration-200 ease-out",
           toneIslandClass(tone),
           expanded
-            ? "flex w-fit max-w-[min(720px,94vw)] items-center justify-center gap-2 rounded-2xl px-3.5 py-2 text-xs"
+            ? clsx(
+                "flex w-fit max-w-[min(720px,94vw)] rounded-2xl px-3.5 py-2 text-xs",
+                flashHasAction ? "flex-col items-center gap-2" : "items-center justify-center gap-2",
+              )
             : "inline-flex h-7 max-w-none items-center gap-1.5 rounded-full px-2.5",
           showIdle && "flex-col gap-1",
-          showSticky && "flex-wrap",
+          showSticky && "flex-wrap items-center justify-center",
         )}
       >
         {!expanded ? (
@@ -396,17 +415,27 @@ function GlobalStatusBar({
           <div
             role="status"
             aria-live="polite"
-            className="flex items-center justify-center gap-2"
+            className={clsx(
+              "relative min-w-0",
+              flash!.action
+                ? "flex flex-col items-center gap-2 px-6"
+                : "flex items-center justify-center gap-2",
+            )}
           >
             <span className="min-w-0 text-center text-sm font-medium leading-snug">
               {flash!.message}
             </span>
             {flash!.action ? (
-              <ActionButton action={flash!.action} tone={flash!.tone} />
+              <div className="flex justify-center">
+                <ActionButton action={flash!.action} tone={flash!.tone} compact />
+              </div>
             ) : null}
             <button
               type="button"
-              className="shrink-0 rounded-md p-0.5 opacity-70 hover:bg-black/5 hover:opacity-100"
+              className={clsx(
+                "shrink-0 rounded-md p-0.5 opacity-70 hover:bg-black/5 hover:opacity-100",
+                flash!.action ? "absolute right-0 top-0" : "",
+              )}
               onClick={onDismissFlash}
               aria-label="Dismiss notification"
             >
@@ -418,7 +447,7 @@ function GlobalStatusBar({
         {showSticky ? (
           <>
             <StickyIcon icon={sticky!.icon} />
-            <div className="min-w-0 text-center text-sm font-medium leading-snug sm:text-left">
+            <div className="min-w-0 text-center text-sm font-medium leading-snug">
               {sticky!.message}
             </div>
             {sticky!.secondaryAction ? (

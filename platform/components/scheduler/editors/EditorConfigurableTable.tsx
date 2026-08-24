@@ -53,7 +53,7 @@ const VIRT_VIEWPORT_MAX_PX = 720;
 
 const TABLE_CLASS = "table-fixed border-separate border-spacing-0";
 const HEADER_BAR_CLASS =
-  "sticky top-0 z-[2] flex w-full min-w-0 items-stretch bg-content1 shadow-[0_1px_0_rgba(0,0,0,0.06)]";
+  "sticky top-0 z-[2] flex w-full min-w-0 items-stretch bg-content1 pr-3 shadow-[0_1px_0_rgba(0,0,0,0.06)]";
 const HEADER_TR_STYLE = { height: EDITOR_HEADER_HEIGHT_PX } as const;
 const BODY_TR_STYLE = {
   height: ROW_HEIGHT_PX,
@@ -366,6 +366,39 @@ export function EditorConfigurableTable<TRow>({
     [],
   );
 
+  /**
+   * Let the table use native scrolling. Only take over at the edges so leftover
+   * wheel delta continues the page without trapping the pointer.
+   */
+  useEffect(() => {
+    const el = vScrollRef.current;
+    if (!el) return;
+
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey) return;
+      if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+
+      const maxScroll = el.scrollHeight - el.clientHeight;
+      if (maxScroll <= 1) return;
+
+      let delta = event.deltaY;
+      if (event.deltaMode === 1) delta *= 16;
+      else if (event.deltaMode === 2) delta *= el.clientHeight;
+
+      const atTop = el.scrollTop <= 1;
+      const atBottom = el.scrollTop >= maxScroll - 1;
+      const leftoverUp = delta < 0 && atTop;
+      const leftoverDown = delta > 0 && atBottom;
+      if (!leftoverUp && !leftoverDown) return;
+
+      event.preventDefault();
+      window.scrollBy(0, delta);
+    };
+
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
   const visibleSlice = useMemo(
     () => displayRows.slice(startIndex, endIndex),
     [displayRows, startIndex, endIndex],
@@ -464,7 +497,7 @@ export function EditorConfigurableTable<TRow>({
       <div ref={containerRef} className="w-full min-w-0">
         <div
           ref={vScrollRef}
-          className="w-full min-w-0 max-h-[min(720px,calc(100dvh-14rem))] overflow-y-auto overscroll-contain [overflow-anchor:none]"
+          className="w-full min-w-0 max-h-[min(720px,calc(100dvh-14rem))] overflow-y-auto overscroll-none pr-3 [overflow-anchor:none] [scrollbar-gutter:stable]"
           onScroll={virtualized ? handleVScroll : undefined}
         >
           {/* Sticky header strip — outside overflow-x so vertical stickiness works */}
@@ -522,7 +555,7 @@ export function EditorConfigurableTable<TRow>({
           </div>
 
           {/* Body strip */}
-          <div className="flex w-full min-w-0 items-start">
+          <div className="flex w-full min-w-0 items-start pr-3">
             {pinnedSpecs.length > 0 ? (
               <div className={FREEZE_EDGE_LEFT_CLASS} style={leftStyle}>
                 <table

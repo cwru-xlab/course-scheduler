@@ -3441,7 +3441,7 @@ type PatternDayApplyRow = {
         setPatternApplyPrompt(null);
       }
       const multiDayNotice = canOfferPatternApply
-        ? `Only ${selectedDay} was updated. Use "Apply to all pattern days" to extend this time to its other days (${otherPatternDays.join(", ")}).`
+        ? `Only ${selectedDay} was updated. Other pattern days: ${otherPatternDays.join(", ")}.`
         : `Only ${selectedDay} was updated. This section uses a multi-day pattern — its other days are unchanged. Adjust them from the schedule table or re-place per day.`;
 
       // Warnings (room overlap, instructor double-booking) keep the applied move
