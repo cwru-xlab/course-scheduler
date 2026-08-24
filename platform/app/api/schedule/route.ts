@@ -16,13 +16,13 @@ import { solverErrorsFromBody } from "@/lib/api/solverFetch";
 import { enrichSolverErrors, normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
 import { sectionLocksFromInput } from "@/lib/scheduling/sectionLocks";
 import { publishSharedSchedule } from "@/lib/shared-schedule";
-import {
-  SOLVER_API_TIMEOUT_MS,
-  SOLVER_ROUTE_MAX_DURATION_SEC,
-} from "@/lib/solver-timeouts";
+import { SOLVER_API_TIMEOUT_MS } from "@/lib/solver-timeouts";
 
-// Must exceed CP-SAT search budget (see solver-timeouts.ts).
-export const maxDuration = SOLVER_ROUTE_MAX_DURATION_SEC;
+// Must exceed CP-SAT search budget + headroom (see lib/solver-timeouts.ts).
+// Segment config exports must be static literals — Next.js cannot statically
+// evaluate an imported constant here (build fails with "Invalid segment
+// configuration export detected"). solver-timeouts.ts guards this stays 720.
+export const maxDuration = 720;
 
 export async function POST(request: NextRequest) {
   // Serialize solver runs across users: the Flask solver is single-worker

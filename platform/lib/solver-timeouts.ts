@@ -9,3 +9,11 @@ export const SOLVER_CLIENT_TIMEOUT_MS = SOLVER_API_TIMEOUT_MS + 60_000;
 
 /** Next.js route maxDuration (seconds) for /api/schedule. */
 export const SOLVER_ROUTE_MAX_DURATION_SEC = Math.ceil(SOLVER_CLIENT_TIMEOUT_MS / 1000);
+
+/**
+ * Route segment config (`export const maxDuration`) must be a static literal in
+ * the route file — Next.js cannot statically evaluate imported constants. The
+ * literal lives in app/api/schedule/route.ts; this assignment fails the type
+ * check if the two ever drift apart.
+ */
+const ROUTE_MAX_DURATION_LITERAL_GUARD: typeof SOLVER_ROUTE_MAX_DURATION_SEC = 720;
