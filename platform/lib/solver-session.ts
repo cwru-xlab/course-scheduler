@@ -5,6 +5,11 @@
  * Not shared across replicas; scale-out requires Redis (or similar).
  */
 
+import {
+  SOLVER_API_TIMEOUT_MS,
+  SOLVER_CLIENT_TIMEOUT_MS,
+} from "@/lib/solver-timeouts";
+
 export type SolverSessionStatus =
   | "idle"
   | "running"
@@ -46,10 +51,10 @@ type InternalState = SolverSessionState & {
 
 const DEFAULT_SESSION_ID = "default";
 /** Matches schedule API / solver timeout budget. */
-const ESTIMATED_MAX_MS = 150_000;
+const ESTIMATED_MAX_MS = SOLVER_API_TIMEOUT_MS;
 const PROGRESS_CAP = 92;
 const TICK_MS = 250;
-const MAX_RUNTIME_MS = 180_000;
+const MAX_RUNTIME_MS = SOLVER_CLIENT_TIMEOUT_MS;
 const BROADCAST_THROTTLE_MS = 250;
 
 const globalRef = globalThis as unknown as {

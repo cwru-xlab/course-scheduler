@@ -1,0 +1,2341 @@
+id course_id department section_code
+S1 Foundations of Accounting I ACCT 100
+S2 Foundations of Accounting I ACCT 100
+S3 Foundations of Accounting I ACCT 100
+S4 Spreadsheet Basics for Business and Non-Business MajorsACCT 106
+S5 Spreadsheet Basics for Business and Non-Business MajorsACCT 106
+S6 Foundations of Accounting II ACCT 200
+S7 Foundations of Accounting II ACCT 200
+S8 Foundations of Accounting II ACCT 200
+S9 Corporate Reporting I ACCT 300
+S10 Corporate Reporting II ACCT 301
+S11 Income Tax: Concepts, Skills, Planning ACCT 305
+S12 Accounting Information Systems ACCT 306
+S13 Applied Management Accounting ACCT 307
+S14 Technology Lab for Applied Management AccountingACCT 307L
+S15 Technology Lab for Applied Management AccountingACCT 307L
+S16 Technology Tools for Financial Management ACCT 316
+S17 Corporate Reporting and Analysis ACCT 357
+S18 Independent Study ACCT 360
+S19 Independent Study ACCT 360
+S20 Corporate Reporting I ACCT 400
+S21 Corporate Reporting II ACCT 401
+S22 Advanced Financial Reporting ACCT 404
+S23 Advanced Financial Reporting ACCT 404
+S24 Advanced Federal Taxes ACCT 405
+S25 Accounting Information Systems ACCT 406
+S26 Applied Management Accounting ACCT 407
+S27 Corporate Reporting and Analysis ACCT 414
+S28 Advanced Accounting Technology ACCT 416
+S29 Forensic Accounting ACCT 418
+S30 Client Communication, Ethics, and Professionalism ACCT 431
+S31 Advanced Auditing Theory and Practice ACCT 444
+S32 MAcc Capstone ACCT 495
+S33 MAcc Capstone ACCT 495
+S34 Advanced Accounting Theory ACCT 520
+S35 Special Problems and Topics: Experimental Rsch & AuditingACCT 601
+S36 Dissertation Ph.D. ACCT 701
+S37 Seminar: Financial Services Industry BAFI 210
+S38 Applying Artificial Intelligence and Blockchain in Business and FinanceBAFI 335
+S39 Applying Artificial Intelligence and Blockchain in Business and FinanceBAFI 335
+S40 Money and Banking BAFI 341
+S41 Money and Banking BAFI 341
+S42 Financial Data Science: Data Analytics & Machine Learning FundamentalsBAFI 351
+S43 Corporate Finance BAFI 355
+S44 Corporate Finance BAFI 355
+S45 Corporate Finance BAFI 355
+S46 Investments BAFI 356
+S47 Financial Modeling BAFI 357
+S48 Intermediate Corporate Finance BAFI 358
+S49 Real Estate Finance BAFI 364
+S50 Options and Other Derivatives BAFI 365
+S51 International Finance BAFI 372
+S52 Financial Strategy and Value Creation BAFI 428
+S53 Investment Management BAFI 429
+S54 Fixed Income Markets and Their Derivatives BAFI 431
+S55 Corporate Risk Management BAFI 432
+S56 Financial Decisions and Value Creation BAFI 440
+S57 Real Estate Finance BAFI 464
+S58 Global Banking & Capital Markets BAFI 480
+S59 Special Problems and Topics BAFI 501
+S60 Special Problems and Topics: CFA Research ChallengeBAFI 501
+S61 Legal Environment of Management BLAW 331
+S62 Legal Environment of Management BLAW 417
+S63 xLab capstone BTEC 398
+S64 xLab capstone BTEC 398
+S65 Introduction to Programming for Business ApplicationsBTEC 420
+S66 Introduction to Programming for Business ApplicationsBTEC 420
+S67 Managerial Marketing I BUAI 407A
+S68 Managerial Marketing II BUAI 407B
+S69 Team Development BUAI 485B
+S70 Operations Management BUAI 406A
+S71 Accounting and Financial Management BUAI 410
+S72 Operations Analytics: Stochastic BUAI 432
+S73 Marketing Models and Digital Analytics BUAI 435
+S74 Advanced Marketing Analytics BUAI 445
+S75 Machine Learning and Artificial Intelligence in Business AnalyticsBUAI 446
+S76 Prescriptive Analytics BUAI 455
+S77 Experiential Learning - Business Analytics BUAI 495
+S78 Experiential Learning - Business Analytics BUAI 495
+S79 Independent Study BUAI 501
+S80 Independent Study BUAI 501
+S81 Independent Study BUAI 501
+S82 Independent Study BUAI 501
+S83 Theory and Practice of Collective Action DBAP 611
+S84 Technology and Social System Design DBAP 617
+S85 Qualitative Inquiry I DBAP 638
+S86 Social Ethics: Contemporary Issues DBAP 640
+S87 Directed Studies Seminar: Research Proposal DBAP 642
+S88 Directed Studies Seminar: Quantitative Capstone DBAP 642
+S89 Directed Studies Seminar: Integrative Paper/DissertationDBAP 642
+S90 Directed Studies Seminar: Qualitative Research PaperDBAP 642
+S91 Experimental Design and Analysis DBAP 649
+S92 Knowledge Dissemination to Influence Managerial PracticeDBAP 664
+S93 Flourishing Entreprise: Creating Sustainable Value for Business and WorldDBAP 672
+S94 Designing Sustainable Systems DBAP 677
+S95 Foundational Statistical Analysis and Measurement DBAP 682
+S96 Integration of Methods Sequences DBAP 683
+S97 Applied Research Project Continuation DBAP 699
+S98 Introduction to Programming for Business ApplicationsDESN 210
+S99 Introduction to Programming for Business ApplicationsDESN 210
+S100 Creativity in Design & Business: Sources of Perception, Imagination, & Creative ThinkingDESN 302
+S101 Entrepreneurship Through Acquisition II DESN 318
+S102 Entrepreneurship Through Acquisition III DESN 319
+S103 Database Management DESN 320
+S104 Entrepreneurship Through Acquisition III DESN 419
+S105 Entrepreneurship Through Acquisition II DESN 420
+S106 Dissertation Ph.D. DESN 701
+S107 Dissertation Ph.D. DESN 701
+S108 Dissertation Ph.D. DESN 701
+S109 Principles of Microeconomics ECON 102
+S110 Principles of Microeconomics ECON 102
+S111 Principles of Microeconomics ECON 102
+S112 Principles of Macroeconomics ECON 103
+S113 Principles of Macroeconomics ECON 103
+S114 Principles of Macroeconomics ECON 103
+S115 Principles of Macroeconomics ECON 103
+S116 Markets, Morality, and Civic Responsibility ECON 202
+S117 Data Visualization in R ECON 216
+S118 Intermediate Macro Theory ECON 307
+S119 Intermediate Macro Theory ECON 307
+S120 Intermediate Micro Theory: Calculus-Based ECON 309
+S121 Econometrics ECON 326
+S122 Econometrics ECON 326
+S123 Econometrics ECON 326
+S124 Advanced Econometrics ECON 327
+S125 Game Theory: The Economics of Thinking StrategicallyECON 329
+S126 Economic Analysis of Labor Markets ECON 332
+S127 Money and Banking ECON 341
+S128 Money and Banking ECON 341
+S129 Public Finance ECON 342
+S130 Sustainability and Solidarity: Exploring the Nordic Economic ModelECON 352
+S131 Sustainability and Solidarity: Exploring the Nordic Economic ModelECON 352
+S132 Economic Analysis of Business Strategies ECON 364
+S133 Industrial Strategy: Government Action to Transform the EconomyECON 367
+S134 Advanced Topics and Writing in Economics ECON 391
+S135 Capstone Research in Economics ECON 395
+S136 Capstone Research in Economics ECON 395
+S137 Honors Research I ECON 397
+S138 Honors Research II ECON 398
+S139 Advanced Econometrics ECON 427
+S140 Game Theory: The Economics of Thinking StrategicallyECON 429
+S141 Economics of Negotiation and Conflict Resolution ECON 431
+S142 Leading Design in Organizations EMBA 478B
+S143 Business Ethics for Executives EMBA 420
+S144 Economic Analysis for Managers EMBA 437
+S145 Corporate Finance EMBA 439
+S146 Strategy EMBA 451
+S147 Strategic Negotiations EMBA 471
+S148 Leading Change: Teams EMBA 473
+S149 Corporate Governance and Dialogues in Healthcare EMBA 476
+S150 Leading Change: Society EMBA 479
+S151 Special Topics in Management: Global Mkt Strat for ExecsEMBA 480
+S152 Special Topics in Management: AI Trends in ManagementEMBA 480
+S153 Special Topics in Management: Mergers & AcquisitionsEMBA 480
+S154 Special Topics in Management EMBA 480
+S155 Entrepreneurial Strategy ENTP 301
+S156 Social Entrepreneurship: Igniting Social Change ENTP 322
+S157 Beyond Silicon Valley: Growing Entrepreneurship in Transitioning EconomiesENTP 323
+S158 Power Talks: Emerging Energy, Startup, and Entrepreneurial StrategyENTP 326
+S159 Entrepreneurial Finance ENTP 444
+S160 Individual, Team and Career Development FNCE 436B
+S161 Individual, Team and Career Development FNCE 436B
+S162 Individual, Team and Career Development FNCE 436B
+S163 Individual, Team and Career Development FNCE 436B
+S164 Algorithmic Trading FNCE 412
+S165 Financial Strategy and Value Creation FNCE 428
+S166 Investment Management FNCE 429
+S167 Fixed Income Markets and Their Derivatives FNCE 431
+S168 Corporate Risk Management FNCE 432
+S169 Financial Decisions Modeling and Analytics FNCE 440
+S170 Financial Models Using Big Data FNCE 470
+S171 Global Banking & Capital Markets FNCE 480
+S172 Capstone Project: Master of Finance FNCE 495
+S173 Dialogues in Healthcare Management HSMC 325
+S174 Dialogues in Healthcare Management HSMC 425
+S175 Managing Organizational Change and Real-World ChallengesLEOC 414B
+S176 Team Development for Transforming Organizations LEOC 431
+S177 Inclusive Leadership LEOC 440
+S178 Leading Change from a Complexity Perspective LEOC 470
+S179 Strategic Thinking for Organizational Transformation LEOC 479A
+S180 Dynamics of Creativity and Innovation in OrganizationsLEOC 480
+S181 Engineering in Heealthcare MBAP 423H
+S182 Finance Issues and Applications in Healthcare MBAP 426H
+S183 Finance Issues and Applications in Healthcare MBAP 426H
+S184 Introduction to Population Health MBAP 427H
+S185 Introduction to Population Health MBAP 427H
+S186 Artificial Intelligence Applications in Healthcare ManagementMBAP 429H
+S187 Artificial Intelligence Applications in Healthcare ManagementMBAP 429H
+S188 Health Beyond Hospital Systems: Transforming Care from Social Determinants to StrategyMBAP 432H
+S189 Health Beyond Hospital Systems: Transforming Care from Social Determinants to StrategyMBAP 432H
+S190 Foundations of Product Management MBAP 450P
+S191 Foundations of Product Management MBAP 450P
+S192 Product Development & Delivery MBAP 456P
+S193 Product Development & Delivery MBAP 456P
+S194 Managing People and Organizations MBAP 404
+S195 Managing People and Organizations MBAP 404
+S196 Leading Self MBAP 470
+S197 Leading Self MBAP 470
+S198 Regression and Decision Modeling MBAP 472
+S199 Leading Others MBAP 474
+S200 Leading Others MBAP 474
+S201 Leading Others MBAP 474
+S202 Leading Others MBAP 474
+S203 Using Financial Statements to Evaluate Performance MBAP 475
+S204 Using Financial Statements to Evaluate Performance MBAP 475
+S205 Cost-Based Decision Making MBAP 476
+S206 Cost-Based Decision Making MBAP 476
+S207 Corporate Finance MBAP 477
+S208 Corporate Finance MBAP 477
+S209 Corporate Finance MBAP 477
+S210 Corporate Finance MBAP 477
+S211 Valuing Businesses MBAP 478
+S212 Valuing Businesses MBAP 478
+S213 Leading Organizations MBAP 479
+S214 Leading Organizations MBAP 479
+S215 Introduction to Business Strategy MBAP 480
+S216 Marketing Planning and Management MBAP 481
+S217 Introduction to Supply Chain Management MBAP 482
+S218 Introduction to Supply Chain Management MBAP 482
+S219 The Strategic Edge - Economics for Leaders MBAP 483
+S220 The Strategic Edge - Economics for Leaders MBAP 483
+S221 The Strategic Edge - Economics for Leaders MBAP 483
+S222 The Strategic Edge - Economics for Leaders MBAP 483
+S223 Introduction to Operations Management MBAP 484
+S224 Introduction to Operations Management MBAP 484
+S225 Introduction to Operations Management MBAP 484
+S226 Introduction to Operations Management MBAP 484
+S227 Introduction to Operations Management MBAP 484
+S228 Business Strategy Applications MBAP 485
+S229 Marketing Execution MBAP 487
+S230 Experience in Business Problem Solving: OrganizationsMGMT 198
+S231 Experience in Business Problem Solving: Digital and AI InnovationMGMT 198
+S232 Experience in Business Problem Solving: Digital and AI InnovationMGMT 198
+S233 Contemporary Business and Communication MGMT 201
+S234 Contemporary Business and Communication MGMT 201
+S235 Essentials of Personal Finance MGMT 205
+S236 Essentials of Personal Finance MGMT 205
+S237 Essentials of Personal Finance MGMT 205
+S238 Essentials of Personal Finance MGMT 205
+S239 Doing Good: How Nonprofits Change Lives MGMT 221
+S240 What is Making and Manufacturing Today, and Why is Innovation Part of the Story?MGMT 224
+S241 International Management Institute MGMT 315
+S242 International Management Institute MGMT 315
+S243 International Management Institute MGMT 315
+S244 Introduction to Family Businesses MGMT 320
+S245 Complexities of Family Businesses MGMT 321
+S246 Financing Change: Impact Investing in Action MGMT 324
+S247 Advanced Seminar: Entertainment Sponsorships MGMT 395
+S248 Advanced Seminar: Evaluating Ideas in Real-Time MGMT 395
+S249 Advanced Seminar: Social Justice Leadership MGMT 395
+S250 Advanced Seminar: Social Justice Leadership MGMT 395
+S251 Advanced Seminar: Social Justice Leadership MGMT 395
+S252 Advanced Seminar: Booms and Busts - Lessons MGMT 395
+S253 Advanced Seminar: Booms and Busts - Lessons MGMT 395
+S254 Advanced Seminar: Commercial Credit Risk MGMT 395
+S255 Advanced Seminar: Becoming Conversant in AI MGMT 395
+S256 Advanced Seminar: Intentional Impact Strategy MGMT 395
+S257 Advanced Seminar: Private Credit: New Corp Debt MGMT 395
+S258 Advanced Seminar: Truth About Capital Structure MGMT 395
+S259 Advanced Seminar: Art Science of Decision Making MGMT 395
+S260 Advanced Seminar: Real Estate Investment MGMT 395
+S261 Experience in Business Consulting for Sustainable ImpactMGMT 396
+S262 Undergraduate Research Project MGMT 397
+S263 Undergraduate Research Project MGMT 397
+S264 Undergraduate Research Project MGMT 397
+S265 Action Learning MGMT 398
+S266 Professional Development: Skills for Success MGMT 411
+S267 Leadership in Action: Teamwork and Influence MGMT 412
+S268 Business Communication: Storytelling for Impact MGMT 413
+S269 Project Execution Skills: Strategies for Real World Problem SolvingMGMT 414
+S270 Project Execution Skills: Strategies for Real World Problem SolvingMGMT 414
+S271 Project Execution Skills: Strategies for Real World Problem SolvingMGMT 414
+S272 Curricular Practical Training MGMT 418
+S273 Introduction to Family Businesses MGMT 420
+S274 Complexities of Family Businesses MGMT 421
+S275 International Institute MGMT 458
+S276 Measurement Theory and Method MGMT 571
+S277 Advanced Topics MGMT 602
+S278 Qualitative Inquiry I MGMT 638
+S279 Social Ethics: Contemporary Issues MGMT 640
+S280 Directed Studies Seminar: PhD Research Proposal MGMT 642
+S281 Experimental Design and Analysis MGMT 649
+S282 Knowledge Dissemination to Influence Managerial PracticeMGMT 664
+S283 Designing Sustainable Systems MGMT 677
+S284 Foundational Statistical Analysis and Measurement MGMT 682
+S285 Integration of Methods Sequence MGMT 683
+S286 Dissertation Ph.D. MGMT 701
+S287 Introduction to Information: A Systems and Design ApproachMIDS 301
+S288 Marketing Management MKMR 201
+S289 Marketing Management MKMR 201
+S290 Marketing Management MKMR 201
+S291 Marketing Management MKMR 201
+S292 Measuring Marketing Performance MKMR 308
+S293 Marketing Analytics MKMR 310
+S294 Customer Relationship Management MKMR 311
+S295 Strategic Internet Marketing MKMR 348
+S296 Social Media Strategy MKMR 350
+S297 Social Media Strategy MKMR 450
+S298 Leading Change from a Complexity Perspective MPOD 470B
+S299 Individual Mastery Projects MPOD 439
+S300 Organization Innovation MPOD 479
+S301 Business Forecasting OPMT 477A
+S302 Enterprise Resource Planning in the Supply Chain OPMT 477B
+S303 Experiential Learning with Six Sigma Green Belt OPMT 420
+S304 Global Supply Chain Logistics OPMT 475
+S305 Special Problems and Topics OPMT 501
+S306 Spreadsheet and Business Process Simulation - I OPRE 332A
+S307 Spreadsheet and Business Process Simulation - II OPRE 332B
+S308 Spreadsheet and Business Process Simulation - I OPRE 432A
+S309 Spreadsheet and Business Process Simulation - II OPRE 432B
+S310 Statistics for Business and Management Science I OPRE 207
+S311 Statistics for Business and Management Science I OPRE 207
+S312 Operations Research and Supply Chain ManagementOPRE 301
+S313 Operations Research and Supply Chain ManagementOPRE 301
+S314 Confidence Blueprint: Skills for College, Career, and LifeORBH 222
+S315 The Confidence Blueprint: Skills for College, Career, and LifeORBH 222
+S316 Ethics for the Real World: Developing a Code of Ethics to Guide Decisions in Work and LifeORBH 240
+S317 Leading People: The Practice, Theory, and Reality of Leadership (LEAD I)ORBH 250
+S318 Leading Organizations (LEAD II) ORBH 251
+S319 Developing Interpersonal Skills for Leading ORBH 303
+S320 The Art and Science of High-Functioning Teams ORBH 310
+S321 Quantum Leadership: Creating Value for You, Business, and the WorldORBH 330
+S322 Building Leadership Character: Ethics in Action ORBH 375
+S323 Managing Negotiations ORBH 380
+S324 Developing Interpersonal Skills for Leading ORBH 403
+S325 Economics of Negotiation and Conflict Resolution ORBH 413
+S326 Quantum Leadership: Creating Value for You, Business, and the WorldORBH 430
+S327 Women in Organizations ORBH 460
+S328 Building Champions in the Family Business:  How Leadership and Teamwork Drive a Winning CultureORBH 462
+S329 Organizational Behavior Department Seminar ORBH 510
+S330 Micro Organizational Behavior ORBH 511
+S331 Appreciative Inquiry and Strength-Based Change ORBH 513
+S332 Learning and Development ORBH 570
+S333 Dissertation Ph.D. ORBH 701
+S334 Dissertation Ph.D. ORBH 701
+S335 Dissertation Ph.D. ORBH 701
+S336 Dissertation Ph.D. ORBH 701
+S337 Dissertation Ph.D. ORBH 701
+S338 Business Policy PLCY 399
+S339 Spreadsheet and Business Process Simulation - I SCMG 432A
+S340 Spreadsheet and Business Process Simulation - II SCMG 432B
+S341 Business Forecasting SCMG 477A
+S342 Enterprise Resource Planning in the Supply Chain SCMG 477B
+S343 Experiential Learning with Six Sigma Green Belt SCMG 420
+S344 Artificial Intelligence Fundamentals for Supply Chain ManagementSCMG 462
+S345 Case Studies in Artificial Intelligence - Supply Chain ApplicationsSCMG 463
+S346 Global Supply Chain Logistics SCMG 475
+S347 Capstone Project: MSCM SCMG 495
+S348 Innovation & Entrepreneurship: Concepts and PracticeVEAL 334
+S349 Innovation & Entrepreneurship: Concepts and PracticeVEAL 334
+section_number instructor_id expected_enrollment enrollment_cap
+100 8 0 62
+101 9 0 62
+102 9 0 62
+100 4 0 50
+101 7 0 50
+101 5 0 60
+102 5 0 60
+103 Staff 0 50
+100 3 0
+100 Staff 0
+100 4 0 40
+100 10 0
+100 Staff 0
+100 12 0 35
+101 12 0 35
+100 11 0 25
+100 Staff 0
+100 Staff 0 999
+101 Staff 0 10
+100 Staff 0
+100 Staff 0
+400 6 0 50
+400 Staff 0 50
+100 Staff 0 50
+100 Staff 0
+100 12 0
+100 5 0 36
+100 10 0 45
+100 13 0 45
+100 1 0 36
+100 Staff 0 50
+100 8 0 24
+100 12 0 24
+100 Staff 0 50
+100 Staff 0 999
+100 2 0 999
+400 16 0 40
+100 20 0 55
+101 20 0 55
+100 14 0
+101 Staff 0
+100 18 0 35
+100 19 0 55
+101 19 0 55
+102 15 0 55
+100 15 0 60
+100 95 0
+100 17 0 50
+100 21 0
+100 Staff 0 50
+100 Staff 0 45
+100 Staff 0
+100 15 0
+100 Staff 0
+100 20 0
+100 17 0
+100 Staff 0
+100 Staff 0 12
+800 Staff 0 1
+100 Staff 0 1
+100 2 0
+100 Staff 0
+100 22 0 25
+101 23 0 25
+101 Staff 0
+102 Staff 0
+100 Staff 0 49
+100 Staff 0 49
+100 Staff 0 50
+100 27 0 40
+100 Staff 0 24
+100 Staff 0 22
+100 24 0 40
+100 Staff 0 48
+100 Staff 0 40
+100 25 0 40
+100 54 0 24
+101 Staff 0 24
+400 Staff 0 1
+400 Staff 0 1
+800 Staff 0 1
+100 Staff 0 1
+400 31 0 999
+400 30 0 50
+400 29 0
+400 2 0
+401 29 0 999
+402 Staff 0 999
+403 Staff 0 999
+800 Staff 0 2
+400 Staff 0
+400 Staff 0
+100 33 0 50
+400 Staff 0
+400 Staff 0
+400 32 0
+800 28 0 999
+101 96 0
+102 24 0
+100 35 0 45
+100 36 0
+100 37 0
+100 34 0 45
+100 Staff 0
+100 Staff 0
+100 Staff 0 5
+103 Staff 0 5
+104 Staff 0 5
+100 39 0 60
+101 39 0 60
+103 Staff 0 62
+100 Staff 0 60
+101 22 0 60
+103 45 0 60
+104 Staff 0 60
+100 47 0 18
+100 38 0 50
+100 Staff 0 50
+101 Staff 0 50
+100 41 0 40
+100 42 0 56
+110 42 0 28
+111 42 0 28
+100 43 0
+100 Staff 0
+100 46 0 45
+100 14 0
+101 14 0
+100 43 0 55
+100 Staff 0 34
+100 Staff 0 34
+100 39 0 50
+100 Staff 0 18
+100 44 0 18
+100 38 0 24
+101 46 0 24
+100 Staff 0 999
+100 Staff 0 999
+100 Staff 0
+100 51 0
+100 Staff 0
+100 23 0 50
+100 52 0 50
+100 42 0 50
+100 21 0 50
+100 50 0 50
+100 51 0 50
+100 48 0 50
+100 49 0 50
+100 33 0 50
+100 53 0 50
+101 54 0 50
+102 50 0 50
+103 5 0 50
+100 55 0 58
+100 56 0 18
+100 56 0 18
+100 57 0 18
+100 58 0
+100 Staff 0 54
+100 Staff 0 54
+100 Staff 0 54
+100 Staff 0 54
+100 Staff 0
+100 21 0
+100 Staff 0
+100 Staff 0
+100 Staff 0
+100 Staff 0
+100 Staff 0 55
+100 Staff 0 50
+100 16 0
+100 42 0
+100 Staff 0
+400 92 0
+400 48 0 35
+400 60 0 35
+400 61 0 35
+400 59 0 35
+800 Staff 0 35
+800 68 0
+800 67 0 50
+800 Staff 0 50
+800 63 0 45
+800 Staff 0 45
+800 Staff 0 45
+800 Staff 0 45
+800 Staff 0 45
+800 Staff 0 45
+800 Staff 0 45
+800 Staff 0 45
+800 66 0 45
+800 Staff 0 45
+400 Staff 0 50
+400 Staff 0 50
+800 65 0 50
+800 Staff 0 50
+800 25 0
+400 65 0 50
+800 65 0 50
+400 Staff 0 50
+800 Staff 0 50
+400 12 0 50
+800 Staff 0 50
+400 12 0 50
+800 12 0 50
+400 Staff 0 50
+400 Staff 0 50
+800 Staff 0 50
+800 Staff 0 50
+400 21 0
+800 21 0
+400 33 0
+800 Staff 0
+400 Staff 0
+400 Staff 0
+400 Staff 0 50
+800 Staff 0 50
+400 51 0 50
+400 Staff 0 50
+800 Staff 0 50
+800 Staff 0 50
+800 Staff 0 45
+800 Staff 0 45
+400 64 0 50
+400 Staff 0 50
+400 Staff 0 50
+400 Staff 0
+400 Staff 0
+100 70 0 40
+101 Staff 0 40
+102 55 0 36
+100 35 0 45
+101 35 0 45
+100 4 0 47
+101 4 0 40
+102 6 0 40
+103 4 0 40
+100 77 0 18
+100 76 0 18
+100 Staff 0 30
+100 Staff 0 30
+100 55 0 30
+100 78 0
+100 78 0
+100 79 0 18
+100 71 0 18
+101 71 0 18
+102 72 0 18
+103 72 0 18
+104 72 0 18
+105 73 0 18
+106 73 0 18
+107 19 0 18
+108 18 0 18
+400 74 0 18
+105 Staff 0 18
+109 16 0 18
+110 80 0 18
+111 98 0 18
+100 55 0 50
+100 Staff 0 1
+101 Staff 0 1
+102 Staff 0 999
+100 Hazard,Brett C 0 45
+100 Staff 0 40
+100 Staff 0 40
+100 Staff 0 40
+100 8 0 55
+101 8 0 55
+102 8 0 55
+800 Staff 0
+100 Staff 0
+100 Staff 0
+400 58 0
+100 Staff 0 10
+800 28 0 999
+400 Staff 0
+400 Staff 0
+403 Staff 0 999
+400 24 0
+400 69 0
+400 Staff 0
+400 75 0
+400 Staff 0
+100 Staff 0 20
+100 96 0 55
+100 32 0 40
+101 28 0 50
+102 28 0 50
+100 26 0 50
+100 26 0 45
+100 Staff 0 50
+100 83 0
+100 Staff 0 45
+100 32 0
+100 Staff 0
+100 Staff 0 35
+400 Staff 0 35
+400 Staff 0 35
+100 Staff 0
+100 Staff 0
+100 64 0 24
+100 Staff 0
+800 Staff 0 1
+100 25 0
+100 Staff 0
+100 Staff 0
+100 Staff 0
+100 87 0 55
+101 87 0 55
+100 25 0 35
+101 88 0 35
+100 93 0 18
+101 94 0
+100 91 0
+100 89 0 60
+100 89 0 60
+400 65 0 50
+100 48 0 50
+100 33 0
+100 91 0 18
+100 92 0 60
+400 Staff 0 50
+100 Staff 0
+100 Staff 0
+800 60 0 50
+800 101 0 25
+100 60 0
+100 29 0
+100 33 0
+100 65 0
+100 61 0 5
+101 60 0 5
+102 48 0 5
+105 Staff 0 5
+107 Staff 0 5
+100 49 0 55
+100 Staff 0
+100 Staff 0
+100 Staff 0
+100 86 0
+100 Staff 0 24
+100 18 0 51
+100 64 0 51
+100 Staff 0
+100 64 0 24
+100 Staff 0 15
+100 Staff 0 15
+allowed_meeting_patterns room_requirements crosslist_group_id tags
+MP-B-75
+MP-B-75
+MP-B-75
+MP-A-50
+MP-A-50
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75 XG1
+MP-B-75 XG2
+MP-B-75
+MP-B-75 XG3
+MP-B-75 XG4
+MP-A-50
+MP-A-50
+MP-A-50
+MP-C-150
+MP-B-75
+MP-B-75
+MP-B-75 XG1
+MP-B-75 XG2
+MP-B-75
+MP-B-75
+MP-C-150
+MP-B-75 XG3
+MP-B-75 XG4
+MP-C-150
+MP-B-75
+MP-B-75
+MP-C-150
+MP-C-150
+MP-A-50
+MP-B-75
+MP-C-150
+MP-A-50
+MP-A-50
+MP-C-150
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75 XG5
+MP-C-150
+MP-B-75
+MP-C-150 XG6
+MP-C-150 XG7
+MP-C-150 XG8
+MP-C-150 XG9
+MP-C-150 XG10
+MP-B-75 XG5
+MP-C-150
+MP-B-75
+MP-B-75
+MP-B-75 XG11
+MP-B-75 XG11
+MP-B-75
+MP-B-75
+MP-C-150
+MP-B-75
+MP-C-150
+MP-C-150
+MP-C-150
+MP-B-75
+MP-C-150
+MP-C-150
+MP-C-150
+MP-C-150
+MP-B-75
+MP-B-75
+MP-B-75
+MP-A-50
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-C-150
+MP-C-150
+MP-C-150 XG12
+MP-C-150 XG13
+MP-B-75
+MP-B-75
+MP-A-50
+MP-B-75
+MP-C-150 XG14
+MP-C-150
+MP-B-75
+MP-C-150 XG15
+MP-C-150
+MP-C-150 XG16
+MP-B-75
+MP-C-150
+MP-B-75
+MP-B-75
+MP-C-150 XG17
+MP-C-150 XG18
+MP-C-150
+MP-C-150 XG18
+MP-C-150 XG17
+MP-A-50
+MP-A-50
+MP-A-50
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-A-50
+MP-A-50
+MP-B-75
+MP-B-75
+MP-C-150
+MP-C-150
+MP-B-75 XG19
+MP-B-75 XG20
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75 XG19
+MP-B-75 XG20
+MP-C-150 XG21
+MP-C-150
+MP-C-150
+MP-C-150
+MP-C-150
+MP-C-150
+MP-C-150
+MP-C-150
+MP-C-150
+MP-C-150
+MP-C-150
+MP-C-150
+MP-C-150
+MP-C-150
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-C-150
+MP-C-150
+MP-C-150
+MP-C-150
+MP-C-150
+MP-C-150 XG6
+MP-C-150 XG7
+MP-C-150 XG8
+MP-C-150 XG9
+MP-C-150 XG10
+MP-C-150
+MP-C-150
+MP-B-75
+MP-C-150 XG22
+MP-C-150 XG22
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-C-150
+MP-B-75
+MP-C-150
+MP-B-75
+MP-C-150
+MP-B-75
+MP-C-150
+MP-B-75
+MP-C-150
+MP-B-75
+MP-C-150
+MP-B-75
+MP-C-150
+MP-B-75
+MP-C-150
+MP-B-75
+MP-B-75
+MP-C-150
+MP-B-75
+MP-C-150
+MP-C-150
+MP-C-150
+MP-C-150
+MP-C-150
+MP-C-150
+MP-C-150
+MP-B-75
+MP-C-150
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-C-150
+MP-C-150
+MP-C-150
+MP-B-75
+MP-C-150
+MP-B-75
+MP-C-150
+MP-B-75
+MP-C-150
+MP-C-150
+MP-B-75
+MP-B-75
+MP-B-75
+MP-C-150
+MP-C-150
+MP-C-150
+MP-B-75
+MP-B-75
+MP-C-150
+MP-C-150
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-C-150
+MP-C-150 XG23
+MP-C-150 XG24
+MP-B-75
+MP-A-50
+MP-A-50
+MP-A-50
+MP-A-50
+MP-A-50
+MP-A-50
+MP-A-50
+MP-A-50
+MP-A-50
+MP-A-50
+MP-A-50
+MP-A-50
+MP-A-50
+MP-A-50
+MP-C-150
+MP-A-50
+MP-A-50
+MP-A-50
+MP-C-150
+MP-A-50
+MP-B-75
+MP-B-75
+MP-A-50
+MP-A-50
+MP-A-50
+MP-A-50
+MP-C-150 XG23
+MP-C-150 XG24
+MP-B-75
+MP-C-150
+MP-B-75
+MP-C-150 XG12
+MP-C-150 XG13
+MP-A-50
+MP-C-150 XG14
+MP-C-150
+MP-C-150 XG15
+MP-C-150
+MP-C-150 XG16
+MP-A-50
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75 XG25
+MP-B-75 XG25
+MP-A-50
+MP-C-150
+MP-B-75
+MP-C-150 XG26
+MP-C-150 XG27
+MP-C-150 XG28
+MP-B-75 XG29
+MP-B-75
+MP-C-150 XG30
+MP-C-150
+MP-C-150
+MP-C-150
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-C-150
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-C-150 XG31
+MP-B-75
+MP-C-150 XG32
+MP-B-75
+MP-B-75
+MP-C-150 XG31
+MP-C-150 XG21
+MP-C-150 XG32
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-B-75
+MP-A-50
+MP-A-50
+MP-A-50
+MP-A-50
+MP-A-50
+MP-B-75
+MP-C-150 XG30
+MP-C-150
+MP-C-150 XG26
+MP-C-150 XG27
+MP-C-150 XG28
+MP-C-150
+MP-C-150
+MP-B-75 XG29
+MP-B-75
+MP-B-75
+MP-B-75
+previous_meeting_pattern state
+TuTh 1:00PM - 2:15PM active
+MW 9:00AM - 10:15AM active
+MW 10:30AM - 11:45AM active
+Th 1:00PM - 1:50PM active
+Tu 8:30AM - 9:20AM active
+MW 12:45PM - 2:00PM active
+MW 3:20PM - 4:35PM active
+TBA inactive
+MW 12:45PM - 2:00PM active
+MW 9:00AM - 10:15AM inactive
+MW 3:20PM - 4:35PM active
+TuTh 10:00AM - 11:15AM active
+TuTh 11:30AM - 12:45PM active
+active
+active
+Th 1:00PM - 2:00PM active
+Th 6:00PM - 8:45PM inactive
+TBA inactive
+MW 8:55AM - 10:10AM inactive
+active
+MW 9:00AM - 10:15AM inactive
+active
+TBA inactive
+W 6:00PM - 8:45PM inactive
+TuTh 10:00AM - 11:15AM active
+TuTh 11:30AM - 12:45PM active
+Th 6:00PM - 8:45PM active
+active
+active
+M 6:00PM - 8:45PM; F 1/16 12:00PM - 2:45PMactive
+Th 2:30PM - 5:15PM inactive
+active
+active
+Tu 6:00PM - 8:45PM inactive
+inactive
+TBA inactive
+M 6:30PM - 8:00PM active
+MW 12:35PM - 1:50PM active
+TuTh 11:30AM - 12:45PM active
+TuTh 11:30AM - 12:45PM active
+TuTh 2:30PM - 3:45PM inactive
+TuTh 11:30AM - 12:45PM active
+MW 9:00AM - 10:15AM active
+MW 10:35AM - 11:50AM active
+TuTh 11:30AM - 12:45PM active
+MW 12:45PM - 2:00PM active
+active
+MW 3:20PM - 4:35PM active
+active
+Tu 6:00PM - 8:30PM inactive
+active
+Tu 6:00PM - 8:45PM inactive
+M 9:00AM - 11:30AM active
+Tu 3:00PM - 5:45PM active
+Tu 11:30AM - 2:15PM active
+W 12:00PM - 2:45PM active
+active
+W 3:00PM - 5:45PM inactive
+TBA active
+TBA active
+MW 12:45PM - 2:00PM active
+MW 12:45PM - 2:00PM active
+active
+active
+M 6:00PM - 8:30PM active
+MW 3:20PM - 4:35PM active
+M 9:00AM - 11:45AM inactive
+M 9:00AM - 11:45AM inactive
+Th 3:00PM - 5:45PM inactive
+active
+W 6:30PM - 9:00PM inactive
+Tu 3:00PM - 5:45PM inactive
+Tu 3:00PM - 5:45PM active
+W 2:15PM - 5:00PM inactive
+active
+active
+active
+active
+TBA inactive
+TBA inactive
+TBA inactive
+TBA inactive
+F  - inactive
+Sa  - inactive
+Th  - inactive
+Sa 9:00AM - 3:30PM inactive
+TBA inactive
+TBA inactive
+TBA inactive
+TBA inactive
+Th  - inactive
+F  - inactive
+inactive
+Th  - inactive
+F  - inactive
+Sa  - inactive
+TBA inactive
+M 6:00PM - 8:30PM active
+MW 3:20PM - 4:35PM active
+TuTh 2:30PM - 3:45PM active
+Tu 6:00PM - 8:30PM active
+Tu 6:00PM - 8:30PM active
+Tu 4:00PM - 6:30PM active
+Tu 6:00PM - 8:30PM active
+Tu 6:00PM - 8:30PM active
+TBA inactive
+TBA inactive
+TBA inactive
+MW 10:30AM - 11:45AM active
+MW 12:45PM - 2:00PM active
+TuTh 2:30PM - 3:45PM active
+MW 3:20PM - 4:35PM active
+TuTh 8:30AM - 9:45AM active
+TuTh 2:30PM - 3:45PM active
+MW 12:45PM - 2:00PM active
+TuTh 11:30AM - 12:45PM inactive
+TuTh 10:00AM - 11:15AM active
+MWF 10:35AM - 11:25AM active
+MWF 11:40AM - 12:30PM active
+TuTh 11:30AM - 12:45PM active
+MW 3:20PM - 4:35PM active
+M 2:15PM - 3:05PM active
+M 4:50PM - 5:40PM active
+TuTh 11:30AM - 12:45PM active
+TuTh 8:30AM - 9:45AM active
+active
+TuTh 11:30AM - 12:45PM active
+TuTh 2:30PM - 3:45PM active
+TuTh 2:30PM - 3:45PM active
+TBA inactive
+TBA inactive
+MW 9:00AM - 10:15AM active
+MW 12:45PM - 2:00PM inactive
+TuTh 10:00AM - 11:15AM active
+TuTh 1:00PM - 2:15PM active
+TuTh 1:00PM - 2:15PM active
+TBA inactive
+TBA inactive
+TuTh 11:30AM - 12:45PM active
+TuTh 8:30AM - 9:45AM active
+W 6:00PM - 8:30PM active
+Sa 1:15PM - 3:15PM inactive
+Sa 8:00AM - 12:15PM inactive
+Sa 8:00AM - 10:00AM inactive
+Sa 10:15AM - 12:15PM inactive
+Th 8:00AM - 12:15PM inactive
+Th 3:30PM - 5:30PM inactive
+Sa 1:15PM - 5:30PM inactive
+Sa 3:30PM - 5:30PM inactive
+Th 1:15PM - 3:15PM inactive
+Th 8:00AM - 10:00AM inactive
+F 10:15AM - 12:15PM inactive
+Sa 10:15AM - 12:15PM inactive
+Sa 1:15PM - 5:30PM inactive
+TuTh 2:30PM - 3:45PM active
+TuTh 1:00PM - 2:15PM active
+TuTh 11:30AM - 12:45PM active
+MW 10:35AM - 11:50AM active
+Thursday evenings in the past active
+Th 9:15AM - 11:15AM inactive
+Th 9:15AM - 11:15AM inactive
+Th 9:15AM - 11:15AM inactive
+Th 9:15AM - 11:15AM inactive
+M 3:00PM - 5:45PM inactive
+Tu 6:00PM - 8:45PM inactive
+M 9:00AM - 11:30AM active
+Tu 3:00PM - 5:45PM active
+Tu 11:30AM - 2:15PM active
+W 12:00PM - 2:45PM active
+Th 3:00PM - 5:45PM inactive
+W 3:00PM - 5:45PM inactive
+active
+Tu 6:00PM - 8:00PM active
+Tu 6:00PM - 8:00PM active
+inactive
+inactive
+inactive
+inactive
+inactive
+8:30 am-5:00 pm inactive
+active
+W 7:00PM - 8:30PM active
+TBA inactive
+Tu 7:00PM - 8:30PM active
+TBA inactive
+Th 7:00PM - 8:30PM active
+TBA inactive
+Tu 7:00PM - 8:30PM inactive
+TBA inactive
+W 7:00PM - 8:30PM inactive
+TBA inactive
+Tu 7:00PM - 8:30PM active
+TBA inactive
+M 6:00PM - 7:30PM inactive
+TBA inactive
+W 7:00PM - 8:30PM active
+TBA inactive
+active
+W 7:00PM - 8:30PM active
+TBA active
+M 7:45PM - 9:15PM inactive
+W 7:00PM - 8:30PM inactive
+Tu 7:00PM - 8:30PM active
+Tu 7:00PM - 8:30PM inactive
+M 6:00PM - 7:30PM active
+Tu 7:00PM - 8:30PM active
+M 7:45PM - 9:15PM inactive
+TBA inactive
+W 7:00PM - 8:30PM inactive
+TBA inactive
+active
+active
+active
+active
+inactive
+inactive
+M 6:00PM - 7:30PM active
+Th 7:00PM - 8:30PM active
+M 7:45PM - 9:15PM active
+TBA inactive
+Tu 7:00PM - 8:30PM inactive
+TBA inactive
+Th 7:00PM - 8:30PM inactive
+TBA inactive
+W 6:00PM - 7:30PM active
+M 6:00PM - 7:30PM inactive
+TBA inactive
+active
+inactive
+Tu 6:00PM - 8:00PM active
+Tu 10:00AM - 11:15AM active
+W 2:15PM - 3:30PM active
+TuTh 10:00AM - 11:15AM active
+TuTh 11:30AM - 12:45PM active
+Tu 2:30PM - 3:45PM active
+M 3:20PM - 4:35PM active
+MW 10:30AM - 11:45AM active
+active
+TuTh 10:00AM - 11:15AM active
+MW 12:45PM - 2:00PM active
+TBA active
+MTuWThFSaSu  - active
+Th 4:00PM - 5:00PM active
+M 6:00PM - 8:30PM active
+M 6:00PM - 8:30PM active
+TuTh 4:00PM - 5:15PM active
+Th 1:00PM - 3:00PM active
+F 12:00PM - 2:00PM active
+Tu 1:00PM - 2:00PM active
+Tu 2:30PM - 3:30PM active
+Tu 4:00PM - 5:00PM active
+W 12:45PM - 1:45PM active
+W 2:15PM - 3:15PM active
+W 5:30PM - 6:30PM active
+Tu 1:00PM - 2:00PM active
+Th 9:00AM - 11:00AM active
+Tu 6:00PM - 8:00PM inactive
+Th 4:00PM - 5:00PM active
+M 1:00PM - 2:00PM active
+M 2:15PM - 3:15PM active
+Th 6:00PM - 8:00PM active
+TBA inactive
+TBA inactive
+TBA inactive
+M 6:00PM - 8:00PM active
+inactive
+inactive
+inactive
+active
+active
+active
+inactive
+M 6:00PM - 8:30PM active
+M 6:00PM - 8:30PM active
+inactive
+M 9:00AM - 3:00PM inactive
+TBA inactive
+Th  - inactive
+Sa 9:00AM - 3:30PM inactive
+TBA inactive
+Th  - inactive
+F  - inactive
+Th  - inactive
+F  - inactive
+Sa  - inactive
+TBA inactive
+TuTh 10:00AM - 11:15AM active
+MW 10:35AM - 11:50AM active
+TuTh 10:00AM - 11:15AM active
+TuTh 11:30AM - 12:45PM active
+active
+MW 9:00AM - 10:15AM active
+TuTh 11:30AM - 12:45PM inactive
+TuTh 1:00PM - 2:15PM active
+MW 10:35AM - 11:50AM active
+MW 12:45PM - 2:00PM active
+MW 12:45PM - 2:00PM active
+F 8:30AM - 5:00PM inactive
+Sa 8:30AM - 5:00PM inactive
+WTh 8:30AM - 5:00PM inactive
+W 6:00PM - 8:30PM active
+W 6:00PM - 8:30PM active
+Th 2:30PM - 5:15PM active
+TuTh 10:00AM - 11:15AM active
+TBA inactive
+Tu 3:00PM - 5:45PM active
+Tu 3:00PM - 5:45PM inactive
+Tu 3:00PM - 5:45PM active
+Tu 3:00PM - 5:45PM inactive
+MW 9:00AM - 10:15AM active
+MW 10:30AM - 11:45AM active
+MW 12:45PM - 2:00PM active
+MW 3:15PM - 4:30PM active
+Th 5:30PM - 8:00PM active
+active
+active
+TuTh 10:00AM - 11:15AM active
+TuTh 11:30AM - 12:45PM active
+Sa 10:00AM - 2:00PM active
+MW 3:20PM - 4:35PM active
+Tu 6:00PM - 8:00PM active
+TuTh 10:00AM - 11:15AM active
+MW 12:45PM - 2:00PM active
+Sa 10:00AM - 2:00PM active
+W 6:00PM - 8:30PM active
+Tu 6:00PM - 8:00PM active
+active
+REMOTE active
+inactive
+inactive
+inactive
+inactive
+TBA inactive
+TBA inactive
+TBA inactive
+TBA inactive
+TBA inactive
+MW 12:45PM - 2:00PM active
+Tu 3:00PM - 5:45PM active
+Tu 3:00PM - 5:45PM inactive
+W 6:00PM - 8:30PM active
+W 6:00PM - 8:30PM active
+Th 2:30PM - 5:15PM active
+W 9:00AM - 11:45AM active
+W 9:00AM - 11:45AM active
+TuTh 10:00AM - 11:15AM active
+active
+TBA inactive
+MTuWThFSaSu 7:00AM - 8:00AMinactive
+prev_notes
+
+
+
+
+
+
+
+new_notes
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: New | Setup: LAB | 
+Draft status: New | Setup: LAB | 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: IND 
+Draft status: Archive | Setup: IND 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: New | Session style: 
+Draft status: New | Session style: 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: New | Setup: LEC | 
+Draft status: New | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: RSC 
+Draft status: Archive | Setup: DSR 
+Draft status: Active | Setup: SEM 
+Draft status: New | Setup: LEC | 
+Draft status: New | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: New | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: New | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: IND | 
+Draft status: Active | Setup: IND | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: New | Setup: LEC | 
+Draft status: New | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: SEM 
+Draft status: New | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: New | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: New | Setup: LEC | 
+Draft status: New | Setup: LEC | 
+Draft status: New | Session style: 
+Draft status: New | Session style: 
+Draft status: Archive | Setup: IND 
+Draft status: Archive | Setup: IND 
+Draft status: Archive | Setup: IND 
+Draft status: Archive | Setup: IND 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: SEM 
+Draft status: Archive | Setup: SEM 
+Draft status: Archive | Setup: SEM 
+Draft status: Archive | Setup: SEM 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: SEM 
+Draft status: Archive | Comment: 
+Draft status: Archive | Setup: SEM 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: RSC 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: DSR 
+Draft status: Archive | Setup: DSR 
+Draft status: Archive | Setup: DSR 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: SEM 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LAB | 
+Draft status: Active | Setup: LAB | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: New | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: SEM 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: SEM 
+Draft status: Archive | Setup: RSC 
+Draft status: Archive | Setup: RSC 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: SEM 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: SEM 
+Draft status: Archive | Setup: SEM 
+Draft status: Archive | Setup: SEM 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: SEM 
+Draft status: Archive | Setup: SEM 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Session 
+Draft status: Archive | Setup: SEM 
+Draft status: Archive | Setup: SEM 
+Draft status: Archive | Setup: SEM 
+Draft status: Archive | Setup: SEM 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: New | Setup: SEM | 
+Draft status: New | Setup: LEC | 
+Draft status: New | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: SEM 
+Draft status: New | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: New | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: New | Setup: LEC | 
+Draft status: New | Setup: LEC | 
+Draft status: New | Setup: LEC | 
+Draft status: New | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: New | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: SEM 
+Draft status: Archive | Setup: SEM 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: SEM 
+Draft status: Archive | Setup: RSC 
+Draft status: Archive | Setup: RSC 
+Draft status: Archive | Setup: RSC 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: New | Setup: LEC | 
+Draft status: New | Setup: LEC | 
+Draft status: New | Setup: LEC | 
+Draft status: Archive | Session 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: RSC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: SEM 
+Draft status: Archive | Setup: SEM 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: SEM 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: DSR 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: New | Setup: LEC | 
+Draft status: New | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: IND 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: SEM 
+Draft status: New | Setup: SEM | 
+Draft status: New | Session style: 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: SEM 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: SEM 
+Draft status: New | Setup: LEC | 
+Draft status: New | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Archive | Setup: SEM 
+Draft status: Archive | Setup: SEM 
+Draft status: Archive | Setup: SEM 
+Draft status: Archive | Setup: DSR 
+Draft status: Archive | Setup: DSR 
+Draft status: Archive | Setup: DSR 
+Draft status: Archive | Setup: DSR 
+Draft status: Archive | Setup: DSR 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: LEC 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: New | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Active | Setup: LEC | 
+Draft status: Archive | Setup: SEM 
+Draft status: Archive | Setup: SEM 
+id name rank_type unavailable_times
+1 Johnson, David Adjunct
+2 Fogarty, Tim Adjunct
+3 Carlisle, Melissa Adjunct
+4 Sasmaz, Mary Adjunct
+5 Blakeway-Phillips, Heidi Adjunct
+6 Martin, Sharon Adjunct
+7 Szabo, Bruce Adjunct
+8 Joseph, Abraham Adjunct
+9 Dong, Yufan Adjunct
+10 Bucaro, Anthony Adjunct
+11 Skomra, Piotr Adjunct
+12 Jarvis, Mark Adjunct
+13 Baum, Lewis Adjunct
+14 Thompson, John Adjunct
+15 Bae, Joon Woo Adjunct
+16 Steinberg, Greg Adjunct
+17 Krishnan, CNV Adjunct
+18 Vaidya, Jay Adjunct
+19 Rausche, Amra Adjunct
+20 Gupta, Anurag Adjunct
+Szabo,Bruce MIchaelSzabo,Bruce MIchael Unknown
+Blakeway-Phillips,Heidi ChristineBlakeway-Phillips,Heidi Christine Unknown
+Martin,Sharon LeeMartin,Sharon Lee Unknown
+Dong,YufanDong,Yufan Unknown
+Bucaro,Anthony CarlBucaro,Anthony Carl Unknown
+Barrus,Mark ElliottBarrus,Mark Elliott Unknown
+Thompson,JohnThompson,John Unknown
+Wang,Li Wang,Li Unknown
+Madureira,Leonardo LMadureira,Leonardo L Unknown
+Krishnan,C N VKrishnan,C N V Unknown
+Stanek,David AStanek,David A Unknown
+Fallahtafti,AlirezaFallahtafti,Alireza Unknown
+Jung,MiyeonJung,Miyeon Unknown
+Mathur,Kamlesh; Singh,JagdipMathur,Kamlesh; Singh,Jagdip Unknown
+Singh,JagdipSingh,Jagdip Unknown
+Niraj,Rakesh KumarNiraj,Rakesh Kumar Unknown
+Boyatzis,Richard EBoyatzis,Richard E Unknown
+Cola,Philip A.Cola,Philip A. Unknown
+Lyytinen,Kalle JLyytinen,Kalle J Unknown
+Doherty,Eileen; Shemberg,AndreaDoherty,Eileen; Shemberg,Andrea Unknown
+Parameswaran,VijayaParameswaran,Vijaya Unknown
+Dangelo,MarkDangelo,Mark Unknown
+Vykhovanyuk,BogdanVykhovanyuk,Bogdan Unknown
+Yoo,YoungjinYoo,Youngjin Unknown
+Nambisan,Satish PannikatNambisan,Satish Pannikat Unknown
+Hawkins,Jenny RaeHawkins,Jenny Rae Unknown
+Ernest PhD,Jonathan OrryErnest PhD,Jonathan Orry Unknown
+Wang,SiningWang,Sining Unknown
+Lussier,MartineLussier,Martine Unknown
+Hammack,PeterHammack,Peter Unknown
+Clingingsmith,David LClingingsmith,David L Unknown
+Xiong,HeyuXiong,Heyu Unknown
+Shoag,Daniel WarrenShoag,Daniel Warren Unknown
+Sheremeta,Roman MSheremeta,Roman M Unknown
+Helper,SusanHelper,Susan Unknown
+Schweitzer,Mark EdwardSchweitzer,Mark Edward Unknown
+Zabell,Julia Helen KiousZabell,Julia Helen Kious Unknown
+Mathur,KamleshMathur,Kamlesh Unknown
+Van Oosten,Ellen BrooksVan Oosten,Ellen Brooks Unknown
+Staff Staff Adjunct
+Fry,Ronald EFry,Ronald E Unknown
+Lowry,ScotLowry,Scot Unknown
+Buchter,Megan ElizabethBuchter,Megan Elizabeth Unknown
+Cashon,Tiffany ECashon,Tiffany E Unknown
+Cashon,Tiffany E; Goldberg,MichaelCashon,Tiffany E; Goldberg,Michael Unknown
+Benton-Smith,Angela MoniqueBenton-Smith,Angela Monique Unknown
+Cooperrider,David LCooperrider,David L Unknown
+Barrett,FrankBarrett,Frank Unknown
+Coen,CorinneCoen,Corinne Unknown
+Peck,Simon IanPeck,Simon Ian Unknown
+Tischler,Nicole ThereseTischler,Nicole Therese Unknown
+Laszlo,Christopher PeterLaszlo,Christopher Peter Unknown
+Hill,MichaelHill,Michael Unknown
+Herschman,Ray SamuelHerschman,Ray Samuel Unknown
+Healy,Suzanne LeeHealy,Suzanne Lee Unknown
+Hazard,Brett CHazard,Brett C Unknown
+Gilmore,James HaydnGilmore,James Haydn Unknown
+Camp,Lisa AnnCamp,Lisa Ann Unknown
+Taylor,John DTaylor,John D Unknown
+Baierl,Mindy MBaierl,Mindy M Unknown
+Gerace,SamGerace,Sam Unknown
+Vaidya,Jay DeeVaidya,Jay Dee Unknown
+Linton,MichaelLinton,Michael Unknown
+Feddeck,Maria VolkovaFeddeck,Maria Volkova Unknown
+Smith,DalithiaSmith,Dalithia Unknown
+Schwartz,Edward  ; Stone,KevinSchwartz,Edward  ; Stone,Kevin Unknown
+Zelman,IvyZelman,Ivy Unknown
+Hazard,Brett C; Taylor,John DHazard,Brett C; Taylor,John D Unknown
+Jankowski,Joseph; Theofrastous,Theodore CharlesJankowski,Joseph; Theofrastous,Theodore CharlesUnknown
+Cornuke,Brandon RobertCornuke,Brandon Robert Unknown
+Bogart,William ThomasBogart,William Thomas Unknown
+Freeman-Hildreth,Yolonda FayeFreeman-Hildreth,Yolonda Faye Unknown
+Buchanan,RichardBuchanan,Richard Unknown
+Weitzner,Steven PWeitzner,Steven P Unknown
+Watkins,AndrewWatkins,Andrew Unknown
+Case PhD,Susan SCase PhD,Susan S Unknown
+Howard,Anita RHoward,Anita R Unknown
+Godwin,LindseyGodwin,Lindsey Unknown
+Stephens,John PStephens,John P Unknown
+Bilimoria,DianaBilimoria,Diana Unknown
+Chatterjee,SayanChatterjee,Sayan Unknown
+Diaz Salazar,Jose  ; Goldberg,MichaelDiaz Salazar,Jose  ; Goldberg,Michael Unknown
+21 Olavarria, Jose Adjunct
+22 Wang, Sining Adjunct
+23 Agamanolis, Stefan Adjunct
+24 Jung, Miyeon Adjunct
+25 Fallahtafi, Alireza Adjunct
+26 Niraj, Rakesh Adjunct
+27 Vairaktarakis, George Adjunct
+28 Brock, Juergen Adjunct
+29 Cola, Philip Adjunct
+30 Buchanan, Richard Adjunct
+31 Moore, Pete Adjunct
+32 Hughes, Christian Adjunct
+33 Godwin, Lindsey Adjunct
+34 Dangelo, Mark Adjunct
+35 Gilmore, James Adjunct
+36 King,GJ Adjunct
+37 Lowry, Scot Adjunct
+38 Clingingsmith, David Adjunct
+39 Ernest, Jonathan Adjunct
+40 Lussier, Martine Adjunct
+41 Xiong, Heyu Adjunct
+42 Votruba, Mark Adjunct
+43 Shoag, Daniel Adjunct
+44 Hawkins, Jenny Rae Adjunct
+45 Hammack, Peter Adjunct
+46 Schweitzer, Mark Adjunct
+47 Wolcowitz, Jeffrey Adjunct
+48 Stephens, John Paul Adjunct
+49 Peck, Simon Adjunct
+50 Bailey, Bernard Adjunct
+51 Sheremeta, Roman Adjunct
+52 Julius, Dan Adjunct
+53 Medvedev, Andrew Adjunct
+54 Gerace, Sam Adjunct
+55 Buchter, Megan Adjunct
+56 Cashon, Tiffany Adjunct
+57 Steirer, Jonathan Adjunct
+58 Goldberg, Michael Adjunct
+59 Barrett, Frank Adjunct
+60 Bilimoria, Diana Adjunct
+61 Boyatzis, Richard Adjunct
+62 Van Oosten, Ellen Adjunct
+63 Nevel, Alan Adjunct
+64 Goulder, Michael Adjunct
+65 Messer, Tracey Adjunct
+66 Fisher, Mike Adjunct
+67 Herschman, Ray Adjunct
+68 Hill, Michael Adjunct
+69 Sanger, Sharon Adjunct
+70 Hazard, Brett Adjunct
+71 Linton, Michael Adjunct
+72 Howard, Anita Adjunct
+73 Levine, Kenneth Adjunct
+74 Simpson, Yvette Adjunct
+75 Gaskin, James Adjunct
+76 Camp, Lisa Adjunct
+77 Henry, Christine Adjunct
+78 Steeb, Cindy Adjunct
+79 Falco, Elizabeth Adjunct
+80 Arbesman, Samuel Adjunct
+81 Schwartz,Edward & Stone,  Kevin Adjunct
+82 Sarangadharan Geetha Kumari, Akhil Adjunct
+83 Bodapati, Narsi Adjunct
+84 Mathur, Kamlesh Adjunct
+85 Solow, Daniel Adjunct
+86 Difilippo, Daniel Adjunct
+87 Wu, Qi Adjunct
+88 Ning, Jie Adjunct
+89 Feddeck, Maria Adjunct
+90 Ehasz, Sharon Adjunct
+91 Case, Susan Adjunct
+92 Morales, Omar Adjunct
+93 Smith, Dalithia Adjunct
+94 Guilliam, Laura Adjunct
+95 Petkova, Ralitsa Unknown
+96 Frank, Morgan Unknown
+97 Stoller, Jacob Unknown
+98 Schwartz,Edward Unknown
+99 Stone, Kevin Unknown
+100 Taylor, John Unknown
+101 Rooney, Jim Unknown
+preferred_days preferred_patterns max_teaching_days prev_notes
+
+
+
+new_notes
+
+id building room_number capacity features
+Peter B Lewis 201 PBL 201 72
+Peter B Lewis 258 PBL 258 58
+Peter B Lewis 203 PBL 203 65
+Peter B Lewis 02 PBL 2 62
+Peter B Lewis 220 PBL 220 36
+Peter B Lewis 401 PBL 401 60
+Peter B Lewis 106 PBL 106 61
+Peter B Lewis 118 PBL 118 54
+Peter B Lewis 05 PBL 5 45
+Peter B Lewis 501 PBL 501 52
+Peter B Lewis 202 PBL 202 65
+Peter B Lewis 07 PBL 7 60 Computer classroom
+Peter B Lewis 03 PBL 3 48
+Peter B Lewis 04 PBL 4 52
+Peter B Lewis 121 PBL 121 25
+Peter B Lewis 120 PBL 120 20
+Peter B Lewis 105 PBL 105 17
+Peter B Lewis 123 PBL 123 12
+Peter B Lewis 218 PBL 218 14
+Peter B Lewis 283 PBL 283 14
+Peter B Lewis 418 PBL 418 14
+Peter B Lewis 518 PBL 518 12
+prev_notes new_notes
+id day start_time end_time slot_type prev_notes
+A1-M Mon 08:15 09:05 standard
+A1-W Wed 08:15 09:05 standard
+A1-F Fri 08:15 09:05 standard
+A2-M Mon 09:20 10:10 standard
+A2-W Wed 09:20 10:10 standard
+A2-F Fri 09:20 10:10 standard
+A3-M Mon 10:25 11:15 standard
+A3-W Wed 10:25 11:15 standard
+A3-F Fri 10:25 11:15 standard
+A4-M Mon 11:30 12:20 standard
+A4-W Wed 11:30 12:20 standard
+A4-F Fri 11:30 12:20 standard
+A5-M Mon 14:05 14:55 standard
+A5-W Wed 14:05 14:55 standard
+A5-F Fri 14:05 14:55 standard
+A6-M Mon 15:10 16:00 standard
+A6-W Wed 15:10 16:00 standard
+A6-F Fri 15:10 16:00 standard
+A7-M Mon 16:40 17:30 standard
+A7-W Wed 16:40 17:30 standard
+A7-F Fri 16:40 17:30 standard
+B1-M Mon 08:55 10:10 standard
+B1-W Wed 08:55 10:10 standard
+B2-M Mon 08:55 10:10 standard
+B2-F Fri 08:55 10:10 standard
+B3-W Wed 08:55 10:10 standard
+B3-F Fri 08:55 10:10 standard
+B4-T Tue 08:30 09:45 standard
+B4-R Thu 08:30 09:45 standard
+B5-T Tue 10:00 11:15 standard
+B5-R Thu 10:00 11:15 standard
+B6-T Tue 11:30 12:45 standard
+B6-R Thu 11:30 12:45 standard
+B7-M Mon 12:35 13:50 standard
+B7-W Wed 12:35 13:50 standard
+B8-T Tue 13:00 14:15 standard
+B8-R Thu 13:00 14:15 standard
+B9-T Tue 14:45 16:00 standard
+B9-R Thu 14:45 16:00 standard
+B10-M Mon 15:10 16:25 standard
+B10-W Wed 15:10 16:25 standard
+B11-T Tue 16:15 17:30 standard
+B11-R Thu 16:15 17:30 standard
+B12-M Mon 16:40 17:55 standard
+B12-W Wed 16:40 17:55 standard
+B13-T Tue 18:00 19:15 standard
+B13-R Thu 18:00 19:15 standard
+B14-M Mon 18:25 19:40 standard
+B14-W Wed 18:25 19:40 standard
+B15-T Tue 19:30 20:45 standard
+B15-R Thu 19:30 20:45 standard
+C1-M Mon 18:25 20:55 standard
+C2-T Tue 18:00 20:30 standard
+C3-W Wed 18:25 20:55 standard
+C4-R Thu 18:00 20:30 standard
+C5-F Fri 18:25 20:55 standard
+L1-M Mon 08:15 11:15 standard
+L2-M Mon 11:45 14:45 standard
+L3-M Mon 15:10 18:10 standard
+L4-M Mon 18:30 21:30 standard
+L5-T Tue 08:15 11:15 standard
+L6-T Tue 11:30 14:30 standard
+L7-T Tue 14:45 17:45 standard
+L8-T Tue 18:00 21:00 standard
+L9-W Wed 08:15 11:15 standard
+L10-W Wed 11:45 14:45 standard
+L11-W Wed 15:10 18:10 standard
+L12-W Wed 18:30 21:30 standard
+L13-R Thu 08:15 11:15 standard
+L14-R Thu 11:30 14:30 standard
+L15-R Thu 14:45 17:45 standard
+L16-R Thu 18:00 21:00 standard
+L17-F Fri 08:15 11:15 standard
+L18-F Fri 15:10 18:10 standard
+L19-F Fri 18:30 21:30 standard
+new_notes
+
+id slots_required allowed_days
+MP-A-50 3 Mon;Wed;Fri
+MP-B-75 2 Mon;Tue;Wed;Thu;Fri
+MP-C-150 1 Mon;Tue;Wed;Thu;Fri
+MP-D-50 1 Mon;Tue;Wed;Thu;Fri
+MP-L-180 1 Mon;Tue;Wed;Thu;Fri
+compatible_timeslot_sets
+A1-M|A1-W|A1-F;A2-M|A2-W|A2-F;A3-M|A3-W|A3-F;A4-M|A4-W|A4-F;A5-M|A5-
+W|A5-F;A6-M|A6-W|A6-F;A7-M|A7-W|A7-F
+B1-M|B1-W;B2-M|B2-F;B3-W|B3-F;B4-T|B4-R;B5-T|B5-R;B6-T|B6-R;B7-M|B7-W;B8-
+T|B8-R;B9-T|B9-R;B10-M|B10-W;B11-T|B11-R;B12-M|B12-W;B13-T|B13-R;B14-M|B14-
+W;B15-T|B15-R
+C1-M;C2-T;C3-W;C4-R;C5-F
+A1-M|A1-W|A1-F;A2-M|A2-W|A2-F;A3-M|A3-W|A3-F;A4-M|A4-W|A4-F;A5-M|A5-
+W|A5-F;A6-M|A6-W|A6-F;A7-M|A7-W|A7-F
+L1-M;L2-M;L3-M;L4-M;L5-T;L6-T;L7-T;L8-T;L9-W;L10-W;L11-W;L12-W;L13-R;L14-R;L15-
+R;L16-R;L17-F;L18-F;L19-F
+prev_notes new_notes
+scope row_key note_id parent_note_id seq
+sections S412 1783563145574-7rrtuuv 1
+sections S394 1783563145574-ww5ymmk 1
+sections S236 1783563145574-epk7s2i 1
+sections S207 1783563145574-2alh0q8 1
+sections S403 1783563145574-4lves0e 1
+sections S374 1783563145574-7yyisxf 1
+sections S423 1783563145574-mlf8ewy 1
+sections S154 1783563145574-4jil38f 1
+sections S137 1783563145574-sut23z8 1
+sections S185 1783563145574-wy0p1yr 1
+sections S157 1783563145574-touobfa 1
+sections S167 1783563145574-fhmeqv0 1
+sections S146 1783563145574-vzn431f 1
+sections S158 1783563145574-lnqpyzh 1
+sections S174 1783563145574-v4asfgg 1
+sections S269 1783563145574-bgvrbnx 1
+sections S354 1783563145574-xllvzrs 1
+sections S397 1783563145574-ezkvcx4 1
+sections S176 1783563145574-93bqxil 1
+sections S190 1783563145574-89bcf7m 1
+sections S395 1783563145574-j3xa88u 1
+sections S392 1783563145574-7uqa53e 1
+sections S400 1783563145574-toruwhq 1
+sections S390 1783563145574-d932xjt 1
+sections S164 1783563145574-jzs0pjy 1
+sections S173 1783563145574-gitwumn 1
+sections S413 1783563145574-lpjc1dj 1
+sections S452 1783563145574-2u1xbxe 1
+sections S410 1783563145574-6381bwy 1
+sections S237 1783563145574-ofpuuwm 1
+sections S227 1783563145574-xd8qi39 1
+sections S411 1783563145574-lp9wq54 1
+sections S179 1783563145574-z5e0jwj 1
+sections S425 1783563145574-vul9z28 1
+sections S161 1783563145574-n5121j7 1
+sections S388 1783563145574-173ilvy 1
+sections S333 1783563145574-cj1flpz 1
+sections S443 1783563145574-vu18x0c 1
+sections S270 1783563145574-t1u3uic 1
+sections S347 1783563145574-w30ddds 1
+sections S399 1783563145574-9ml9bo1 1
+sections S106 1783563145574-glcrwrx 1
+sections S181 1783563145574-qtgbrg7 1
+sections S138 1783563145574-0tgj3yj 1
+sections S160 1783563145574-uhsrsqo 1
+sections S175 1783563145574-ru2kfwn 1
+sections S401 1783563145574-eastvzt 1
+sections S171 1783563145574-9ddnmo1 1
+sections S309 1783563145574-xtfara2 1
+sections S139 1783563145574-m3wv2pu 1
+sections S170 1783563145574-e66eoc5 1
+sections S107 1783563145574-1rxn58f 1
+sections S195 1783563145574-ra8r409 1
+sections S111 1783563145574-gb7xrjo 1
+sections S155 1783563145574-aczobih 1
+sections S233 1783563145574-h7y775a 1
+sections S444 1783563145574-8uqj5ma 1
+sections S348 1783563145574-ezhgqz1 1
+sections S228 1783563145574-l9p95jn 1
+sections S387 1783563145574-ncy4a9z 1
+sections S193 1783563145574-adpxzet 1
+sections S255 1783563145574-c1hzkld 1
+sections S376 1783563145574-mzkhz1e 1
+sections S168 1783563145574-p9ihxe2 1
+sections S211 1783563145574-y2g4lvr 1
+sections S186 1783563145574-ydhjqu2 1
+sections S308 1783563145574-6hjgb73 1
+sections S169 1783563145574-hcvxqud 1
+sections S264 1783563145574-10nvzp7 1
+sections S205 1783563145574-qjgya5s 1
+sections S396 1783563145574-vfn7p23 1
+sections S180 1783563145574-xq0ou0r 1
+sections S182 1783563145574-99i0asg 1
+sections S125 1783563145574-yomngq3 1
+sections S172 1783563145574-xkz9k1c 1
+sections S398 1783563145574-odjaxse 1
+created_at author completed
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+2026-07-09T02:12:25.332Z Mitchell Fein (mitchell.fein)FALSE
+body source
+Changed to LEOC 470 existing
+Moved from Fall to Spring, DBAP and MGMT should be separate courses existing
+move to fall existing
+Tuesday evenings second half existing
+moving from spring to fall existing
+NOT  CONFIRMED existing
+Dropping from program existing
+moving from spring to fall existing
+as a lab, this should be capped at 35 students existing
+Keep DBAP 638 remove MGMT 638 existing
+moving from fall to spring existing
+Not needed existing
+Request to teach this (and FNCE 440) back to back with BAFI 358, 75 min sessions, twice 
+per week existing
+moving from fall to spring existing
+May not be needed existing
+Moved from fall to spring existing
+DBAP and MGMT should be separate courses existing
+first 7 weeks existing
+May not be needed existing
+DBAP and MGMT should be separate courses existing
+first 7 weeks existing
+MGMT 638 not needed if no new PhD existing
+evening first 7 weeks existing
+moved to Fall (Brock) existing
+Needed for ETA Concentration, NOT Tuesday or Thurs evenings, need an evening section 
+time existing
+May not be needed existing
+Moved to Summer 2026 existing
+Dropping from program existing
+moving from fall to spring existing
+Same days as ECON 395 existing
+only 1 section existing
+Moving to Fall 2026 existing
+No preference in instructor, time existing
+Dropping from program existing
+Needs to be in the evening, ask MBA for evening night that works best existing
+NOT CONFIRMED existing
+DBAP and MGMT should be separate courses existing
+Weekly evening existing
+moved from fall to spring existing
+NOT CONFIRMED existing
+first 7 weeks IF NEEDED existing
+Timing based on Macc schedule existing
+IF NEED SECTION (depends on enrollment), infrequent meeting needed existing
+Adding a section - cap at 35 students existing
+Needs to be in the evening, ask MBA for evening night that works best existing
+May not be needed existing
+Moved from Fall to Spring existing
+Not needed existing
+Is second section needed? existing
+Has to be M or T at 6pm existing
+Not needed - moved to Fall existing
+moving from spring to fall existing
+DBAP and MGMT should be separate courses existing
+Use Day and time in SP26 field existing
+Request to teach this (and FNCE 440) back to back with BAFI 358, 75 min sessions, twice 
+per week existing
+move from spring to fall; MW ideally existing
+Biweekly daytime existing
+NOT  CONFIRMED existing
+TTh existing
+NOT CONFIRMED existing
+Moved from Spring to Fall (Brock) existing
+Needed for ETA concentration, not on a Tuesday evening existing
+DBAP and MGMT should be separate courses existing
+Not needed existing
+TTh existing
+DBAP and MGMT should be separate courses existing
+Is second section needed? existing
+Not needed - now MGMT existing
+Request to teach this (and FNCE 440) back to back with BAFI 358, 75 min sessions, twice 
+per week existing
+Tuesday evenings first half existing
+first 7 weeks existing
+New Capstone section, infrequent meeting needed, Caps should be 24 (JH) existing
+No preference in instructor, time existing
+Use Day and time in SP26 field existing
+Not needed existing
+first 7 weeks existing
+id member_section_ids
+XG1 S9;S20
+XG2 S10;S21
+XG3 S12;S25
+XG4 S13;S26
+XG5 S49;S57
+XG6 S52;S165
+XG7 S53;S166
+XG8 S54;S167
+XG9 S55;S168
+XG10 S56;S169
+XG11 S61;S62
+XG12 S85;S278
+XG13 S86;S279
+XG14 S91;S281
+XG15 S94;S283
+XG16 S96;S285
+XG17 S101;S105
+XG18 S102;S104
+XG19 S124;S139
+XG20 S125;S140
+XG21 S141;S325
+XG22 S173;S174
+XG23 S244;S273
+XG24 S245;S274
+XG25 S296;S297
+XG26 S301;S341
+XG27 S302;S342
+XG28 S303;S343
+XG29 S304;S346
+XG30 S306;S339
+XG31 S319;S324
+XG32 S321;S326
+id member_section_ids reason
+scope days start_time end_time instructor_id room_id
+timeslot_ids reason
+section_id fixed_timeslot_set fixed_room
+section_id preferred_timeslot_set preferred_room weight
