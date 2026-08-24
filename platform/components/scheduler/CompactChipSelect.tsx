@@ -29,23 +29,64 @@ export function CompactChipSelect({
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const [menuPos, setMenuPos] = useState({ top: 0, left: 0, width: 240 });
+  type MenuPos = {
+    side: "below" | "above";
+    top?: number;
+    bottom?: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+  };
+  const [menuPos, setMenuPos] = useState<MenuPos>({
+    side: "below",
+    top: -9999,
+    left: 0,
+    width: 240,
+    maxHeight: 320,
+  });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  /**
+   * Viewport-fixed positioning so the menu always fully fits: open below when
+   * there is room, flip above near the bottom of the screen, and cap the menu
+   * height to whichever side has space.
+   */
   const updatePosition = useCallback(() => {
     if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
     const width = Math.max(rect.width, 240);
-    let left = rect.left + window.scrollX;
-    const maxLeft = window.scrollX + window.innerWidth - width - 8;
-    left = Math.max(window.scrollX + 8, Math.min(left, maxLeft));
-    setMenuPos({
-      top: rect.bottom + window.scrollY + 4,
-      left,
-      width,
-    });
+    const margin = 8;
+    const minVisible = 160;
+    const maxMenuHeight = 360;
+    const spaceBelow = window.innerHeight - rect.bottom - margin;
+    const spaceAbove = rect.top - margin;
+    const flip = spaceBelow < minVisible && spaceAbove > spaceBelow;
+    const maxHeight = Math.max(
+      Math.min(flip ? spaceAbove : spaceBelow, maxMenuHeight),
+      120,
+    );
+    let left = rect.left;
+    const maxLeft = window.innerWidth - width - margin;
+    left = Math.max(margin, Math.min(left, maxLeft));
+    if (flip) {
+      setMenuPos({
+        side: "above",
+        bottom: window.innerHeight - rect.top + 4,
+        left,
+        width,
+        maxHeight,
+      });
+    } else {
+      setMenuPos({
+        side: "below",
+        top: rect.bottom + 4,
+        left,
+        width,
+        maxHeight,
+      });
+    }
   }, []);
 
   useEffect(() => {
@@ -181,14 +222,15 @@ export function CompactChipSelect({
             role="listbox"
             aria-label={ariaLabel ?? placeholder}
             style={{
-              position: "absolute",
-              top: menuPos.top,
+              position: "fixed",
+              top: menuPos.side === "below" ? menuPos.top : undefined,
+              bottom: menuPos.side === "above" ? menuPos.bottom : undefined,
               left: menuPos.left,
               width: menuPos.width,
               zIndex: 9999,
             }}
           >
-            <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+            <div className="flex max-h-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg" style={{ maxHeight: menuPos.maxHeight }}>
               {value.length > 0 ? (
                 <div className="flex flex-wrap gap-1 border-b border-slate-100 px-2.5 py-2">
                   {value.map((tag) => (
@@ -219,7 +261,7 @@ export function CompactChipSelect({
                 />
               </div>
 
-              <div className="max-h-48 overflow-y-auto py-1">
+              <div className="min-h-0 flex-1 overflow-y-auto py-1">
                 {listItems.length === 0 ? (
                   <div className="px-3 py-2 text-xs text-slate-400">
                     {inputValue.trim()

@@ -45,7 +45,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { useIslandNotify, useSetStatusBarContent } from "@/components/GlobalStatusBar";
 import { MultiSelect } from "@/components/scheduler/MultiSelect";
 import { appToolbarShellClass, appNavLinkClass } from "@/lib/ui/appChromeStyles";
-import { navbarPopoverProps, toolbarChipPopoverChipClass, toolbarChipPopoverContentClass, toolbarChipPopoverGridClass, toolbarChipPopoverGridStyle } from "@/lib/ui/navbarPopoverProps";
+import { navbarPopoverProps, toolbarChipPopoverChipClass, toolbarChipPopoverContentClass, toolbarChipPopoverGridClass, toolbarChipPopoverGridStyle, toolbarPanelCloseOnInteractOutside, useOverlayClampedHeight } from "@/lib/ui/navbarPopoverProps";
 import { TagInput } from "@/components/scheduler/TagInput";
 import { ViewportModal } from "@/components/scheduler/ViewportModal";
 import {
@@ -53,10 +53,8 @@ import {
   editorToolbarBtnPrimary,
   editorToolbarBtnSecondary,
   editorToolbarDivider,
-  editorFilterBtnClass,
   editorFilterClearBtnClass,
 } from "@/components/scheduler/editors/editorToolbarStyles";
-import { EditorModalShell } from "@/components/scheduler/editors/EditorModalShell";
 import { useAuth } from "@/lib/auth-client";
 import {
   LAST_SOLVER_RUN_STORAGE_KEY,
@@ -1315,13 +1313,16 @@ type PatternDayApplyRow = {
   } | null>(null);
   const [selectedDepartmentKeys, setSelectedDepartmentKeys] = useState<string[]>([]);
   const [selectedInstructorIds, setSelectedInstructorIds] = useState<string[]>([]);
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const filtersPanelRef = useOverlayClampedHeight<HTMLDivElement>(filtersExpanded);
   const activeFilterCount = selectedDepartmentKeys.length + selectedInstructorIds.length;
   const [searchQuery, setSearchQuery] = useState("");
   const [hoveredDepartmentKey, setHoveredDepartmentKey] = useState<string | null>(null);
   const [selectedLegendDepartmentKeys, setSelectedLegendDepartmentKeys] = useState<string[]>([]);
   const [colorsExpanded, setColorsExpanded] = useState(false);
   const [crosslistExpanded, setCrosslistExpanded] = useState(false);
+  const colorsGridRef = useOverlayClampedHeight<HTMLDivElement>(colorsExpanded);
+  const crosslistGridRef = useOverlayClampedHeight<HTMLDivElement>(crosslistExpanded);
   const [crosslistPickerModal, setCrosslistPickerModal] = useState<{
     crosslistGroupId: string;
     memberSections: SectionDto[];
@@ -4806,16 +4807,91 @@ type PatternDayApplyRow = {
           className="w-full max-w-[14rem]"
         />
         <span className="mx-0.5 hidden h-5 w-px shrink-0 bg-slate-200 sm:block" aria-hidden />
-        <Button
-          size="sm"
-          radius="md"
-          variant="bordered"
-          className={editorFilterBtnClass}
-          startContent={<Filter className="size-3.5" aria-hidden />}
-          onPress={() => setFiltersOpen(true)}
+        <Popover
+          isOpen={filtersExpanded}
+          onOpenChange={setFiltersExpanded}
+          placement="bottom-start"
+          {...navbarPopoverProps}
+          shouldCloseOnInteractOutside={toolbarPanelCloseOnInteractOutside}
         >
-          Filters{activeFilterCount > 0 ? ` · ${activeFilterCount}` : ""}
-        </Button>
+          <PopoverTrigger>
+            <button
+              type="button"
+              aria-expanded={filtersExpanded}
+              className="inline-flex items-center gap-1.5 h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <Filter className="size-3.5 text-slate-400" aria-hidden />
+              <span className="uppercase tracking-wider text-[10px] text-slate-500">Filters</span>
+              {activeFilterCount > 0 ? (
+                <span className="text-slate-400">{activeFilterCount}</span>
+              ) : null}
+              <ChevronDown
+                className={clsx(
+                  "size-3.5 text-slate-400 transition-transform",
+                  filtersExpanded && "rotate-180",
+                )}
+                aria-hidden
+              />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            className={toolbarChipPopoverContentClass}
+            aria-label="Filters"
+          >
+            <div
+              ref={filtersPanelRef}
+              className="max-h-[min(70vh,560px)] space-y-2 overflow-y-auto p-3"
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <div className="grid grid-cols-1 items-center gap-2 rounded-lg border border-default-200 bg-default-50/60 px-3 py-2 sm:grid-cols-[7rem_1fr_auto]">
+                <span className="text-xs font-semibold uppercase tracking-wide text-default-600">
+                  Departments
+                </span>
+                <div className="min-w-0 overflow-hidden">
+                  <MultiSelect
+                    placeholder="Any department…"
+                    options={departmentFilterOptions}
+                    value={selectedDepartmentKeys}
+                    onChange={setSelectedDepartmentKeys}
+                    showSearch
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  variant="light"
+                  className="shrink-0 font-semibold"
+                  isDisabled={selectedDepartmentKeys.length === 0}
+                  onPress={() => setSelectedDepartmentKeys([])}
+                >
+                  Clear
+                </Button>
+              </div>
+              <div className="grid grid-cols-1 items-center gap-2 rounded-lg border border-default-200 bg-default-50/60 px-3 py-2 sm:grid-cols-[7rem_1fr_auto]">
+                <span className="text-xs font-semibold uppercase tracking-wide text-default-600">
+                  Professors
+                </span>
+                <div className="min-w-0 overflow-hidden">
+                  <MultiSelect
+                    placeholder="Any professor…"
+                    options={professorFilterOptions}
+                    value={selectedInstructorIds}
+                    onChange={setSelectedInstructorIds}
+                    showSearch
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  variant="light"
+                  className="shrink-0 font-semibold"
+                  isDisabled={selectedInstructorIds.length === 0}
+                  onPress={() => setSelectedInstructorIds([])}
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
         {activeFilterCount > 0 && (
           <Button
             size="sm"
@@ -4866,6 +4942,7 @@ type PatternDayApplyRow = {
               </PopoverTrigger>
               <PopoverContent className={toolbarChipPopoverContentClass}>
                 <div
+                  ref={colorsGridRef}
                   className={clsx(toolbarChipPopoverGridClass, "p-3")}
                   style={toolbarChipPopoverGridStyle(departmentColorLegend.length)}
                   onPointerDown={(e) => e.stopPropagation()}
@@ -4941,6 +5018,7 @@ type PatternDayApplyRow = {
               </PopoverTrigger>
               <PopoverContent className={toolbarChipPopoverContentClass}>
                 <div
+                  ref={crosslistGridRef}
                   className={clsx(toolbarChipPopoverGridClass, "p-3")}
                   style={toolbarChipPopoverGridStyle(crosslistGroupLegend.length)}
                   onPointerDown={(e) => e.stopPropagation()}
@@ -4983,76 +5061,6 @@ type PatternDayApplyRow = {
           </Button>
         </div>
       </div>
-
-      <EditorModalShell
-        isOpen={filtersOpen}
-        title="Filters"
-        onClose={() => setFiltersOpen(false)}
-        footer={
-          activeFilterCount > 0 ? (
-            <Button
-              size="sm"
-              variant="flat"
-              className="font-semibold"
-              onPress={() => {
-                setSelectedDepartmentKeys([]);
-                setSelectedInstructorIds([]);
-              }}
-            >
-              Clear all
-            </Button>
-          ) : undefined
-        }
-      >
-        <div className="space-y-2">
-          <div className="grid grid-cols-1 items-center gap-2 rounded-lg border border-default-200 bg-default-50/60 px-3 py-2 sm:grid-cols-[7rem_1fr_auto]">
-            <span className="text-xs font-semibold uppercase tracking-wide text-default-600">
-              Departments
-            </span>
-            <div className="min-w-0 overflow-hidden">
-              <MultiSelect
-                placeholder="Any department…"
-                options={departmentFilterOptions}
-                value={selectedDepartmentKeys}
-                onChange={setSelectedDepartmentKeys}
-                showSearch
-              />
-            </div>
-            <Button
-              size="sm"
-              variant="light"
-              className="shrink-0 font-semibold"
-              isDisabled={selectedDepartmentKeys.length === 0}
-              onPress={() => setSelectedDepartmentKeys([])}
-            >
-              Clear
-            </Button>
-          </div>
-          <div className="grid grid-cols-1 items-center gap-2 rounded-lg border border-default-200 bg-default-50/60 px-3 py-2 sm:grid-cols-[7rem_1fr_auto]">
-            <span className="text-xs font-semibold uppercase tracking-wide text-default-600">
-              Professors
-            </span>
-            <div className="min-w-0 overflow-hidden">
-              <MultiSelect
-                placeholder="Any professor…"
-                options={professorFilterOptions}
-                value={selectedInstructorIds}
-                onChange={setSelectedInstructorIds}
-                showSearch
-              />
-            </div>
-            <Button
-              size="sm"
-              variant="light"
-              className="shrink-0 font-semibold"
-              isDisabled={selectedInstructorIds.length === 0}
-              onPress={() => setSelectedInstructorIds([])}
-            >
-              Clear
-            </Button>
-          </div>
-        </div>
-      </EditorModalShell>
 
 
 

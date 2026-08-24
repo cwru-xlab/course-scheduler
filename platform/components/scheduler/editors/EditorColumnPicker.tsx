@@ -11,6 +11,7 @@ import {
   toolbarChipPopoverContentClass,
   toolbarChipPopoverGridClass,
   toolbarChipPopoverGridStyle,
+  useOverlayClampedHeight,
 } from "@/lib/ui/navbarPopoverProps";
 import type { EditorColumnPreset, EditorColumnSpec } from "./useEditorColumnVisibility";
 
@@ -35,6 +36,7 @@ export function EditorColumnPicker({
   onApplyPreset,
 }: EditorColumnPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const gridRef = useOverlayClampedHeight<HTMLDivElement>(isOpen);
   const visibleCount = specs.filter((spec) => visibleIds.has(spec.id)).length;
   const hasPresets = Boolean(presets && presets.length > 0 && onApplyPreset);
 
@@ -66,6 +68,7 @@ export function EditorColumnPicker({
       </PopoverTrigger>
       <PopoverContent className={toolbarChipPopoverContentClass}>
         <div
+          ref={gridRef}
           className="space-y-2.5 p-3"
           onPointerDown={(e) => e.stopPropagation()}
         >

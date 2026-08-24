@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+
 /** Shared Popover settings for navbar panels (settings, live users). */
 export const navbarPopoverProps = {
   /** Click to open — hover + portaled content is unreliable. */
@@ -7,9 +9,56 @@ export const navbarPopoverProps = {
   showArrow: true,
 } as const;
 
+/**
+ * Keep a popover panel inside the viewport by mirroring the height clamp that
+ * React Aria computes on the portaled overlay wrapper (`max-height` inline
+ * style, set so the popover fits above or below the trigger). The clamp is not
+ * inherited by inner content — fixed `max-h-*` classes would overflow past it —
+ * so panels attach this ref and track the wrapper's clamped height instead.
+ * The hook is in this file so every toolbar panel (Filters / Columns / Colors /
+ * Crosslist) shares one implementation.
+ */
+export function useOverlayClampedHeight<T extends HTMLElement>(active: boolean) {
+  const ref = useRef<T | null>(null);
+
+  useEffect(() => {
+    if (!active) return;
+    const el = ref.current;
+    const host = el
+      ?.closest("[data-slot='base']")
+      ?.parentElement?.parentElement as HTMLElement | null | undefined;
+    if (!el || !host) return;
+
+    const apply = () => {
+      // Unclamped wrappers size to their content, so this only ever shrinks
+      // the panel to what React Aria says fits.
+      const cap = host.clientHeight;
+      if (cap > 0) el.style.maxHeight = `${cap}px`;
+    };
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(host);
+    return () => {
+      observer.disconnect();
+      el.style.maxHeight = "";
+    };
+  }, [active]);
+
+  return ref;
+}
+
 /** Fixed width for toolbar chip popovers (Columns / Colors / Crosslist). */
 export const toolbarChipPopoverContentClass =
   "w-[min(640px,92vw)] min-w-[min(640px,92vw)] max-w-[min(640px,92vw)] p-0";
+
+/**
+ * `shouldCloseOnInteractOutside` for toolbar panels that embed select controls
+ * (e.g. floating Filters): presses inside a portal'd editor select menu must
+ * not dismiss the panel.
+ */
+export function toolbarPanelCloseOnInteractOutside(element: Element): boolean {
+  return !element.closest(".editor-select-menu, [role='listbox']");
+}
 
 export const toolbarChipPopoverGridClass =
   "grid max-h-72 gap-2 overflow-y-auto";
