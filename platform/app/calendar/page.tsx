@@ -61,6 +61,7 @@ import {
   VIEW_FROM_HISTORY_KEY,
   saveScheduleToHistory,
   type LastSolverRunSnapshot,
+  isValidLastSolverRunSnapshot,
 } from "@/lib/scheduling/history";
 import { downloadRoomAssignmentWorkbook } from "@/lib/export/roomAssignmentWorkbook";
 import { assignSectionDesignations } from "@/lib/scheduling/sectionDesignations";
@@ -1097,8 +1098,7 @@ export default function CalendarPage() {
   const [displayedDataRevision, setDisplayedDataRevision] = useState<SchedulingDataRevision | null>(null);
   // Highest shared revision already reflected on this page (applied or authored).
   const appliedSharedRevisionRef = useRef(0);
-  // Adopt the current shared revision as baseline on first poll so we only react
-  // to runs that happen while this user is live (avoids clobbering on open).
+  // First successful meta poll with revision>0 triggers apply (or banner) once.
   const sharedInitializedRef = useRef(false);
   // True while the current view came from History (protect it from auto-sync).
   const historyViewActiveRef = useRef(false);
@@ -1393,6 +1393,9 @@ type PatternDayApplyRow = {
   // solver-run snapshot. Shared by the localStorage hydration path and the
   // cross-user shared-schedule sync so both stay identical.
   const applyRunSnapshot = useCallback((parsed: LastSolverRun) => {
+    if (!isValidLastSolverRunSnapshot(parsed)) {
+      throw new Error("Invalid solver-run snapshot: missing solution.assignments or input.sections.");
+    }
     // Prefer the latest editor draft for `slot_type` so UI updates
     // (short vs long blocks) reflect immediately without rerunning solver.
     let slotTypeByTimeslotId = new Map<string, string>();
@@ -1537,7 +1540,7 @@ type PatternDayApplyRow = {
           if (raw) {
             try {
               const parsed = JSON.parse(raw) as LastSolverRun;
-              if (mounted) {
+              if (mounted && isValidLastSolverRunSnapshot(parsed)) {
                 // Remember which shared revision this local snapshot corresponds
                 // to (if it came from a shared run) so we don't re-apply our own.
                 if (typeof sessionStorage !== "undefined") {
@@ -1624,7 +1627,22 @@ type PatternDayApplyRow = {
     const full = await fetchSharedScheduleFull();
     if (!full || !full.snapshot) return false;
     const snapshot = full.snapshot as unknown as LastSolverRun;
-    applyRunSnapshot(snapshot);
+    if (!isValidLastSolverRunSnapshot(snapshot)) {
+      // Incomplete sync payload (e.g. revision bumped without a full solution).
+      // Adopt the revision so we do not retry-crash, but do not wipe the calendar.
+      if (typeof full.revision === "number" && full.revision > 0) {
+        appliedSharedRevisionRef.current = full.revision;
+      }
+      return false;
+    }
+    try {
+      applyRunSnapshot(snapshot);
+    } catch {
+      if (typeof full.revision === "number" && full.revision > 0) {
+        appliedSharedRevisionRef.current = full.revision;
+      }
+      return false;
+    }
     try {
       localStorage.setItem(LAST_SOLVER_RUN_STORAGE_KEY, JSON.stringify(snapshot));
     } catch {
@@ -2634,17 +2652,23 @@ type PatternDayApplyRow = {
     return () => { setStatusBarContent(null); };
   }, [setStatusBarContent, displayedDataRevision, sharedScheduleMeta.dataRevision, hasValidUnsavedEdit]);
 
-  // React to solver runs published by other live users. On first poll we adopt
-  // the current revision as a baseline so we only react to runs that happen
-  // while this user is present. Newer revisions auto-apply when the page is
-  // clean, or surface an "apply" banner if that would discard local edits or a
-  // schedule the user pulled from history.
+  // React to solver runs published by other live users. On first poll, if a
+  // shared schedule already exists and the page is clean, apply it so late
+  // joiners see the current shared revision (not only subsequent bumps).
   useEffect(() => {
     const rev = sharedScheduleMeta.revision;
     if (!sharedInitializedRef.current) {
       if (rev > 0) {
         sharedInitializedRef.current = true;
-        appliedSharedRevisionRef.current = rev;
+        const clean = !hasValidUnsavedEdit && !historyViewActiveRef.current;
+        if (clean && solverRunStatus !== "loading") {
+          void applySharedSnapshot();
+        } else {
+          appliedSharedRevisionRef.current = rev;
+          if (!clean) {
+            setIncomingShared({ revision: rev, ranBy: sharedScheduleMeta.ranBy });
+          }
+        }
       }
       return;
     }

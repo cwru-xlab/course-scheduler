@@ -1,5 +1,6 @@
 import time
-from datetime import datetime
+import threading
+from datetime import datetime, timedelta
 import json
 import os
 import re
@@ -39,8 +40,11 @@ from spreadsheet_io.spreadsheet_utils import (
     parse_nested_list_cell,
 )
 
-# CP-SAT search budget. Keep in sync with platform/lib/solver-timeouts.ts.
-SOLVER_MAX_TIME_SECONDS = 600.0
+# CP-SAT deadlines. Hard budget stays in sync with platform/lib/solver-timeouts.ts.
+# Soft: if any feasible exists by this wall time, stop and return best-so-far.
+# Hard: absolute search cap; no feasible by then → solver_timeout / UNKNOWN.
+SOLVER_SOFT_TIME_SECONDS = 60.0
+SOLVER_MAX_TIME_SECONDS = 180.0
 
 # Cap infeasibility diagnosis so /solve returns before API proxies time out.
 DIAGNOSE_MAX_INSTRUCTOR_STEPS = 20
@@ -48,6 +52,7 @@ DIAGNOSE_MAX_SECONDS = 60.0
 DIAGNOSE_RELAX_BUDGET_SECONDS = 15.0
 
 from model import (
+    ActivityEventRow,
     AppAccessUser,
     BlockedTime,
     Course,
@@ -61,13 +66,92 @@ from model import (
     RoomPreferences,
     ScheduleAssignment,
     ScheduleSolution,
+    SchedulingDataRevisionRow,
     Section,
     SectionPreferences,
+    SharedScheduleRow,
     SoftLock,
+    SolverSessionLockRow,
     Timeslot,
     ValidationError,
     db,
 )
+
+# Serialize CP-SAT /solve within this process. Next.js DB lock is the cross-replica
+# gate; this prevents two overlapping solves from crashing a single Flask worker.
+_solve_request_lock = threading.Lock()
+
+# Lock TTL aligned with platform SOLVER_CLIENT_TIMEOUT_MS (budget + 2 min headroom).
+SOLVER_LOCK_TTL_MS = int((SOLVER_MAX_TIME_SECONDS + 120) * 1000)
+_ACTIVITY_MAX_EVENTS = 30
+_ACTIVITY_TTL = timedelta(hours=24)
+_SYNC_SINGLETON_ID = 1
+
+
+class _SoftDeadlineCallback(cp_model.CpSolverSolutionCallback):
+    """Stop search at the soft deadline once a feasible solution exists.
+
+    Within [0, soft]: keep improving. At/after soft: StopSearch on the next
+    solution event, or via a timer if a feasible was already found.
+    """
+
+    def __init__(self, soft_seconds: float, log_prefix: str = "[solve]"):
+        cp_model.CpSolverSolutionCallback.__init__(self)
+        self._soft_seconds = float(soft_seconds)
+        self._log_prefix = log_prefix
+        self._has_feasible = False
+        self._soft_stopped = False
+        self._lock = threading.Lock()
+
+    def on_solution_callback(self):
+        with self._lock:
+            self._has_feasible = True
+            if self.WallTime() >= self._soft_seconds:
+                self._stop_soft_locked()
+
+    def try_soft_stop(self):
+        """Called from a timer thread when the soft deadline elapses."""
+        with self._lock:
+            if self._has_feasible:
+                self._stop_soft_locked()
+
+    def _stop_soft_locked(self):
+        if self._soft_stopped:
+            return
+        self._soft_stopped = True
+        print(
+            f"{self._log_prefix} Soft deadline hit with feasible solution "
+            f"(soft={self._soft_seconds:.0f}s)",
+            flush=True,
+        )
+        self.StopSearch()
+
+    @property
+    def soft_stopped(self) -> bool:
+        return self._soft_stopped
+
+
+def _run_cpsat_with_deadlines(
+    model: cp_model.CpModel,
+    *,
+    soft_seconds: float = SOLVER_SOFT_TIME_SECONDS,
+    hard_seconds: float = SOLVER_MAX_TIME_SECONDS,
+    log_prefix: str = "[solve]",
+) -> Tuple[cp_model.CpSolver, int, _SoftDeadlineCallback]:
+    """Solve with soft (return-if-feasible) and hard (absolute) deadlines."""
+    solver = cp_model.CpSolver()
+    solver.parameters.max_time_in_seconds = float(hard_seconds)
+    solver.parameters.num_workers = 2
+    solver.parameters.random_seed = 0
+    callback = _SoftDeadlineCallback(soft_seconds, log_prefix=log_prefix)
+    timer = threading.Timer(float(soft_seconds), callback.try_soft_stop)
+    timer.daemon = True
+    timer.start()
+    try:
+        status = solver.Solve(model, callback)
+    finally:
+        timer.cancel()
+    return solver, status, callback
 
 
 """
@@ -1390,11 +1474,9 @@ def _check_feasible(
                                     <= 1
                                 )
 
-    solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = SOLVER_MAX_TIME_SECONDS
-    solver.parameters.num_workers = 2
-    solver.parameters.random_seed = 0
-    status = solver.Solve(model)
+    _solver, status, _cb = _run_cpsat_with_deadlines(
+        model, log_prefix="[feasibility]"
+    )
     return status in (cp_model.OPTIMAL, cp_model.FEASIBLE)
 
 
@@ -2180,12 +2262,17 @@ def _solve_schedule(input_data: SchedulingInput):
     model.Minimize(sum(penalty_terms))
 
     print("[solve] Model built, starting CP-SAT solver...", flush=True)
-    solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = SOLVER_MAX_TIME_SECONDS
-    solver.parameters.num_workers = 2
-    solver.parameters.random_seed = 0
-    status = solver.Solve(model)
-    print(f"[solve] Solver finished, status={solver.StatusName(status)}", flush=True)
+    print(
+        f"[solve] Deadlines: soft={SOLVER_SOFT_TIME_SECONDS:.0f}s "
+        f"(stop if feasible), hard={SOLVER_MAX_TIME_SECONDS:.0f}s",
+        flush=True,
+    )
+    solver, status, callback = _run_cpsat_with_deadlines(model, log_prefix="[solve]")
+    print(
+        f"[solve] Solver finished, status={solver.StatusName(status)}"
+        f"{' (soft-stopped)' if callback.soft_stopped else ''}",
+        flush=True,
+    )
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         base_diag = {
             **_build_run_diagnostics(input_data, options_by_section),
@@ -2765,55 +2852,74 @@ def import_excel():
 
 @app.route("/solve", methods=["POST"])
 def solve():
-    data = request.get_json()
-    if not data or "input" not in data:
-        return jsonify(
-            {
+    if not _solve_request_lock.acquire(blocking=False):
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "solver_busy",
+                            "message": "Another solve is already in progress on this worker.",
+                        }
+                    ],
+                }
+            ),
+            409,
+        )
+
+    try:
+        data = request.get_json()
+        if not data or "input" not in data:
+            return jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "invalid_request",
+                            "message": "Missing 'input' field",
+                        }
+                    ],
+                }
+            ), 400
+
+        print("[solve] Starting solve request...", flush=True)
+        input_data = SchedulingInput(data["input"])
+        archived_count = sum(1 for s in input_data.sections if _is_section_archived(s))
+        if archived_count:
+            print(
+                f"[solve] {archived_count} archived section(s) will be excluded from scheduling",
+                flush=True,
+            )
+
+        remove_instructors = data.get("remove_instructors")
+        if remove_instructors:
+            print(f"[solve] Removing {len(remove_instructors)} instructor(s): {remove_instructors}", flush=True)
+            for inst_id in remove_instructors:
+                input_data = _strip_instructor(input_data, inst_id)
+
+        try:
+            result = _solve_schedule(input_data)
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            result = {
                 "status": "error",
                 "errors": [
                     {
-                        "code": "invalid_request",
-                        "message": "Missing 'input' field",
+                        "code": "internal_error",
+                        "message": (
+                            "The scheduling service hit an unexpected error while running the solver. "
+                            "Try again, or use Check Data to find spreadsheet issues."
+                        ),
+                        "detail": f"{type(exc).__name__}: {exc}",
                     }
                 ],
             }
-        ), 400
-
-    print("[solve] Starting solve request...", flush=True)
-    input_data = SchedulingInput(data["input"])
-    archived_count = sum(1 for s in input_data.sections if _is_section_archived(s))
-    if archived_count:
-        print(
-            f"[solve] {archived_count} archived section(s) will be excluded from scheduling",
-            flush=True,
-        )
-
-    remove_instructors = data.get("remove_instructors")
-    if remove_instructors:
-        print(f"[solve] Removing {len(remove_instructors)} instructor(s): {remove_instructors}", flush=True)
-        for inst_id in remove_instructors:
-            input_data = _strip_instructor(input_data, inst_id)
-
-    try:
-        result = _solve_schedule(input_data)
-    except Exception as exc:
-        import traceback
-        traceback.print_exc()
-        result = {
-            "status": "error",
-            "errors": [
-                {
-                    "code": "internal_error",
-                    "message": (
-                        "The scheduling service hit an unexpected error while running the solver. "
-                        "Try again, or use Check Data to find spreadsheet issues."
-                    ),
-                    "detail": f"{type(exc).__name__}: {exc}",
-                }
-            ],
-        }
-    print(f"[solve] Solve completed with status: {result.get('status', 'unknown')}", flush=True)
-    return jsonify(result)
+        print(f"[solve] Solve completed with status: {result.get('status', 'unknown')}", flush=True)
+        return jsonify(result)
+    finally:
+        _solve_request_lock.release()
 # ---------------------------------------------------------------------------
 # Future work / design notes
 # ---------------------------------------------------------------------------
@@ -3650,6 +3756,450 @@ def update_constraints():
     return jsonify({"status": "ok"}), 200
 
 
+# ---------------------------------------------------------------------------
+# Cross-user sync state (Postgres/sqlite via SQLAlchemy — shared across replicas)
+# ---------------------------------------------------------------------------
+
+
+def _get_or_create_shared_schedule() -> SharedScheduleRow:
+    row = SharedScheduleRow.query.get(_SYNC_SINGLETON_ID)
+    if row is None:
+        row = SharedScheduleRow(id=_SYNC_SINGLETON_ID, revision=0, snapshot=None)
+        db.session.add(row)
+        db.session.commit()
+    return row
+
+
+def _get_or_create_data_revision() -> Optional[SchedulingDataRevisionRow]:
+    return SchedulingDataRevisionRow.query.get(_SYNC_SINGLETON_ID)
+
+
+def _get_or_create_solver_lock() -> SolverSessionLockRow:
+    row = SolverSessionLockRow.query.get(_SYNC_SINGLETON_ID)
+    if row is None:
+        row = SolverSessionLockRow(
+            id=_SYNC_SINGLETON_ID,
+            locked=False,
+            progress=0,
+            status="idle",
+            cancel_requested=False,
+        )
+        db.session.add(row)
+        db.session.commit()
+    return row
+
+
+def _expire_solver_lock_if_needed(row: SolverSessionLockRow) -> bool:
+    """Clear a stale lock past TTL. Returns True if the lock was expired."""
+    now_ms = int(time.time() * 1000)
+    if not row.locked:
+        return False
+    expires = row.expires_at
+    if expires is None and row.started_at is not None:
+        expires = int(row.started_at) + SOLVER_LOCK_TTL_MS
+    if expires is not None and now_ms > int(expires):
+        row.locked = False
+        row.run_id = None
+        row.progress = 0
+        row.status = "failed"
+        row.error = "Solver lock expired (previous run likely crashed or timed out)."
+        row.cancel_requested = False
+        row.started_by = None
+        row.started_by_network_id = None
+        row.started_at = None
+        row.expires_at = None
+        db.session.commit()
+        return True
+    return False
+
+
+@app.route("/sync/shared-schedule", methods=["GET"])
+def sync_shared_schedule_get():
+    """Return shared schedule meta, or full snapshot when ?full=1."""
+    try:
+        row = _get_or_create_shared_schedule()
+        revision_row = _get_or_create_data_revision()
+        full = request.args.get("full")
+        payload = row.to_full_dict() if full else row.to_meta_dict()
+        payload["dataRevision"] = revision_row.to_dict() if revision_row else None
+        return jsonify(payload)
+    except Exception as exc:  # pylint: disable=broad-except
+        return (
+            jsonify({"status": "error", "error": f"shared_schedule_read_failed: {exc}"}),
+            500,
+        )
+
+
+@app.route("/sync/shared-schedule", methods=["POST"])
+def sync_shared_schedule_publish():
+    """Publish a new shared schedule snapshot (bumps revision)."""
+    body = request.get_json(silent=True) or {}
+    snapshot = body.get("snapshot")
+    if not snapshot or not isinstance(snapshot, dict):
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "invalid_snapshot",
+                            "message": "Body requires a snapshot object.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+    solution = snapshot.get("solution")
+    input_obj = snapshot.get("input")
+    if (
+        not isinstance(solution, dict)
+        or not isinstance(solution.get("assignments"), list)
+        or not isinstance(input_obj, dict)
+        or not isinstance(input_obj.get("sections"), list)
+    ):
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "invalid_snapshot",
+                            "message": (
+                                "Snapshot requires input.sections and "
+                                "solution.assignments arrays."
+                            ),
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+    try:
+        row = _get_or_create_shared_schedule()
+        row.revision = int(row.revision or 0) + 1
+        row.ran_by = body.get("ranBy") if isinstance(body.get("ranBy"), str) else None
+        row.ran_at = int(time.time() * 1000)
+        row.snapshot = snapshot
+        db.session.commit()
+        return jsonify(row.to_meta_dict())
+    except Exception as exc:  # pylint: disable=broad-except
+        db.session.rollback()
+        return (
+            jsonify({"status": "error", "error": f"shared_schedule_publish_failed: {exc}"}),
+            500,
+        )
+
+
+@app.route("/sync/activity", methods=["GET"])
+def sync_activity_list():
+    """List recent activity events (pruned to TTL + max count)."""
+    try:
+        cutoff = datetime.utcnow() - _ACTIVITY_TTL
+        ActivityEventRow.query.filter(ActivityEventRow.created_at < cutoff).delete(
+            synchronize_session=False
+        )
+        db.session.commit()
+        limit = request.args.get("limit", type=int) or _ACTIVITY_MAX_EVENTS
+        limit = max(1, min(limit, _ACTIVITY_MAX_EVENTS))
+        rows = (
+            ActivityEventRow.query.order_by(ActivityEventRow.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+        return jsonify({"events": [r.to_dict() for r in rows]})
+    except Exception as exc:  # pylint: disable=broad-except
+        db.session.rollback()
+        return jsonify({"status": "error", "error": f"activity_list_failed: {exc}"}), 500
+
+
+@app.route("/sync/activity", methods=["POST"])
+def sync_activity_record():
+    """Append an activity event."""
+    body = request.get_json(silent=True) or {}
+    kind = str(body.get("kind") or "").strip()
+    network_id = str(body.get("networkId") or "").strip()
+    actor_name = str(body.get("actorName") or "").strip() or "Someone"
+    messages = {
+        "spreadsheet_import": f"{actor_name} imported a spreadsheet",
+        "editor_save": f"{actor_name} saved editor data",
+        "calendar_save": f"{actor_name} saved calendar placements",
+        "solver_run": f"{actor_name} ran the solver",
+    }
+    if kind not in messages or not network_id:
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "invalid_activity",
+                            "message": "kind and networkId are required.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+    try:
+        event_id = f"{int(time.time() * 1000)}-{os.urandom(4).hex()}"
+        row = ActivityEventRow(
+            id=event_id,
+            network_id=network_id,
+            actor_name=actor_name,
+            kind=kind,
+            message=messages[kind],
+            created_at=datetime.utcnow(),
+        )
+        db.session.add(row)
+        cutoff = datetime.utcnow() - _ACTIVITY_TTL
+        ActivityEventRow.query.filter(ActivityEventRow.created_at < cutoff).delete(
+            synchronize_session=False
+        )
+        # Keep only the newest N rows.
+        excess = (
+            ActivityEventRow.query.order_by(ActivityEventRow.created_at.desc())
+            .offset(_ACTIVITY_MAX_EVENTS)
+            .all()
+        )
+        for old in excess:
+            db.session.delete(old)
+        db.session.commit()
+        return jsonify({"event": row.to_dict()}), 201
+    except Exception as exc:  # pylint: disable=broad-except
+        db.session.rollback()
+        return jsonify({"status": "error", "error": f"activity_record_failed: {exc}"}), 500
+
+
+@app.route("/sync/data-revision", methods=["GET"])
+def sync_data_revision_get():
+    try:
+        row = _get_or_create_data_revision()
+        return jsonify({"revision": row.to_dict() if row else None})
+    except Exception as exc:  # pylint: disable=broad-except
+        return jsonify({"status": "error", "error": f"data_revision_read_failed: {exc}"}), 500
+
+
+@app.route("/sync/data-revision", methods=["POST"])
+def sync_data_revision_set():
+    body = request.get_json(silent=True) or {}
+    network_id = str(body.get("networkId") or "").strip()
+    actor_name = str(body.get("actorName") or "").strip() or "Someone"
+    if not network_id:
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "invalid_revision",
+                            "message": "networkId is required.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+    try:
+        now_iso = datetime.utcnow().isoformat() + "Z"
+        row = SchedulingDataRevisionRow.query.get(_SYNC_SINGLETON_ID)
+        if row is None:
+            row = SchedulingDataRevisionRow(
+                id=_SYNC_SINGLETON_ID,
+                last_modified_by_network_id=network_id,
+                last_modified_by_name=actor_name,
+                last_modified_at=now_iso,
+            )
+            db.session.add(row)
+        else:
+            row.last_modified_by_network_id = network_id
+            row.last_modified_by_name = actor_name
+            row.last_modified_at = now_iso
+        db.session.commit()
+        return jsonify({"revision": row.to_dict()})
+    except Exception as exc:  # pylint: disable=broad-except
+        db.session.rollback()
+        return (
+            jsonify({"status": "error", "error": f"data_revision_write_failed: {exc}"}),
+            500,
+        )
+
+
+@app.route("/sync/solver-session", methods=["GET"])
+def sync_solver_session_get():
+    try:
+        row = _get_or_create_solver_lock()
+        _expire_solver_lock_if_needed(row)
+        row = _get_or_create_solver_lock()
+        return jsonify(row.to_dict())
+    except Exception as exc:  # pylint: disable=broad-except
+        return jsonify({"status": "error", "error": f"solver_session_read_failed: {exc}"}), 500
+
+
+@app.route("/sync/solver-session/acquire", methods=["POST"])
+def sync_solver_session_acquire():
+    """Atomically acquire the distributed solver lock. 409 if busy."""
+    body = request.get_json(silent=True) or {}
+    started_by = body.get("startedBy") if isinstance(body.get("startedBy"), str) else None
+    started_by_network_id = (
+        body.get("startedByNetworkId")
+        if isinstance(body.get("startedByNetworkId"), str)
+        else None
+    )
+    ttl_ms = body.get("ttlMs")
+    try:
+        ttl_ms = int(ttl_ms) if ttl_ms is not None else SOLVER_LOCK_TTL_MS
+    except (TypeError, ValueError):
+        ttl_ms = SOLVER_LOCK_TTL_MS
+    ttl_ms = max(60_000, min(ttl_ms, SOLVER_LOCK_TTL_MS * 2))
+
+    try:
+        row = _get_or_create_solver_lock()
+        _expire_solver_lock_if_needed(row)
+        row = _get_or_create_solver_lock()
+        if row.locked:
+            return jsonify({"acquired": False, "session": row.to_dict()}), 409
+
+        now_ms = int(time.time() * 1000)
+        run_id = f"{now_ms}-{os.urandom(4).hex()}"
+        row.locked = True
+        row.run_id = run_id
+        row.progress = 0
+        row.status = "running"
+        row.started_by = started_by
+        row.started_by_network_id = started_by_network_id
+        row.started_at = now_ms
+        row.error = None
+        row.expires_at = now_ms + ttl_ms
+        row.cancel_requested = False
+        db.session.commit()
+        return jsonify({"acquired": True, "session": row.to_dict()})
+    except Exception as exc:  # pylint: disable=broad-except
+        db.session.rollback()
+        return (
+            jsonify({"status": "error", "error": f"solver_session_acquire_failed: {exc}"}),
+            500,
+        )
+
+
+@app.route("/sync/solver-session/progress", methods=["POST"])
+def sync_solver_session_progress():
+    body = request.get_json(silent=True) or {}
+    run_id = body.get("runId")
+    progress = body.get("progress")
+    try:
+        row = _get_or_create_solver_lock()
+        if not row.locked or (run_id and row.run_id != run_id):
+            return jsonify({"ok": False, "session": row.to_dict()}), 409
+        if progress is not None:
+            try:
+                row.progress = max(0, min(100, int(progress)))
+            except (TypeError, ValueError):
+                pass
+        db.session.commit()
+        return jsonify({"ok": True, "session": row.to_dict(), "cancelRequested": row.cancel_requested})
+    except Exception as exc:  # pylint: disable=broad-except
+        db.session.rollback()
+        return (
+            jsonify({"status": "error", "error": f"solver_session_progress_failed: {exc}"}),
+            500,
+        )
+
+
+@app.route("/sync/solver-session/finish", methods=["POST"])
+def sync_solver_session_finish():
+    body = request.get_json(silent=True) or {}
+    run_id = body.get("runId")
+    status = str(body.get("status") or "completed").strip().lower()
+    if status not in ("completed", "failed", "cancelled"):
+        status = "failed"
+    error = body.get("error") if isinstance(body.get("error"), str) else None
+    progress = body.get("progress")
+    try:
+        row = _get_or_create_solver_lock()
+        if run_id and row.run_id and row.run_id != run_id and row.locked:
+            return jsonify({"ok": False, "session": row.to_dict()}), 409
+        row.locked = False
+        row.status = status
+        row.error = error
+        row.cancel_requested = False
+        row.expires_at = None
+        if progress is not None:
+            try:
+                row.progress = max(0, min(100, int(progress)))
+            except (TypeError, ValueError):
+                pass
+        elif status == "completed":
+            row.progress = 100
+        elif status == "cancelled":
+            row.progress = 0
+        if status in ("cancelled", "failed"):
+            row.started_by = None
+            row.started_by_network_id = None
+            row.started_at = None
+            row.run_id = None
+        else:
+            row.run_id = None
+        db.session.commit()
+        return jsonify({"ok": True, "session": row.to_dict()})
+    except Exception as exc:  # pylint: disable=broad-except
+        db.session.rollback()
+        return (
+            jsonify({"status": "error", "error": f"solver_session_finish_failed: {exc}"}),
+            500,
+        )
+
+
+@app.route("/sync/solver-session/cancel", methods=["POST"])
+def sync_solver_session_cancel():
+    """Owner-requested cancel: mark cancel_requested and unlock if possible."""
+    body = request.get_json(silent=True) or {}
+    network_id = str(body.get("networkId") or "").strip()
+    if not network_id:
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": "invalid_cancel",
+                            "message": "networkId is required.",
+                        }
+                    ],
+                }
+            ),
+            400,
+        )
+    try:
+        row = _get_or_create_solver_lock()
+        _expire_solver_lock_if_needed(row)
+        row = _get_or_create_solver_lock()
+        if not row.locked:
+            return jsonify({"ok": True, "cancelled": False, "session": row.to_dict()})
+        if row.started_by_network_id != network_id:
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": "Cannot cancel: not the owner of this run",
+                        "session": row.to_dict(),
+                    }
+                ),
+                403,
+            )
+        # Keep locked=True until the owning Next.js process aborts /solve and
+        # calls finish — otherwise another replica could start a second solve.
+        row.cancel_requested = True
+        db.session.commit()
+        return jsonify({"ok": True, "cancelled": True, "session": row.to_dict()})
+    except Exception as exc:  # pylint: disable=broad-except
+        db.session.rollback()
+        return (
+            jsonify({"status": "error", "error": f"solver_session_cancel_failed: {exc}"}),
+            500,
+        )
+
+
 # Ensure schema on import (covers `flask run` / gunicorn, not only `python app.py`).
 with app.app_context():
     db.create_all()
@@ -3658,5 +4208,10 @@ with app.app_context():
 
 
 if __name__ == "__main__":
-    # Run the Flask app
-    app.run(debug=True, host="0.0.0.0", port=5001)
+    # threaded=True: /access/check, /data, and sync endpoints stay responsive while
+    # CP-SAT /solve runs on another thread. Concurrent /solve is serialized by
+    # _solve_request_lock; cross-replica serialization uses the DB solver lock.
+    # Local workflow: `python app.py` (optional FLASK_DEBUG=0, PORT=5001).
+    _port = int(os.environ.get("PORT", os.environ.get("SOLVER_PORT", "5001")))
+    _debug = os.environ.get("FLASK_DEBUG", "true").lower() in ("1", "true", "yes")
+    app.run(debug=_debug, host="0.0.0.0", port=_port, threaded=True)

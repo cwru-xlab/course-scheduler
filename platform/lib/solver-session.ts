@@ -1,10 +1,12 @@
 /**
- * Canonical solver-run state for a single Next.js process.
+ * Canonical solver-run state.
  *
- * Clients mirror this via SSE — they never invent progress.
- * Not shared across replicas; scale-out requires Redis (or similar).
+ * Distributed lock + session fields live in the solver DB (via /sync/solver-session).
+ * AbortController + progress timers remain process-local on the Next.js instance
+ * that acquired the lock (only that instance can abort the in-flight Flask fetch).
  */
 
+import { fetchSolver } from "@/lib/api/solverFetch";
 import {
   SOLVER_API_TIMEOUT_MS,
   SOLVER_CLIENT_TIMEOUT_MS,
@@ -47,6 +49,9 @@ type InternalState = SolverSessionState & {
   maxRuntimeTimer: ReturnType<typeof setTimeout> | null;
   lastBroadcastAt: number;
   lastBroadcastProgress: number;
+  lastRemoteSyncAt: number;
+  /** True when this process owns the AbortController for the current run. */
+  ownsRun: boolean;
 };
 
 const DEFAULT_SESSION_ID = "default";
@@ -56,6 +61,8 @@ const PROGRESS_CAP = 92;
 const TICK_MS = 250;
 const MAX_RUNTIME_MS = SOLVER_CLIENT_TIMEOUT_MS;
 const BROADCAST_THROTTLE_MS = 250;
+const REMOTE_SYNC_MS = 2000;
+const SYNC_TIMEOUT_MS = 8_000;
 
 const globalRef = globalThis as unknown as {
   __solverSession?: InternalState;
@@ -78,6 +85,8 @@ function emptyState(): InternalState {
     maxRuntimeTimer: null,
     lastBroadcastAt: 0,
     lastBroadcastProgress: -1,
+    lastRemoteSyncAt: 0,
+    ownsRun: false,
   };
 }
 
@@ -111,7 +120,6 @@ function publicSnapshot(state: InternalState = getInternal()): SolverSessionStat
 
 function estimateProgress(startedAt: number, now = Date.now()): number {
   const elapsed = Math.max(0, now - startedAt);
-  // Keep in sync with client SolverProgressContext: linear vs ESTIMATED_MAX_MS.
   return Math.min(
     PROGRESS_CAP,
     Math.max(1, Math.floor((elapsed / ESTIMATED_MAX_MS) * PROGRESS_CAP)),
@@ -151,6 +159,77 @@ function broadcast(force = false) {
   }
 }
 
+function applyRemoteSession(remote: Partial<SolverSessionState> & { cancelRequested?: boolean }) {
+  const state = getInternal();
+  // Don't clobber a run this process owns with a stale remote idle.
+  if (state.ownsRun && state.locked) return;
+
+  state.locked = Boolean(remote.locked);
+  state.runId = typeof remote.runId === "string" ? remote.runId : null;
+  state.progress = typeof remote.progress === "number" ? remote.progress : 0;
+  state.status =
+    remote.status === "running" ||
+    remote.status === "completed" ||
+    remote.status === "failed" ||
+    remote.status === "cancelled" ||
+    remote.status === "idle"
+      ? remote.status
+      : state.locked
+        ? "running"
+        : "idle";
+  state.startedBy = typeof remote.startedBy === "string" ? remote.startedBy : null;
+  state.startedByNetworkId =
+    typeof remote.startedByNetworkId === "string" ? remote.startedByNetworkId : null;
+  state.startedAt = typeof remote.startedAt === "number" ? remote.startedAt : null;
+  state.error = typeof remote.error === "string" ? remote.error : null;
+  broadcast(true);
+}
+
+/** Returns true when the owning process should abort (cancel requested). */
+async function syncProgressToSolver(runId: string, progress: number): Promise<boolean> {
+  try {
+    const { response, data } = await fetchSolver(
+      "/sync/solver-session/progress",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runId, progress }),
+      },
+      { timeoutMs: SYNC_TIMEOUT_MS },
+    );
+    if (response.ok && data.cancelRequested === true) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+async function syncFinishToSolver(opts: {
+  runId: string | null;
+  status: Exclude<SolverSessionStatus, "running" | "idle">;
+  error?: string | null;
+  progress?: number;
+}): Promise<void> {
+  try {
+    await fetchSolver(
+      "/sync/solver-session/finish",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          runId: opts.runId,
+          status: opts.status,
+          error: opts.error ?? null,
+          progress: opts.progress,
+        }),
+      },
+      { timeoutMs: SYNC_TIMEOUT_MS },
+    );
+  } catch {
+    /* best-effort */
+  }
+}
+
 function startProgressTicker(state: InternalState) {
   clearTimers(state);
   state.progressTimer = setInterval(() => {
@@ -163,12 +242,32 @@ function startProgressTicker(state: InternalState) {
       current.progress = next;
       broadcast(false);
     }
+    const now = Date.now();
+    // Sync progress + cancel_requested on a slower cadence than the local ticker
+    // so remote cancels are observed even after progress hits PROGRESS_CAP.
+    if (
+      current.ownsRun &&
+      current.runId &&
+      now - current.lastRemoteSyncAt >= REMOTE_SYNC_MS
+    ) {
+      current.lastRemoteSyncAt = now;
+      void syncProgressToSolver(current.runId, current.progress).then((cancelRequested) => {
+        if (!cancelRequested) return;
+        const live = getInternal();
+        if (!live.ownsRun || !live.locked) return;
+        try {
+          live.abortController?.abort();
+        } catch {
+          /* ignore */
+        }
+        finishSession({ status: "cancelled", progress: 0, error: null });
+      });
+    }
   }, TICK_MS);
 
   state.maxRuntimeTimer = setTimeout(() => {
     const current = getInternal();
     if (!current.locked || current.status !== "running") return;
-    // Force-fail: abort in-flight fetch and unlock so UI never stays stuck.
     try {
       current.abortController?.abort();
     } catch {
@@ -190,7 +289,29 @@ export function subscribeSolverSession(listener: Listener): () => void {
   };
 }
 
+/** Local snapshot only (SSE). Prefer readSolverSessionRemote for cross-replica. */
 export function readSolverSession(): SolverSessionState {
+  return publicSnapshot();
+}
+
+export async function readSolverSessionRemote(): Promise<SolverSessionState> {
+  const local = getInternal();
+  if (local.ownsRun && local.locked) {
+    return publicSnapshot(local);
+  }
+  try {
+    const { response, data } = await fetchSolver(
+      "/sync/solver-session",
+      { method: "GET", cache: "no-store" },
+      { timeoutMs: SYNC_TIMEOUT_MS },
+    );
+    if (response.ok) {
+      applyRemoteSession(data as Partial<SolverSessionState>);
+      return publicSnapshot();
+    }
+  } catch {
+    /* keep local */
+  }
   return publicSnapshot();
 }
 
@@ -206,18 +327,58 @@ export function toLockCompat(state: SolverSessionState = readSolverSession()): S
 }
 
 /**
- * Acquire the session lock and start the server progress ticker.
+ * Acquire the distributed session lock and start the server progress ticker.
  * Returns the AbortSignal for the Flask fetch, or null if already locked.
  */
-export function beginSolverRun(input: {
+export async function beginSolverRun(input: {
   startedBy: string | null;
   startedByNetworkId: string | null;
-}): { runId: string; signal: AbortSignal } | null {
+}): Promise<{ runId: string; signal: AbortSignal } | null> {
   const state = getInternal();
-  if (state.locked) return null;
+  if (state.ownsRun && state.locked) return null;
+
+  let remoteSession: Partial<SolverSessionState> | null = null;
+  let acquired = false;
+  try {
+    const { response, data } = await fetchSolver(
+      "/sync/solver-session/acquire",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          startedBy: input.startedBy,
+          startedByNetworkId: input.startedByNetworkId,
+          ttlMs: SOLVER_CLIENT_TIMEOUT_MS,
+        }),
+      },
+      { timeoutMs: SYNC_TIMEOUT_MS },
+    );
+    if (response.status === 409) {
+      applyRemoteSession((data.session as Partial<SolverSessionState>) ?? data);
+      return null;
+    }
+    if (response.ok && data.acquired === true && data.session) {
+      acquired = true;
+      remoteSession = data.session as Partial<SolverSessionState>;
+    } else if (response.status === 404 || response.status === 405) {
+      // Old solver without sync endpoints — fall back to process-local lock.
+      if (state.locked) return null;
+      acquired = true;
+    } else if (!response.ok) {
+      return null;
+    }
+  } catch {
+    // Solver unreachable: process-local lock only (dev / degraded).
+    if (state.locked) return null;
+    acquired = true;
+  }
+
+  if (!acquired) return null;
 
   const abortController = new AbortController();
-  const runId = `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+  const runId =
+    (typeof remoteSession?.runId === "string" && remoteSession.runId) ||
+    `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
 
   state.locked = true;
   state.runId = runId;
@@ -225,10 +386,12 @@ export function beginSolverRun(input: {
   state.status = "running";
   state.startedBy = input.startedBy;
   state.startedByNetworkId = input.startedByNetworkId;
-  state.startedAt = Date.now();
+  state.startedAt =
+    typeof remoteSession?.startedAt === "number" ? remoteSession.startedAt : Date.now();
   state.error = null;
   state.abortController = abortController;
   state.lastBroadcastProgress = -1;
+  state.ownsRun = true;
 
   startProgressTicker(state);
   broadcast(true);
@@ -242,29 +405,37 @@ export function finishSession(opts: {
   progress?: number;
 }): void {
   const state = getInternal();
+  const runId = state.runId;
   clearTimers(state);
 
   const isCancel = opts.status === "cancelled";
   state.status = opts.status;
   state.error = opts.error ?? null;
-  state.progress = isCancel ? 0 : (opts.progress ?? (opts.status === "completed" ? 100 : state.progress));
+  state.progress = isCancel
+    ? 0
+    : (opts.progress ?? (opts.status === "completed" ? 100 : state.progress));
   state.locked = false;
   state.abortController = null;
-  // Keep startedBy / startedAt briefly for banner attribution, then clear on next begin.
-  // For idle UX after cancel/fail, clear run attribution so buttons re-enable cleanly.
+  state.ownsRun = false;
+
   if (opts.status === "cancelled" || opts.status === "failed") {
     state.startedBy = null;
     state.startedByNetworkId = null;
     state.startedAt = null;
     state.runId = null;
   } else if (opts.status === "completed") {
-    // Keep startedBy for "last run" display elsewhere; unlock means not running.
     state.runId = null;
   }
 
   broadcast(true);
 
-  // After a short hold on completed/failed, return status to idle (progress bar gone).
+  void syncFinishToSolver({
+    runId,
+    status: opts.status,
+    error: opts.error ?? null,
+    progress: state.progress,
+  });
+
   if (opts.status === "completed") {
     setTimeout(() => {
       const current = getInternal();
@@ -290,20 +461,45 @@ export function finishSession(opts: {
   }
 }
 
-/** Owner cancel: abort Flask proxy fetch and unlock without completing to 100%. */
-export function cancelSolverSession(networkId: string): boolean {
+/** Owner cancel: abort Flask proxy fetch (if local) and unlock distributed lock. */
+export async function cancelSolverSession(networkId: string): Promise<boolean> {
   const state = getInternal();
-  if (!state.locked) return false;
-  if (state.startedByNetworkId !== networkId) return false;
 
+  // Prefer distributed cancel so any replica can clear the lock.
+  let remoteCancelled = false;
   try {
-    state.abortController?.abort();
+    const { response, data } = await fetchSolver(
+      "/sync/solver-session/cancel",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ networkId }),
+      },
+      { timeoutMs: SYNC_TIMEOUT_MS },
+    );
+    if (response.status === 403) return false;
+    if (response.ok && data.cancelled === true) {
+      remoteCancelled = true;
+    } else if (response.ok && data.cancelled === false && !state.locked) {
+      return false;
+    }
   } catch {
-    /* ignore */
+    /* local-only cancel below */
   }
 
-  finishSession({ status: "cancelled", progress: 0, error: null });
-  return true;
+  if (state.locked && state.startedByNetworkId === networkId) {
+    try {
+      state.abortController?.abort();
+    } catch {
+      /* ignore */
+    }
+    finishSession({ status: "cancelled", progress: 0, error: null });
+    return true;
+  }
+
+  // Another replica owns the AbortController; cancel_requested is set in DB and
+  // that owner will abort + finish on the next progress sync.
+  return remoteCancelled;
 }
 
 export function getActiveAbortSignal(): AbortSignal | null {
@@ -312,20 +508,21 @@ export function getActiveAbortSignal(): AbortSignal | null {
 
 // --- Compatibility shims for existing schedule route during migration ---
 
-export function acquireSolverLock(
+export async function acquireSolverLock(
   startedBy: string | null,
   startedByNetworkId: string | null,
-): boolean {
-  return beginSolverRun({ startedBy, startedByNetworkId }) !== null;
+): Promise<boolean> {
+  return (await beginSolverRun({ startedBy, startedByNetworkId })) !== null;
 }
 
 export function releaseSolverLock(): void {
   const state = getInternal();
   if (!state.locked) return;
-  // Generic release without a known outcome — treat as failed unlock.
   clearTimers(state);
+  const runId = state.runId;
   state.locked = false;
   state.abortController = null;
+  state.ownsRun = false;
   state.status = "idle";
   state.progress = 0;
   state.runId = null;
@@ -334,13 +531,14 @@ export function releaseSolverLock(): void {
   state.startedAt = null;
   state.error = null;
   broadcast(true);
+  void syncFinishToSolver({ runId, status: "failed", error: "Solver lock released." });
 }
 
 export function readSolverLock(): SolverLockCompat {
   return toLockCompat();
 }
 
-export function cancelSolverRun(): boolean {
+export async function cancelSolverRun(): Promise<boolean> {
   const state = getInternal();
   if (!state.locked || !state.startedByNetworkId) return false;
   return cancelSolverSession(state.startedByNetworkId);

@@ -1,5 +1,9 @@
-/** CP-SAT search budget (seconds). Keep in sync with solver/app.py SOLVER_MAX_TIME_SECONDS. */
-export const SOLVER_MAX_TIME_SECONDS = 600;
+/**
+ * CP-SAT hard search budget (seconds). Keep in sync with solver/app.py
+ * SOLVER_MAX_TIME_SECONDS. Soft deadline (stop-if-feasible) is solver-only:
+ * SOLVER_SOFT_TIME_SECONDS = 60 in solver/app.py.
+ */
+export const SOLVER_MAX_TIME_SECONDS = 180;
 
 /** Flask fetch timeout: solver budget + model-build / serialization headroom. */
 export const SOLVER_API_TIMEOUT_MS = SOLVER_MAX_TIME_SECONDS * 1000 + 60_000;
@@ -16,4 +20,4 @@ export const SOLVER_ROUTE_MAX_DURATION_SEC = Math.ceil(SOLVER_CLIENT_TIMEOUT_MS 
  * literal lives in app/api/schedule/route.ts; this assignment fails the type
  * check if the two ever drift apart.
  */
-const ROUTE_MAX_DURATION_LITERAL_GUARD: typeof SOLVER_ROUTE_MAX_DURATION_SEC = 720;
+const ROUTE_MAX_DURATION_LITERAL_GUARD: typeof SOLVER_ROUTE_MAX_DURATION_SEC = 300;

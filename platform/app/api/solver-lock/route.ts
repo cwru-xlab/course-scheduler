@@ -4,7 +4,7 @@ import { siteConfig } from "@/config/site";
 import { verifyToken, type AuthUser } from "@/lib/auth";
 import {
   cancelSolverSession,
-  readSolverSession,
+  readSolverSessionRemote,
   toLockCompat,
 } from "@/lib/solver-session";
 
@@ -20,7 +20,8 @@ async function getAuthUser(request: NextRequest): Promise<AuthUser | null> {
 
 /** Snapshot (compat shape) for debugging / non-SSE clients. */
 export async function GET() {
-  return NextResponse.json(toLockCompat(readSolverSession()), {
+  const state = await readSolverSessionRemote();
+  return NextResponse.json(toLockCompat(state), {
     status: 200,
     headers: { "Cache-Control": "no-store" },
   });
@@ -33,9 +34,9 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const ok = cancelSolverSession(user.networkId);
+  const ok = await cancelSolverSession(user.networkId);
   if (!ok) {
-    const state = readSolverSession();
+    const state = await readSolverSessionRemote();
     if (!state.locked) {
       return NextResponse.json({ ok: true, cancelled: false }, { status: 200 });
     }

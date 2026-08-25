@@ -13,10 +13,14 @@ export type AccessCheckResult = {
 };
 
 const CACHE_TTL_MS = 45_000;
+/** How long a successful allow decision remains usable after a transport failure. */
+const STALE_ALLOW_GRACE_MS = 5 * 60_000;
 
 type CacheEntry = {
   result: AccessCheckResult;
   expiresAt: number;
+  /** When the successful allow decision was stored (for stale-on-error grace). */
+  storedAt: number;
 };
 
 const checkCache = new Map<string, CacheEntry>();
@@ -46,6 +50,28 @@ export function shouldBypassAllowlist(authProvider: string): boolean {
   );
 }
 
+function readFreshCache(id: string): AccessCheckResult | null {
+  const cached = checkCache.get(id);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.result;
+  }
+  return null;
+}
+
+/** Recent successful allow — usable when the solver is briefly unreachable. */
+function readStaleAllow(id: string): AccessCheckResult | null {
+  const cached = checkCache.get(id);
+  if (
+    cached &&
+    cached.result.allowed &&
+    cached.result.tier != null &&
+    Date.now() - cached.storedAt <= STALE_ALLOW_GRACE_MS
+  ) {
+    return cached.result;
+  }
+  return null;
+}
+
 export async function checkAccessAllowlist(
   networkId: string,
   options?: { skipCache?: boolean },
@@ -54,10 +80,8 @@ export async function checkAccessAllowlist(
   if (!id) return { allowed: false, tier: null };
 
   if (!options?.skipCache) {
-    const cached = checkCache.get(id);
-    if (cached && cached.expiresAt > Date.now()) {
-      return cached.result;
-    }
+    const fresh = readFreshCache(id);
+    if (fresh) return fresh;
   }
 
   try {
@@ -76,8 +100,18 @@ export async function checkAccessAllowlist(
       // in local/dev so work can continue before the table is seeded.
       if (process.env.NODE_ENV !== "production" && response.status === 404) {
         const result: AccessCheckResult = { allowed: true, tier: "active" };
-        checkCache.set(id, { result, expiresAt: Date.now() + CACHE_TTL_MS });
+        checkCache.set(id, {
+          result,
+          expiresAt: Date.now() + CACHE_TTL_MS,
+          storedAt: Date.now(),
+        });
         return result;
+      }
+      // Non-transport HTTP errors: prefer a recent allow over cascading 403s
+      // when the solver is overloaded (e.g. 502/503 during a long solve).
+      if (process.env.NODE_ENV === "production" && response.status >= 500) {
+        const stale = readStaleAllow(id);
+        if (stale) return stale;
       }
       return { allowed: false, tier: null };
     }
@@ -90,13 +124,21 @@ export async function checkAccessAllowlist(
       allowed: allowed && tier != null,
       tier: allowed ? tier : null,
     };
-    checkCache.set(id, { result, expiresAt: Date.now() + CACHE_TTL_MS });
+    checkCache.set(id, {
+      result,
+      expiresAt: Date.now() + CACHE_TTL_MS,
+      storedAt: Date.now(),
+    });
     return result;
   } catch {
     if (process.env.NODE_ENV !== "production") {
       // Local solver down — don't lock out SSO testing mid-dev.
       return { allowed: true, tier: "active" };
     }
+    // Transient transport failure (ETIMEDOUT while solver is busy): reuse a
+    // recent successful allow rather than cascading 403s to authenticated users.
+    const stale = readStaleAllow(id);
+    if (stale) return stale;
     return { allowed: false, tier: null };
   }
 }

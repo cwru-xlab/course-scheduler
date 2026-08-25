@@ -28,7 +28,7 @@ export async function GET() {
       {
         ...data,
         meta: {
-          revision: getSchedulingDataRevision(),
+          revision: await getSchedulingDataRevision(),
         },
       },
       {

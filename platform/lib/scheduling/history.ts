@@ -24,6 +24,21 @@ export type LastSolverRunSnapshot = {
   name?: string;
 };
 
+/** True when a snapshot has the fields `applyRunSnapshot` needs (avoids runtime .map crashes). */
+export function isValidLastSolverRunSnapshot(
+  value: unknown,
+): value is LastSolverRunSnapshot {
+  if (!value || typeof value !== "object") return false;
+  const snap = value as Record<string, unknown>;
+  const input = snap.input;
+  const solution = snap.solution;
+  if (!input || typeof input !== "object") return false;
+  if (!solution || typeof solution !== "object") return false;
+  const sections = (input as { sections?: unknown }).sections;
+  const assignments = (solution as { assignments?: unknown }).assignments;
+  return Array.isArray(sections) && Array.isArray(assignments);
+}
+
 export type SavedScheduleEntry = {
   id: string;
   name: string;

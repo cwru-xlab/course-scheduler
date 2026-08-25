@@ -23,7 +23,9 @@ export {
 const FORMAT_HINT_CODE = "format_reference";
 
 export function isFetchFailedMessage(message: string): boolean {
-  return /fetch failed|failed to fetch|networkerror|network error/i.test(message);
+  return /fetch failed|failed to fetch|networkerror|network error|etimedout|econnrefused|econnreset|socket hang up|timed out|timeout/i.test(
+    message,
+  );
 }
 
 export function isLikelySpreadsheetFormatIssue(error: ValidationError): boolean {
