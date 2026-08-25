@@ -75,9 +75,17 @@ const CATALOG: Record<string, CatalogEntry> = {
   },
   network_error: {
     title: "Could not reach the scheduling service",
-    whatHappened: "Your browser could not connect to the scheduling service.",
+    whatHappened: "The web app could not complete a request to the scheduling service.",
     howToFix:
-      "Confirm the scheduling service is running (default port 5001), refresh the page, and try again.",
+      "Confirm SOLVER_URL points at a reachable solver host, that the solver process is running, and try again. Check the technical detail for timeout vs connection errors.",
+    severity: "system",
+  },
+  solver_proxy_timeout: {
+    title: "Scheduling service timed out",
+    whatHappened:
+      "The web app waited for the solver but got no complete response before the proxy timeout.",
+    howToFix:
+      "Retry once the solver is idle. If this keeps happening, check that the solver host is reachable from Vercel, not overloaded, and that firewall/security groups allow the connection for the full solve duration.",
     severity: "system",
   },
   solver_response_invalid: {
@@ -237,6 +245,10 @@ function looksLikeRawTechnicalText(text: string): boolean {
     lowered.includes("keyerror") ||
     lowered.includes("status ") ||
     lowered.includes("non-json") ||
+    lowered.includes("etimedout") ||
+    lowered.includes("econnrefused") ||
+    lowered.includes("econnreset") ||
+    lowered.includes("solver_url host") ||
     /^[a-z]+error:/i.test(text) ||
     /\(status \d{3}\)/.test(text)
   );

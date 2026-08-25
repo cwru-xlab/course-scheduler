@@ -13,10 +13,12 @@ import { tryRecordActivity } from "@/lib/record-activity";
 import { getSchedulingDataRevision, tryRecordSchedulingDataRevision } from "@/lib/scheduling/dataRevisionStore";
 import { fetchSolverLong } from "@/lib/api/solverFetchLong";
 import { solverErrorsFromBody } from "@/lib/api/solverFetch";
-import { enrichSolverErrors, normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
+import { enrichSolverErrors, classifySolverProxyFailure } from "@/lib/spreadsheet/formatGuide";
 import { sectionLocksFromInput } from "@/lib/scheduling/sectionLocks";
 import { publishSharedSchedule } from "@/lib/shared-schedule";
 import { SOLVER_API_TIMEOUT_MS } from "@/lib/solver-timeouts";
+
+const SOLVER_URL = process.env.SOLVER_URL ?? "http://localhost:5001";
 
 // Must exceed CP-SAT search budget + headroom (see lib/solver-timeouts.ts).
 // Segment config exports must be static literals — Next.js cannot statically
@@ -226,12 +228,23 @@ export async function POST(request: NextRequest) {
 
     const rawMessage =
       error instanceof Error ? error.message : "Failed to reach scheduling service.";
-    const message = normalizeNetworkError(rawMessage, "solver");
-    finish({ status: "failed", error: message });
+    const classified = classifySolverProxyFailure(rawMessage, SOLVER_URL);
+    console.error("[api/schedule] solver proxy failure", {
+      code: classified.code,
+      detail: classified.detail,
+      timeoutMs: SOLVER_API_TIMEOUT_MS,
+    });
+    finish({ status: "failed", error: classified.message });
     return NextResponse.json(
       {
         status: "error",
-        errors: enrichSolverErrors([{ code: "network_error", message }]),
+        errors: enrichSolverErrors([
+          {
+            code: classified.code,
+            message: classified.message,
+            detail: classified.detail,
+          },
+        ]),
       },
       { status: 502 },
     );

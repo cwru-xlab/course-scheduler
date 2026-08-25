@@ -89,7 +89,11 @@ export async function POST(request: NextRequest) {
     name,
     scheduleDate,
     savedByUserId: gate.user!.networkId,
-    savedByName: gate.user!.name || gate.user!.email || "Unknown",
+    savedByName:
+      gate.user!.name?.trim() ||
+      gate.user!.email?.trim() ||
+      gate.user!.networkId ||
+      "Unknown",
     snapshot: body.snapshot as any,
   });
 
