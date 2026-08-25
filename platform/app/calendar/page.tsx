@@ -19,6 +19,7 @@ import {
   Save,
   Share2,
   Shuffle,
+  ArrowUpDown,
   Undo2,
   Unlock,
   X,
@@ -45,7 +46,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { useIslandNotify, useSetStatusBarContent } from "@/components/GlobalStatusBar";
 import { MultiSelect } from "@/components/scheduler/MultiSelect";
 import { appToolbarShellClass, appNavLinkClass } from "@/lib/ui/appChromeStyles";
-import { navbarPopoverProps, toolbarChipPopoverChipClass, toolbarChipPopoverContentClass, toolbarChipPopoverGridClass, toolbarChipPopoverGridStyle, toolbarPanelCloseOnInteractOutside, useOverlayClampedHeight } from "@/lib/ui/navbarPopoverProps";
+import { navbarPopoverProps, toolbarChipPopoverChipClass, toolbarChipPopoverContentClass, toolbarChipPopoverGridClass, toolbarChipPopoverGridStyle, toolbarCompactPopoverContentClass, toolbarFormPopoverContentClass, toolbarPanelCloseOnInteractOutside, useOverlayClampedHeight } from "@/lib/ui/navbarPopoverProps";
 import { TagInput } from "@/components/scheduler/TagInput";
 import { ViewportModal } from "@/components/scheduler/ViewportModal";
 import {
@@ -99,6 +100,15 @@ import {
 } from "@/lib/solver/solverErrorStorage";
 import { normalizeNetworkError } from "@/lib/spreadsheet/formatGuide";
 import { validateSchedulingInput } from "@/lib/spreadsheet/validateClient";
+import {
+  CALENDAR_ROOM_SORT_OPTIONS,
+  canonicalizeRoomNumber,
+  DEFAULT_CALENDAR_ROOM_SORT_MODE,
+  readCalendarRoomSortMode,
+  sortRooms,
+  writeCalendarRoomSortMode,
+  type CalendarRoomSortMode,
+} from "@/lib/scheduling/roomNumber";
 import { CrosslistCalendarEventCard, CrosslistLegendSwatch } from "./CrosslistCalendarEventCard";
 import {
   assignCalendarEventLanes,
@@ -688,10 +698,7 @@ function CrosslistScheduleBanner({
 }
 
 function formatRoomNumberForDisplay(roomNumber?: string): string {
-  const value = (roomNumber ?? "").toString().trim();
-  if (!value) return "";
-  // Spreadsheet imports may coerce whole-number room values to strings like "201.0".
-  return value.replace(/\.0+$/, "");
+  return canonicalizeRoomNumber(roomNumber);
 }
 
 function splitCsv(value: string): string[] {
@@ -1315,8 +1322,18 @@ type PatternDayApplyRow = {
   const [selectedInstructorIds, setSelectedInstructorIds] = useState<string[]>([]);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const filtersPanelRef = useOverlayClampedHeight<HTMLDivElement>(filtersExpanded);
+  const [roomSortExpanded, setRoomSortExpanded] = useState(false);
+  const roomSortPanelRef = useOverlayClampedHeight<HTMLDivElement>(roomSortExpanded);
   const activeFilterCount = selectedDepartmentKeys.length + selectedInstructorIds.length;
   const [searchQuery, setSearchQuery] = useState("");
+  const [roomSortMode, setRoomSortMode] = useState<CalendarRoomSortMode>(
+    DEFAULT_CALENDAR_ROOM_SORT_MODE,
+  );
+
+  useEffect(() => {
+    setRoomSortMode(readCalendarRoomSortMode());
+  }, []);
+
   const [hoveredDepartmentKey, setHoveredDepartmentKey] = useState<string | null>(null);
   const [selectedLegendDepartmentKeys, setSelectedLegendDepartmentKeys] = useState<string[]>([]);
   const [colorsExpanded, setColorsExpanded] = useState(false);
@@ -2348,7 +2365,8 @@ type PatternDayApplyRow = {
 
   const roomRows = useMemo(() => {
     if (!data) return [];
-    return data.rooms.map((room) => {
+    const orderedRooms = sortRooms(data.rooms, roomSortMode);
+    return orderedRooms.map((room) => {
       const roomEvents = [...(allEventsByRoom.get(room.id) ?? [])].sort(
         (a, b) => a.start - b.start,
       );
@@ -2376,7 +2394,7 @@ type PatternDayApplyRow = {
       );
       return { room, visibleEvents, hiddenEvents, rowHeight: Math.max(100, needed) };
     });
-  }, [allEventsByRoom, data, sectionMatchesFilters]);
+  }, [allEventsByRoom, data, roomSortMode, sectionMatchesFilters]);
 
   const linkedSectionIdsBySection = useMemo(() => {
     const map = new Map<string, string[]>();
@@ -2411,7 +2429,7 @@ type PatternDayApplyRow = {
       byRoom.get(roomId)?.push(event);
     });
 
-    return data.rooms.map((room) => {
+    return sortRooms(data.rooms, roomSortMode).map((room) => {
       const roomEvents = [...(byRoom.get(room.id) ?? [])].sort((a, b) => a.start - b.start);
       const laneEndTimes: number[] = [];
       const roomEventsWithLane = roomEvents.map((event) => {
@@ -4859,7 +4877,7 @@ type PatternDayApplyRow = {
             </button>
           </PopoverTrigger>
           <PopoverContent
-            className={toolbarChipPopoverContentClass}
+            className={toolbarFormPopoverContentClass}
             aria-label="Filters"
           >
             <div
@@ -5100,8 +5118,65 @@ type PatternDayApplyRow = {
         )}
       >
         <div className="flex bg-slate-50 border-b border-slate-200">
-          <div className="w-40 flex-shrink-0 border-r border-slate-200 p-4 font-bold text-[10px] uppercase text-slate-500 tracking-widest">
-            Rooms \ Time
+          <div className="w-40 flex-shrink-0 border-r border-slate-200 px-3 py-3 flex items-center justify-between gap-1">
+            <span className="font-bold text-[10px] uppercase text-slate-500 tracking-widest">
+              Rooms \ Time
+            </span>
+            <Popover
+              isOpen={roomSortExpanded}
+              onOpenChange={setRoomSortExpanded}
+              placement="bottom-start"
+              {...navbarPopoverProps}
+              shouldCloseOnInteractOutside={toolbarPanelCloseOnInteractOutside}
+            >
+              <PopoverTrigger>
+                <button
+                  type="button"
+                  aria-expanded={roomSortExpanded}
+                  aria-label="Room order"
+                  title="Room order"
+                  className="inline-flex size-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
+                >
+                  <ArrowUpDown className="size-3" aria-hidden />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                className={toolbarCompactPopoverContentClass}
+                aria-label="Room order"
+              >
+                <div
+                  ref={roomSortPanelRef}
+                  className="max-h-[min(50vh,320px)] space-y-1 overflow-y-auto p-2"
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                    Room order
+                  </p>
+                  {CALENDAR_ROOM_SORT_OPTIONS.map((opt) => {
+                    const selected = roomSortMode === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        className={clsx(
+                          "flex w-full items-center rounded-md px-2.5 py-1.5 text-left text-xs font-semibold transition-colors",
+                          selected
+                            ? "bg-sky-50 text-weatherhead-primary"
+                            : "text-slate-700 hover:bg-slate-50",
+                        )}
+                        onClick={() => {
+                          setRoomSortMode(opt.value);
+                          writeCalendarRoomSortMode(opt.value);
+                          setRoomSortExpanded(false);
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="flex flex-1">
             {timeAxisLabels.map((t) => (
