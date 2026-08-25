@@ -51,6 +51,14 @@ export function useOverlayClampedHeight<T extends HTMLElement>(active: boolean) 
 export const toolbarChipPopoverContentClass =
   "w-[min(640px,92vw)] min-w-[min(640px,92vw)] max-w-[min(640px,92vw)] p-0";
 
+/** Content-sized popover for short option lists (e.g. Room order). */
+export const toolbarCompactPopoverContentClass =
+  "w-max max-w-[min(280px,92vw)] p-0";
+
+/** Form-style toolbar popover (e.g. Filters) — wide enough for controls, not chip-grid wide. */
+export const toolbarFormPopoverContentClass =
+  "w-[min(400px,92vw)] max-w-[min(400px,92vw)] p-0";
+
 /**
  * `shouldCloseOnInteractOutside` for toolbar panels that embed select controls
  * (e.g. floating Filters): presses inside a portal'd editor select menu must

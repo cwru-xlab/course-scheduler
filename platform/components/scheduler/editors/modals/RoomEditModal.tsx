@@ -6,6 +6,7 @@ import { Button } from "@heroui/button";
 import { EditorModalShell } from "../EditorModalShell";
 import { TagInput } from "../../TagInput";
 import type { Room } from "@/lib/scheduling/types";
+import { canonicalizeRoomNumber } from "@/lib/scheduling/roomNumber";
 
 type RoomEditModalProps = {
   isOpen: boolean;
@@ -43,7 +44,7 @@ export function RoomEditModal({
       ...draft,
       id: draft.id.trim(),
       building: draft.building.trim(),
-      room_number: draft.room_number.trim(),
+      room_number: canonicalizeRoomNumber(draft.room_number),
     });
     onClose();
   };

@@ -9,9 +9,15 @@ import pandas as pd
 from model import Course, Instructor, Room, Timeslot, MeetingPattern, Section, db
 
 try:
-    from spreadsheet_io.spreadsheet_utils import normalize_spreadsheet_string_cell
+    from spreadsheet_io.spreadsheet_utils import (
+        canonicalize_room_number,
+        normalize_spreadsheet_string_cell,
+    )
 except ModuleNotFoundError:
-    from spreadsheet_utils import normalize_spreadsheet_string_cell  # type: ignore[no-redef]
+    from spreadsheet_utils import (  # type: ignore[no-redef]
+        canonicalize_room_number,
+        normalize_spreadsheet_string_cell,
+    )
 
 
 def _parse_time(value: Any) -> time:
@@ -269,7 +275,7 @@ def parse_excel_to_dicts(excel_bytes: bytes) -> ParsedData:
                 {
                     "id": normalize_spreadsheet_string_cell(row["id"]),
                     "building": normalize_spreadsheet_string_cell(row["building"]),
-                    "room_number": normalize_spreadsheet_string_cell(
+                    "room_number": canonicalize_room_number(
                         row.get("room_number", "")
                     ),
                     "capacity": int(row["capacity"]),

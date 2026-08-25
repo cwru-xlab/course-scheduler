@@ -5,11 +5,27 @@ export type CalendarSectionLike = {
   course_id: string | number;
   department?: string | null;
   section_code: string;
+  /** Registrar section number (not the 100/400/800 display designation). */
+  section_number?: string;
   instructor_id: string;
   crosslist_group_id?: string | null;
   room_id?: string | null;
   timeslot_id?: string | null;
 };
+
+/** Hover card lines: "DEPT code - Section N" + instructor. */
+export function formatCalendarSectionHoverLines(
+  section: Pick<CalendarSectionLike, "department" | "section_code" | "section_number">,
+  instructorName: string,
+): { title: string; instructor: string } {
+  const dept = String(section.department ?? "").trim();
+  const code = String(section.section_code ?? "").trim();
+  const number = String(section.section_number ?? "").trim();
+  const head = [dept, code].filter(Boolean).join(" ");
+  const title = number ? `${head} - Section ${number}` : head || "—";
+  const instructor = instructorName.trim() || "—";
+  return { title, instructor };
+}
 
 export type RawCalendarEvent = {
   section: CalendarSectionLike;

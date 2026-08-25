@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from io import BytesIO
+import re
 from typing import Any, Dict, List
 
 from openpyxl import Workbook
@@ -402,6 +403,40 @@ def normalize_spreadsheet_string_cell(value: Any) -> str:
     return text
 
 
+def _pad_digit_run(digits: str) -> str:
+    """
+    If fewer than 3 digits and does not already begin with 0, prepend one zero.
+    Examples: 2 -> 02, 12 -> 012, 02 -> 02, 102 -> 102.
+    Also collapses prior 3-digit zfill of single-digit rooms (002 -> 02).
+    """
+    if not digits.isdigit():
+        return digits
+    if re.fullmatch(r"00\d", digits):
+        return digits[1:]
+    if len(digits) >= 3 or digits.startswith("0"):
+        return digits
+    return f"0{digits}"
+
+
+def canonicalize_room_number(value: Any) -> str:
+    """
+    Canonical room_number string.
+
+    Short numbers without a leading zero get one prepended (2 -> 02; 02 stays).
+    Mixed values pad the final numeric run only (e.g. A2 -> A02). Idempotent.
+    """
+    text = normalize_spreadsheet_string_cell(value)
+    if not text:
+        return ""
+    if text.isdigit():
+        return _pad_digit_run(text)
+    match = re.match(r"^(.*?)(\d+)(\D*)$", text)
+    if not match:
+        return text
+    prefix, digits, suffix = match.group(1), match.group(2), match.group(3)
+    return f"{prefix}{_pad_digit_run(digits)}{suffix}"
+
+
 def maybe_str(value: Any) -> str | None:
     """Optional string from a cell; normalizes Excel/JSON float artifacts."""
     if value is None:
@@ -411,8 +446,8 @@ def maybe_str(value: Any) -> str | None:
 
 
 def format_room_number_for_export(value: Any) -> str:
-    """Alias for :func:`normalize_spreadsheet_string_cell` (room_number)."""
-    return normalize_spreadsheet_string_cell(value)
+    """Export room_number as canonical string."""
+    return canonicalize_room_number(value)
 
 
 def build_template_workbook() -> Workbook:

@@ -36,6 +36,7 @@ from spreadsheet_io.import_from_spreadsheet import parse_scheduling_input_from_e
 from spreadsheet_io.export_to_spreadsheet import scheduling_input_to_excel_bytes
 from spreadsheet_io.spreadsheet_utils import (
     build_template_bytes,
+    canonicalize_room_number,
     normalize_section_state,
     parse_nested_list_cell,
 )
@@ -2676,7 +2677,7 @@ def get_data():
             {
                 "id": r.id,
                 "building": r.building,
-                "room_number": r.room_number,
+                "room_number": canonicalize_room_number(r.room_number),
                 "capacity": r.capacity,
                 "features": r.features or [],
             }
@@ -3481,11 +3482,14 @@ def update_rooms():
             if room_id is None or str(room_id).strip() == "":
                 continue
             room = Room.query.get(room_id)
+            room_number = canonicalize_room_number(
+                item.get("room_number") or room_id or "TBD"
+            )
             if room is None:
                 room = Room(
                     id=room_id,
                     building=item.get("building") or "Unknown",
-                    room_number=item.get("room_number") or room_id or "TBD",
+                    room_number=room_number or "TBD",
                     capacity=int(item.get("capacity") or 0),
                     room_type=item.get("room_type") or "lecture",
                     has_av=bool(item.get("has_av", False)),
@@ -3495,7 +3499,10 @@ def update_rooms():
                 db.session.add(room)
             else:
                 room.building = item.get("building") or room.building
-                room.room_number = item.get("room_number") or room.room_number
+                room.room_number = (
+                    canonicalize_room_number(item.get("room_number"))
+                    or room.room_number
+                )
                 room.capacity = int(item.get("capacity") or room.capacity or 0)
                 room.room_type = item.get("room_type") or room.room_type
                 room.has_av = bool(item.get("has_av", room.has_av))
