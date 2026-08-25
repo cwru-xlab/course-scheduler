@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 
 import { isSectionArchived } from "@/lib/scheduling/sectionState";
+import { canonicalizeRoomNumber } from "@/lib/scheduling/roomNumber";
 import {
   SCHEDULING_WINDOW_END_HOUR,
   SCHEDULING_WINDOW_START_HOUR,
@@ -149,9 +150,7 @@ export function parseCourseId(
 }
 
 export function formatRoomNumberForDisplay(roomNumber?: string): string {
-  const value = (roomNumber ?? "").toString().trim();
-  if (!value) return "";
-  return value.replace(/\.0+$/, "");
+  return canonicalizeRoomNumber(roomNumber);
 }
 
 export function formatRoomLabel(room: RoomAssignmentRoom | null | undefined): string {

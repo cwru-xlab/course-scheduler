@@ -12,6 +12,7 @@ DEFAULT_ALLOWED_MEETING_PATTERNS = ["MP-A-50", "MP-B-75"]
 try:
     from spreadsheet_io.spreadsheet_utils import (
         SHEET_NAME_TO_SPEC,
+        canonicalize_room_number,
         maybe_float,
         maybe_int,
         maybe_str,
@@ -23,6 +24,7 @@ try:
 except ModuleNotFoundError:
     from spreadsheet_utils import (  # type: ignore[no-redef]
         SHEET_NAME_TO_SPEC,
+        canonicalize_room_number,
         maybe_float,
         maybe_int,
         maybe_str,
@@ -124,7 +126,7 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
             {
                 "id": room_id,
                 "building": _str_with_default(row, "building", "Rooms", default=""),
-                "room_number": maybe_str(row.get("room_number")) or "",
+                "room_number": canonicalize_room_number(row.get("room_number")),
                 "capacity": _int_with_default(row, "capacity", "Rooms", default=0),
                 "features": parse_list_cell(row.get("features")),
             }

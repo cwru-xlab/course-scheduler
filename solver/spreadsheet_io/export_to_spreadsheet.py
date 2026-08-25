@@ -11,6 +11,8 @@ try:
     from spreadsheet_io.notes_export import apply_notes_to_workbook
     from spreadsheet_io.spreadsheet_utils import (
         SPREADSHEET_SPECS,
+        canonicalize_room_number,
+        format_room_number_for_export,
         normalize_spreadsheet_string_cell,
         serialize_list_cell,
         serialize_nested_list_cell,
@@ -20,6 +22,8 @@ except ModuleNotFoundError:
     from notes_export import apply_notes_to_workbook  # type: ignore[no-redef]
     from spreadsheet_utils import (  # type: ignore[no-redef]
         SPREADSHEET_SPECS,
+        canonicalize_room_number,
+        format_room_number_for_export,
         normalize_spreadsheet_string_cell,
         serialize_list_cell,
         serialize_nested_list_cell,
@@ -71,6 +75,23 @@ def scheduling_input_to_excel_bytes(
         rows = _rows_for_sheet(spec.name, payload, instructor_lookup)
         for row in rows:
             ws.append([row.get(column, "") for column in spec.columns])
+
+    # Force Rooms.room_number cells to Excel text so leading zeros survive re-import.
+    rooms_ws = sheets.get("Rooms")
+    if rooms_ws is not None:
+        try:
+            room_number_col = SPREADSHEET_SPECS[
+                next(i for i, s in enumerate(SPREADSHEET_SPECS) if s.name == "Rooms")
+            ].columns.index("room_number") + 1
+        except (StopIteration, ValueError):
+            room_number_col = None
+        if room_number_col is not None:
+            for row_idx in range(2, rooms_ws.max_row + 1):
+                cell = rooms_ws.cell(row=row_idx, column=room_number_col)
+                if cell.value is None or cell.value == "":
+                    continue
+                cell.value = canonicalize_room_number(cell.value)
+                cell.number_format = "@"
 
     instructor_ws = sheets.get("Instructors")
     for spec in SPREADSHEET_SPECS:
@@ -199,7 +220,7 @@ def _rows_for_sheet(
             {
                 "id": _export_str(item.get("id", "")),
                 "building": _export_str(item.get("building", "")),
-                "room_number": _export_str(item.get("room_number", "")),
+                "room_number": format_room_number_for_export(item.get("room_number", "")),
                 "capacity": item.get("capacity", ""),
                 "features": serialize_list_cell(item.get("features")),
                 "prev_notes": "",

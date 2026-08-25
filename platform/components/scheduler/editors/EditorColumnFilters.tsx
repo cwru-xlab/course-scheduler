@@ -8,7 +8,7 @@ import clsx from "clsx";
 import { ChevronDown } from "lucide-react";
 
 import {
-  toolbarChipPopoverContentClass,
+  toolbarFormPopoverContentClass,
   navbarPopoverProps,
   toolbarPanelCloseOnInteractOutside,
   useOverlayClampedHeight,
@@ -280,7 +280,7 @@ export function EditorColumnFilters<TRow>({
             </button>
           </PopoverTrigger>
           <PopoverContent
-            className={toolbarChipPopoverContentClass}
+            className={toolbarFormPopoverContentClass}
             aria-label="Filters"
           >
             <div
