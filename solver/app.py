@@ -42,8 +42,10 @@ from spreadsheet_io.spreadsheet_utils import (
 
 # CP-SAT deadlines. Hard budget stays in sync with platform/lib/solver-timeouts.ts.
 # Soft: if any feasible exists by this wall time, stop and return best-so-far.
+# Kept under common load-balancer idle timeouts (often 60s) so Vercel→solver
+# connections are less likely to be dropped mid-search with no response bytes.
 # Hard: absolute search cap; no feasible by then → solver_timeout / UNKNOWN.
-SOLVER_SOFT_TIME_SECONDS = 60.0
+SOLVER_SOFT_TIME_SECONDS = 45.0
 SOLVER_MAX_TIME_SECONDS = 180.0
 
 # Cap infeasibility diagnosis so /solve returns before API proxies time out.

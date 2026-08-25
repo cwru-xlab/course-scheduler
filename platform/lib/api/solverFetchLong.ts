@@ -62,6 +62,10 @@ function nodeHttpFetch(
         path: `${parsed.pathname}${parsed.search}`,
         method,
         headers,
+        // Long CP-SAT calls send no bytes until the JSON body is ready.
+        // Keepalive helps some NAT paths; load-balancer idle timeout must
+        // still be >= hard solve budget (see solver/.env.example).
+        agent: false,
       },
       (res) => {
         const chunks: Buffer[] = [];
@@ -84,6 +88,13 @@ function nodeHttpFetch(
         });
       },
     );
+
+    req.on("socket", (socket) => {
+      socket.setKeepAlive(true, 15_000);
+      // Do not use socket.setTimeout for the overall budget — we manage that
+      // with `timer` below. A short socket timeout would false-fail long solves.
+      socket.setTimeout(0);
+    });
 
     const onAbort = () => {
       clearTimeout(timer);

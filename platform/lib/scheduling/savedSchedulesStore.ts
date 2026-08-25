@@ -58,7 +58,12 @@ function persistToDisk(entries: SavedScheduleEntry[]) {
 }
 
 export function listSavedSchedules(): SavedScheduleEntry[] {
-  return [...getState()].sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+  return [...getState()]
+    .map((entry) => ({
+      ...entry,
+      savedBy: entry.savedByName || entry.savedBy || entry.savedByUserId || undefined,
+    }))
+    .sort((a, b) => b.savedAt.localeCompare(a.savedAt));
 }
 
 export function saveSavedSchedule(params: {
@@ -76,6 +81,8 @@ export function saveSavedSchedule(params: {
     savedAt: new Date().toISOString(),
     savedByUserId: params.savedByUserId,
     savedByName: params.savedByName,
+    // Alias for UI that still reads `savedBy`.
+    savedBy: params.savedByName,
     snapshot: params.snapshot,
   };
   const next = [entry, ...entries];

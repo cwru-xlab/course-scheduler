@@ -296,7 +296,10 @@ export default function HistoryPage() {
                     <span>
                       Saved by{" "}
                       <span className="font-semibold text-slate-900">
-                        {item.savedBy?.trim() || "Unknown user"}
+                        {item.savedByName?.trim() ||
+                          item.savedBy?.trim() ||
+                          item.savedByUserId?.trim() ||
+                          "Unknown user"}
                       </span>
                     </span>
                   </div>

@@ -1,7 +1,7 @@
 /**
  * CP-SAT hard search budget (seconds). Keep in sync with solver/app.py
  * SOLVER_MAX_TIME_SECONDS. Soft deadline (stop-if-feasible) is solver-only:
- * SOLVER_SOFT_TIME_SECONDS = 60 in solver/app.py.
+ * SOLVER_SOFT_TIME_SECONDS = 45 in solver/app.py.
  */
 export const SOLVER_MAX_TIME_SECONDS = 180;
 

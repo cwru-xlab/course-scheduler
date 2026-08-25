@@ -80,10 +80,73 @@ export function formatSolverServiceUnavailable(context: "import" | "export" | "s
 
   return (
     `Could not reach the scheduling service to ${action}. ` +
-    "Confirm the solver is running (default port 5001). " +
+    "Confirm the solver host is reachable from the web app (SOLVER_URL) and running. " +
     `If you recently imported a spreadsheet, verify its structure matches ${EXAMPLE_SPREADSHEET_FILENAME} — ` +
     "misaligned sheets, headers, or delimiters can cause the service to fail with a generic network error."
   );
+}
+
+/** Hostname (no credentials) for diagnostic messages. */
+export function solverHostLabel(solverUrl: string): string {
+  try {
+    const u = new URL(solverUrl);
+    return u.host || solverUrl;
+  } catch {
+    return solverUrl || "unknown";
+  }
+}
+
+/**
+ * Classify Next.js → Flask proxy failures so 502s are diagnosable in the UI
+ * (timeout vs refused vs other), without leaking credentials from SOLVER_URL.
+ */
+export function classifySolverProxyFailure(
+  rawMessage: string,
+  solverUrl: string,
+): { code: string; message: string; detail: string } {
+  const host = solverHostLabel(solverUrl);
+  const raw = (rawMessage || "Failed to reach scheduling service.").trim();
+  const detail = `${raw} (SOLVER_URL host: ${host})`;
+
+  if (/timed out|etimedout|timeout/i.test(raw)) {
+    return {
+      code: "solver_proxy_timeout",
+      message:
+        `The scheduling service at ${host} did not respond in time. ` +
+        "It may still be solving, overloaded, firewalled from Vercel, or the request exceeded the proxy timeout.",
+      detail,
+    };
+  }
+  if (/econnrefused|enotfound|getaddrinfo|ehostunreach|enetunreach/i.test(raw)) {
+    return {
+      code: "network_error",
+      message:
+        `Could not connect to the scheduling service at ${host}. ` +
+        "Confirm SOLVER_URL points at a reachable solver and that the process is running.",
+      detail,
+    };
+  }
+  if (/econnreset|socket hang up/i.test(raw)) {
+    return {
+      code: "network_error",
+      message:
+        `The connection to the scheduling service at ${host} was reset. ` +
+        "The solver may have crashed or closed the connection mid-request.",
+      detail,
+    };
+  }
+  if (isFetchFailedMessage(raw)) {
+    return {
+      code: "network_error",
+      message: formatSolverServiceUnavailable("solver"),
+      detail,
+    };
+  }
+  return {
+    code: "network_error",
+    message: raw,
+    detail,
+  };
 }
 
 export function normalizeNetworkError(
@@ -103,7 +166,7 @@ export function enrichSpreadsheetErrors(
   const normalized = errors.map((error) => ({
     ...error,
     message:
-      error.code === "network_error"
+      error.code === "network_error" && isFetchFailedMessage(error.message)
         ? normalizeNetworkError(error.message, context)
         : error.message,
   }));
@@ -121,13 +184,22 @@ export function enrichSpreadsheetErrors(
 }
 
 export function enrichSolverErrors(errors: ValidationError[]): ValidationError[] {
-  const normalized = errors.map((error) => ({
-    ...error,
-    message:
-      error.code === "network_error"
-        ? normalizeNetworkError(error.message, "solver")
-        : error.message,
-  }));
+  const normalized = errors.map((error) => {
+    // Preserve already-classified proxy failures (friendly message + technical detail).
+    if (error.code === "solver_proxy_timeout") {
+      return error;
+    }
+    if (error.code === "network_error" && error.detail) {
+      return error;
+    }
+    return {
+      ...error,
+      message:
+        error.code === "network_error" && isFetchFailedMessage(error.message)
+          ? normalizeNetworkError(error.message, "solver")
+          : error.message,
+    };
+  });
 
   const needsFormatHint =
     normalized.some(isLikelySpreadsheetFormatIssue) ||
