@@ -113,6 +113,9 @@ export const useSharedScheduleFull = (): SharedScheduleFullResult => {
     fetchSharedScheduleFull()
       .then((next) => {
         if (cancelled) return;
+        // Do not advance lastRevisionRef when the full fetch fails/returns null —
+        // keep retrying on the next meta poll tick.
+        if (!next) return;
         setFull(next);
         lastRevisionRef.current = meta.revision;
       })

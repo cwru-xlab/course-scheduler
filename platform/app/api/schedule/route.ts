@@ -21,8 +21,8 @@ import { SOLVER_API_TIMEOUT_MS } from "@/lib/solver-timeouts";
 // Must exceed CP-SAT search budget + headroom (see lib/solver-timeouts.ts).
 // Segment config exports must be static literals — Next.js cannot statically
 // evaluate an imported constant here (build fails with "Invalid segment
-// configuration export detected"). solver-timeouts.ts guards this stays 720.
-export const maxDuration = 720;
+// configuration export detected"). solver-timeouts.ts guards this stays 300.
+export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
   // Serialize solver runs across users: the Flask solver is single-worker
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     // best-effort attribution
   }
 
-  const started = beginSolverRun({
+  const started = await beginSolverRun({
     startedBy: userLabel,
     startedByNetworkId: userNetworkId,
   });
@@ -166,19 +166,22 @@ export async function POST(request: NextRequest) {
             )
           : [];
         const sectionLocks = sectionLocksFromInput(input);
-        const currentDataRevision = getSchedulingDataRevision();
-        const meta = publishSharedSchedule({
-          ranBy: userLabel,
-          snapshot: {
-            input,
-            solution: data,
-            lockedSectionIds,
-            sectionLocks,
-            createdAt: new Date().toISOString(),
-            dataRevision: currentDataRevision ?? undefined,
-          },
-        });
-        sharedRevision = meta.revision;
+        const currentDataRevision = await getSchedulingDataRevision();
+        const solutionPayload = data as { assignments?: unknown };
+        if (Array.isArray(solutionPayload.assignments)) {
+          const meta = await publishSharedSchedule({
+            ranBy: userLabel,
+            snapshot: {
+              input,
+              solution: data,
+              lockedSectionIds,
+              sectionLocks,
+              createdAt: new Date().toISOString(),
+              dataRevision: currentDataRevision ?? undefined,
+            },
+          });
+          sharedRevision = meta.revision;
+        }
       } catch {
         // Publishing is best-effort; never fail the solve because of it.
       }

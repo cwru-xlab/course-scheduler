@@ -16,7 +16,7 @@ export async function tryRecordActivity(
 ): Promise<void> {
   const user = await getRequestAuthUser(request);
   if (!user) return;
-  recordActivity({
+  await recordActivity({
     networkId: user.networkId,
     actorName: user.name,
     kind,

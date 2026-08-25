@@ -24,11 +24,15 @@ async function requireActiveUser(request: NextRequest) {
     return { user, tier: "active" as const };
   }
 
-  const access = await checkAccessAllowlist(user.networkId, { skipCache: true });
-  if (!access.allowed || access.tier !== "active") {
+  // Prefer cache so a brief solver timeout during /solve does not cascade 403s.
+  const access = await checkAccessAllowlist(user.networkId);
+  if (!access.allowed || (access.tier !== "active" && access.tier !== "developer")) {
     return {
       error: NextResponse.json(
-        { error: "forbidden", message: "Only active users can access saved schedules." },
+        {
+          error: "forbidden",
+          message: "Only active or developer users can access saved schedules.",
+        },
         { status: 403 },
       ),
     };

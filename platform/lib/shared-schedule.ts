@@ -1,12 +1,11 @@
-// Shared "latest solver run" store, scoped to a single Next.js server process.
-// Mirrors the solver-lock / activity-log pattern: in-memory on globalThis with
-// best-effort JSON persistence under .data so the latest schedule survives a
-// server restart. Not shared across replicas — if the app is scaled
-// horizontally, back this with the solver DB or a shared cache.
+// Shared "latest solver run" store.
+// Primary: solver DB via /sync/shared-schedule (works across Vercel replicas).
+// Fallback: process-local globalThis + .data/ when sync endpoints are unavailable.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
+import { fetchSolver } from "@/lib/api/solverFetch";
 import type { SchedulingDataRevision } from "@/lib/scheduling/dataRevision";
 import type { SectionLockState } from "@/lib/scheduling/types";
 
@@ -30,7 +29,9 @@ export type SharedScheduleState = {
   snapshot: SharedScheduleSnapshot | null;
 };
 
-export type SharedScheduleMeta = Omit<SharedScheduleState, "snapshot">;
+export type SharedScheduleMeta = Omit<SharedScheduleState, "snapshot"> & {
+  dataRevision?: SchedulingDataRevision | null;
+};
 
 const globalRef = globalThis as unknown as {
   __sharedSchedule?: SharedScheduleState;
@@ -38,6 +39,7 @@ const globalRef = globalThis as unknown as {
 
 const DATA_DIR = join(process.cwd(), ".data");
 const SCHEDULE_FILE = join(DATA_DIR, "latest-schedule.json");
+const SYNC_TIMEOUT_MS = 12_000;
 
 const emptyState = (): SharedScheduleState => ({
   revision: 0,
@@ -63,14 +65,15 @@ function loadFromDisk(): SharedScheduleState {
   }
 }
 
-function getState(): SharedScheduleState {
+function getLocalState(): SharedScheduleState {
   if (!globalRef.__sharedSchedule) {
     globalRef.__sharedSchedule = loadFromDisk();
   }
   return globalRef.__sharedSchedule;
 }
 
-function persistToDisk(state: SharedScheduleState) {
+function persistLocal(state: SharedScheduleState) {
+  globalRef.__sharedSchedule = state;
   try {
     if (!existsSync(DATA_DIR)) {
       mkdirSync(DATA_DIR, { recursive: true });
@@ -81,29 +84,110 @@ function persistToDisk(state: SharedScheduleState) {
   }
 }
 
+function parseMeta(data: Record<string, unknown>): SharedScheduleMeta {
+  return {
+    revision: typeof data.revision === "number" ? data.revision : 0,
+    ranBy: typeof data.ranBy === "string" ? data.ranBy : null,
+    ranAt: typeof data.ranAt === "number" ? data.ranAt : null,
+    dataRevision:
+      data.dataRevision && typeof data.dataRevision === "object"
+        ? (data.dataRevision as SchedulingDataRevision)
+        : null,
+  };
+}
+
 /** Cheap metadata read for polling (no large snapshot payload). */
-export function readSharedScheduleMeta(): SharedScheduleMeta {
-  const state = getState();
-  return { revision: state.revision, ranBy: state.ranBy, ranAt: state.ranAt };
+export async function readSharedScheduleMeta(): Promise<SharedScheduleMeta> {
+  try {
+    const { response, data } = await fetchSolver(
+      "/sync/shared-schedule",
+      { method: "GET", cache: "no-store" },
+      { timeoutMs: SYNC_TIMEOUT_MS },
+    );
+    if (response.ok) {
+      return parseMeta(data as Record<string, unknown>);
+    }
+  } catch {
+    /* fall through to local */
+  }
+  const local = getLocalState();
+  return { revision: local.revision, ranBy: local.ranBy, ranAt: local.ranAt };
 }
 
 /** Full read including the snapshot payload. */
-export function readSharedSchedule(): SharedScheduleState {
-  return { ...getState() };
+export async function readSharedSchedule(): Promise<SharedScheduleState> {
+  try {
+    const { response, data } = await fetchSolver(
+      "/sync/shared-schedule?full=1",
+      { method: "GET", cache: "no-store" },
+      { timeoutMs: SYNC_TIMEOUT_MS },
+    );
+    if (response.ok) {
+      const meta = parseMeta(data as Record<string, unknown>);
+      const rawSnapshot =
+        data.snapshot && typeof data.snapshot === "object"
+          ? (data.snapshot as SharedScheduleSnapshot)
+          : null;
+      // Reject incomplete payloads so clients do not crash on .assignments.map.
+      const snapshot =
+        rawSnapshot &&
+        rawSnapshot.solution &&
+        typeof rawSnapshot.solution === "object" &&
+        Array.isArray((rawSnapshot.solution as { assignments?: unknown }).assignments) &&
+        rawSnapshot.input &&
+        typeof rawSnapshot.input === "object" &&
+        Array.isArray((rawSnapshot.input as { sections?: unknown }).sections)
+          ? rawSnapshot
+          : null;
+      return {
+        revision: meta.revision,
+        ranBy: meta.ranBy,
+        ranAt: meta.ranAt,
+        snapshot,
+      };
+    }
+  } catch {
+    /* fall through to local */
+  }
+  return { ...getLocalState() };
 }
 
-export function publishSharedSchedule(input: {
+export async function publishSharedSchedule(input: {
   ranBy: string | null;
   snapshot: SharedScheduleSnapshot;
-}): SharedScheduleMeta {
-  const current = getState();
+}): Promise<SharedScheduleMeta> {
+  try {
+    const { response, data } = await fetchSolver(
+      "/sync/shared-schedule",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ranBy: input.ranBy, snapshot: input.snapshot }),
+      },
+      { timeoutMs: SYNC_TIMEOUT_MS },
+    );
+    if (response.ok) {
+      const meta = parseMeta(data as Record<string, unknown>);
+      // Mirror locally so fallback reads stay coherent on this process.
+      persistLocal({
+        revision: meta.revision,
+        ranBy: meta.ranBy,
+        ranAt: meta.ranAt,
+        snapshot: input.snapshot,
+      });
+      return meta;
+    }
+  } catch {
+    /* fall through to local */
+  }
+
+  const current = getLocalState();
   const next: SharedScheduleState = {
     revision: current.revision + 1,
     ranBy: input.ranBy,
     ranAt: Date.now(),
     snapshot: input.snapshot,
   };
-  globalRef.__sharedSchedule = next;
-  persistToDisk(next);
+  persistLocal(next);
   return { revision: next.revision, ranBy: next.ranBy, ranAt: next.ranAt };
 }

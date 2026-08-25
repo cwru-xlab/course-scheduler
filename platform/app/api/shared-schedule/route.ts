@@ -4,7 +4,12 @@ import { siteConfig } from "@/config/site";
 import { verifyToken } from "@/lib/auth";
 import { getSchedulingDataRevision } from "@/lib/scheduling/dataRevisionStore";
 import { sectionLocksFromInput } from "@/lib/scheduling/sectionLocks";
-import { publishSharedSchedule, readSharedSchedule, readSharedScheduleMeta, type SharedScheduleSnapshot } from "@/lib/shared-schedule";
+import {
+  publishSharedSchedule,
+  readSharedSchedule,
+  readSharedScheduleMeta,
+  type SharedScheduleSnapshot,
+} from "@/lib/shared-schedule";
 import type { SectionLockState } from "@/lib/scheduling/types";
 
 // GET /api/shared-schedule           -> cheap metadata (revision/ranBy/ranAt/dataRevision) for polling
@@ -13,14 +18,21 @@ import type { SectionLockState } from "@/lib/scheduling/types";
 export async function GET(request: NextRequest) {
   const full = request.nextUrl.searchParams.get("full");
   if (full) {
-    return NextResponse.json(readSharedSchedule(), {
+    return NextResponse.json(await readSharedSchedule(), {
       headers: { "Cache-Control": "no-store" },
     });
   }
+  const meta = await readSharedScheduleMeta();
+  const dataRevision =
+    meta.dataRevision !== undefined
+      ? meta.dataRevision
+      : await getSchedulingDataRevision();
   return NextResponse.json(
     {
-      ...readSharedScheduleMeta(),
-      dataRevision: getSchedulingDataRevision(),
+      revision: meta.revision,
+      ranBy: meta.ranBy,
+      ranAt: meta.ranAt,
+      dataRevision,
     },
     {
       headers: { "Cache-Control": "no-store" },
@@ -61,12 +73,24 @@ export async function POST(request: NextRequest) {
         soft_locks?: Array<{ section_id?: string }>;
       }
     | undefined;
-  const solution = body?.solution;
-  if (!input || !solution) {
+  const solution = body?.solution as { assignments?: unknown } | undefined;
+  if (
+    !input ||
+    !solution ||
+    typeof solution !== "object" ||
+    !Array.isArray(solution.assignments) ||
+    !Array.isArray((input as { sections?: unknown }).sections)
+  ) {
     return NextResponse.json(
       {
         status: "error",
-        errors: [{ code: "invalid_snapshot", message: "Snapshot requires input and solution." }],
+        errors: [
+          {
+            code: "invalid_snapshot",
+            message:
+              "Snapshot requires input.sections and solution.assignments arrays.",
+          },
+        ],
       },
       { status: 400 },
     );
@@ -95,6 +119,6 @@ export async function POST(request: NextRequest) {
     createdAt: body.createdAt ?? new Date().toISOString(),
   };
 
-  const meta = publishSharedSchedule({ ranBy: userLabel, snapshot });
+  const meta = await publishSharedSchedule({ ranBy: userLabel, snapshot });
   return NextResponse.json(meta, { headers: { "Cache-Control": "no-store" } });
 }

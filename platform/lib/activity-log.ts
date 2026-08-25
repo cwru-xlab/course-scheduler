@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
+import { fetchSolver } from "@/lib/api/solverFetch";
+
 export type ActivityKind =
   | "spreadsheet_import"
   | "editor_save"
@@ -25,6 +27,7 @@ const ACTIVITY_MESSAGES: Record<ActivityKind, (name: string) => string> = {
 
 const MAX_EVENTS = 30;
 const TTL_MS = 24 * 60 * 60 * 1000;
+const SYNC_TIMEOUT_MS = 8_000;
 
 const globalRef = globalThis as unknown as {
   __activityEvents?: ActivityEvent[];
@@ -52,14 +55,15 @@ function loadFromDisk(): ActivityEvent[] {
   }
 }
 
-function getEvents(): ActivityEvent[] {
+function getLocalEvents(): ActivityEvent[] {
   if (!globalRef.__activityEvents) {
     globalRef.__activityEvents = loadFromDisk();
   }
   return globalRef.__activityEvents;
 }
 
-function persistToDisk(events: ActivityEvent[]) {
+function persistLocal(events: ActivityEvent[]) {
+  globalRef.__activityEvents = events;
   try {
     if (!existsSync(DATA_DIR)) {
       mkdirSync(DATA_DIR, { recursive: true });
@@ -70,12 +74,63 @@ function persistToDisk(events: ActivityEvent[]) {
   }
 }
 
-export function recordActivity(input: {
+function normalizeEvent(raw: Record<string, unknown>): ActivityEvent | null {
+  if (
+    typeof raw.id !== "string" ||
+    typeof raw.networkId !== "string" ||
+    typeof raw.actorName !== "string" ||
+    typeof raw.kind !== "string" ||
+    typeof raw.message !== "string" ||
+    typeof raw.createdAt !== "string"
+  ) {
+    return null;
+  }
+  return {
+    id: raw.id,
+    networkId: raw.networkId,
+    actorName: raw.actorName,
+    kind: raw.kind as ActivityKind,
+    message: raw.message,
+    createdAt: raw.createdAt,
+  };
+}
+
+export async function recordActivity(input: {
   networkId: string;
   actorName: string;
   kind: ActivityKind;
-}): ActivityEvent {
+}): Promise<ActivityEvent> {
   const actorName = input.actorName.trim() || "Someone";
+
+  try {
+    const { response, data } = await fetchSolver(
+      "/sync/activity",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          networkId: input.networkId,
+          actorName,
+          kind: input.kind,
+        }),
+      },
+      { timeoutMs: SYNC_TIMEOUT_MS },
+    );
+    if (response.ok && data.event && typeof data.event === "object") {
+      const event = normalizeEvent(data.event as Record<string, unknown>);
+      if (event) {
+        const next = pruneExpired([event, ...getLocalEvents()], Date.now()).slice(
+          0,
+          MAX_EVENTS,
+        );
+        persistLocal(next);
+        return event;
+      }
+    }
+  } catch {
+    /* fall through to local */
+  }
+
   const event: ActivityEvent = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
     networkId: input.networkId,
@@ -84,20 +139,35 @@ export function recordActivity(input: {
     message: ACTIVITY_MESSAGES[input.kind](actorName),
     createdAt: new Date().toISOString(),
   };
-
   const now = Date.now();
-  const next = pruneExpired([event, ...getEvents()], now).slice(0, MAX_EVENTS);
-  globalRef.__activityEvents = next;
-  persistToDisk(next);
+  const next = pruneExpired([event, ...getLocalEvents()], now).slice(0, MAX_EVENTS);
+  persistLocal(next);
   return event;
 }
 
-export function listActivityEvents(limit = MAX_EVENTS): ActivityEvent[] {
+export async function listActivityEvents(limit = MAX_EVENTS): Promise<ActivityEvent[]> {
+  try {
+    const { response, data } = await fetchSolver(
+      `/sync/activity?limit=${encodeURIComponent(String(limit))}`,
+      { method: "GET", cache: "no-store" },
+      { timeoutMs: SYNC_TIMEOUT_MS },
+    );
+    if (response.ok && Array.isArray(data.events)) {
+      const events = (data.events as Array<Record<string, unknown>>)
+        .map(normalizeEvent)
+        .filter((e): e is ActivityEvent => e != null)
+        .slice(0, limit);
+      persistLocal(events);
+      return events;
+    }
+  } catch {
+    /* fall through to local */
+  }
+
   const now = Date.now();
-  const pruned = pruneExpired(getEvents(), now);
-  if (pruned.length !== getEvents().length) {
-    globalRef.__activityEvents = pruned;
-    persistToDisk(pruned);
+  const pruned = pruneExpired(getLocalEvents(), now);
+  if (pruned.length !== getLocalEvents().length) {
+    persistLocal(pruned);
   }
   return pruned.slice(0, limit);
 }

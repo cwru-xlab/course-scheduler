@@ -3,6 +3,7 @@ from typing import Dict, List, Optional
 
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Column,
     DateTime,
@@ -736,4 +737,112 @@ class AppAccessUser(db.Model):
             "added_by": self.added_by,
             "created_at": self.created_at.isoformat() + "Z" if self.created_at else None,
             "updated_at": self.updated_at.isoformat() + "Z" if self.updated_at else None,
+        }
+
+
+# ============================================================================
+# CROSS-USER SYNC STATE (shared across Vercel / Next.js replicas via solver DB)
+# ============================================================================
+
+
+class SharedScheduleRow(db.Model):
+    """Singleton row holding the latest published schedule snapshot for all users."""
+
+    __tablename__ = "shared_schedule_state"
+
+    id = Column(Integer, primary_key=True)  # always 1
+    revision = Column(Integer, nullable=False, default=0)
+    ran_by = Column(String(256), nullable=True)
+    ran_at = Column(BigInteger, nullable=True)  # epoch ms
+    snapshot = Column(JSON, nullable=True)
+
+    def to_meta_dict(self):
+        return {
+            "revision": self.revision or 0,
+            "ranBy": self.ran_by,
+            "ranAt": self.ran_at,
+        }
+
+    def to_full_dict(self):
+        return {
+            **self.to_meta_dict(),
+            "snapshot": self.snapshot,
+        }
+
+
+class ActivityEventRow(db.Model):
+    """Recent collaboration activity events (TTL pruned by the API)."""
+
+    __tablename__ = "activity_events"
+
+    id = Column(String(64), primary_key=True)
+    network_id = Column(String(64), nullable=False)
+    actor_name = Column(String(256), nullable=False)
+    kind = Column(String(64), nullable=False)
+    message = Column(String(512), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    def to_dict(self):
+        created = self.created_at
+        return {
+            "id": self.id,
+            "networkId": self.network_id,
+            "actorName": self.actor_name,
+            "kind": self.kind,
+            "message": self.message,
+            "createdAt": (created.isoformat() + "Z") if created else None,
+        }
+
+
+class SchedulingDataRevisionRow(db.Model):
+    """Singleton: who last wrote scheduling input data (for cross-user refresh prompts)."""
+
+    __tablename__ = "scheduling_data_revision"
+
+    id = Column(Integer, primary_key=True)  # always 1
+    last_modified_by_network_id = Column(String(64), nullable=False)
+    last_modified_by_name = Column(String(256), nullable=False)
+    last_modified_at = Column(String(64), nullable=False)  # ISO-8601 string
+
+    def to_dict(self):
+        return {
+            "lastModifiedByNetworkId": self.last_modified_by_network_id,
+            "lastModifiedByName": self.last_modified_by_name,
+            "lastModifiedAt": self.last_modified_at,
+        }
+
+
+class SolverSessionLockRow(db.Model):
+    """
+    Singleton distributed solver busy-lock so multiple Next.js replicas cannot
+    start overlapping CP-SAT runs. expires_at allows recovery after crashes.
+    """
+
+    __tablename__ = "solver_session_lock"
+
+    id = Column(Integer, primary_key=True)  # always 1
+    locked = Column(Boolean, nullable=False, default=False)
+    run_id = Column(String(64), nullable=True)
+    progress = Column(Integer, nullable=False, default=0)
+    status = Column(String(32), nullable=False, default="idle")
+    started_by = Column(String(256), nullable=True)
+    started_by_network_id = Column(String(64), nullable=True)
+    started_at = Column(BigInteger, nullable=True)  # epoch ms
+    error = Column(Text, nullable=True)
+    expires_at = Column(BigInteger, nullable=True)  # epoch ms
+    cancel_requested = Column(Boolean, nullable=False, default=False)
+
+    def to_dict(self):
+        return {
+            "sessionId": "default",
+            "locked": bool(self.locked),
+            "runId": self.run_id,
+            "progress": int(self.progress or 0),
+            "status": self.status or "idle",
+            "startedBy": self.started_by,
+            "startedByNetworkId": self.started_by_network_id,
+            "startedAt": self.started_at,
+            "error": self.error,
+            "expiresAt": self.expires_at,
+            "cancelRequested": bool(self.cancel_requested),
         }

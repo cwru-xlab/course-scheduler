@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json(
-    { events: listActivityEvents() },
+    { events: await listActivityEvents() },
     { headers: { "Cache-Control": "no-store" } },
   );
 }
