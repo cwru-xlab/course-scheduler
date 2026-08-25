@@ -110,12 +110,14 @@ import {
   type CalendarRoomSortMode,
 } from "@/lib/scheduling/roomNumber";
 import { CrosslistCalendarEventCard, CrosslistLegendSwatch } from "./CrosslistCalendarEventCard";
+import { SoloCalendarEventCard } from "./SoloCalendarEventCard";
 import {
   assignCalendarEventLanes,
   calendarEventInstructorIds,
   calendarEventMatchesFilters,
   calendarEventSectionIds,
   findCalendarEventBySectionId,
+  formatCalendarSectionHoverLines,
   getCalendarEventKey,
   isCrosslistGroupEvent,
   mergeCrosslistCalendarEvents,
@@ -5218,7 +5220,7 @@ type PatternDayApplyRow = {
                 <div
                   key={room.id}
                   ref={(el) => setRoomTrackRef(room.id, el)}
-                  className="relative overflow-visible border-b border-slate-200/80 last:border-b-0 z-0 has-[[data-crosslist-hover=true]]:z-30"
+                  className="relative overflow-visible border-b border-slate-200/80 last:border-b-0 z-0 has-[[data-calendar-hover=true]]:z-30"
                   style={{ minHeight: rowHeight }}
                   onPointerMove={(e) => {
                     if (!pendingPlacementSectionId || calendarDrag) return;
@@ -5717,36 +5719,34 @@ type PatternDayApplyRow = {
                     const designation = sectionDesignations.get(section.id);
                     const isConflicting = conflictSectionIds.has(section.id);
                     const isStaggered = sectionIsStaggered(section.id);
+                    const hoverLines = formatCalendarSectionHoverLines(section, professor);
 
                     return (
-                      <div
+                      <SoloCalendarEventCard
                         key={getCalendarEventKey(event, room.id)}
-                        className={clsx(
-                          "group absolute border-l-4 rounded-lg p-2.5 flex flex-col justify-between z-10 shadow-sm select-none",
-                          solverInput && "cursor-grab touch-none active:cursor-grabbing",
-                          !isDragSource && "hover:shadow-md",
-                          isDragSource &&
-                            calendarDrag?.hasMoved &&
-                            "opacity-[0.12] pointer-events-none",
-                          !matchesAllFilters && "opacity-35",
-                          (activeLegendDepartmentKeys.size > 0 || hasSearch) &&
-                            matchesAllFilters &&
-                            "ring-2 ring-slate-300/80 shadow-md",
-                          isConflicting &&
-                            "ring-2 ring-red-500 ring-offset-1 z-20 shadow-md",
-                        )}
+                        timeLabel={timeLabel}
+                        faceTitle={title}
+                        designation={designation}
+                        professor={professor}
+                        hoverTitle={hoverLines.title}
+                        hoverInstructor={hoverLines.instructor}
+                        color={color}
+                        matchesHoveredDepartment={matchesAllFilters}
+                        hasActiveFilter={activeLegendDepartmentKeys.size > 0 || hasSearch}
+                        isDragSource={isDragSource}
+                        hasDragMoved={Boolean(calendarDrag?.hasMoved)}
+                        placementLocked={lockState}
+                        draggable={Boolean(solverInput)}
+                        lockable={Boolean(solverInput)}
+                        isStaggered={isStaggered}
+                        onToggleLock={(e) => requestToggleLockFromCalendar(section.id, e?.shiftKey)}
+                        isConflicting={isConflicting}
                         style={{
                           left: `${leftPct * 100}%`,
                           width: `${Math.max(widthPct * 100, 0.5)}%`,
                           top,
                           height: EVENT_HEIGHT_PX,
-                          backgroundColor: color.cardBg,
-                          backgroundImage: color.cardPattern,
-                          borderLeftColor: color.cardBorder,
                         }}
-                        title={`${title}${designation ? ` · ${designation}` : ""} • ${professor} • ${timeLabel} • Room ${room.id}${
-                          isStaggered ? " • Staggered across days" : ""
-                        }`}
                         {...sharedPointerHandlers}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -5761,77 +5761,7 @@ type PatternDayApplyRow = {
                             draft: toSectionFormDraft(section),
                           });
                         }}
-                      >
-                        {isStaggered && (
-                          <span
-                            className="absolute left-1 top-1 z-[3] flex size-5 items-center justify-center rounded-md border border-indigo-200 bg-indigo-50/95 text-indigo-700 shadow-sm"
-                            title="Staggered: different times on different days"
-                            aria-label="Staggered across days"
-                          >
-                            <Shuffle className="size-3" aria-hidden />
-                          </span>
-                        )}
-                        <div className="absolute right-1 top-1 z-[3] flex items-center gap-1">
-                          {solverInput && (
-                            <button
-                              type="button"
-                              className={clsx(
-                                "flex size-5 shrink-0 items-center justify-center rounded-md border shadow-sm transition-opacity",
-                                lockState === "hard"
-                                  ? "border-red-300 bg-red-50 text-red-900 opacity-100"
-                                  : lockState === "soft"
-                                    ? "border-amber-300 bg-amber-50 text-amber-900 opacity-100"
-                                    : "border-slate-300 bg-white/90 text-slate-600 opacity-0 hover:bg-white focus-visible:opacity-100 group-hover:opacity-100",
-                              )}
-                              title={
-                                lockState === "hard"
-                                  ? "Hard-locked — click to unlock"
-                                  : lockState === "soft"
-                                    ? "Soft-locked — click to hard-lock"
-                                    : "Lock for solver"
-                              }
-                              aria-label={
-                                lockState === "hard"
-                                  ? "Hard-locked"
-                                  : lockState === "soft"
-                                    ? "Soft-locked"
-                                    : "Not locked"
-                              }
-                              onPointerDown={(e) => e.stopPropagation()}
-                              onPointerUp={(e) => e.stopPropagation()}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                requestToggleLockFromCalendar(section.id, e.shiftKey);
-                              }}
-                            >
-                              {lockState === "hard" ? (
-                                <Lock className="size-3" />
-                              ) : lockState === "soft" ? (
-                                <LockOpen className="size-3" />
-                              ) : (
-                                <Unlock className="size-3" />
-                              )}
-                            </button>
-                          )}
-                        </div>
-                        <div
-                          className={clsx(
-                            "font-black text-[10px] truncate text-slate-900 pr-9",
-                            isStaggered && "pl-6",
-                          )}
-                        >
-                          {title}
-                          {designation ? (
-                            <span className="ml-1 font-bold text-[9px] text-slate-600 tabular-nums">
-                              · {designation}
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="text-[9px] font-bold leading-tight text-slate-700">
-                          <div className="truncate">{professor}</div>
-                          <div className="text-[8px] leading-snug truncate">{timeLabel}</div>
-                        </div>
-                      </div>
+                      />
                     );
                   })}
                 </div>
