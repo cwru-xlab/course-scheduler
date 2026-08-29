@@ -130,8 +130,8 @@ export function SoloCalendarEventCard({
             <span
               draggable
               className="flex size-5 shrink-0 cursor-grab items-center justify-center rounded-md border border-slate-300 bg-white/90 text-slate-500 opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
-              title="Drag to queue to unplace"
-              aria-label="Drag to queue to unplace"
+              title="Drag to queue sidebar to unplace"
+              aria-label="Drag to queue sidebar to unplace"
               onPointerDown={(e) => e.stopPropagation()}
               onDragStart={(e) => {
                 if (placementLocked !== "none") {
