@@ -386,7 +386,8 @@ class Section(db.Model):
     
     # Assigned values (nullable because assignment happens during scheduling)
     room_id = Column(String, ForeignKey("rooms.id"), nullable=True)  # Assigned room
-    timeslot_id = Column(String, ForeignKey("timeslots.id"), nullable=True)  # Assigned timeslot
+    timeslot_id = Column(String, ForeignKey("timeslots.id"), nullable=True)  # First assigned timeslot (legacy FK)
+    timeslot_ids = Column(JSON, nullable=False, default=list)  # List[str] - all meeting timeslot IDs
     
     # Cross-listing: Self-referential foreign key (section can reference another section)
     # remote_side: Needed for self-referential relationships
@@ -448,6 +449,9 @@ class Section(db.Model):
             "instructor_id": self.instructor_id,
             "room_id": self.room_id,
             "timeslot_id": self.timeslot_id,
+            "timeslot_ids": self.timeslot_ids or (
+                [self.timeslot_id] if self.timeslot_id else []
+            ),
             "crosslisting_id": self.crosslisting_id,
             "crosslist_group_id": self.crosslist_group_id,
             "section_type": self.section_type,
