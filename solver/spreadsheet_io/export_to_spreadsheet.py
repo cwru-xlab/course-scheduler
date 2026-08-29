@@ -9,6 +9,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 try:
     from spreadsheet_io.beautify import beautify_workbook
     from spreadsheet_io.notes_export import apply_notes_to_workbook
+    from spreadsheet_io.online_schedule_export import apply_online_schedule_sheet
     from spreadsheet_io.spreadsheet_utils import (
         SPREADSHEET_SPECS,
         canonicalize_room_number,
@@ -20,6 +21,7 @@ try:
 except ModuleNotFoundError:
     from beautify import beautify_workbook  # type: ignore[no-redef]
     from notes_export import apply_notes_to_workbook  # type: ignore[no-redef]
+    from online_schedule_export import apply_online_schedule_sheet  # type: ignore[no-redef]
     from spreadsheet_utils import (  # type: ignore[no-redef]
         SPREADSHEET_SPECS,
         canonicalize_room_number,
@@ -107,6 +109,8 @@ def scheduling_input_to_excel_bytes(
     ]
     if populated_notes:
         apply_notes_to_workbook(workbook, populated_notes)
+
+    apply_online_schedule_sheet(workbook, payload)
 
     beautify_workbook(workbook)
 

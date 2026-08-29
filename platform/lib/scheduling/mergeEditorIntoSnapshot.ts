@@ -1,10 +1,19 @@
-import type { SchedulingInput, Section, SectionLockState } from "./types";
+import type { SchedulingInput, SectionLockState } from "./types";
 import type { LastSolverRunSnapshot } from "./history";
 import { isValidLastSolverRunSnapshot } from "./history";
+import { crosslistPeerSectionIds } from "./crosslist";
+import {
+  validatePreservedAssignment,
+  type EditorInvalidatedPlacement,
+} from "@/app/calendar/placementValidation";
+
+export type { EditorInvalidatedPlacement, EditorInvalidationReason } from "@/app/calendar/placementValidation";
+
 export const SCHEDULING_SNAPSHOT_MERGED_EVENT = "wsom-scheduling-snapshot-merged";
 /** Session flag: calendar has unsaved placement edits vs baseline. */
 export const CALENDAR_UNSAVED_PLACEMENTS_KEY = "wsom-calendar-unsaved-placements";
 export const ORPHAN_PENDING_STORAGE_KEY = "wsom-pending-orphan-sections";
+export const EDITOR_INVALIDATED_PLACEMENTS_KEY = "wsom-editor-invalidated-placements";
 
 export type CalendarAssignmentEntry = {
   timeslot_ids: string[];
@@ -15,43 +24,9 @@ export type CalendarAssignmentEntry = {
 export type MergeEditorSnapshotResult = {
   snapshot: LastSolverRunSnapshot;
   orphanSectionIds: string[];
-  patternInvalidSectionIds: string[];
+  editorInvalidatedPlacements: EditorInvalidatedPlacement[];
   keptGhostSectionIds: string[];
 };
-
-function assignmentFromEntry(entry?: CalendarAssignmentEntry | null) {
-  if (!entry) return null;
-  const timeslotIds = (entry.timeslot_ids ?? []).filter(Boolean);
-  const roomId = String(entry.room_id ?? "").trim();
-  if (!timeslotIds.length && !roomId) return null;
-  return {
-    section_id: "",
-    timeslot_ids: timeslotIds,
-    room_id: roomId,
-    meeting_pattern_id: String(entry.meeting_pattern_id ?? "").trim(),
-  };
-}
-
-function allowedPatternsSignature(patterns: string[] | undefined): string {
-  return [...(patterns ?? [])].map((p) => p.trim()).filter(Boolean).sort().join("\0");
-}
-
-function allowedMeetingPatternsChanged(prev: Section | undefined, fresh: Section): boolean {
-  if (!prev) return false;
-  return allowedPatternsSignature(prev.allowed_meeting_patterns) !==
-    allowedPatternsSignature(fresh.allowed_meeting_patterns);
-}
-
-function isPatternValidForSection(
-  section: Section,
-  meetingPatternId: string,
-): boolean {
-  const patternId = meetingPatternId.trim();
-  if (!patternId) return true;
-  const allowed = section.allowed_meeting_patterns ?? [];
-  if (!allowed.length) return true;
-  return allowed.includes(patternId);
-}
 
 function buildAssignmentsMap(
   assignments: Array<{
@@ -71,6 +46,50 @@ function buildAssignmentsMap(
       },
     ]),
   );
+}
+
+export function readEditorInvalidatedPlacements(): EditorInvalidatedPlacement[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = sessionStorage.getItem(EDITOR_INVALIDATED_PLACEMENTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (item): item is EditorInvalidatedPlacement =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof (item as EditorInvalidatedPlacement).sectionId === "string" &&
+        typeof (item as EditorInvalidatedPlacement).reason === "string" &&
+        typeof (item as EditorInvalidatedPlacement).message === "string",
+    );
+  } catch {
+    return [];
+  }
+}
+
+export function writeEditorInvalidatedPlacements(
+  placements: EditorInvalidatedPlacement[],
+): void {
+  if (typeof window === "undefined") return;
+  if (!placements.length) {
+    sessionStorage.removeItem(EDITOR_INVALIDATED_PLACEMENTS_KEY);
+    return;
+  }
+  sessionStorage.setItem(EDITOR_INVALIDATED_PLACEMENTS_KEY, JSON.stringify(placements));
+}
+
+export function clearEditorInvalidation(sectionIds: string[]): void {
+  if (typeof window === "undefined" || !sectionIds.length) return;
+  const remove = new Set(sectionIds);
+  const next = readEditorInvalidatedPlacements().filter((p) => !remove.has(p.sectionId));
+  writeEditorInvalidatedPlacements(next);
+}
+
+export function editorInvalidatedPlacementsToMap(
+  placements: EditorInvalidatedPlacement[],
+): Map<string, EditorInvalidatedPlacement> {
+  return new Map(placements.map((p) => [p.sectionId, p]));
 }
 
 /**
@@ -98,7 +117,7 @@ export function mergeEditorIntoSnapshot(
 
   const nextAssignments: Record<string, CalendarAssignmentEntry> = {};
   const orphanSectionIds: string[] = [];
-  const patternInvalidSectionIds: string[] = [];
+  const editorInvalidatedPlacements: EditorInvalidatedPlacement[] = [];
   const keptGhostSectionIds: string[] = [];
 
   for (const [sectionId, entry] of Object.entries(prevAssignmentMap)) {
@@ -112,23 +131,34 @@ export function mergeEditorIntoSnapshot(
       }
       continue;
     }
-    const patternId = entry.meeting_pattern_id ?? "";
+
     const prevSection = prevSectionById.get(sectionId);
-    const patternsChanged = allowedMeetingPatternsChanged(prevSection, fresh);
-    if (
-      patternsChanged &&
-      patternId &&
-      !isPatternValidForSection(fresh, patternId)
-    ) {
-      patternInvalidSectionIds.push(sectionId);
+    const linkedSectionIds = crosslistPeerSectionIds(sectionId, freshInput.sections);
+    const validation = validatePreservedAssignment({
+      section: fresh,
+      prevSection,
+      linkedSectionIds,
+      allSections: freshInput.sections,
+      assignment: entry,
+      rooms: freshInput.rooms,
+    });
+
+    if (!validation.valid) {
+      editorInvalidatedPlacements.push({
+        sectionId,
+        reason: validation.reason,
+        message: validation.message,
+      });
       continue;
     }
+
     nextAssignments[sectionId] = { ...entry };
   }
 
   for (const section of freshInput.sections) {
     if (nextAssignments[section.id]) continue;
     // New sections start unplaced (queue).
+    void section;
   }
 
   const solutionAssignments = Object.entries(nextAssignments).map(([section_id, value]) => ({
@@ -157,7 +187,7 @@ export function mergeEditorIntoSnapshot(
   return {
     snapshot,
     orphanSectionIds,
-    patternInvalidSectionIds,
+    editorInvalidatedPlacements,
     keptGhostSectionIds,
   };
 }
@@ -176,14 +206,17 @@ export function readLastSolverRunSnapshot(): LastSolverRunSnapshot | null {
 
 export function writeLastSolverRunSnapshot(
   snapshot: LastSolverRunSnapshot,
-  meta?: { patternInvalidSectionIds?: string[]; orphanSectionIds?: string[] },
+  meta?: {
+    editorInvalidatedPlacements?: EditorInvalidatedPlacement[];
+    orphanSectionIds?: string[];
+  },
 ): void {
   if (typeof window === "undefined") return;
   localStorage.setItem("wsom-last-solver-run", JSON.stringify(snapshot));
   window.dispatchEvent(
     new CustomEvent(SCHEDULING_SNAPSHOT_MERGED_EVENT, {
       detail: {
-        patternInvalidSectionIds: meta?.patternInvalidSectionIds ?? [],
+        editorInvalidatedPlacements: meta?.editorInvalidatedPlacements ?? [],
         orphanSectionIds: meta?.orphanSectionIds ?? [],
       },
     }),
@@ -230,10 +263,10 @@ export async function mergeEditorSaveIntoCalendar(
 ): Promise<{
   merged: boolean;
   orphanSectionIds: string[];
-  patternInvalidSectionIds: string[];
+  editorInvalidatedPlacements: EditorInvalidatedPlacement[];
 }> {
   if (typeof window === "undefined") {
-    return { merged: false, orphanSectionIds: [], patternInvalidSectionIds: [] };
+    return { merged: false, orphanSectionIds: [], editorInvalidatedPlacements: [] };
   }
 
   if (calendarHasUnsavedPlacements()) {
@@ -241,17 +274,17 @@ export async function mergeEditorSaveIntoCalendar(
       "Apply editor changes to the calendar? Unsaved calendar placements will be preserved where still valid.",
     );
     if (!proceed) {
-      return { merged: false, orphanSectionIds: [], patternInvalidSectionIds: [] };
+      return { merged: false, orphanSectionIds: [], editorInvalidatedPlacements: [] };
     }
   }
 
   const existing = readLastSolverRunSnapshot();
   if (!existing) {
     // No solver snapshot to merge into — avoid publishing an empty schedule.
-    return { merged: false, orphanSectionIds: [], patternInvalidSectionIds: [] };
+    return { merged: false, orphanSectionIds: [], editorInvalidatedPlacements: [] };
   }
 
-  const { snapshot, orphanSectionIds, patternInvalidSectionIds } = mergeEditorIntoSnapshot(
+  const { snapshot, orphanSectionIds, editorInvalidatedPlacements } = mergeEditorIntoSnapshot(
     existing,
     freshInput,
     { dataRevision },
@@ -267,10 +300,11 @@ export async function mergeEditorSaveIntoCalendar(
     console.warn(
       "[mergeEditorSaveIntoCalendar] Skipping publish: merge would remove all placements.",
     );
-    return { merged: false, orphanSectionIds: [], patternInvalidSectionIds: [] };
+    return { merged: false, orphanSectionIds: [], editorInvalidatedPlacements: [] };
   }
 
-  writeLastSolverRunSnapshot(snapshot, { patternInvalidSectionIds, orphanSectionIds });
+  writeEditorInvalidatedPlacements(editorInvalidatedPlacements);
+  writeLastSolverRunSnapshot(snapshot, { editorInvalidatedPlacements, orphanSectionIds });
   if (orphanSectionIds.length) {
     const orphanSections =
       existing?.input.sections.filter((s) => orphanSectionIds.includes(s.id)) ?? [];
@@ -283,6 +317,6 @@ export async function mergeEditorSaveIntoCalendar(
   return {
     merged: true,
     orphanSectionIds,
-    patternInvalidSectionIds,
+    editorInvalidatedPlacements,
   };
 }

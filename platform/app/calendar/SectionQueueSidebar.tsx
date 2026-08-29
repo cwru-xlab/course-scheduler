@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo, useState, type RefObject } from "react";
+import { useMemo, useRef, useState, type DragEvent, type RefObject } from "react";
 import clsx from "clsx";
-import { AlertTriangle, Archive, ChevronLeft, ChevronRight, GripVertical, Layers } from "lucide-react";
+import { AlertTriangle, Archive, ChevronDown, ChevronLeft, ChevronRight, Filter, GripVertical, Layers, Pencil } from "lucide-react";
 
 import { formatCalendarSectionHoverLines } from "./calendarEvents";
 import { setCalendarDragImage } from "./calendarDragGhost";
+import type { EditorInvalidatedPlacement, EditorInvalidationReason } from "@/lib/scheduling/mergeEditorIntoSnapshot";
 import { isSectionArchived } from "@/lib/scheduling/sectionState";
-import { isQueuedSection } from "@/lib/scheduling/sectionOnline";
+import { isQueuedSection, primaryPatternForSection, sectionMatchesPatternFilter } from "@/lib/scheduling/sectionOnline";
 
 export type QueueSectionRow = {
   id: string;
@@ -24,17 +25,21 @@ export type QueueSectionRow = {
   timeslot_id?: string | null;
   previous_meeting_pattern?: string | null;
   isGhost?: boolean;
-  patternInvalid?: boolean;
+  editorInvalidation?: EditorInvalidatedPlacement | null;
 };
 
 type SectionQueueSidebarProps = {
   open: boolean;
   onToggleOpen: () => void;
+  onRequestOpen?: () => void;
+  sidebarRef?: RefObject<HTMLDivElement | null>;
   sections: QueueSectionRow[];
-  patternInvalidSectionIds: Set<string>;
+  editorInvalidatedPlacements: Map<string, EditorInvalidatedPlacement>;
   ghostSectionIds: Set<string>;
   activeDragSectionId: string | null;
   onBeginPlace: (sectionId: string) => void;
+  onEditSection: (sectionId: string) => void;
+  onPlacementDragEnd?: () => void;
   onDropUnplace: (sectionId: string) => void;
   dropZoneRef?: RefObject<HTMLDivElement | null>;
 };
@@ -42,14 +47,31 @@ type SectionQueueSidebarProps = {
 type QueueTab = "unscheduled" | "archived";
 type QueueSort = "course" | "pattern";
 
+function invalidationLabel(reason: EditorInvalidationReason): string {
+  switch (reason) {
+    case "pattern":
+      return "Pattern no longer allowed — fix in editor";
+    case "capacity":
+      return "Enrollment exceeds room capacity";
+    case "room_requirements":
+      return "Assigned room missing required features";
+    default:
+      return "Placement invalidated by editor change";
+  }
+}
+
 export function SectionQueueSidebar({
   open,
   onToggleOpen,
+  onRequestOpen,
+  sidebarRef,
   sections,
-  patternInvalidSectionIds,
+  editorInvalidatedPlacements,
   ghostSectionIds,
   activeDragSectionId,
   onBeginPlace,
+  onEditSection,
+  onPlacementDragEnd,
   onDropUnplace,
   dropZoneRef,
 }: SectionQueueSidebarProps) {
@@ -57,17 +79,20 @@ export function SectionQueueSidebar({
   const [search, setSearch] = useState("");
   const [patternFilter, setPatternFilter] = useState<string>("");
   const [sortBy, setSortBy] = useState<QueueSort>("course");
+  const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const suppressRowClickRef = useRef(false);
 
   const enriched = useMemo(
     () =>
       sections.map((s) => ({
         ...s,
-        patternInvalid: patternInvalidSectionIds.has(s.id),
+        editorInvalidation: editorInvalidatedPlacements.get(s.id) ?? s.editorInvalidation ?? null,
         isGhost: ghostSectionIds.has(s.id),
         queued: isQueuedSection(s, s.assignment ?? null),
       })),
-    [sections, patternInvalidSectionIds, ghostSectionIds],
+    [sections, editorInvalidatedPlacements, ghostSectionIds],
   );
 
   const patternOptions = useMemo(() => {
@@ -84,24 +109,18 @@ export function SectionQueueSidebar({
   }, [enriched]);
 
   const filtered = useMemo(() => {
-    const primaryPatternLabel = (row: (typeof enriched)[number]): string => {
-      const allowed = (row.allowed_meeting_patterns ?? []).map((p) => p.trim()).filter(Boolean);
-      if (allowed.length > 0) return allowed[0];
-      const fromAssignment = String(row.assignment?.meeting_pattern_id ?? "").trim();
-      if (fromAssignment) return fromAssignment;
-      const fromPersisted = String(row.previous_meeting_pattern ?? "").trim();
-      return fromPersisted || "—";
-    };
-
     const q = search.trim().toLowerCase();
     let rows = enriched;
     if (tab === "unscheduled") {
-      rows = rows.filter((s) => s.queued && !isSectionArchived(s));
+      rows = rows.filter((s) => s.queued && !isSectionArchived(s) && !s.isGhost);
+      if (needsAttentionOnly) {
+        rows = rows.filter((s) => Boolean(s.editorInvalidation));
+      }
     } else if (tab === "archived") {
       rows = rows.filter((s) => isSectionArchived(s));
     }
     if (tab === "unscheduled" && patternFilter) {
-      rows = rows.filter((s) => (s.allowed_meeting_patterns ?? []).includes(patternFilter));
+      rows = rows.filter((s) => sectionMatchesPatternFilter(s, patternFilter));
     }
     if (q) {
       rows = rows.filter((s) => {
@@ -114,10 +133,12 @@ export function SectionQueueSidebar({
       });
     }
     return [...rows].sort((a, b) => {
-      if (a.patternInvalid !== b.patternInvalid) return a.patternInvalid ? -1 : 1;
+      const aInvalid = Boolean(a.editorInvalidation);
+      const bInvalid = Boolean(b.editorInvalidation);
+      if (aInvalid !== bInvalid) return aInvalid ? -1 : 1;
       if (tab === "unscheduled" && sortBy === "pattern") {
-        const patternCmp = primaryPatternLabel(a).localeCompare(
-          primaryPatternLabel(b),
+        const patternCmp = primaryPatternForSection(a).localeCompare(
+          primaryPatternForSection(b),
           undefined,
           { sensitivity: "base" },
         );
@@ -127,12 +148,44 @@ export function SectionQueueSidebar({
       const lb = formatCalendarSectionHoverLines(b, b.instructorName).title;
       return la.localeCompare(lb, undefined, { sensitivity: "base" });
     });
-  }, [enriched, tab, search, patternFilter, sortBy]);
+  }, [enriched, tab, search, patternFilter, sortBy, needsAttentionOnly]);
 
-  const patternInvalidCount = enriched.filter((s) => s.patternInvalid).length;
+  const activeFilterCount = useMemo(() => {
+    if (tab !== "unscheduled") return 0;
+    let count = 0;
+    if (patternFilter) count += 1;
+    if (sortBy !== "course") count += 1;
+    if (needsAttentionOnly) count += 1;
+    return count;
+  }, [tab, patternFilter, sortBy, needsAttentionOnly]);
+
+  const clearFilters = () => {
+    setPatternFilter("");
+    setSortBy("course");
+    setNeedsAttentionOnly(false);
+  };
+
+  const invalidatedCount = enriched.filter((s) => s.editorInvalidation).length;
+
+  const handleCollapsedUnplaceDragOver = (e: DragEvent) => {
+    if (!e.dataTransfer.types.includes("text/section-id")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOver(true);
+    onRequestOpen?.();
+  };
+
+  const handleCollapsedUnplaceDrop = (e: DragEvent) => {
+    const sectionId = e.dataTransfer.getData("text/section-id");
+    if (!sectionId) return;
+    e.preventDefault();
+    setDragOver(false);
+    onDropUnplace(sectionId);
+  };
 
   return (
     <div
+      ref={sidebarRef}
       className={clsx(
         "relative flex shrink-0 transition-[width] duration-300 ease-out",
         open ? "w-72" : "w-10",
@@ -149,9 +202,20 @@ export function SectionQueueSidebar({
 
       <aside
         className={clsx(
-          "flex h-full min-h-0 flex-col border-r border-slate-200 bg-white shadow-sm",
+          "flex h-full w-full min-w-0 flex-col overflow-x-hidden border-r border-slate-200 bg-white shadow-sm",
           !open && "overflow-hidden",
+          !open && dragOver && "bg-sky-50 ring-2 ring-inset ring-sky-300",
         )}
+        {...(!open
+          ? {
+              onDragEnter: handleCollapsedUnplaceDragOver,
+              onDragOver: handleCollapsedUnplaceDragOver,
+              onDragLeave: (e: DragEvent) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false);
+              },
+              onDrop: handleCollapsedUnplaceDrop,
+            }
+          : {})}
       >
         {open ? (
           <>
@@ -159,10 +223,10 @@ export function SectionQueueSidebar({
               <h2 className="text-xs font-black uppercase tracking-wider text-slate-700">
                 Section queue
               </h2>
-              {patternInvalidCount > 0 ? (
+              {invalidatedCount > 0 ? (
                 <p className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-amber-800">
                   <AlertTriangle className="size-3 shrink-0" />
-                  {patternInvalidCount} unplaced (pattern changed)
+                  {invalidatedCount} need attention after editor changes
                 </p>
               ) : null}
             </div>
@@ -190,38 +254,104 @@ export function SectionQueueSidebar({
               ))}
             </div>
 
-            <div className="space-y-2 border-b border-slate-200 px-2 py-2">
+            <div className="min-w-0 space-y-2 border-b border-slate-200 px-2 py-2">
               <input
-                className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs"
+                className="w-full min-w-0 rounded-md border border-slate-200 px-2 py-1.5 text-xs"
                 placeholder="Search queue…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
               {tab === "unscheduled" ? (
-                <div className="flex gap-1.5">
-                  <select
-                    className="min-w-0 flex-1 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs"
-                    value={patternFilter}
-                    onChange={(e) => setPatternFilter(e.target.value)}
-                    aria-label="Filter by meeting pattern"
+                <>
+                  <button
+                    type="button"
+                    className={clsx(
+                      "flex w-full min-w-0 items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-xs font-semibold transition-colors",
+                      filtersExpanded || activeFilterCount > 0
+                        ? "border-sky-200 bg-sky-50/80 text-sky-900"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50",
+                    )}
+                    aria-expanded={filtersExpanded}
+                    onClick={() => setFiltersExpanded((open) => !open)}
                   >
-                    <option value="">All patterns</option>
-                    {patternOptions.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    className="w-[5.5rem] shrink-0 rounded-md border border-slate-200 bg-white px-1.5 py-1.5 text-xs"
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as QueueSort)}
-                    aria-label="Sort queue"
-                  >
-                    <option value="course">By course</option>
-                    <option value="pattern">By pattern</option>
-                  </select>
-                </div>
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <Filter className="size-3.5 shrink-0" aria-hidden />
+                      <span>Filters</span>
+                      {activeFilterCount > 0 ? (
+                        <span className="rounded-full bg-sky-200 px-1.5 py-0.5 text-[9px] font-bold leading-none text-sky-900">
+                          {activeFilterCount}
+                        </span>
+                      ) : null}
+                    </span>
+                    <ChevronDown
+                      className={clsx(
+                        "size-3.5 shrink-0 text-slate-500 transition-transform",
+                        filtersExpanded && "rotate-180",
+                      )}
+                      aria-hidden
+                    />
+                  </button>
+                  {filtersExpanded ? (
+                    <div className="space-y-1.5 rounded-md border border-slate-200 bg-slate-50/60 p-2">
+                      <div>
+                        <label
+                          htmlFor="queue-pattern-filter"
+                          className="mb-0.5 block text-[10px] font-semibold text-slate-500"
+                        >
+                          Meeting pattern
+                        </label>
+                        <select
+                          id="queue-pattern-filter"
+                          className="min-w-0 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs"
+                          value={patternFilter}
+                          onChange={(e) => setPatternFilter(e.target.value)}
+                        >
+                          <option value="">All patterns</option>
+                          {patternOptions.map((p) => (
+                            <option key={p} value={p}>
+                              {p}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="queue-sort-by"
+                          className="mb-0.5 block text-[10px] font-semibold text-slate-500"
+                        >
+                          Sort by
+                        </label>
+                        <select
+                          id="queue-sort-by"
+                          className="min-w-0 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs"
+                          value={sortBy}
+                          onChange={(e) => setSortBy(e.target.value as QueueSort)}
+                        >
+                          <option value="course">Course name</option>
+                          <option value="pattern">Meeting pattern</option>
+                        </select>
+                      </div>
+                      <label className="flex min-w-0 cursor-pointer items-center gap-2 text-[10px] font-semibold text-slate-600">
+                        <input
+                          type="checkbox"
+                          className="size-3.5 shrink-0 rounded border-slate-300"
+                          checked={needsAttentionOnly}
+                          onChange={(e) => setNeedsAttentionOnly(e.target.checked)}
+                        />
+                        <span className="min-w-0">Needs attention only</span>
+                      </label>
+                      {activeFilterCount > 0 ? (
+                        <button
+                          type="button"
+                          className="w-full text-left text-[10px] font-semibold text-sky-700 hover:text-sky-900"
+                          onClick={clearFilters}
+                        >
+                          Clear filters
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </>
               ) : null}
             </div>
 
@@ -229,7 +359,7 @@ export function SectionQueueSidebar({
               ref={dropZoneRef}
               data-queue-drop-zone="true"
               className={clsx(
-                "mx-2 mb-2 rounded-lg border-2 border-dashed px-2 py-3 text-center text-[10px] font-semibold transition-colors",
+                "mx-2 mb-2 min-w-0 rounded-lg border-2 border-dashed px-2 py-3 text-center text-[10px] font-semibold transition-colors",
                 dragOver
                   ? "border-sky-400 bg-sky-50 text-sky-800"
                   : "border-slate-200 text-slate-500",
@@ -249,7 +379,7 @@ export function SectionQueueSidebar({
               Drop here to unplace
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 space-y-1.5">
+            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-2 pb-3 space-y-1.5 [scrollbar-gutter:stable]">
               {filtered.length === 0 ? (
                 <p className="px-1 py-4 text-center text-xs text-slate-400">No sections</p>
               ) : (
@@ -259,36 +389,77 @@ export function SectionQueueSidebar({
                     row.instructorName,
                   );
                   const active = activeDragSectionId === row.id;
+                  const invalidation = row.editorInvalidation;
+                  const placeBlocked = invalidation?.reason === "pattern";
                   return (
-                    <button
+                    <div
                       key={row.id}
-                      type="button"
-                      draggable
                       data-queue-section-row="true"
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("text/section-id", row.id);
-                        e.dataTransfer.effectAllowed = "move";
-                        const card = e.currentTarget;
-                        setCalendarDragImage(e.nativeEvent, card, { width: 200, offsetY: 20 });
-                        onBeginPlace(row.id);
-                      }}
-                      onClick={() => onBeginPlace(row.id)}
                       className={clsx(
                         "flex w-full items-start gap-2 rounded-lg border px-2 py-2 text-left transition-colors",
                         active
                           ? "border-sky-400 bg-sky-50 ring-2 ring-sky-200"
-                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
-                        row.patternInvalid && "border-amber-300 bg-amber-50/80",
+                          : invalidation
+                            ? "border-amber-300 border-l-4 border-l-amber-400 bg-amber-50/80 hover:border-amber-400"
+                            : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
                       )}
                     >
-                      <GripVertical className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
-                      <div className="min-w-0 flex-1">
+                      <button
+                        type="button"
+                        draggable={!placeBlocked}
+                        aria-label={`Drag ${title} to calendar`}
+                        className={clsx(
+                          "mt-0.5 shrink-0 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600",
+                          placeBlocked ? "cursor-not-allowed opacity-50" : "cursor-grab active:cursor-grabbing",
+                        )}
+                        onDragStart={(e) => {
+                          if (placeBlocked) {
+                            e.preventDefault();
+                            return;
+                          }
+                          suppressRowClickRef.current = true;
+                          e.dataTransfer.setData("text/section-id", row.id);
+                          e.dataTransfer.effectAllowed = "move";
+                          const card = e.currentTarget.closest("[data-queue-section-row]");
+                          if (card instanceof HTMLElement) {
+                            setCalendarDragImage(e.nativeEvent, card, { width: 200, offsetY: 20 });
+                          }
+                          onBeginPlace(row.id);
+                        }}
+                        onDragEnd={() => {
+                          onPlacementDragEnd?.();
+                          window.setTimeout(() => {
+                            suppressRowClickRef.current = false;
+                          }, 0);
+                        }}
+                      >
+                        <GripVertical className="size-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        className="min-w-0 flex-1 text-left"
+                        onClick={() => {
+                          if (suppressRowClickRef.current) {
+                            suppressRowClickRef.current = false;
+                            return;
+                          }
+                          onEditSection(row.id);
+                        }}
+                      >
+                        {invalidation ? (
+                          <span className="mb-1 inline-flex rounded bg-amber-200/80 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-amber-900">
+                            Auto-unplaced
+                          </span>
+                        ) : null}
                         <div className="truncate text-[11px] font-bold text-slate-900">{title}</div>
                         <div className="truncate text-[10px] text-slate-500">{instructor}</div>
-                        {row.patternInvalid ? (
-                          <div className="mt-1 flex items-center gap-1 text-[9px] font-semibold text-amber-800">
-                            <AlertTriangle className="size-3" />
-                            Pattern no longer allowed
+                        {invalidation ? (
+                          <div className="mt-1 flex min-w-0 items-start gap-1 text-[9px] font-semibold text-amber-800">
+                            <AlertTriangle className="mt-0.5 size-3 shrink-0" />
+                            <span className="min-w-0 break-words">
+                              {invalidation.message ||
+                                invalidationLabel(invalidation.reason)}
+                            </span>
                           </div>
                         ) : null}
                         {row.isGhost ? (
@@ -315,8 +486,16 @@ export function SectionQueueSidebar({
                             ))}
                           </div>
                         ) : null}
-                      </div>
-                    </button>
+                      </button>
+                      <button
+                        type="button"
+                        className="mt-0.5 shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                        aria-label={`Edit ${title}`}
+                        onClick={() => onEditSection(row.id)}
+                      >
+                        <Pencil className="size-3" />
+                      </button>
+                    </div>
                   );
                 })
               )}

@@ -4,6 +4,17 @@ const normalizeGroupId = (value: unknown): string => String(value ?? "").trim();
 
 const normalizeSectionId = (value: unknown): string => String(value ?? "").trim();
 
+/** Peer section ids sharing a crosslist group (or `[sectionId]` when solo). */
+export function crosslistPeerSectionIds<
+  T extends { id: string; crosslist_group_id?: string | null },
+>(sectionId: string, sections: T[]): string[] {
+  const section = sections.find((s) => s.id === sectionId);
+  const gid = section?.crosslist_group_id;
+  if (!gid) return [sectionId];
+  const peers = sections.filter((s) => s.crosslist_group_id === gid).map((s) => s.id);
+  return peers.length ? peers : [sectionId];
+}
+
 export const normalizeCrosslistData = (input: SchedulingInput): SchedulingInput => {
   const sectionIds = new Set(input.sections.map((section) => normalizeSectionId(section.id)).filter(Boolean));
   const membersByGroup = new Map<string, Set<string>>();

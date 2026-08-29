@@ -8,6 +8,7 @@ import {
 } from "./calendarEvents";
 import type { TimeslotDto } from "./calendarTypes";
 import { isPlaceholderInstructor } from "@/lib/scheduling/placeholderInstructor";
+import { isOnlineSection } from "@/lib/scheduling/sectionOnline";
 
 /**
  * Single source of truth for calendar placement validation.
@@ -40,6 +41,18 @@ export type PlacementEvaluation = {
 
 export type TimeslotWithMinutes = TimeslotDto & { start: number; end: number };
 
+export type EditorInvalidationReason = "pattern" | "capacity" | "room_requirements";
+
+export type EditorInvalidatedPlacement = {
+  sectionId: string;
+  reason: EditorInvalidationReason;
+  message: string;
+};
+
+export type PreservedAssignmentValidationResult =
+  | { valid: true }
+  | { valid: false; reason: EditorInvalidationReason; message: string };
+
 type PlacementSectionLike = {
   id: string;
   course_id: string | number;
@@ -50,11 +63,15 @@ type PlacementSectionLike = {
   crosslist_group_id?: string | null;
   room_id?: string | null;
   timeslot_id?: string | null;
+  section_number?: string | null;
+  room_requirements?: string[];
+  allowed_meeting_patterns?: string[];
 };
 
 type PlacementRoomLike = {
   id: string;
   capacity?: number;
+  features?: string[];
 };
 
 type PlacementData = {
@@ -74,6 +91,98 @@ type InstructorLike = {
   id: string;
   name?: string;
 };
+
+function allowedPatternsSignature(patterns: string[] | undefined): string {
+  return [...(patterns ?? [])].map((p) => p.trim()).filter(Boolean).sort().join("\0");
+}
+
+function allowedMeetingPatternsChanged(
+  prev: PlacementSectionLike | undefined,
+  fresh: PlacementSectionLike,
+): boolean {
+  if (!prev) return false;
+  return (
+    allowedPatternsSignature(prev.allowed_meeting_patterns) !==
+    allowedPatternsSignature(fresh.allowed_meeting_patterns)
+  );
+}
+
+function isPatternValidForSection(section: PlacementSectionLike, meetingPatternId: string): boolean {
+  const patternId = meetingPatternId.trim();
+  if (!patternId) return true;
+  const allowed = section.allowed_meeting_patterns ?? [];
+  if (!allowed.length) return true;
+  return allowed.includes(patternId);
+}
+
+/** Room features must include every required feature (matches solver logic). */
+export function roomMeetsRequirements(
+  room: { features?: string[] },
+  requirements: string[],
+): boolean {
+  const required = requirements.map((r) => r.trim()).filter(Boolean);
+  if (!required.length) return true;
+  const features = room.features ?? [];
+  return required.every((feature) => features.includes(feature));
+}
+
+/**
+ * Re-validate an existing placement after editor metadata changes.
+ * Used during editor-to-calendar merge to auto-unplace stale assignments.
+ */
+export function validatePreservedAssignment(input: {
+  section: PlacementSectionLike;
+  prevSection?: PlacementSectionLike;
+  linkedSectionIds: string[];
+  allSections: PlacementSectionLike[];
+  assignment: { room_id: string; meeting_pattern_id?: string; timeslot_ids?: string[] };
+  rooms: PlacementRoomLike[];
+}): PreservedAssignmentValidationResult {
+  const { section, prevSection, linkedSectionIds, allSections, assignment, rooms } = input;
+  const linkedIds = linkedSectionIds.length ? linkedSectionIds : [section.id];
+  const patternId = String(assignment.meeting_pattern_id ?? "").trim();
+  const roomId = String(assignment.room_id ?? "").trim();
+  const online = isOnlineSection(section);
+
+  if (
+    allowedMeetingPatternsChanged(prevSection, section) &&
+    patternId &&
+    !isPatternValidForSection(section, patternId)
+  ) {
+    return {
+      valid: false,
+      reason: "pattern",
+      message: "Pattern no longer allowed — fix in editor",
+    };
+  }
+
+  if (!online && roomId) {
+    const targetRoom = rooms.find((room) => room.id === roomId);
+    const requiredSeats = requiredSeatsForSections(linkedIds, allSections);
+    if (Number.isFinite(targetRoom?.capacity) && requiredSeats > (targetRoom?.capacity ?? 0)) {
+      return {
+        valid: false,
+        reason: "capacity",
+        message: `Enrollment exceeds room capacity (${requiredSeats} seats needed, room ${roomId} holds ${targetRoom?.capacity}).`,
+      };
+    }
+
+    const requirements = section.room_requirements ?? [];
+    if (targetRoom && requirements.length > 0 && !roomMeetsRequirements(targetRoom, requirements)) {
+      const missing = requirements.filter((req) => !(targetRoom.features ?? []).includes(req));
+      return {
+        valid: false,
+        reason: "room_requirements",
+        message:
+          missing.length > 0
+            ? `Assigned room missing required features: ${missing.join(", ")}`
+            : "Assigned room missing required features",
+      };
+    }
+  }
+
+  return { valid: true };
+}
 
 /** Cross-listed sections share a room; capacity need is the max member cap. */
 export function requiredSeatsForSections(

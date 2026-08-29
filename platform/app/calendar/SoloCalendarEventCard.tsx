@@ -46,6 +46,7 @@ type SoloCalendarEventCardProps = {
   onClick: (event: MouseEvent<HTMLDivElement>) => void;
   /** When set, shows a grip handle for HTML5 drag-to-queue unplace. */
   queueDragSectionId?: string;
+  onQueueDragBlocked?: () => void;
 };
 
 export function SoloCalendarEventCard({
@@ -73,6 +74,7 @@ export function SoloCalendarEventCard({
   onPointerCancel,
   onClick,
   queueDragSectionId,
+  onQueueDragBlocked,
 }: SoloCalendarEventCardProps) {
   const [hovered, setHovered] = useState(false);
 
@@ -132,6 +134,11 @@ export function SoloCalendarEventCard({
               aria-label="Drag to queue to unplace"
               onPointerDown={(e) => e.stopPropagation()}
               onDragStart={(e) => {
+                if (placementLocked !== "none") {
+                  e.preventDefault();
+                  onQueueDragBlocked?.();
+                  return;
+                }
                 e.dataTransfer.setData("text/section-id", queueDragSectionId);
                 e.dataTransfer.effectAllowed = "move";
                 const card = (e.currentTarget as HTMLElement).closest(
