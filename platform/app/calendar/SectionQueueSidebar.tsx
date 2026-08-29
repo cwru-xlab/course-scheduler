@@ -41,7 +41,6 @@ type SectionQueueSidebarProps = {
   onEditSection: (sectionId: string) => void;
   onPlacementDragEnd?: () => void;
   onDropUnplace: (sectionId: string) => void;
-  dropZoneRef?: RefObject<HTMLDivElement | null>;
 };
 
 type QueueTab = "unscheduled" | "archived";
@@ -73,7 +72,6 @@ export function SectionQueueSidebar({
   onEditSection,
   onPlacementDragEnd,
   onDropUnplace,
-  dropZoneRef,
 }: SectionQueueSidebarProps) {
   const [tab, setTab] = useState<QueueTab>("unscheduled");
   const [search, setSearch] = useState("");
@@ -167,18 +165,25 @@ export function SectionQueueSidebar({
 
   const invalidatedCount = enriched.filter((s) => s.editorInvalidation).length;
 
-  const handleCollapsedUnplaceDragOver = (e: DragEvent) => {
+  const handleUnplaceDragOver = (e: DragEvent) => {
     if (!e.dataTransfer.types.includes("text/section-id")) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
     setDragOver(true);
-    onRequestOpen?.();
+    if (!open) onRequestOpen?.();
   };
 
-  const handleCollapsedUnplaceDrop = (e: DragEvent) => {
+  const handleUnplaceDragLeave = (e: DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDragOver(false);
+    }
+  };
+
+  const handleUnplaceDrop = (e: DragEvent) => {
     const sectionId = e.dataTransfer.getData("text/section-id");
     if (!sectionId) return;
     e.preventDefault();
+    e.stopPropagation();
     setDragOver(false);
     onDropUnplace(sectionId);
   };
@@ -204,18 +209,12 @@ export function SectionQueueSidebar({
         className={clsx(
           "flex h-full w-full min-w-0 flex-col overflow-x-hidden border-r border-slate-200 bg-white shadow-sm",
           !open && "overflow-hidden",
-          !open && dragOver && "bg-sky-50 ring-2 ring-inset ring-sky-300",
+          dragOver && "bg-sky-50 ring-2 ring-inset ring-sky-300",
         )}
-        {...(!open
-          ? {
-              onDragEnter: handleCollapsedUnplaceDragOver,
-              onDragOver: handleCollapsedUnplaceDragOver,
-              onDragLeave: (e: DragEvent) => {
-                if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false);
-              },
-              onDrop: handleCollapsedUnplaceDrop,
-            }
-          : {})}
+        onDragEnterCapture={handleUnplaceDragOver}
+        onDragOverCapture={handleUnplaceDragOver}
+        onDragLeave={handleUnplaceDragLeave}
+        onDropCapture={handleUnplaceDrop}
       >
         {open ? (
           <>
@@ -223,6 +222,11 @@ export function SectionQueueSidebar({
               <h2 className="text-xs font-black uppercase tracking-wider text-slate-700">
                 Section queue
               </h2>
+              {dragOver ? (
+                <p className="mt-1 text-[10px] font-semibold text-sky-700">
+                  Release anywhere in the queue to unplace
+                </p>
+              ) : null}
               {invalidatedCount > 0 ? (
                 <p className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-amber-800">
                   <AlertTriangle className="size-3 shrink-0" />
@@ -355,31 +359,7 @@ export function SectionQueueSidebar({
               ) : null}
             </div>
 
-            <div
-              ref={dropZoneRef}
-              data-queue-drop-zone="true"
-              className={clsx(
-                "mx-2 mb-2 min-w-0 rounded-lg border-2 border-dashed px-2 py-3 text-center text-[10px] font-semibold transition-colors",
-                dragOver
-                  ? "border-sky-400 bg-sky-50 text-sky-800"
-                  : "border-slate-200 text-slate-500",
-              )}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOver(true);
-              }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragOver(false);
-                const sectionId = e.dataTransfer.getData("text/section-id");
-                if (sectionId) onDropUnplace(sectionId);
-              }}
-            >
-              Drop here to unplace
-            </div>
-
-            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-2 pb-3 space-y-1.5 [scrollbar-gutter:stable]">
+            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-2 pb-3 pt-2 space-y-1.5 [scrollbar-gutter:stable]">
               {filtered.length === 0 ? (
                 <p className="px-1 py-4 text-center text-xs text-slate-400">No sections</p>
               ) : (

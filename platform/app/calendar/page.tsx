@@ -1464,7 +1464,6 @@ type PatternDayApplyRow = {
     cardBorder: string;
   };
   const [queueUnplaceDrag, setQueueUnplaceDrag] = useState<QueueUnplaceDragState | null>(null);
-  const queueDropZoneRef = useRef<HTMLDivElement | null>(null);
   const queueSidebarRef = useRef<HTMLDivElement | null>(null);
   const queueSidebarAutoOpenedRef = useRef(false);
   const sidebarUnplaceDropSucceededRef = useRef(false);
@@ -3427,21 +3426,14 @@ type PatternDayApplyRow = {
     };
     const onPointerUp = (e: PointerEvent) => {
       if (e.pointerId !== queueUnplaceDrag.pointerId) return;
-      const dropRect = queueDropZoneRef.current?.getBoundingClientRect();
       const sidebarRect = queueSidebarRef.current?.getBoundingClientRect();
-      const overDropZone =
-        dropRect &&
-        e.clientX >= dropRect.left &&
-        e.clientX <= dropRect.right &&
-        e.clientY >= dropRect.top &&
-        e.clientY <= dropRect.bottom;
       const overSidebar =
         sidebarRect &&
         e.clientX >= sidebarRect.left &&
         e.clientX <= sidebarRect.right &&
         e.clientY >= sidebarRect.top &&
         e.clientY <= sidebarRect.bottom;
-      const droppedInSidebar = !!(overDropZone || overSidebar);
+      const droppedInSidebar = !!overSidebar;
       if (droppedInSidebar) {
         unplaceSection(queueUnplaceDrag.sectionId);
       }
@@ -6689,7 +6681,6 @@ type PatternDayApplyRow = {
             }
           }}
           onDropUnplace={handleQueueSidebarUnplaceDrop}
-          dropZoneRef={queueDropZoneRef}
         />
       <div
         className={clsx(
