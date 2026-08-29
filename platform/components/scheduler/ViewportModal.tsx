@@ -10,6 +10,8 @@ type ViewportModalProps = {
   onClose?: () => void;
   children: ReactNode;
   zIndex?: number;
+  /** When false, backdrop clicks do not call onClose. Default true. */
+  closeOnBackdropClick?: boolean;
 };
 
 /**
@@ -21,6 +23,7 @@ export function ViewportModal({
   onClose,
   children,
   zIndex = 1050,
+  closeOnBackdropClick = true,
 }: ViewportModalProps) {
   useBodyScrollLock(isOpen);
 
@@ -31,7 +34,7 @@ export function ViewportModal({
       className="fixed inset-0 flex items-center justify-center bg-black/40 p-4 backdrop-blur-[1px] overscroll-none"
       style={{ zIndex }}
       role="presentation"
-      onClick={onClose}
+      onClick={closeOnBackdropClick ? onClose : undefined}
     >
       {children}
     </div>,

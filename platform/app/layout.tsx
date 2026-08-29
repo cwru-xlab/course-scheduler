@@ -9,7 +9,6 @@ import { siteConfig } from "@/config/site";
 import { fontSans } from "@/config/fonts";
 import { Navbar } from "@/components/navbar";
 import { StatusBarProvider } from "@/components/GlobalStatusBar";
-import { SolverProgressPercent } from "@/components/SolverProgressIndicator";
 import { SolverActivityBridge } from "@/components/SolverActivityBridge";
 import { UnsavedChangesGuard } from "@/components/scheduler/UnsavedChangesGuard";
 import { RemoteChangesBanner } from "@/components/scheduler/RemoteChangesBanner";
@@ -52,7 +51,6 @@ export default function RootLayout({
             <div className="relative flex flex-col min-h-screen bg-[var(--weatherhead-surface)] dark:bg-default-100">
               <Navbar />
               <StatusBarProvider>
-                <SolverProgressPercent />
                 <SolverActivityBridge />
                 <UnsavedChangesGuard />
                 <RemoteChangesBanner />

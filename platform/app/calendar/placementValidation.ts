@@ -7,6 +7,7 @@ import {
   type CalendarEvent,
 } from "./calendarEvents";
 import type { TimeslotDto } from "./calendarTypes";
+import { isPlaceholderInstructor } from "@/lib/scheduling/placeholderInstructor";
 
 /**
  * Single source of truth for calendar placement validation.
@@ -25,7 +26,8 @@ export type PlacementReasonCode =
   | "capacity"
   | "room_conflict"
   | "instructor_conflict"
-  | "missing_data";
+  | "missing_data"
+  | "online_section";
 
 export type PlacementEvaluation = {
   /** `block` = do not apply the move; `warn` = apply but flag; `ok` = clean. */
@@ -187,8 +189,12 @@ export function evaluatePlacement(input: {
   // 4. Instructor double-booking (any room) — warning, move still applied.
   const draggedInstructorIds = new Set<string>();
   for (const linkedSectionId of linkedIds) {
-    const instructorId = data.sections.find((s) => s.id === linkedSectionId)?.instructor_id;
-    if (instructorId) draggedInstructorIds.add(instructorId);
+    const linked = data.sections.find((s) => s.id === linkedSectionId);
+    const instructorId = linked?.instructor_id;
+    if (!instructorId) continue;
+    const instructorName = instructorById.get(instructorId)?.name;
+    if (isPlaceholderInstructor(instructorId, instructorName)) continue;
+    draggedInstructorIds.add(instructorId);
   }
   const instructorConflicts =
     draggedInstructorIds.size === 0

@@ -11,6 +11,7 @@ import React, {
 } from "react";
 
 import { persistSchedulingInput } from "./persist";
+import { mergeEditorSaveIntoCalendar } from "./mergeEditorIntoSnapshot";
 import type { SchedulingInput } from "./types";
 import { normalizeCrosslistData } from "./crosslist";
 import { confirmLeaveIfUnsaved } from "./unsavedChanges";
@@ -580,6 +581,17 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
         warnings: result.warnings.length > 0 ? result.warnings : undefined,
       });
       clearSaveFeedbackSoon(isManualOrAutosaveOff ? 5000 : 2500);
+
+      const dataRevision =
+        user?.networkId
+          ? {
+              lastModifiedByNetworkId: user.networkId,
+              lastModifiedByName: user.name ?? user.networkId,
+              lastModifiedAt: new Date().toISOString(),
+            }
+          : undefined;
+      void mergeEditorSaveIntoCalendar(beforeSave, dataRevision);
+
       return true;
     } catch (err) {
       setSaveFeedback({

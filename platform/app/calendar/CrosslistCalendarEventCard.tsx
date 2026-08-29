@@ -2,9 +2,10 @@
 
 import { useState, type MouseEvent, type PointerEvent } from "react";
 import clsx from "clsx";
-import { Lock, LockOpen, Shuffle, Unlock } from "lucide-react";
+import { GripVertical, Lock, LockOpen, Shuffle, Unlock } from "lucide-react";
 
 import { formatCalendarSectionHoverLines, type CalendarSectionLike } from "./calendarEvents";
+import { setCalendarDragImage } from "./calendarDragGhost";
 import type { SectionLockState } from "@/lib/scheduling/types";
 
 type DepartmentPalette = {
@@ -30,9 +31,6 @@ type CrosslistCalendarEventCardProps = {
   draggable: boolean;
   lockable?: boolean;
   isStaggered?: boolean;
-  /** Shared 100/400/800… designation for all crosslist members. */
-  sectionDesignation?: string | null;
-  designationBySectionId?: Map<string, string>;
   onToggleLock?: (e?: MouseEvent<HTMLButtonElement>) => void;
   isConflicting?: boolean;
   style: {
@@ -48,6 +46,8 @@ type CrosslistCalendarEventCardProps = {
   onPointerUp: (event: PointerEvent<HTMLDivElement>) => void;
   onPointerCancel: (event: PointerEvent<HTMLDivElement>) => void;
   onClick: (event: MouseEvent<HTMLDivElement>) => void;
+  /** When set, shows a grip handle for HTML5 drag-to-queue unplace. */
+  queueDragSectionId?: string;
 };
 
 /** Same slate RGB as dept calendar hatch lines (page.tsx cardPattern). */
@@ -123,7 +123,6 @@ export function CrosslistCalendarEventCard({
   draggable,
   lockable = false,
   isStaggered = false,
-  sectionDesignation = null,
   onToggleLock,
   isConflicting = false,
   style,
@@ -134,9 +133,9 @@ export function CrosslistCalendarEventCard({
   onPointerUp,
   onPointerCancel,
   onClick,
+  queueDragSectionId,
 }: CrosslistCalendarEventCardProps) {
   const [hovered, setHovered] = useState(false);
-  const designation = String(sectionDesignation ?? "").trim();
 
   return (
     <div
@@ -151,6 +150,7 @@ export function CrosslistCalendarEventCard({
       onMouseLeave={() => setHovered(false)}
     >
       <div
+        data-calendar-event-card="true"
         className={clsx(
           "group relative overflow-hidden border-l-4 rounded-lg p-2.5 flex flex-col justify-between shadow-sm select-none",
           draggable && "cursor-grab touch-none active:cursor-grabbing",
@@ -185,6 +185,27 @@ export function CrosslistCalendarEventCard({
           </span>
         )}
         <div className="absolute right-1 top-1 z-[4] flex items-center gap-1">
+          {queueDragSectionId ? (
+            <span
+              draggable
+              className="flex size-5 shrink-0 cursor-grab items-center justify-center rounded-md border border-slate-300 bg-white/90 text-slate-500 opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
+              title="Drag to queue to unplace"
+              aria-label="Drag to queue to unplace"
+              onPointerDown={(e) => e.stopPropagation()}
+              onDragStart={(e) => {
+                e.dataTransfer.setData("text/section-id", queueDragSectionId);
+                e.dataTransfer.effectAllowed = "move";
+                const card = (e.currentTarget as HTMLElement).closest(
+                  "[data-calendar-event-card]",
+                ) as HTMLElement | null;
+                if (card) {
+                  setCalendarDragImage(e.nativeEvent, card, { width: 180, offsetY: 28 });
+                }
+              }}
+            >
+              <GripVertical className="size-3" />
+            </span>
+          ) : null}
           {lockable && onToggleLock && (
             <button
               type="button"
@@ -234,11 +255,6 @@ export function CrosslistCalendarEventCard({
           )}
         >
           {crosslistGroupId}
-          {designation ? (
-            <span className="ml-1 font-bold text-[9px] text-slate-600 tabular-nums">
-              · {designation}
-            </span>
-          ) : null}
         </div>
         <div className="relative z-[1] text-[9px] font-bold leading-tight text-slate-700">
           <div className="truncate text-slate-800">
