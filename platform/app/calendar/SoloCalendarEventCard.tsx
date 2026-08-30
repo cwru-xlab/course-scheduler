@@ -2,9 +2,10 @@
 
 import { useState, type MouseEvent, type PointerEvent } from "react";
 import clsx from "clsx";
-import { Lock, LockOpen, Shuffle, Unlock } from "lucide-react";
+import { Lock, LockOpen, Shuffle, Unlock, GripVertical } from "lucide-react";
 
 import { CalendarSectionHoverTip } from "./CalendarSectionHoverTip";
+import { setCalendarDragImage } from "./calendarDragGhost";
 import type { SectionLockState } from "@/lib/scheduling/types";
 
 type DepartmentPalette = {
@@ -17,8 +18,6 @@ type SoloCalendarEventCardProps = {
   timeLabel: string;
   /** On-card face title (dept + course_id). */
   faceTitle: string;
-  /** Optional 100/400/800… designation shown on the card face. */
-  designation?: string | null;
   professor: string;
   hoverTitle: string;
   hoverInstructor: string;
@@ -45,12 +44,14 @@ type SoloCalendarEventCardProps = {
   onPointerUp: (event: PointerEvent<HTMLDivElement>) => void;
   onPointerCancel: (event: PointerEvent<HTMLDivElement>) => void;
   onClick: (event: MouseEvent<HTMLDivElement>) => void;
+  /** When set, shows a grip handle for HTML5 drag-to-queue unplace. */
+  queueDragSectionId?: string;
+  onQueueDragBlocked?: () => void;
 };
 
 export function SoloCalendarEventCard({
   timeLabel,
   faceTitle,
-  designation = null,
   professor,
   hoverTitle,
   hoverInstructor,
@@ -72,9 +73,10 @@ export function SoloCalendarEventCard({
   onPointerUp,
   onPointerCancel,
   onClick,
+  queueDragSectionId,
+  onQueueDragBlocked,
 }: SoloCalendarEventCardProps) {
   const [hovered, setHovered] = useState(false);
-  const designationText = String(designation ?? "").trim();
 
   return (
     <div
@@ -89,6 +91,7 @@ export function SoloCalendarEventCard({
       onMouseLeave={() => setHovered(false)}
     >
       <div
+        data-calendar-event-card="true"
         className={clsx(
           "group relative border-l-4 rounded-lg p-2.5 flex flex-col justify-between shadow-sm select-none",
           draggable && "cursor-grab touch-none active:cursor-grabbing",
@@ -123,6 +126,32 @@ export function SoloCalendarEventCard({
           </span>
         )}
         <div className="absolute right-1 top-1 z-[3] flex items-center gap-1">
+          {queueDragSectionId ? (
+            <span
+              draggable
+              className="flex size-5 shrink-0 cursor-grab items-center justify-center rounded-md border border-slate-300 bg-white/90 text-slate-500 opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
+              title="Drag to queue sidebar to unplace"
+              aria-label="Drag to queue sidebar to unplace"
+              onPointerDown={(e) => e.stopPropagation()}
+              onDragStart={(e) => {
+                if (placementLocked !== "none") {
+                  e.preventDefault();
+                  onQueueDragBlocked?.();
+                  return;
+                }
+                e.dataTransfer.setData("text/section-id", queueDragSectionId);
+                e.dataTransfer.effectAllowed = "move";
+                const card = (e.currentTarget as HTMLElement).closest(
+                  "[data-calendar-event-card]",
+                ) as HTMLElement | null;
+                if (card) {
+                  setCalendarDragImage(e.nativeEvent, card, { width: 180, offsetY: 28 });
+                }
+              }}
+            >
+              <GripVertical className="size-3" />
+            </span>
+          ) : null}
           {lockable && onToggleLock && (
             <button
               type="button"
@@ -172,11 +201,6 @@ export function SoloCalendarEventCard({
           )}
         >
           {faceTitle}
-          {designationText ? (
-            <span className="ml-1 font-bold text-[9px] text-slate-600 tabular-nums">
-              · {designationText}
-            </span>
-          ) : null}
         </div>
         <div className="text-[9px] font-bold leading-tight text-slate-700">
           <div className="truncate">{professor}</div>

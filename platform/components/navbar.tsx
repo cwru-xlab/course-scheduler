@@ -8,7 +8,7 @@ import { usePathname } from "next/navigation";
 import { LiveUsersIndicator } from "@/components/LiveUsersIndicator";
 import { NavbarSettingsMenu } from "@/components/NavbarSettingsMenu";
 import { UserMenu } from "@/components/user-menu";
-import { SolverProgressIndicator } from "@/components/SolverProgressIndicator";
+import { SolverProgressIndicator, SolverProgressBadge } from "@/components/SolverProgressIndicator";
 import { isFullBleedRoute, pageHorizontalGutterClassName } from "@/lib/layout/pageGutters";
 
 export const Navbar = () => {
@@ -92,8 +92,9 @@ export const Navbar = () => {
             <NavbarSettingsMenu />
           </nav>
 
-          <div className="flex flex-1 items-center justify-end gap-1 md:flex-none md:justify-self-end">
+          <div className="flex flex-1 items-center justify-end gap-2 md:flex-none md:justify-self-end">
             <div id="calendar-navbar-slot" className="flex items-center justify-end gap-2" />
+            <SolverProgressBadge />
             <div className="md:hidden">
               <NavbarSettingsMenu variant="compact" />
             </div>

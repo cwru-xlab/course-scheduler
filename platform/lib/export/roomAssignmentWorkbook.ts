@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 
+import { isOnlineSection } from "@/lib/scheduling/sectionOnline";
 import { isSectionArchived } from "@/lib/scheduling/sectionState";
 import { canonicalizeRoomNumber } from "@/lib/scheduling/roomNumber";
 import {
@@ -58,6 +59,10 @@ const GRID_HEADER_FONT = "FFFFFF";
 const GRID_ROOM_FILL = "F1F5F9";
 const GRID_EMPTY_FILL = "FAFAFA";
 const GRID_BORDER = "CBD5E1";
+const ONLINE_BAND_FILL = "EDE9FE";
+const ONLINE_BAND_FONT = "5B21B6";
+const ONLINE_GRID_EMPTY_FILL = "F5F3FF";
+const ONLINE_LANE_ROOM_ID_PREFIX = "__ONLINE__::";
 
 export type RoomAssignmentSection = {
   id: string;
@@ -434,7 +439,9 @@ export function buildAssignmentRows(input: RoomAssignmentWorkbookInput): string[
         classTitle: cols.classTitle,
         section: cols.section,
         daysAndTimes: formatDaysAndTimes(slots),
-        roomNumber: formatRoomLabel(room) || (roomId ? String(roomId) : ""),
+        roomNumber: isOnlineSection(section)
+          ? "Online"
+          : formatRoomLabel(room) || (roomId ? String(roomId) : ""),
       };
     })
     .sort((a, b) => {
@@ -457,7 +464,7 @@ export function buildAssignmentRows(input: RoomAssignmentWorkbookInput): string[
   return rows;
 }
 
-type GridEvent = {
+export type GridEvent = {
   roomId: string;
   startMin: number;
   endMin: number;
@@ -465,9 +472,30 @@ type GridEvent = {
   departmentKey: string;
   groupKey: string;
   isCrosslist: boolean;
+  lane?: number;
 };
 
-function collectDayEvents(
+/** Assign non-overlapping lanes for concurrent events (mirrors calendar lane logic). */
+export function assignEventLanes<T extends { startMin: number; endMin: number }>(
+  events: T[],
+): (T & { lane: number })[] {
+  const sorted = [...events].sort(
+    (a, b) => a.startMin - b.startMin || a.endMin - b.endMin,
+  );
+  const laneEndTimes: number[] = [];
+  return sorted.map((event) => {
+    let lane = laneEndTimes.findIndex((laneEnd) => laneEnd <= event.startMin);
+    if (lane === -1) {
+      lane = laneEndTimes.length;
+      laneEndTimes.push(event.endMin);
+    } else {
+      laneEndTimes[lane] = event.endMin;
+    }
+    return { ...event, lane };
+  });
+}
+
+export function collectDayEvents(
   day: RoomAssignmentDay,
   input: RoomAssignmentWorkbookInput,
 ): GridEvent[] {
@@ -489,6 +517,7 @@ function collectDayEvents(
 
   for (const section of input.sections) {
     if (isSectionArchived(section)) continue;
+    if (isOnlineSection(section)) continue;
     const placement = input.assignments[section.id];
     const timeslotIds =
       placement?.timeslot_ids?.length
@@ -526,6 +555,83 @@ function collectDayEvents(
 
     events.push({
       roomId,
+      startMin,
+      endMin,
+      label: eventCellLabel({
+        section,
+        peers,
+        startTime: slot.start_time,
+        endTime: slot.end_time,
+        instructor,
+        crosslistGroupId: isCrosslist ? groupId : undefined,
+      }),
+      departmentKey: departmentKey(labelSection),
+      groupKey,
+      isCrosslist,
+    });
+  }
+
+  return events;
+}
+
+export function collectOnlineGridEvents(
+  day: RoomAssignmentDay,
+  input: RoomAssignmentWorkbookInput,
+): GridEvent[] {
+  const timeslotById = new Map(input.timeslots.map((t) => [t.id, t]));
+  const instructorById = new Map(input.instructors.map((i) => [i.id, i]));
+
+  const membersByGroup = new Map<string, RoomAssignmentSection[]>();
+  for (const section of input.sections) {
+    if (isSectionArchived(section)) continue;
+    const groupId = String(section.crosslist_group_id ?? "").trim();
+    if (!groupId) continue;
+    const members = membersByGroup.get(groupId) ?? [];
+    members.push(section);
+    membersByGroup.set(groupId, members);
+  }
+
+  const events: GridEvent[] = [];
+  const seenGroupKeys = new Set<string>();
+
+  for (const section of input.sections) {
+    if (isSectionArchived(section)) continue;
+    if (!isOnlineSection(section)) continue;
+
+    const placement = input.assignments[section.id];
+    const timeslotIds =
+      placement?.timeslot_ids?.length
+        ? placement.timeslot_ids
+        : section.timeslot_id
+          ? [section.timeslot_id]
+          : [];
+    const slot = timeslotIds
+      .map((id) => timeslotById.get(String(id)))
+      .find((ts) => !!ts && timeslotMatchesDay(ts, day));
+    if (!slot) continue;
+
+    const startMin = parseMinutes(slot.start_time);
+    const endMin = parseMinutes(slot.end_time);
+    const groupId = String(section.crosslist_group_id ?? "").trim();
+    const peers = groupId ? membersByGroup.get(groupId) : undefined;
+    const labelSection = peers?.[0] ?? section;
+    const instructor =
+      instructorById.get(labelSection.instructor_id)?.name?.trim() ||
+      labelSection.instructor_id ||
+      "";
+
+    const groupKey =
+      peers && peers.length >= 2
+        ? `${groupId}::online::${startMin}::${endMin}`
+        : `section::${section.id}::${startMin}`;
+
+    if (seenGroupKeys.has(groupKey)) continue;
+    seenGroupKeys.add(groupKey);
+
+    const isCrosslist = Boolean(peers && peers.length >= 2);
+
+    events.push({
+      roomId: "",
       startMin,
       endMin,
       label: eventCellLabel({
@@ -591,6 +697,191 @@ function applyAssignmentSheet(
     from: { row: 1, column: 1 },
     to: { row: lastDataRow, column: ASSIGNMENT_HEADERS.length },
   };
+}
+
+function paintGridRow(
+  sheet: ExcelJS.Worksheet,
+  excelRow: number,
+  rowEvents: GridEvent[],
+  colCount: number,
+  deptIndexByKey: Map<string, number>,
+  options?: {
+    emptyFill?: string;
+    roomCellValue?: string;
+    roomCellFill?: string;
+    paintRoomCell?: boolean;
+  },
+): void {
+  const emptyFill = options?.emptyFill ?? GRID_EMPTY_FILL;
+  const paintRoomCell = options?.paintRoomCell ?? true;
+  const row = sheet.getRow(excelRow);
+  row.height = 56;
+
+  if (paintRoomCell) {
+    const roomCell = row.getCell(1);
+    roomCell.value = options?.roomCellValue ?? "";
+    roomCell.font = { bold: true, size: 9, color: { argb: "FF0F172A" } };
+    roomCell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: `FF${options?.roomCellFill ?? GRID_ROOM_FILL}` },
+    };
+    roomCell.alignment = { vertical: "middle", horizontal: "left", wrapText: true };
+    roomCell.border = thinBorder();
+  }
+
+  for (let c = 0; c < colCount; c += 1) {
+    const cell = row.getCell(c + 2);
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: `FF${emptyFill}` },
+    };
+    cell.border = thinBorder();
+    cell.alignment = {
+      vertical: "top",
+      horizontal: "left",
+      wrapText: true,
+      shrinkToFit: false,
+    };
+  }
+
+  const sortedEvents = [...rowEvents].sort(
+    (a, b) => a.startMin - b.startMin || a.endMin - b.endMin,
+  );
+  const occupied = new Array(colCount).fill(false);
+
+  for (const event of sortedEvents) {
+    const span = quarterSpanColumns(event.startMin, event.endMin);
+    if (!span) continue;
+
+    let startCol = span.startCol;
+    let endCol = span.endCol;
+
+    while (startCol <= endCol && occupied[startCol]) startCol += 1;
+    if (startCol > endCol) {
+      const cell = row.getCell(span.startCol + 2);
+      const existing = cell.value != null ? String(cell.value) : "";
+      cell.value = existing ? `${existing}\n\n${event.label}` : event.label;
+      cell.alignment = {
+        vertical: "top",
+        horizontal: "left",
+        wrapText: true,
+      };
+      row.height = Math.max(row.height ?? 56, 84);
+      continue;
+    }
+
+    let mergeEnd = startCol;
+    while (mergeEnd + 1 <= endCol && !occupied[mergeEnd + 1]) mergeEnd += 1;
+
+    for (let c = startCol; c <= mergeEnd; c += 1) occupied[c] = true;
+
+    const excelStartCol = startCol + 2;
+    const excelEndCol = mergeEnd + 2;
+    if (excelEndCol > excelStartCol) {
+      sheet.mergeCells(excelRow, excelStartCol, excelRow, excelEndCol);
+    }
+
+    const cell = row.getCell(excelStartCol);
+    const palette = paletteForDepartment(event.departmentKey, deptIndexByKey);
+    cell.value = event.label;
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: `FF${palette.bg}` },
+    };
+    cell.font = { size: 7, bold: true, color: { argb: "FF0F172A" } };
+    cell.alignment = {
+      vertical: "top",
+      horizontal: "left",
+      wrapText: true,
+    };
+    const leftStyle = event.isCrosslist ? "thick" : "medium";
+    cell.border = {
+      top: {
+        style: event.isCrosslist ? "medium" : "thin",
+        color: { argb: `FF${palette.border}` },
+      },
+      left: { style: leftStyle, color: { argb: `FF${palette.border}` } },
+      bottom: {
+        style: event.isCrosslist ? "medium" : "thin",
+        color: { argb: `FF${palette.border}` },
+      },
+      right: {
+        style: event.isCrosslist ? "medium" : "thin",
+        color: { argb: `FF${palette.border}` },
+      },
+    };
+
+    const lineCount = String(cell.value).split("\n").length;
+    row.height = Math.max(row.height ?? 56, Math.min(140, 24 + lineCount * 11));
+  }
+}
+
+function applyOnlineGridSection(
+  sheet: ExcelJS.Worksheet,
+  colCount: number,
+  bandRow: number,
+  day: RoomAssignmentDay,
+  input: RoomAssignmentWorkbookInput,
+  deptIndexByKey: Map<string, number>,
+): { laneCount: number; events: GridEvent[] } {
+  const onlineEvents = collectOnlineGridEvents(day, input);
+  if (!onlineEvents.length) {
+    return { laneCount: 0, events: [] };
+  }
+
+  const laned = assignEventLanes(onlineEvents);
+  const laneCount = laned.reduce((max, event) => Math.max(max, event.lane + 1), 0);
+
+  const band = sheet.getRow(bandRow);
+  band.height = 22;
+  if (colCount > 0) {
+    sheet.mergeCells(bandRow, 1, bandRow, colCount + 1);
+  }
+  const bandCell = band.getCell(1);
+  bandCell.value = "Online";
+  bandCell.font = { bold: true, size: 10, color: { argb: `FF${ONLINE_BAND_FONT}` } };
+  bandCell.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: `FF${ONLINE_BAND_FILL}` },
+  };
+  bandCell.alignment = { vertical: "middle", horizontal: "center" };
+  bandCell.border = thinBorder("7C3AED");
+
+  const firstLaneRow = bandRow + 1;
+  const lastLaneRow = bandRow + laneCount;
+
+  for (let lane = 0; lane < laneCount; lane += 1) {
+    const excelRow = firstLaneRow + lane;
+    const laneEvents = laned
+      .filter((event) => event.lane === lane)
+      .map((event) => ({
+        ...event,
+        roomId: `${ONLINE_LANE_ROOM_ID_PREFIX}${lane}`,
+      }));
+    paintGridRow(sheet, excelRow, laneEvents, colCount, deptIndexByKey, {
+      emptyFill: ONLINE_GRID_EMPTY_FILL,
+      paintRoomCell: false,
+    });
+  }
+
+  if (laneCount > 0) {
+    sheet.mergeCells(firstLaneRow, 1, lastLaneRow, 1);
+    const mergedRoomCell = sheet.getRow(firstLaneRow).getCell(1);
+    mergedRoomCell.value = "";
+    mergedRoomCell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: `FF${ONLINE_GRID_EMPTY_FILL}` },
+    };
+    mergedRoomCell.border = thinBorder("C4B5FD");
+    mergedRoomCell.alignment = { vertical: "middle", horizontal: "center" };
+  }
+
+  return { laneCount, events: laned };
 }
 
 function applyDayGridSheet(
@@ -676,121 +967,34 @@ function applyDayGridSheet(
 
   rooms.forEach((room, roomIndex) => {
     const excelRow = roomIndex + 2;
-    const row = sheet.getRow(excelRow);
-    row.height = 56;
-
-    const roomCell = row.getCell(1);
-    roomCell.value = room.label;
-    roomCell.font = { bold: true, size: 9, color: { argb: "FF0F172A" } };
-    roomCell.fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: `FF${GRID_ROOM_FILL}` },
-    };
-    roomCell.alignment = { vertical: "middle", horizontal: "left", wrapText: true };
-    roomCell.border = thinBorder();
-
-    for (let c = 0; c < colCount; c += 1) {
-      const cell = row.getCell(c + 2);
-      cell.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: `FF${GRID_EMPTY_FILL}` },
-      };
-      cell.border = thinBorder();
-      cell.alignment = {
-        vertical: "top",
-        horizontal: "left",
-        wrapText: true,
-        shrinkToFit: false,
-      };
-    }
-
-    const roomEvents = events
-      .filter((e) => e.roomId === room.id)
-      .sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
-
-    // Track occupied quarter columns (defensive; rooms normally have ≥15 min gaps).
-    const occupied = new Array(colCount).fill(false);
-
-    for (const event of roomEvents) {
-      const span = quarterSpanColumns(event.startMin, event.endMin);
-      if (!span) continue;
-
-      let startCol = span.startCol;
-      let endCol = span.endCol;
-
-      while (startCol <= endCol && occupied[startCol]) startCol += 1;
-      if (startCol > endCol) {
-        // Rare collision — append into the original start cell.
-        const cell = row.getCell(span.startCol + 2);
-        const existing = cell.value != null ? String(cell.value) : "";
-        cell.value = existing ? `${existing}\n\n${event.label}` : event.label;
-        cell.alignment = {
-          vertical: "top",
-          horizontal: "left",
-          wrapText: true,
-        };
-        row.height = Math.max(row.height ?? 56, 84);
-        continue;
-      }
-
-      let mergeEnd = startCol;
-      while (mergeEnd + 1 <= endCol && !occupied[mergeEnd + 1]) mergeEnd += 1;
-
-      for (let c = startCol; c <= mergeEnd; c += 1) occupied[c] = true;
-
-      const excelStartCol = startCol + 2;
-      const excelEndCol = mergeEnd + 2;
-      if (excelEndCol > excelStartCol) {
-        sheet.mergeCells(excelRow, excelStartCol, excelRow, excelEndCol);
-      }
-
-      const cell = row.getCell(excelStartCol);
-      const palette = paletteForDepartment(event.departmentKey, deptIndexByKey);
-      cell.value = event.label;
-      cell.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: `FF${palette.bg}` },
-      };
-      cell.font = { size: 7, bold: true, color: { argb: "FF0F172A" } };
-      cell.alignment = {
-        vertical: "top",
-        horizontal: "left",
-        wrapText: true,
-      };
-      // Cross-lists get a thick left bar (matches calendar X affordance at a glance).
-      const leftStyle = event.isCrosslist ? "thick" : "medium";
-      cell.border = {
-        top: {
-          style: event.isCrosslist ? "medium" : "thin",
-          color: { argb: `FF${palette.border}` },
-        },
-        left: { style: leftStyle, color: { argb: `FF${palette.border}` } },
-        bottom: {
-          style: event.isCrosslist ? "medium" : "thin",
-          color: { argb: `FF${palette.border}` },
-        },
-        right: {
-          style: event.isCrosslist ? "medium" : "thin",
-          color: { argb: `FF${palette.border}` },
-        },
-      };
-
-      const lineCount = String(cell.value).split("\n").length;
-      row.height = Math.max(row.height ?? 56, Math.min(140, 24 + lineCount * 11));
-    }
+    const roomEvents = events.filter((e) => e.roomId === room.id);
+    paintGridRow(sheet, excelRow, roomEvents, colCount, deptIndexByKey, {
+      roomCellValue: room.label,
+      roomCellFill: GRID_ROOM_FILL,
+    });
   });
 
+  const bandRow = rooms.length + 2;
+  const { laneCount: onlineLaneCount, events: onlineGridEvents } = applyOnlineGridSection(
+    sheet,
+    colCount,
+    bandRow,
+    day,
+    input,
+    deptIndexByKey,
+  );
+  const onlineBlockRows = onlineGridEvents.length ? 1 + onlineLaneCount : 0;
+
+  const allGridEvents = [...events, ...onlineGridEvents];
+
   // Department color legend at the bottom
-  const legendStart = rooms.length + 4;
+  const legendStart = rooms.length + onlineBlockRows + 4;
   const legendTitle = sheet.getRow(legendStart);
   legendTitle.getCell(1).value = "Department colors";
   legendTitle.getCell(1).font = { bold: true, size: 10, color: { argb: "FF475569" } };
 
   const usedDepts = Array.from(
-    new Set(events.map((e) => e.departmentKey)),
+    new Set(allGridEvents.map((e) => e.departmentKey)),
   ).sort(naturalCompare);
 
   usedDepts.forEach((key, idx) => {
@@ -814,7 +1018,7 @@ function applyDayGridSheet(
     legendRow.height = 18;
   });
 
-  if (events.some((e) => e.isCrosslist)) {
+  if (allGridEvents.some((e) => e.isCrosslist)) {
     const noteRow = sheet.getRow(legendStart + 1 + usedDepts.length + 1);
     noteRow.getCell(1).value =
       "✕ Cross-list cards list every linked course and use a thicker border.";

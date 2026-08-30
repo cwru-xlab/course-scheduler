@@ -7,7 +7,8 @@
     "dev:clean": "rm -rf .next && next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint --fix"
+    "lint": "eslint --fix",
+    "test": "npx tsx --test lib/scheduling/mergeEditorIntoSnapshot.test.ts lib/scheduling/sectionOnline.test.ts lib/export/roomAssignmentWorkbook.test.ts"
   },
   "dependencies": {
     "@heroui/accordion": "2.2.24",

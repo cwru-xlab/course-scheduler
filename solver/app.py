@@ -40,6 +40,7 @@ from spreadsheet_io.spreadsheet_utils import (
     normalize_section_state,
     parse_nested_list_cell,
 )
+from online_sections import ONLINE_ROOM_SENTINEL, is_online_section as _is_online_section
 
 # CP-SAT deadlines. Hard budget stays in sync with platform/lib/solver-timeouts.ts.
 # Soft: if any feasible exists by this wall time, stop and return best-so-far.
@@ -335,6 +336,10 @@ def _ensure_schema_migrations() -> None:
                             "ALTER TABLE sections ADD COLUMN section_number VARCHAR(16) NOT NULL DEFAULT ''"
                         )
                     )
+                if "timeslot_ids" not in section_cols:
+                    conn.execute(
+                        text("ALTER TABLE sections ADD COLUMN timeslot_ids JSON NOT NULL DEFAULT '[]'")
+                    )
             if "blocked_times" in tables:
                 blocked_cols = {c["name"] for c in inspector.get_columns("blocked_times")}
                 if "days" not in blocked_cols:
@@ -399,6 +404,37 @@ def _ensure_schema_migrations() -> None:
                     pass
     except Exception:  # pylint: disable=broad-except
         pass
+
+
+def _backfill_section_timeslot_ids() -> None:
+    """Copy legacy timeslot_id into timeslot_ids when the array is empty."""
+    try:
+        rows = Section.query.filter(Section.timeslot_id.isnot(None)).all()  # type: ignore[attr-defined]
+        changed = False
+        for section in rows:
+            existing = section.timeslot_ids or []
+            if existing:
+                continue
+            if section.timeslot_id:
+                section.timeslot_ids = [section.timeslot_id]
+                changed = True
+        if changed:
+            db.session.commit()
+    except Exception:  # pylint: disable=broad-except
+        db.session.rollback()
+
+
+def _normalize_section_timeslot_ids(item: Dict[str, Any]) -> List[str]:
+    """Resolve timeslot_ids from payload, falling back to legacy timeslot_id."""
+    raw_ids = item.get("timeslot_ids")
+    if isinstance(raw_ids, list):
+        ids = [str(ts).strip() for ts in raw_ids if str(ts).strip()]
+        if ids:
+            return ids
+    legacy = item.get("timeslot_id")
+    if legacy is not None and str(legacy).strip():
+        return [str(legacy).strip()]
+    return []
 
 
 # ---------------------------------------------------------------------------
@@ -863,6 +899,8 @@ def _validate_crosslist_capacity(
 ) -> List[dict]:
     """Validate that each cross-list group can fit in at least one room.
 
+    All-online groups skip room capacity. Mixed groups use in-person members only.
+
     Args:
         crosslists: Cross-list groups.
         sections: All section definitions.
@@ -873,13 +911,27 @@ def _validate_crosslist_capacity(
     """
     errors: List[dict] = []
     max_room_capacity = max((_room_to_dict(room).get("capacity", 0) for room in rooms), default=0)
-    total_by_group = _build_crosslist_totals(crosslists, sections)
+    section_to_group = _build_section_to_crosslist_group(crosslists, sections)
     for group in crosslists:
         group_dict = group.to_dict() if hasattr(group, "to_dict") else group
         group_id = group_dict.get("id") if isinstance(group_dict, dict) else group.id
         if group_id is None:
             continue
-        total = total_by_group.get(group_id, 0)
+        members = group_dict.get("member_section_ids", []) if isinstance(group_dict, dict) else []
+        member_dicts = []
+        for member_id in members:
+            for section in sections:
+                section_dict = _section_to_dict(section)
+                if section_dict.get("id") == member_id:
+                    member_dicts.append(section_dict)
+                    break
+        if member_dicts and all(_is_online_section(member) for member in member_dicts):
+            continue
+        total = _crosslist_in_person_capacity_required(
+            str(group_id), sections, section_to_group
+        )
+        if total == 0:
+            continue
         if total > max_room_capacity:
             errors.append({
                 "code": "crosslist_capacity",
@@ -889,6 +941,42 @@ def _validate_crosslist_capacity(
                 ),
             })
     return errors
+
+
+def _crosslist_in_person_capacity_required(
+    crosslist_id: str,
+    sections: List,
+    section_to_group: Dict[str, str],
+) -> int:
+    """Max seats among in-person members of a cross-list group."""
+    max_cap = 0
+    for section in sections:
+        section_dict = _section_to_dict(section)
+        section_id = section_dict.get("id")
+        if section_to_group.get(section_id) != crosslist_id:
+            continue
+        if _is_online_section(section_dict):
+            continue
+        max_cap = max(max_cap, _required_section_capacity(section_dict))
+    return max_cap
+
+
+def _crosslist_options_incompatible(
+    option_a: Tuple[str, Tuple[str, ...], str, int],
+    option_b: Tuple[str, Tuple[str, ...], str, int],
+    section_a_dict: dict,
+    section_b_dict: dict,
+) -> bool:
+    """True when two cross-list member options cannot be selected together."""
+    _, timeslot_a, room_a, _ = option_a
+    _, timeslot_b, room_b, _ = option_b
+    if timeslot_a != timeslot_b:
+        return True
+    online_a = _is_online_section(section_a_dict)
+    online_b = _is_online_section(section_b_dict)
+    if online_a != online_b:
+        return False
+    return room_a != room_b
 
 def _build_options(
     input_data: SchedulingInput,
@@ -971,6 +1059,7 @@ def _build_options(
     for section in input_data.sections:
         section_dict = _section_to_dict(section)
         section_id = section_dict["id"]
+        is_online = _is_online_section(section_dict)
         required_capacity = _required_section_capacity(section_dict)
         section_prefs = section_prefs_by_id.get(section_id, {})
         # get the instructor for the section
@@ -978,30 +1067,31 @@ def _build_options(
         # get the unavailable times for the instructor
         unavailable = instructor.get("unavailable_times", []) if instructor else []
         lock = locked_by_section.get(section_id)
-        available_rooms = []
-        for room in input_data.rooms:
-            room_dict = _room_to_dict(room)
-            if not ignore_room_capacity and room_dict["capacity"] < required_capacity:
-                continue
-            if not ignore_room_features and not _has_required_features(
-                room_dict, section_dict.get("room_requirements", [])
-            ):
-                continue
-            # Section-specific allowed_rooms constraint (if provided).
-            allowed_rooms = section_prefs.get("allowed_rooms") if isinstance(section_prefs, dict) else None
-            if allowed_rooms:
-                if room_dict["id"] not in allowed_rooms:
+        available_rooms: List[dict] = []
+        if not is_online:
+            for room in input_data.rooms:
+                room_dict = _room_to_dict(room)
+                if not ignore_room_capacity and room_dict["capacity"] < required_capacity:
                     continue
-            available_rooms.append(room_dict)
-        crosslist_id = section_to_crosslist_group.get(section_id)
-        if crosslist_id:
-            required_capacity = crosslist_totals.get(crosslist_id, 0)
-            if not ignore_crosslist_capacity and not ignore_room_capacity:
-                available_rooms = [
-                    room
-                    for room in available_rooms
-                    if room["capacity"] >= required_capacity
-                ]
+                if not ignore_room_features and not _has_required_features(
+                    room_dict, section_dict.get("room_requirements", [])
+                ):
+                    continue
+                # Section-specific allowed_rooms constraint (if provided).
+                allowed_rooms = section_prefs.get("allowed_rooms") if isinstance(section_prefs, dict) else None
+                if allowed_rooms:
+                    if room_dict["id"] not in allowed_rooms:
+                        continue
+                available_rooms.append(room_dict)
+            crosslist_id = section_to_crosslist_group.get(section_id)
+            if crosslist_id:
+                required_capacity = crosslist_totals.get(crosslist_id, 0)
+                if not ignore_crosslist_capacity and not ignore_room_capacity:
+                    available_rooms = [
+                        room
+                        for room in available_rooms
+                        if room["capacity"] >= required_capacity
+                    ]
 
         section_options: List[Tuple[str, Tuple[str, ...], str, int]] = []
         for pattern_id in section_dict.get("allowed_meeting_patterns", []):
@@ -1030,6 +1120,16 @@ def _build_options(
                     fixed_timeslot_set = lock.get("fixed_timeslot_set") if isinstance(lock, dict) else getattr(lock, "fixed_timeslot_set", None)
                     if fixed_timeslot_set and set(fixed_timeslot_set) != set(timeslot_set):
                         continue
+                if is_online:
+                    section_options.append(
+                        (
+                            pattern_id,
+                            tuple(timeslot_set),
+                            ONLINE_ROOM_SENTINEL,
+                            0,
+                        )
+                    )
+                    continue
                 for room in available_rooms:
                     if lock:
                         fixed_room = lock.get("fixed_room") if isinstance(lock, dict) else getattr(lock, "fixed_room", None)
@@ -1460,17 +1560,13 @@ def _check_feasible(
                 for section_b in members[i + 1 :]:
                     options_a = options_by_section.get(section_a, [])
                     options_b = options_by_section.get(section_b, [])
+                    section_a_dict = _section_to_dict(sections_by_id[section_a])
+                    section_b_dict = _section_to_dict(sections_by_id[section_b])
                     for idx_a, option_a in enumerate(options_a):
-                        _, timeslot_a, room_a, _ = option_a
                         for idx_b, option_b in enumerate(options_b):
-                            _, timeslot_b, room_b, _ = option_b
-                            if timeslot_a != timeslot_b:
-                                model.Add(
-                                    option_vars[(section_a, idx_a)]
-                                    + option_vars[(section_b, idx_b)]
-                                    <= 1
-                                )
-                            elif room_a != room_b:
+                            if _crosslist_options_incompatible(
+                                option_a, option_b, section_a_dict, section_b_dict
+                            ):
                                 model.Add(
                                     option_vars[(section_a, idx_a)]
                                     + option_vars[(section_b, idx_b)]
@@ -2125,7 +2221,7 @@ def _solve_schedule(input_data: SchedulingInput):
 
     print("[solve] Major/department/no-overlap constraints done.", flush=True)
 
-    # Cross-listed sections share both times and room.
+    # Cross-listed sections share times; room equality applies to in-person pairs only.
     for group in input_data.crosslist_groups:
         group_dict = group.to_dict() if hasattr(group, "to_dict") else group
         members = group_dict.get("member_section_ids", []) if isinstance(group_dict, dict) else group.member_section_ids
@@ -2133,17 +2229,13 @@ def _solve_schedule(input_data: SchedulingInput):
             for section_b in members[i + 1 :]:
                 options_a = options_by_section.get(section_a, [])
                 options_b = options_by_section.get(section_b, [])
+                section_a_dict = _section_to_dict(sections_by_id[section_a])
+                section_b_dict = _section_to_dict(sections_by_id[section_b])
                 for idx_a, option_a in enumerate(options_a):
-                    _, timeslot_a, room_a, _ = option_a
                     for idx_b, option_b in enumerate(options_b):
-                        _, timeslot_b, room_b, _ = option_b
-                        if timeslot_a != timeslot_b:
-                            model.Add(
-                                option_vars[(section_a, idx_a)]
-                                + option_vars[(section_b, idx_b)]
-                                <= 1
-                            )
-                        elif room_a != room_b:
+                        if _crosslist_options_incompatible(
+                            option_a, option_b, section_a_dict, section_b_dict
+                        ):
                             model.Add(
                                 option_vars[(section_a, idx_a)]
                                 + option_vars[(section_b, idx_b)]
@@ -2394,8 +2486,13 @@ def _solve_schedule(input_data: SchedulingInput):
             "timeslot_ids": list(timeslot_set),
             "room_id": room_id,
         })
+        placement_label = (
+            "online band"
+            if _is_online_section(section_dict)
+            else str(room_id)
+        )
         explanations.append(
-            f"Section {section_id} assigned to {room_id} at {', '.join(timeslot_set)}."
+            f"Section {section_id} assigned to {placement_label} at {', '.join(timeslot_set)}."
         )
 
     for instructor_id, excess_var in adjunct_day_excess_vars.items():
@@ -3249,6 +3346,17 @@ def update_sections():
                 ))
                 existing_timeslot_ids.add(tsid)
 
+            for tsid in _normalize_section_timeslot_ids(item):
+                if tsid and tsid not in existing_timeslot_ids:
+                    db.session.add(Timeslot(
+                        id=tsid,
+                        days="",
+                        start_time=_parse_time("09:00"),
+                        end_time=_parse_time("10:00"),
+                        slot_type="standard",
+                    ))
+                    existing_timeslot_ids.add(tsid)
+
         db.session.flush()
 
         skipped_sections: List[Dict[str, Any]] = []
@@ -3287,6 +3395,8 @@ def update_sections():
 
             dept_raw = item.get("department")
             department = (str(dept_raw).strip() if dept_raw is not None else "") or ""
+            timeslot_ids = _normalize_section_timeslot_ids(item)
+            timeslot_id = timeslot_ids[0] if timeslot_ids else item.get("timeslot_id")
 
             section = Section(
                 id=section_id,
@@ -3295,7 +3405,8 @@ def update_sections():
                 section_number=item.get("section_number") or "",
                 instructor_id=item.get("instructor_id"),
                 room_id=item.get("room_id"),
-                timeslot_id=item.get("timeslot_id"),
+                timeslot_id=timeslot_id,
+                timeslot_ids=timeslot_ids,
                 crosslisting_id=item.get("crosslisting_id"),
                 expected_enrollment=int(item.get("expected_enrollment") or 0),
                 enrollment_cap=int(item.get("enrollment_cap") or 0),
@@ -4213,6 +4324,7 @@ def sync_solver_session_cancel():
 with app.app_context():
     db.create_all()
     _ensure_schema_migrations()
+    _backfill_section_timeslot_ids()
     _seed_if_empty()
 
 

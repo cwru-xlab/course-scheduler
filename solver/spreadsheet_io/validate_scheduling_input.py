@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Set
 
+from online_sections import ONLINE_ROOM_SENTINEL, is_online_section
+
 
 def _err(
     code: str,
@@ -50,6 +52,11 @@ def validate_scheduling_input(data: dict) -> List[dict]:
     soft_locks = [l for l in data.get("soft_locks", []) if isinstance(l, dict)]
 
     section_ids = _ids(sections)
+    sections_by_id = {
+        str(section.get("id", "")).strip(): section
+        for section in sections
+        if str(section.get("id", "")).strip()
+    }
     instructor_ids = _ids(instructors)
     room_ids = _ids(rooms)
     timeslot_ids = _ids(timeslots)
@@ -80,6 +87,17 @@ def validate_scheduling_input(data: dict) -> List[dict]:
     check_dupes(rooms, "Rooms")
     check_dupes(timeslots, "Timeslots")
     check_dupes(meeting_patterns, "MeetingPatterns")
+
+    if ONLINE_ROOM_SENTINEL in room_ids:
+        errors.append(
+            _err(
+                "reserved_room_id",
+                f"Rooms must not use the reserved online sentinel id '{ONLINE_ROOM_SENTINEL}'.",
+                sheet="Rooms",
+                row_id=ONLINE_ROOM_SENTINEL,
+                field="id",
+            )
+        )
 
     if not sections:
         errors.append(
@@ -255,7 +273,29 @@ def validate_scheduling_input(data: dict) -> List[dict]:
                 )
             )
         fixed_room = lock.get("fixed_room")
-        if fixed_room and str(fixed_room).strip() not in room_ids:
+        section = sections_by_id.get(section_id)
+        if section and is_online_section(section):
+            if fixed_room and str(fixed_room).strip() not in ("", ONLINE_ROOM_SENTINEL):
+                errors.append(
+                    _err(
+                        "online_fixed_room",
+                        f"LockedAssignments for online section '{section_id}' must not set fixed_room (online sections are time-only).",
+                        sheet="LockedAssignments",
+                        row_id=section_id or None,
+                        field="fixed_room",
+                    )
+                )
+        elif fixed_room and str(fixed_room).strip() == ONLINE_ROOM_SENTINEL:
+            errors.append(
+                _err(
+                    "invalid_fixed_room",
+                    f"LockedAssignments for section '{section_id}' cannot use the online sentinel as fixed_room.",
+                    sheet="LockedAssignments",
+                    row_id=section_id or None,
+                    field="fixed_room",
+                )
+            )
+        elif fixed_room and str(fixed_room).strip() not in room_ids:
             errors.append(
                 _err(
                     "unknown_room",
@@ -290,6 +330,39 @@ def validate_scheduling_input(data: dict) -> List[dict]:
                     sheet="SoftLocks",
                     row_id=section_id,
                     field="section_id",
+                )
+            )
+        preferred_room = lock.get("preferred_room")
+        section = sections_by_id.get(section_id)
+        if section and is_online_section(section):
+            if preferred_room and str(preferred_room).strip() not in ("", ONLINE_ROOM_SENTINEL):
+                errors.append(
+                    _err(
+                        "online_preferred_room",
+                        f"SoftLocks for online section '{section_id}' must not set preferred_room.",
+                        sheet="SoftLocks",
+                        row_id=section_id or None,
+                        field="preferred_room",
+                    )
+                )
+        elif preferred_room and str(preferred_room).strip() == ONLINE_ROOM_SENTINEL:
+            errors.append(
+                _err(
+                    "invalid_preferred_room",
+                    f"SoftLocks for section '{section_id}' cannot use the online sentinel as preferred_room.",
+                    sheet="SoftLocks",
+                    row_id=section_id or None,
+                    field="preferred_room",
+                )
+            )
+        elif preferred_room and str(preferred_room).strip() not in room_ids:
+            errors.append(
+                _err(
+                    "unknown_room",
+                    f"SoftLocks for section '{section_id}' references unknown room '{preferred_room}'.",
+                    sheet="SoftLocks",
+                    row_id=section_id or None,
+                    field="preferred_room",
                 )
             )
 
