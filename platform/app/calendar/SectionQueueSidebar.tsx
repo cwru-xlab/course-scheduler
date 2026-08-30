@@ -19,6 +19,7 @@ export type QueueSectionRow = {
   instructor_id: string;
   instructorName: string;
   allowed_meeting_patterns?: string[];
+  tags?: string[];
   state?: string | null;
   assignment?: { room_id?: string; timeslot_ids?: string[]; meeting_pattern_id?: string };
   room_id?: string | null;
@@ -76,6 +77,7 @@ export function SectionQueueSidebar({
   const [tab, setTab] = useState<QueueTab>("unscheduled");
   const [search, setSearch] = useState("");
   const [patternFilter, setPatternFilter] = useState<string>("");
+  const [tagFilter, setTagFilter] = useState<string>("");
   const [sortBy, setSortBy] = useState<QueueSort>("course");
   const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
@@ -106,6 +108,16 @@ export function SectionQueueSidebar({
     return Array.from(set).sort();
   }, [enriched]);
 
+  const tagOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of enriched) {
+      for (const t of s.tags ?? []) {
+        if (t.trim()) set.add(t.trim());
+      }
+    }
+    return Array.from(set).sort();
+  }, [enriched]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     let rows = enriched;
@@ -116,6 +128,9 @@ export function SectionQueueSidebar({
       }
     } else if (tab === "archived") {
       rows = rows.filter((s) => isSectionArchived(s));
+    }
+    if (tagFilter) {
+      rows = rows.filter((s) => (s.tags ?? []).includes(tagFilter));
     }
     if (tab === "unscheduled" && patternFilter) {
       rows = rows.filter((s) => sectionMatchesPatternFilter(s, patternFilter));
@@ -146,19 +161,21 @@ export function SectionQueueSidebar({
       const lb = formatCalendarSectionHoverLines(b, b.instructorName).title;
       return la.localeCompare(lb, undefined, { sensitivity: "base" });
     });
-  }, [enriched, tab, search, patternFilter, sortBy, needsAttentionOnly]);
+  }, [enriched, tab, search, patternFilter, tagFilter, sortBy, needsAttentionOnly]);
 
   const activeFilterCount = useMemo(() => {
-    if (tab !== "unscheduled") return 0;
     let count = 0;
+    if (tagFilter) count += 1;
+    if (tab !== "unscheduled") return count;
     if (patternFilter) count += 1;
     if (sortBy !== "course") count += 1;
     if (needsAttentionOnly) count += 1;
     return count;
-  }, [tab, patternFilter, sortBy, needsAttentionOnly]);
+  }, [tab, patternFilter, tagFilter, sortBy, needsAttentionOnly]);
 
   const clearFilters = () => {
     setPatternFilter("");
+    setTagFilter("");
     setSortBy("course");
     setNeedsAttentionOnly(false);
   };
@@ -265,7 +282,7 @@ export function SectionQueueSidebar({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-              {tab === "unscheduled" ? (
+              {(tab === "unscheduled" || tab === "archived") ? (
                 <>
                   <button
                     type="button"
@@ -299,51 +316,76 @@ export function SectionQueueSidebar({
                     <div className="space-y-1.5 rounded-md border border-slate-200 bg-slate-50/60 p-2">
                       <div>
                         <label
-                          htmlFor="queue-pattern-filter"
+                          htmlFor="queue-tag-filter"
                           className="mb-0.5 block text-[10px] font-semibold text-slate-500"
                         >
-                          Meeting pattern
+                          Tag
                         </label>
                         <select
-                          id="queue-pattern-filter"
+                          id="queue-tag-filter"
                           className="min-w-0 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs"
-                          value={patternFilter}
-                          onChange={(e) => setPatternFilter(e.target.value)}
+                          value={tagFilter}
+                          onChange={(e) => setTagFilter(e.target.value)}
                         >
-                          <option value="">All patterns</option>
-                          {patternOptions.map((p) => (
-                            <option key={p} value={p}>
-                              {p}
+                          <option value="">All tags</option>
+                          {tagOptions.map((t) => (
+                            <option key={t} value={t}>
+                              {t}
                             </option>
                           ))}
                         </select>
                       </div>
-                      <div>
-                        <label
-                          htmlFor="queue-sort-by"
-                          className="mb-0.5 block text-[10px] font-semibold text-slate-500"
-                        >
-                          Sort by
-                        </label>
-                        <select
-                          id="queue-sort-by"
-                          className="min-w-0 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs"
-                          value={sortBy}
-                          onChange={(e) => setSortBy(e.target.value as QueueSort)}
-                        >
-                          <option value="course">Course name</option>
-                          <option value="pattern">Meeting pattern</option>
-                        </select>
-                      </div>
-                      <label className="flex min-w-0 cursor-pointer items-center gap-2 text-[10px] font-semibold text-slate-600">
-                        <input
-                          type="checkbox"
-                          className="size-3.5 shrink-0 rounded border-slate-300"
-                          checked={needsAttentionOnly}
-                          onChange={(e) => setNeedsAttentionOnly(e.target.checked)}
-                        />
-                        <span className="min-w-0">Needs attention only</span>
-                      </label>
+                      {tab === "unscheduled" ? (
+                        <>
+                          <div>
+                            <label
+                              htmlFor="queue-pattern-filter"
+                              className="mb-0.5 block text-[10px] font-semibold text-slate-500"
+                            >
+                              Meeting pattern
+                            </label>
+                            <select
+                              id="queue-pattern-filter"
+                              className="min-w-0 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs"
+                              value={patternFilter}
+                              onChange={(e) => setPatternFilter(e.target.value)}
+                            >
+                              <option value="">All patterns</option>
+                              {patternOptions.map((p) => (
+                                <option key={p} value={p}>
+                                  {p}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label
+                              htmlFor="queue-sort-by"
+                              className="mb-0.5 block text-[10px] font-semibold text-slate-500"
+                            >
+                              Sort by
+                            </label>
+                            <select
+                              id="queue-sort-by"
+                              className="min-w-0 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs"
+                              value={sortBy}
+                              onChange={(e) => setSortBy(e.target.value as QueueSort)}
+                            >
+                              <option value="course">Course name</option>
+                              <option value="pattern">Meeting pattern</option>
+                            </select>
+                          </div>
+                          <label className="flex min-w-0 cursor-pointer items-center gap-2 text-[10px] font-semibold text-slate-600">
+                            <input
+                              type="checkbox"
+                              className="size-3.5 shrink-0 rounded border-slate-300"
+                              checked={needsAttentionOnly}
+                              onChange={(e) => setNeedsAttentionOnly(e.target.checked)}
+                            />
+                            <span className="min-w-0">Needs attention only</span>
+                          </label>
+                        </>
+                      ) : null}
                       {activeFilterCount > 0 ? (
                         <button
                           type="button"

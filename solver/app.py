@@ -402,8 +402,8 @@ def _ensure_schema_migrations() -> None:
                     )
                 except Exception:  # pylint: disable=broad-except
                     pass
-    except Exception:  # pylint: disable=broad-except
-        pass
+    except Exception as exc:  # pylint: disable=broad-except
+        print(f"[schema] _ensure_schema_migrations failed: {exc}", flush=True)
 
 
 def _backfill_section_timeslot_ids() -> None:

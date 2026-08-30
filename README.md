@@ -512,6 +512,54 @@ The notes modal also supports deep links:
 
 These notes are **not persisted to the solver backend**.
 
+### 14.7 MBAP manual scheduling workflow
+
+MBAP courses use a **manual-first** workflow: exclude them from auto-solve, place them on the calendar by hand, then hard-lock before re-running the solver for other programs.
+
+#### Section numbers and modalities
+
+| `section_number` | Modality | Calendar placement |
+|------------------|----------|-------------------|
+| `400` | On-campus | Monday room grid (6:15–7:45 PM or 8:00–9:30 PM) |
+| `800`–`899` | Online | Online band (Tuesday or Wednesday evening) |
+
+SOC import derives `section_number` from `section_code` (e.g. `400-LEC` → `400`) and tags MBAP rows with `mbap`. Half-semester sessions may also receive `half-1` / `half-2` tags (informational only).
+
+#### Required timeslots and meeting patterns
+
+Create these in **Editor → Timeslots** and **Editor → Meeting Patterns** (IDs must match):
+
+| ID | Day | Time | Pattern ID |
+|----|-----|------|------------|
+| `Mon_1815_1945` | Mon | 18:15–19:45 | `mbap_mon_615` |
+| `Mon_2000_2130` | Mon | 20:00–21:30 | `mbap_mon_800` |
+| `Tue_1800_2100` | Tue | 18:00–21:00 | `mbap_tue_eve` |
+| `Wed_1800_2100` | Wed | 18:00–21:00 | `mbap_wed_eve` |
+
+Constants are defined in `platform/lib/scheduling/mbapConstants.ts` and `solver/mbap_constants.py`. SOC import applies the matching `allowed_meeting_patterns` when MBAP sections are detected.
+
+#### Recommended workflow
+
+1. Import or edit data; confirm MBAP sections have `section_number` 400 or 800–899 and tag `mbap`.
+2. In **Editor → Sections**, click **Archive MBAP** (or **Archive by tag…**) to exclude MBAP from the solver.
+3. **Run Solver** for the remaining schedule.
+4. On **Calendar**, filter the queue by tag `mbap` (Archived tab).
+5. Place **400** sections on **Monday** in a room; place **800** sections in the **Online** band on Tue/Wed.
+6. **Hard-lock** placed MBAP sections before any subsequent solver run.
+7. **Update Backend** to persist manual placements.
+
+Instructor conflict warnings apply across both the room grid and Online band. Half-semester room sharing is not modeled — ignore room warnings when you know two sections occupy the same slot in different halves.
+
+#### Production database migration
+
+Before deploying code that uses `timeslot_ids`, run:
+
+```sql
+ALTER TABLE sections ADD COLUMN IF NOT EXISTS timeslot_ids JSON NOT NULL DEFAULT '[]';
+```
+
+See `solver/migrations/20260830_sections_timeslot_ids.sql`.
+
 ---
 
 ## 15. Canonical Scheduling Input Model (Frontend + Solver)

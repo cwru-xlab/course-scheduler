@@ -129,6 +129,7 @@ import { SectionQueueSidebar } from "./SectionQueueSidebar";
 import { OrphanSectionsModal } from "./OrphanSectionsModal";
 import {
   assignCalendarEventLanes,
+  buildPlacementConflictEvents,
   calendarEventInstructorIds,
   calendarEventMatchesFilters,
   calendarEventSectionIds,
@@ -1487,11 +1488,12 @@ type PatternDayApplyRow = {
   } | null>(null);
   const [selectedDepartmentKeys, setSelectedDepartmentKeys] = useState<string[]>([]);
   const [selectedInstructorIds, setSelectedInstructorIds] = useState<string[]>([]);
+  const [selectedTagKeys, setSelectedTagKeys] = useState<string[]>([]);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const filtersPanelRef = useOverlayClampedHeight<HTMLDivElement>(filtersExpanded);
   const [roomSortExpanded, setRoomSortExpanded] = useState(false);
   const roomSortPanelRef = useOverlayClampedHeight<HTMLDivElement>(roomSortExpanded);
-  const activeFilterCount = selectedDepartmentKeys.length + selectedInstructorIds.length;
+  const activeFilterCount = selectedDepartmentKeys.length + selectedInstructorIds.length + selectedTagKeys.length;
   const [searchQuery, setSearchQuery] = useState("");
   const [roomSortMode, setRoomSortMode] = useState<CalendarRoomSortMode>(
     DEFAULT_CALENDAR_ROOM_SORT_MODE,
@@ -2155,6 +2157,19 @@ type PatternDayApplyRow = {
     [resolveStaggeredPatternPlacement],
   );
 
+  const tagFilterOptions = useMemo(() => {
+    if (!data) return [];
+    const set = new Set<string>();
+    for (const s of data.sections) {
+      for (const t of s.tags ?? []) {
+        if (t.trim()) set.add(t.trim());
+      }
+    }
+    return Array.from(set)
+      .sort()
+      .map((tag) => ({ key: tag, label: tag }));
+  }, [data]);
+
   const departmentFilterOptions = useMemo(() => {
     if (!data?.sections.length) return [] as { key: string; label: string }[];
     const byKey = new Map<string, string>();
@@ -2608,6 +2623,11 @@ type PatternDayApplyRow = {
     setSelectedInstructorIds((prev) => prev.filter((id) => validInstructorIds.has(id)));
   }, [professorFilterOptions]);
 
+  useEffect(() => {
+    const validTagKeys = new Set(tagFilterOptions.map((option) => option.key));
+    setSelectedTagKeys((prev) => prev.filter((id) => validTagKeys.has(id)));
+  }, [tagFilterOptions]);
+
   const sectionMatchesFilters = useCallback(
     (section: SectionDto) => {
       if (isSectionArchived(section)) {
@@ -2619,9 +2639,12 @@ type PatternDayApplyRow = {
       const instructorMatch =
         selectedInstructorIds.length === 0 ||
         selectedInstructorIds.includes(section.instructor_id);
-      return departmentMatch && instructorMatch;
+      const tagMatch =
+        selectedTagKeys.length === 0 ||
+        (section.tags ?? []).some((tag) => selectedTagKeys.includes(tag.trim()));
+      return departmentMatch && instructorMatch && tagMatch;
     },
-    [selectedDepartmentKeys, selectedInstructorIds],
+    [selectedDepartmentKeys, selectedInstructorIds, selectedTagKeys],
   );
 
   /** Shown under the PDF title when department and/or professor filters are active. */
@@ -2639,8 +2662,14 @@ type PatternDayApplyRow = {
         .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
       lines.push({ key: "professors", label: "Professors", value: labels.join(", ") });
     }
+    if (selectedTagKeys.length > 0) {
+      const labels = [...selectedTagKeys].sort((a, b) =>
+        a.localeCompare(b, undefined, { sensitivity: "base" }),
+      );
+      lines.push({ key: "tags", label: "Tags", value: labels.join(", ") });
+    }
     return lines;
-  }, [selectedDepartmentKeys, selectedInstructorIds, departmentFilterOptions, professorFilterOptions]);
+  }, [selectedDepartmentKeys, selectedInstructorIds, selectedTagKeys, departmentFilterOptions, professorFilterOptions]);
 
   const departmentPaletteByKey = useMemo(() => {
     const map = new Map<string, DepartmentPalette>();
@@ -2752,6 +2781,11 @@ type PatternDayApplyRow = {
     );
   }, [assignmentsBySection, data, selectedDay, solverTimeslotIdsBySection, timeslotById]);
 
+  const placementConflictEvents = useMemo(
+    () => buildPlacementConflictEvents(allDayEvents, onlineDayEvents),
+    [allDayEvents, onlineDayEvents],
+  );
+
   const onlineBandTrackHeight = useMemo(() => {
     const laneCount = Math.max(
       1,
@@ -2786,6 +2820,7 @@ type PatternDayApplyRow = {
         instructor_id: section.instructor_id,
         instructorName: inst?.name?.trim() || section.instructor_id || "—",
         allowed_meeting_patterns: section.allowed_meeting_patterns,
+        tags: section.tags ?? [],
         state: section.state,
         assignment,
         room_id: section.room_id,
@@ -4457,6 +4492,7 @@ type PatternDayApplyRow = {
         data,
         assignmentsBySection,
         allDayEvents,
+        instructorConflictEvents: placementConflictEvents,
         linkedSectionIds,
         instructorById,
         findBlockedPlacementMessage,
@@ -4577,6 +4613,7 @@ type PatternDayApplyRow = {
     [
       assignmentsBySection,
       allDayEvents,
+      placementConflictEvents,
       backendSaveMessage,
       conflictSectionIds,
       dragFeedback,
@@ -5121,6 +5158,7 @@ type PatternDayApplyRow = {
         data,
         assignmentsBySection,
         allDayEvents,
+        instructorConflictEvents: placementConflictEvents,
         linkedSectionIds,
         instructorById,
         findBlockedPlacementMessage,
@@ -5129,6 +5167,7 @@ type PatternDayApplyRow = {
     },
     [
       allDayEvents,
+      placementConflictEvents,
       assignmentsBySection,
       data,
       findBlockedPlacementMessage,
@@ -5447,6 +5486,7 @@ type PatternDayApplyRow = {
         data,
         assignmentsBySection,
         allDayEvents,
+        instructorConflictEvents: placementConflictEvents,
         linkedSectionIds,
         instructorById,
         findBlockedPlacementMessage,
@@ -5455,6 +5495,7 @@ type PatternDayApplyRow = {
     },
     [
       allDayEvents,
+      placementConflictEvents,
       assignmentsBySection,
       data,
       findBlockedPlacementMessage,
@@ -6436,6 +6477,29 @@ type PatternDayApplyRow = {
                   className="shrink-0 font-semibold"
                   isDisabled={selectedDepartmentKeys.length === 0}
                   onPress={() => setSelectedDepartmentKeys([])}
+                >
+                  Clear
+                </Button>
+              </div>
+              <div className="grid grid-cols-1 items-center gap-2 rounded-lg border border-default-200 bg-default-50/60 px-3 py-2 sm:grid-cols-[7rem_1fr_auto]">
+                <span className="text-xs font-semibold uppercase tracking-wide text-default-600">
+                  Tags
+                </span>
+                <div className="min-w-0 overflow-hidden">
+                  <MultiSelect
+                    placeholder="Any tag…"
+                    options={tagFilterOptions}
+                    value={selectedTagKeys}
+                    onChange={setSelectedTagKeys}
+                    showSearch
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  variant="light"
+                  className="shrink-0 font-semibold"
+                  isDisabled={selectedTagKeys.length === 0}
+                  onPress={() => setSelectedTagKeys([])}
                 >
                   Clear
                 </Button>

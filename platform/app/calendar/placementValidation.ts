@@ -214,6 +214,8 @@ export function evaluatePlacement(input: {
   data: PlacementData;
   assignmentsBySection: PlacementAssignmentMap;
   allDayEvents: CalendarEvent[];
+  /** Defaults to allDayEvents; pass merged in-person + online for cross-modality instructor checks. */
+  instructorConflictEvents?: CalendarEvent[];
   linkedSectionIds: string[];
   instructorById: Map<string, InstructorLike>;
   findBlockedPlacementMessage: (
@@ -231,6 +233,7 @@ export function evaluatePlacement(input: {
     data,
     assignmentsBySection,
     allDayEvents,
+    instructorConflictEvents: instructorEventsInput,
     linkedSectionIds,
     instructorById,
     findBlockedPlacementMessage,
@@ -288,14 +291,19 @@ export function evaluatePlacement(input: {
   const overlapsSelected = (eventItem: CalendarEvent) =>
     minutesOverlap(slot.start, slot.end, eventItem.start, eventItem.end);
 
-  // 3. Room overlap — warning, move still applied.
-  const roomConflicts = allDayEvents.filter((eventItem) => {
-    if (!calendarEventConflictsWithSectionIds(eventItem, linkedSectionIdSet)) return false;
-    if (resolveEventRoomId(eventItem) !== targetRoomId) return false;
-    return overlapsSelected(eventItem);
-  });
+  const instructorConflictEvents = instructorEventsInput ?? allDayEvents;
+  const targetRoomIdTrimmed = targetRoomId.trim();
 
-  // 4. Instructor double-booking (any room) — warning, move still applied.
+  // 3. Room overlap — warning, move still applied (in-person only).
+  const roomConflicts = !targetRoomIdTrimmed
+    ? []
+    : allDayEvents.filter((eventItem) => {
+        if (!calendarEventConflictsWithSectionIds(eventItem, linkedSectionIdSet)) return false;
+        if (resolveEventRoomId(eventItem) !== targetRoomId) return false;
+        return overlapsSelected(eventItem);
+      });
+
+  // 4. Instructor double-booking (any modality) — warning, move still applied.
   const draggedInstructorIds = new Set<string>();
   for (const linkedSectionId of linkedIds) {
     const linked = data.sections.find((s) => s.id === linkedSectionId);
@@ -308,7 +316,7 @@ export function evaluatePlacement(input: {
   const instructorConflicts =
     draggedInstructorIds.size === 0
       ? []
-      : allDayEvents.filter((eventItem) => {
+      : instructorConflictEvents.filter((eventItem) => {
           if (!calendarEventConflictsWithSectionIds(eventItem, linkedSectionIdSet)) return false;
           if (!overlapsSelected(eventItem)) return false;
           return calendarEventInstructorIds(eventItem).some((id) =>

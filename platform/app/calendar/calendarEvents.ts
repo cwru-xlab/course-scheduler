@@ -177,3 +177,11 @@ export function calendarEventDisplayLabel(event: CalendarEvent): string {
   }
   return `${event.section.department ?? ""} ${event.section.course_id}`.trim();
 }
+
+/** Merge in-person grid events and Online band events for instructor conflict checks. */
+export function buildPlacementConflictEvents(
+  inPersonEvents: CalendarEvent[],
+  onlineEvents: CalendarEvent[],
+): CalendarEvent[] {
+  return [...inPersonEvents, ...onlineEvents];
+}

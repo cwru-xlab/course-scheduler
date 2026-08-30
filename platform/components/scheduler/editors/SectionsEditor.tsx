@@ -37,6 +37,7 @@ import {
   isSectionNew,
   normalizeSectionState,
 } from "@/lib/scheduling/sectionState";
+import { MBAP_TAG } from "@/lib/scheduling/mbapConstants";
 
 const STATE_OPTIONS: { key: SectionState; label: string }[] = [
   { key: "active", label: "Active" },
@@ -174,6 +175,33 @@ export const SectionsEditor = ({
     }
     return Array.from(set).sort();
   }, [sections]);
+
+  const archiveSectionsByTag = useCallback(
+    (tag: string) => {
+      const normalized = tag.trim().toLowerCase();
+      if (!normalized) return;
+      const toArchive = sections.filter(
+        (section) =>
+          !isSectionArchived(section) &&
+          section.tags.some((t) => t.trim().toLowerCase() === normalized),
+      );
+      if (toArchive.length === 0) {
+        window.alert(`No active sections are tagged "${tag}".`);
+        return;
+      }
+      const confirmed = window.confirm(
+        `Archive ${toArchive.length} section(s) tagged "${tag}"? They will be excluded from the solver until placed from the calendar.`,
+      );
+      if (!confirmed) return;
+      const archiveIds = new Set(toArchive.map((s) => s.id));
+      onUpdate(
+        sections.map((section) =>
+          archiveIds.has(section.id) ? { ...section, state: "archived" } : section,
+        ),
+      );
+    },
+    [onUpdate, sections],
+  );
 
   const sectionFilterDefs = useMemo((): EditorColumnFilterDef<SectionRow>[] => [
     {
@@ -445,15 +473,34 @@ export const SectionsEditor = ({
             filters={columnFilters}
             onChange={setColumnFilters}
             extraContent={
-              <label className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  className="size-3.5 rounded border-slate-300 text-primary accent-[#137fec]"
-                  checked={hideArchived}
-                  onChange={(e) => setHideArchived(e.target.checked)}
-                />
-                <span>Hide archived sections</span>
-              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    className="size-3.5 rounded border-slate-300 text-primary accent-[#137fec]"
+                    checked={hideArchived}
+                    onChange={(e) => setHideArchived(e.target.checked)}
+                  />
+                  <span>Hide archived sections</span>
+                </label>
+                <button
+                  type="button"
+                  className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  onClick={() => archiveSectionsByTag(MBAP_TAG)}
+                >
+                  Archive MBAP
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  onClick={() => {
+                    const tag = window.prompt("Archive all active sections with tag:");
+                    if (tag) archiveSectionsByTag(tag);
+                  }}
+                >
+                  Archive by tag…
+                </button>
+              </div>
             }
           />
           <EditorColumnPicker
