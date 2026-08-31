@@ -155,6 +155,18 @@ def _extract_section_type(section_code: str) -> str:
     return "lecture"
 
 
+def _map_session_to_semester_length(session: str) -> str:
+    """Map SIS Session text to scheduler semester_length keys."""
+    s = re.sub(r"[\s_-]+", " ", (session or "").strip().lower())
+    if any(token in s for token in ("sess1", "sess 1", "1 half", "first half")):
+        return "first_half"
+    if any(token in s for token in ("sess2", "sess 2", "2 half", "second half")):
+        return "second_half"
+    if "half" in s:
+        return "half_any"
+    return "full"
+
+
 def _parse_enrollment_str(val) -> tuple[int, int]:
     """
     Parse 'section_cap (combined_cap)' e.g. '21 (45)' -> (21, 45).
@@ -447,6 +459,7 @@ def load_sections_from_soc_editors(
             "allowed_meeting_patterns": [pattern_id] if pattern_id else [],
             "room_requirements": DEFAULT_ROOM_REQUIREMENTS.copy(),
             "tags": DEFAULT_TAGS.copy(),
+            "semester_length": _map_session_to_semester_length(session),
 
             # Supplemental metadata (not in core model, useful for downstream logic)
             "_meta": {
@@ -625,9 +638,8 @@ def _build_gaps_report(sections: list[dict], rows_missing_class_nbr: int) -> dic
             },
             "Session": {
                 "value_example": "Dyn Dt, Regular, Reg 2 Half, Virt Reg, Virt Sess1, Virt Sess2",
-                "note": "Indicates sub-semester session windows and delivery format.",
-                "fix_option_1": "Add Session field to Section model. Virtual sessions can also set Section.allow_virtual.",
-                "fix_option_2": "Map 'Reg 2 Half', 'Virt Sess1/2' to BlockedTime constraints restricting placement windows.",
+                "note": "Mapped to Section.semester_length (full / half_any / first_half / second_half).",
+                "fix_option_1": "Review mapped values in the sections editor Semester column.",
             },
             "Meeting Dates": {
                 "value_example": "8/24/2026 - 12/7/2026",
@@ -781,6 +793,9 @@ def load_sections_from_sis(
             "previous_meeting_pattern": pattern_id,
             "room_requirements": DEFAULT_ROOM_REQUIREMENTS.copy(),
             "crosslist_group_id": None, "tags": DEFAULT_TAGS.copy(),
+            "semester_length": _map_session_to_semester_length(
+                str(row.get("Session") or row.get("SESSION") or "")
+            ),
         })
 
     pattern_id_to_slots = {p["id"]: p["slots_required"] for p in pattern_key_to_pattern.values()}

@@ -17,6 +17,8 @@ try:
         normalize_spreadsheet_string_cell,
         serialize_list_cell,
         serialize_nested_list_cell,
+        apply_semester_length_dropdown,
+        semester_length_label,
     )
 except ModuleNotFoundError:
     from beautify import beautify_workbook  # type: ignore[no-redef]
@@ -29,6 +31,8 @@ except ModuleNotFoundError:
         normalize_spreadsheet_string_cell,
         serialize_list_cell,
         serialize_nested_list_cell,
+        apply_semester_length_dropdown,
+        semester_length_label,
     )
 
 
@@ -101,6 +105,8 @@ def scheduling_input_to_excel_bytes(
             _apply_instructor_dropdown(
                 sheets[spec.name], spec.columns, instructor_names, instructor_ws,
             )
+        if spec.name == "Sections":
+            apply_semester_length_dropdown(sheets[spec.name])
 
     populated_notes = [
         entry
@@ -192,6 +198,7 @@ def _rows_for_sheet(
                     item.get("previous_meeting_pattern") or ""
                 ),
                 "state": _export_str(item.get("state") or "active"),
+                "semester_length": semester_length_label(item.get("semester_length")),
                 "prev_notes": "",
                 "new_notes": "",
             }

@@ -80,6 +80,10 @@ import {
 import { isOnlineSection, isAssignmentEmpty, isSectionScheduled, normalizeAssignmentRoomId, persistedSectionTimeslotIds, resolveEffectiveAssignment } from "@/lib/scheduling/sectionOnline";
 import { normalizeSectionForSave } from "@/lib/scheduling/normalizeSectionForSave";
 import { isSectionArchived, normalizeSectionState } from "@/lib/scheduling/sectionState";
+import {
+  SEMESTER_LENGTH_OPTIONS,
+  normalizeSemesterLength,
+} from "@/lib/scheduling/semesterLength";
 import { sectionLocksFromInput } from "@/lib/scheduling/sectionLocks";
 import {
   SCHEDULING_WINDOW_END_HOUR,
@@ -92,6 +96,7 @@ import type {
   SchedulingInput,
   SectionLockState,
   SectionState,
+  SemesterLength,
   SoftLock,
   ValidationError,
 } from "@/lib/scheduling/types";
@@ -192,6 +197,7 @@ type SectionDto = {
   crosslist_group_id?: string | null;
   tags?: string[];
   state?: string | null;
+  semester_length?: string | null;
 };
 
 type RoomDto = {
@@ -223,6 +229,7 @@ type SectionFormDraft = {
   crosslist_group_id: string;
   tags: string[];
   state: SectionState;
+  semester_length: SemesterLength;
 };
 
 type LastSolverRun = LastSolverRunSnapshot;
@@ -812,6 +819,7 @@ function toSectionFormDraft(section: SectionDto): SectionFormDraft {
     crosslist_group_id: String(section.crosslist_group_id ?? "").trim(),
     tags: section.tags ?? [],
     state: normalizeSectionState(section.state),
+    semester_length: normalizeSemesterLength(section.semester_length),
   };
 }
 
@@ -1650,6 +1658,7 @@ type PatternDayApplyRow = {
           section.state ?? "active",
           sectionStatesRef.current,
         ),
+        semester_length: normalizeSemesterLength(section.semester_length),
         room_id: normalizeAssignmentRoomId(
           section,
           assignment?.room_id ?? null,
@@ -2246,6 +2255,7 @@ type PatternDayApplyRow = {
         crosslist_group_id: "",
         tags: [],
         state: "new",
+        semester_length: "full",
       },
     });
   }, []);
@@ -2369,6 +2379,7 @@ type PatternDayApplyRow = {
         crosslist_group_id: section.crosslist_group_id ?? null,
         tags: section.tags ?? [],
         state: normalizeSectionState(section.state),
+        semester_length: normalizeSemesterLength(section.semester_length),
       })),
     [],
   );
@@ -5817,6 +5828,7 @@ type PatternDayApplyRow = {
       crosslist_group_id: draft.crosslist_group_id.trim() || null,
       tags: draft.tags,
       state: normalizeSectionState(draft.state),
+      semester_length: normalizeSemesterLength(draft.semester_length),
       previous_meeting_pattern:
         assignmentsBySection[draft.id.trim()]?.meeting_pattern_id ??
         existingSection?.previous_meeting_pattern ??
@@ -8829,6 +8841,26 @@ type PatternDayApplyRow = {
                     <option value="active">Active</option>
                     <option value="new">New</option>
                     <option value="archived">Archived</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-slate-600">Semester</span>
+                  <select
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-2"
+                    value={normalizeSemesterLength(sectionModal.draft.semester_length)}
+                    onChange={(e) =>
+                      updateSectionModalDraft(
+                        "semester_length",
+                        e.target.value as SemesterLength,
+                      )
+                    }
+                    disabled={isSavingSection}
+                  >
+                    {SEMESTER_LENGTH_OPTIONS.map((opt) => (
+                      <option key={opt.key} value={opt.key}>
+                        {opt.label}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <label className="flex flex-col gap-1">

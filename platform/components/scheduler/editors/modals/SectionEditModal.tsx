@@ -7,10 +7,14 @@ import { EditorModalShell } from "../EditorModalShell";
 import { MultiSelect } from "../../MultiSelect";
 import { TagInput } from "../../TagInput";
 import { joinCsv, splitCsv } from "@/lib/scheduling/csvFields";
-import type { Section, SectionState } from "@/lib/scheduling/types";
+import type { Section, SectionState, SemesterLength } from "@/lib/scheduling/types";
 import {
   normalizeSectionState,
 } from "@/lib/scheduling/sectionState";
+import {
+  SEMESTER_LENGTH_OPTIONS,
+  normalizeSemesterLength,
+} from "@/lib/scheduling/semesterLength";
 
 const STATE_OPTIONS: { key: SectionState; label: string }[] = [
   { key: "active", label: "Active" },
@@ -78,6 +82,7 @@ export function SectionEditModal({
       instructor_id: draft.instructor_id.trim(),
       department: (draft.department ?? "").trim(),
       state: normalizeSectionState(draft.state),
+      semester_length: normalizeSemesterLength(draft.semester_length),
     });
     onClose();
   };
@@ -157,6 +162,25 @@ export function SectionEditModal({
             }
           >
             {STATE_OPTIONS.map((opt) => (
+              <option key={opt.key} value={opt.key}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-semibold text-slate-600">Semester</span>
+          <select
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2"
+            value={normalizeSemesterLength(draft.semester_length)}
+            onChange={(e) =>
+              setDraft((d) => ({
+                ...d,
+                semester_length: e.target.value as SemesterLength,
+              }))
+            }
+          >
+            {SEMESTER_LENGTH_OPTIONS.map((opt) => (
               <option key={opt.key} value={opt.key}>
                 {opt.label}
               </option>

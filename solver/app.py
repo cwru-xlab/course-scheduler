@@ -38,6 +38,7 @@ from spreadsheet_io.spreadsheet_utils import (
     build_template_bytes,
     canonicalize_room_number,
     normalize_section_state,
+    normalize_semester_length,
     parse_nested_list_cell,
 )
 from online_sections import ONLINE_ROOM_SENTINEL, is_online_section as _is_online_section
@@ -340,6 +341,12 @@ def _ensure_schema_migrations() -> None:
                     conn.execute(
                         text("ALTER TABLE sections ADD COLUMN timeslot_ids JSON NOT NULL DEFAULT '[]'")
                     )
+                if "semester_length" not in section_cols:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE sections ADD COLUMN semester_length VARCHAR(32) NOT NULL DEFAULT 'full'"
+                        )
+                    )
             if "blocked_times" in tables:
                 blocked_cols = {c["name"] for c in inspector.get_columns("blocked_times")}
                 if "days" not in blocked_cols:
@@ -508,6 +515,7 @@ def _section_to_dict(section) -> dict:
         "tags": getattr(section, "tags", []),
         "department": getattr(section, "department", "") or "",
         "state": getattr(section, "state", None) or "active",
+        "semester_length": getattr(section, "semester_length", None) or "full",
     }
 
 
@@ -3421,6 +3429,7 @@ def update_sections():
                 tags=item.get("tags", []),
                 department=department,
                 state=normalize_section_state(item.get("state")),
+                semester_length=normalize_semester_length(item.get("semester_length")),
             )
             db.session.add(section)
 

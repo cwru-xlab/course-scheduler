@@ -2,6 +2,8 @@ export type Id = string;
 
 export type SectionState = "active" | "archived" | "new";
 
+export type SemesterLength = "full" | "half_any" | "first_half" | "second_half";
+
 export type Section = {
   id: Id;
   course_id: Id;
@@ -19,6 +21,8 @@ export type Section = {
   previous_meeting_pattern?: Id;
   /** active/new = schedule & show on calendar; archived = excluded from solver & calendar */
   state?: SectionState;
+  /** Full semester vs first/second half (or either half). Defaults to full. */
+  semester_length?: SemesterLength;
 };
 
 export type Instructor = {

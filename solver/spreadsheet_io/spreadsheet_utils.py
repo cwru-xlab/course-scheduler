@@ -36,6 +36,7 @@ SPREADSHEET_SPECS: List[SheetSpec] = [
             "tags",
             "previous_meeting_pattern",
             "state",
+            "semester_length",
             "prev_notes",
             "new_notes",
         ],
@@ -137,6 +138,26 @@ SPREADSHEET_SPECS: List[SheetSpec] = [
 
 SHEET_NAME_TO_SPEC: Dict[str, SheetSpec] = {spec.name: spec for spec in SPREADSHEET_SPECS}
 
+# Sections schema before `semester_length` (includes section_number).
+LEGACY_SHEET_COLUMNS_V3: Dict[str, List[str]] = {
+    "Sections": [
+        "id",
+        "course_id",
+        "department",
+        "section_code",
+        "section_number",
+        "instructor_id",
+        "expected_enrollment",
+        "enrollment_cap",
+        "allowed_meeting_patterns",
+        "room_requirements",
+        "crosslist_group_id",
+        "tags",
+        "previous_meeting_pattern",
+        "state",
+    ],
+}
+
 # Sections schema before the `section_number` column was introduced. Still accepted
 # on import so spreadsheets exported by older versions of this app keep working.
 LEGACY_SHEET_COLUMNS_V2: Dict[str, List[str]] = {
@@ -201,9 +222,10 @@ def normalize_sheet_headers(sheet_name: str, headers: List[str]) -> List[str]:
     expected = spec.columns
 
     candidate_schemas = [expected]
-    v2_legacy = LEGACY_SHEET_COLUMNS_V2.get(sheet_name)
-    if v2_legacy:
-        candidate_schemas.append(v2_legacy)
+    for legacy_map in (LEGACY_SHEET_COLUMNS_V3, LEGACY_SHEET_COLUMNS_V2):
+        extra = legacy_map.get(sheet_name)
+        if extra:
+            candidate_schemas.append(extra)
 
     if sheet_name in _ENTITY_SHEETS_WITH_NOTES:
         for schema in candidate_schemas:
@@ -234,6 +256,65 @@ def normalize_section_state(raw: Any) -> str:
     if value == "new":
         return "new"
     return "active"
+
+
+SEMESTER_LENGTH_LABELS: Dict[str, str] = {
+    "full": "Full",
+    "half_any": "Half (any)",
+    "first_half": "First Half",
+    "second_half": "Second Half",
+}
+
+_SEMESTER_LENGTH_ALIASES: Dict[str, str] = {
+    "full": "full",
+    "half any": "half_any",
+    "half (any)": "half_any",
+    "half": "half_any",
+    "first half": "first_half",
+    "1st half": "first_half",
+    "second half": "second_half",
+    "2nd half": "second_half",
+}
+
+
+def normalize_semester_length(raw: Any) -> str:
+    """Return full, half_any, first_half, or second_half. Blank/missing defaults to full."""
+    value = re.sub(r"[_-]+", " ", str(raw or "").strip().lower())
+    value = re.sub(r"\s+", " ", value)
+    if not value:
+        return "full"
+    return _SEMESTER_LENGTH_ALIASES.get(value, "full")
+
+
+def semester_length_label(raw: Any) -> str:
+    return SEMESTER_LENGTH_LABELS[normalize_semester_length(raw)]
+
+
+def apply_semester_length_dropdown(ws: Worksheet) -> None:
+    """Excel list validation for Sections.semester_length (human-readable labels)."""
+    spec = SHEET_NAME_TO_SPEC.get("Sections")
+    if spec is None:
+        return
+    try:
+        col_idx = spec.columns.index("semester_length") + 1
+    except ValueError:
+        return
+    from openpyxl.utils import get_column_letter
+    from openpyxl.worksheet.datavalidation import DataValidation
+
+    col_letter = get_column_letter(col_idx)
+    end_row = max(ws.max_row, 200)
+    formula = ",".join(SEMESTER_LENGTH_LABELS.values())
+    dv = DataValidation(
+        type="list",
+        formula1=f'"{formula}"',
+        allow_blank=True,
+        showErrorMessage=True,
+        errorTitle="Invalid Semester",
+        error="Select Full, Half (any), First Half, or Second Half.",
+    )
+    dv.sqref = f"{col_letter}2:{col_letter}{end_row}"
+    ws.add_data_validation(dv)
 
 
 def parse_list_cell(value: Any) -> List[str]:
@@ -463,6 +544,8 @@ def build_template_workbook() -> Workbook:
     for spec in SPREADSHEET_SPECS:
         ws = wb.create_sheet(spec.name)
         ws.append(spec.columns)
+        if spec.name == "Sections":
+            apply_semester_length_dropdown(ws)
 
     beautify_workbook(wb)
     return wb
