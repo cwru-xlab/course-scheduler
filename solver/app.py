@@ -41,6 +41,14 @@ from spreadsheet_io.spreadsheet_utils import (
     parse_nested_list_cell,
 )
 from online_sections import ONLINE_ROOM_SENTINEL, is_online_section as _is_online_section
+from section_term import (
+    effective_term_group,
+    normalize_assigned_half,
+    normalize_section_term,
+    resolve_section_term,
+    terms_conflict,
+    TERM_HALF_ANY,
+)
 
 # CP-SAT deadlines. Hard budget stays in sync with platform/lib/solver-timeouts.ts.
 # Soft: if any feasible exists by this wall time, stop and return best-so-far.
@@ -340,6 +348,16 @@ def _ensure_schema_migrations() -> None:
                     conn.execute(
                         text("ALTER TABLE sections ADD COLUMN timeslot_ids JSON NOT NULL DEFAULT '[]'")
                     )
+                if "term" not in section_cols:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE sections ADD COLUMN term VARCHAR(16) NOT NULL DEFAULT 'full'"
+                        )
+                    )
+                if "assigned_half" not in section_cols:
+                    conn.execute(
+                        text("ALTER TABLE sections ADD COLUMN assigned_half VARCHAR(16)")
+                    )
             if "blocked_times" in tables:
                 blocked_cols = {c["name"] for c in inspector.get_columns("blocked_times")}
                 if "days" not in blocked_cols:
@@ -506,9 +524,153 @@ def _section_to_dict(section) -> dict:
         "room_requirements": getattr(section, "room_requirements", []),
         "crosslist_group_id": getattr(section, "crosslist_group_id", None),
         "tags": getattr(section, "tags", []),
+        "term": getattr(section, "term", None) or "full",
         "department": getattr(section, "department", "") or "",
         "state": getattr(section, "state", None) or "active",
     }
+
+
+def _build_half_choice_vars(
+    model: cp_model.CpModel,
+    input_data: "SchedulingInput",
+    section_to_crosslist_group: Dict[str, str],
+) -> Dict[str, cp_model.IntVar]:
+    """One bool per half_any section (0=first half, 1=second); crosslist members share a var."""
+    half_choice_vars: Dict[str, cp_model.IntVar] = {}
+    crosslist_choice: Dict[str, cp_model.IntVar] = {}
+    for section in input_data.sections:
+        section_dict = _section_to_dict(section)
+        section_id = section_dict["id"]
+        if resolve_section_term(section_dict) != "half_any":
+            continue
+        crosslist_id = section_to_crosslist_group.get(section_id)
+        if crosslist_id:
+            if crosslist_id not in crosslist_choice:
+                crosslist_choice[crosslist_id] = model.NewBoolVar(
+                    f"half_choice_xlist_{crosslist_id}"
+                )
+            half_choice_vars[section_id] = crosslist_choice[crosslist_id]
+        else:
+            half_choice_vars[section_id] = model.NewBoolVar(f"half_choice_{section_id}")
+    return half_choice_vars
+
+
+def _reify_active_in_first_half(
+    model: cp_model.CpModel,
+    group_used: cp_model.IntVar,
+    half_choice: cp_model.IntVar,
+    name: str,
+) -> cp_model.IntVar:
+    active = model.NewBoolVar(name)
+    model.Add(active <= group_used)
+    model.Add(active <= 1 - half_choice)
+    model.Add(active >= group_used - half_choice)
+    return active
+
+
+def _reify_active_in_second_half(
+    model: cp_model.CpModel,
+    group_used: cp_model.IntVar,
+    half_choice: cp_model.IntVar,
+    name: str,
+) -> cp_model.IntVar:
+    active = model.NewBoolVar(name)
+    model.Add(active <= group_used)
+    model.Add(active <= half_choice)
+    model.Add(active >= group_used + half_choice - 1)
+    return active
+
+
+def _add_slot_term_partition_constraints(
+    model: cp_model.CpModel,
+    group_usages: List[Tuple[cp_model.IntVar, str, Optional[cp_model.IntVar]]],
+    name_prefix: str,
+) -> None:
+    """
+    Term-aware mutex for one (room/instructor, timeslot) cell.
+    group_usages: (group_used, term, optional half_choice for half_any).
+    """
+    if len(group_usages) <= 1:
+        return
+
+    g_full: List[cp_model.IntVar] = []
+    g_h1: List[cp_model.IntVar] = []
+    g_h2: List[cp_model.IntVar] = []
+
+    for idx, (used, term, half_choice) in enumerate(group_usages):
+        if term == "full":
+            g_full.append(used)
+        elif term == "first_half":
+            g_h1.append(used)
+        elif term == "second_half":
+            g_h2.append(used)
+        elif term == "half_any" and half_choice is not None:
+            g_h1.append(
+                _reify_active_in_first_half(
+                    model, used, half_choice, f"{name_prefix}_h1_{idx}"
+                )
+            )
+            g_h2.append(
+                _reify_active_in_second_half(
+                    model, used, half_choice, f"{name_prefix}_h2_{idx}"
+                )
+            )
+        else:
+            # Unresolved half_any — conservative: conflicts with all partitions.
+            g_full.append(used)
+            g_h1.append(used)
+            g_h2.append(used)
+
+    if g_full and g_h1:
+        model.Add(sum(g_full) + sum(g_h1) <= 1)
+    if g_full and g_h2:
+        model.Add(sum(g_full) + sum(g_h2) <= 1)
+    if len(g_h1) > 1:
+        model.Add(sum(g_h1) <= 1)
+    if len(g_h2) > 1:
+        model.Add(sum(g_h2) <= 1)
+
+
+def _build_group_usages(
+    model: cp_model.CpModel,
+    vars_by_group: Dict[str, List[cp_model.IntVar]],
+    section_ids_by_group: Dict[str, str],
+    sections_by_id: Dict[str, Any],
+    half_choice_vars: Dict[str, cp_model.IntVar],
+    name_prefix: str,
+) -> List[Tuple[cp_model.IntVar, str, Optional[cp_model.IntVar]]]:
+    usages: List[Tuple[cp_model.IntVar, str, Optional[cp_model.IntVar]]] = []
+    for group_key, vars_for_group in vars_by_group.items():
+        if not vars_for_group:
+            continue
+        used = model.NewBoolVar(f"{name_prefix}_used_{group_key}")
+        for var in vars_for_group:
+            model.Add(used >= var)
+        section_id = section_ids_by_group.get(group_key, "")
+        section_dict = _section_to_dict(sections_by_id.get(section_id, {}))
+        term = resolve_section_term(section_dict)
+        half_choice = half_choice_vars.get(section_id)
+        usages.append((used, term, half_choice))
+    return usages
+
+
+def _apply_term_aware_group_mutex(
+    model: cp_model.CpModel,
+    vars_by_group: Dict[str, List[cp_model.IntVar]],
+    section_ids_by_group: Dict[str, str],
+    sections_by_id: Dict[str, Any],
+    half_choice_vars: Dict[str, cp_model.IntVar],
+    name_prefix: str,
+) -> None:
+    usages = _build_group_usages(
+        model,
+        vars_by_group,
+        section_ids_by_group,
+        sections_by_id,
+        half_choice_vars,
+        name_prefix,
+    )
+    _add_slot_term_partition_constraints(model, usages, name_prefix)
 
 
 def _is_section_archived(section) -> bool:
@@ -1309,6 +1471,23 @@ def _check_feasible(
     section_to_crosslist_group = _build_section_to_crosslist_group(
         input_data.crosslist_groups, input_data.sections
     )
+    half_choice_vars = _build_half_choice_vars(
+        model, input_data, section_to_crosslist_group
+    )
+    crosslist_roomshare = set()
+    for group in input_data.crosslist_groups:
+        group_dict = group.to_dict() if hasattr(group, "to_dict") else group
+        group_id = group_dict.get("id") if isinstance(group_dict, dict) else group.id
+        crosslist_roomshare.add(group_id)
+    section_to_roomshare_group: Dict[str, str] = {}
+    for section in input_data.sections:
+        section_dict = _section_to_dict(section)
+        section_id = section_dict["id"]
+        crosslist_id = section_to_crosslist_group.get(section_id)
+        if crosslist_id and crosslist_id in crosslist_roomshare:
+            section_to_roomshare_group[section_id] = crosslist_id
+        else:
+            section_to_roomshare_group[section_id] = f"sec:{section_id}"
 
     option_vars: Dict[Tuple[str, int], cp_model.IntVar] = {}
     option_data: Dict[Tuple[str, int], Tuple[str, Tuple[str, ...], str, int]] = {}
@@ -1356,24 +1535,41 @@ def _check_feasible(
             room_id = (_room_to_dict(room)).get("id")
             for timeslot_id in all_timeslot_ids:
                 entries = vars_by_room_timeslot.get((room_id, timeslot_id))
-                if not entries or len(entries) <= 1:
+                if not entries:
                     continue
-                vars_for_slot = [var for _, _, var in entries]
-                model.Add(sum(vars_for_slot) <= 1)
+                vars_by_group: Dict[str, List[cp_model.IntVar]] = {}
+                section_ids_by_group: Dict[str, str] = {}
+                for section_id, idx, var in entries:
+                    group_key = section_to_roomshare_group[section_id]
+                    vars_by_group.setdefault(group_key, []).append(var)
+                    section_ids_by_group.setdefault(group_key, section_id)
+                _apply_term_aware_group_mutex(
+                    model,
+                    vars_by_group,
+                    section_ids_by_group,
+                    sections_by_id,
+                    half_choice_vars,
+                    f"feas_room_{room_id}_{timeslot_id}",
+                )
             for ts_a, ts_b in overlapping_pairs_feas:
                 entries_a = vars_by_room_timeslot.get((room_id, ts_a))
                 entries_b = vars_by_room_timeslot.get((room_id, ts_b))
                 if not entries_a or not entries_b:
                     continue
-                merged_vars: List[cp_model.IntVar] = []
-                seen_var: set[int] = set()
-                for _, _, v in entries_a + entries_b:
-                    vid = id(v)
-                    if vid not in seen_var:
-                        seen_var.add(vid)
-                        merged_vars.append(v)
-                if len(merged_vars) > 1:
-                    model.Add(sum(merged_vars) <= 1)
+                vars_by_group_cross: Dict[str, List[cp_model.IntVar]] = {}
+                section_ids_by_group_cross: Dict[str, str] = {}
+                for section_id, idx, var in entries_a + entries_b:
+                    group_key = section_to_roomshare_group[section_id]
+                    vars_by_group_cross.setdefault(group_key, []).append(var)
+                    section_ids_by_group_cross.setdefault(group_key, section_id)
+                _apply_term_aware_group_mutex(
+                    model,
+                    vars_by_group_cross,
+                    section_ids_by_group_cross,
+                    sections_by_id,
+                    half_choice_vars,
+                    f"feas_room_overlap_{room_id}_{ts_a}_{ts_b}",
+                )
 
     if "instructor_conflicts" not in relax:
         for instructor in input_data.instructors:
@@ -1384,41 +1580,41 @@ def _check_feasible(
                 )
                 if entries_for_slot and len(entries_for_slot) > 1:
                     vars_by_group: Dict[str, List[cp_model.IntVar]] = {}
+                    section_ids_by_group: Dict[str, str] = {}
                     for section_id, var in entries_for_slot:
                         group_key = section_to_crosslist_group.get(
                             section_id, f"sec:{section_id}"
                         )
                         vars_by_group.setdefault(group_key, []).append(var)
-                    if len(vars_by_group) > 1:
-                        group_used_vars = []
-                        for group_key, vars_for_group in vars_by_group.items():
-                            group_used = model.NewBoolVar(
-                                f"feas_inst_use_{instructor_id}_{timeslot_id}_{group_key}"
-                            )
-                            for var in vars_for_group:
-                                model.Add(group_used >= var)
-                            group_used_vars.append(group_used)
-                        model.Add(sum(group_used_vars) <= 1)
+                        section_ids_by_group.setdefault(group_key, section_id)
+                    _apply_term_aware_group_mutex(
+                        model,
+                        vars_by_group,
+                        section_ids_by_group,
+                        sections_by_id,
+                        half_choice_vars,
+                        f"feas_inst_{instructor_id}_{timeslot_id}",
+                    )
             for ts_a, ts_b in overlapping_pairs_feas:
                 entries_a = vars_by_instructor_timeslot.get((instructor_id, ts_a), [])
                 entries_b = vars_by_instructor_timeslot.get((instructor_id, ts_b), [])
                 if entries_a and entries_b:
                     vars_by_group_cross: Dict[str, List[cp_model.IntVar]] = {}
+                    section_ids_by_group_cross: Dict[str, str] = {}
                     for section_id, var in entries_a + entries_b:
                         group_key = section_to_crosslist_group.get(
                             section_id, f"sec:{section_id}"
                         )
                         vars_by_group_cross.setdefault(group_key, []).append(var)
-                    if len(vars_by_group_cross) > 1:
-                        group_used_vars = []
-                        for group_key, vars_for_group in vars_by_group_cross.items():
-                            group_used = model.NewBoolVar(
-                                f"feas_inst_overlap_{instructor_id}_{ts_a}_{ts_b}_{group_key}"
-                            )
-                            for var in vars_for_group:
-                                model.Add(group_used >= var)
-                            group_used_vars.append(group_used)
-                        model.Add(sum(group_used_vars) <= 1)
+                        section_ids_by_group_cross.setdefault(group_key, section_id)
+                    _apply_term_aware_group_mutex(
+                        model,
+                        vars_by_group_cross,
+                        section_ids_by_group_cross,
+                        sections_by_id,
+                        half_choice_vars,
+                        f"feas_inst_overlap_{instructor_id}_{ts_a}_{ts_b}",
+                    )
 
     if "no_overlap_groups" not in relax:
         for group in input_data.no_overlap_groups:
@@ -1456,6 +1652,13 @@ def _check_feasible(
                 a_id, b_id = pair
                 options_a = options_by_section.get(a_id, [])
                 options_b = options_by_section.get(b_id, [])
+                section_a_dict = _section_to_dict(sections_by_id.get(a_id, {}))
+                section_b_dict = _section_to_dict(sections_by_id.get(b_id, {}))
+                if not terms_conflict(
+                    resolve_section_term(section_a_dict),
+                    resolve_section_term(section_b_dict),
+                ):
+                    continue
                 for idx_a, opt_a in enumerate(options_a):
                     _, timeslot_a, _, _ = opt_a
                     for idx_b, opt_b in enumerate(options_b):
@@ -1915,6 +2118,9 @@ def _solve_schedule(input_data: SchedulingInput):
     section_to_crosslist_group = _build_section_to_crosslist_group(
         input_data.crosslist_groups, input_data.sections
     )
+    half_choice_vars = _build_half_choice_vars(
+        model, input_data, section_to_crosslist_group
+    )
     crosslist_roomshare = set()
     for group in input_data.crosslist_groups:
         group_dict = group.to_dict() if hasattr(group, "to_dict") else group
@@ -1990,43 +2196,39 @@ def _solve_schedule(input_data: SchedulingInput):
             if not entries:
                 continue
             vars_by_group: Dict[str, List[cp_model.IntVar]] = {}
+            section_ids_by_group: Dict[str, str] = {}
             for section_id, idx, var in entries:
                 group_key = section_to_roomshare_group[section_id]
                 vars_by_group.setdefault(group_key, []).append(var)
-            if len(vars_by_group) > 1:
-                group_used_vars = []
-                for group_key, vars_for_group in vars_by_group.items():
-                    group_used = model.NewBoolVar(f"room_use_{room_id}_{timeslot_id}_{group_key}")
-                    for var in vars_for_group:
-                        model.Add(group_used >= var)
-                    group_used_vars.append(group_used)
-                model.Add(sum(group_used_vars) <= 1)
+                section_ids_by_group.setdefault(group_key, section_id)
+            _apply_term_aware_group_mutex(
+                model,
+                vars_by_group,
+                section_ids_by_group,
+                sections_by_id,
+                half_choice_vars,
+                f"room_use_{room_id}_{timeslot_id}",
+            )
 
-        # Cross-timeslot overlap conflicts: for pairs of timeslots that overlap
-        # in time, no two different roomshare groups can use the same room.
         for ts_a, ts_b in overlapping_pairs:
             entries_a = vars_by_room_timeslot.get((room_id, ts_a))
             entries_b = vars_by_room_timeslot.get((room_id, ts_b))
             if not entries_a or not entries_b:
                 continue
-            # Merge entries from both timeslots, grouped by roomshare group
             vars_by_group_cross: Dict[str, List[cp_model.IntVar]] = {}
-            for section_id, idx, var in entries_a:
+            section_ids_by_group_cross: Dict[str, str] = {}
+            for section_id, idx, var in entries_a + entries_b:
                 group_key = section_to_roomshare_group[section_id]
                 vars_by_group_cross.setdefault(group_key, []).append(var)
-            for section_id, idx, var in entries_b:
-                group_key = section_to_roomshare_group[section_id]
-                vars_by_group_cross.setdefault(group_key, []).append(var)
-            if len(vars_by_group_cross) > 1:
-                group_used_vars = []
-                for group_key, vars_for_group in vars_by_group_cross.items():
-                    group_used = model.NewBoolVar(
-                        f"room_overlap_{room_id}_{ts_a}_{ts_b}_{group_key}"
-                    )
-                    for var in vars_for_group:
-                        model.Add(group_used >= var)
-                    group_used_vars.append(group_used)
-                model.Add(sum(group_used_vars) <= 1)
+                section_ids_by_group_cross.setdefault(group_key, section_id)
+            _apply_term_aware_group_mutex(
+                model,
+                vars_by_group_cross,
+                section_ids_by_group_cross,
+                sections_by_id,
+                half_choice_vars,
+                f"room_overlap_{room_id}_{ts_a}_{ts_b}",
+            )
 
     print("[solve] Room constraints done.", flush=True)
 
@@ -2037,38 +2239,37 @@ def _solve_schedule(input_data: SchedulingInput):
             entries_for_slot = vars_by_instructor_timeslot.get((instructor_id, timeslot_id))
             if entries_for_slot and len(entries_for_slot) > 1:
                 vars_by_group: Dict[str, List[cp_model.IntVar]] = {}
+                section_ids_by_group: Dict[str, str] = {}
                 for section_id, var in entries_for_slot:
                     group_key = section_to_crosslist_group.get(section_id, f"sec:{section_id}")
                     vars_by_group.setdefault(group_key, []).append(var)
-                if len(vars_by_group) > 1:
-                    group_used_vars = []
-                    for group_key, vars_for_group in vars_by_group.items():
-                        group_used = model.NewBoolVar(
-                            f"inst_use_{instructor_id}_{timeslot_id}_{group_key}"
-                        )
-                        for var in vars_for_group:
-                            model.Add(group_used >= var)
-                        group_used_vars.append(group_used)
-                    model.Add(sum(group_used_vars) <= 1)
-        # Cross-timeslot overlaps for instructors too
+                    section_ids_by_group.setdefault(group_key, section_id)
+                _apply_term_aware_group_mutex(
+                    model,
+                    vars_by_group,
+                    section_ids_by_group,
+                    sections_by_id,
+                    half_choice_vars,
+                    f"inst_use_{instructor_id}_{timeslot_id}",
+                )
         for ts_a, ts_b in overlapping_pairs:
             entries_a = vars_by_instructor_timeslot.get((instructor_id, ts_a), [])
             entries_b = vars_by_instructor_timeslot.get((instructor_id, ts_b), [])
             if entries_a and entries_b:
                 vars_by_group_cross: Dict[str, List[cp_model.IntVar]] = {}
+                section_ids_by_group_cross: Dict[str, str] = {}
                 for section_id, var in entries_a + entries_b:
                     group_key = section_to_crosslist_group.get(section_id, f"sec:{section_id}")
                     vars_by_group_cross.setdefault(group_key, []).append(var)
-                if len(vars_by_group_cross) > 1:
-                    group_used_vars = []
-                    for group_key, vars_for_group in vars_by_group_cross.items():
-                        group_used = model.NewBoolVar(
-                            f"inst_overlap_{instructor_id}_{ts_a}_{ts_b}_{group_key}"
-                        )
-                        for var in vars_for_group:
-                            model.Add(group_used >= var)
-                        group_used_vars.append(group_used)
-                    model.Add(sum(group_used_vars) <= 1)
+                    section_ids_by_group_cross.setdefault(group_key, section_id)
+                _apply_term_aware_group_mutex(
+                    model,
+                    vars_by_group_cross,
+                    section_ids_by_group_cross,
+                    sections_by_id,
+                    half_choice_vars,
+                    f"inst_overlap_{instructor_id}_{ts_a}_{ts_b}",
+                )
 
     print("[solve] Instructor constraints done.", flush=True)
 
@@ -2107,6 +2308,13 @@ def _solve_schedule(input_data: SchedulingInput):
             a_id, b_id = pair
             options_a = options_by_section.get(a_id, [])
             options_b = options_by_section.get(b_id, [])
+            section_a_dict = _section_to_dict(sections_by_id.get(a_id, {}))
+            section_b_dict = _section_to_dict(sections_by_id.get(b_id, {}))
+            if not terms_conflict(
+                resolve_section_term(section_a_dict),
+                resolve_section_term(section_b_dict),
+            ):
+                continue
             for idx_a, opt_a in enumerate(options_a):
                 _, timeslot_a, _, _ = opt_a
                 for idx_b, opt_b in enumerate(options_b):
@@ -2486,6 +2694,11 @@ def _solve_schedule(input_data: SchedulingInput):
             "timeslot_ids": list(timeslot_set),
             "room_id": room_id,
         })
+        if resolve_section_term(section_dict) == "half_any" and section_id in half_choice_vars:
+            half_val = solver.Value(half_choice_vars[section_id])
+            assignments[-1]["assigned_half"] = (
+                "second_half" if half_val else "first_half"
+            )
         placement_label = (
             "online band"
             if _is_online_section(section_dict)
@@ -3397,6 +3610,12 @@ def update_sections():
             department = (str(dept_raw).strip() if dept_raw is not None else "") or ""
             timeslot_ids = _normalize_section_timeslot_ids(item)
             timeslot_id = timeslot_ids[0] if timeslot_ids else item.get("timeslot_id")
+            term = normalize_section_term(item.get("term"))
+            assigned_half = (
+                normalize_assigned_half(item.get("assigned_half"))
+                if term == TERM_HALF_ANY
+                else None
+            )
 
             section = Section(
                 id=section_id,
@@ -3419,6 +3638,8 @@ def update_sections():
                 room_requirements=item.get("room_requirements", []),
                 crosslist_group_id=item.get("crosslist_group_id"),
                 tags=item.get("tags", []),
+                term=term,
+                assigned_half=assigned_half,
                 department=department,
                 state=normalize_section_state(item.get("state")),
             )

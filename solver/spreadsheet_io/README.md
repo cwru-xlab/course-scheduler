@@ -13,10 +13,14 @@ This workbook format is the interchange schema for the scheduler UI's `Schedulin
 ## Required sheets and columns
 
 ### `Sections`
-`id`, `course_id`, `department`, `section_code`, `instructor_id`,
+`id`, `course_id`, `department`, `section_code`, `section_number`, `instructor_id`,
 `expected_enrollment`, `enrollment_cap`, `allowed_meeting_patterns`,
-`room_requirements`, `crosslist_group_id`, `tags`, `previous_meeting_pattern`, `state`,
-`prev_notes`, `new_notes`
+`room_requirements`, `crosslist_group_id`, `tags`, `term`, `assigned_half`,
+`previous_meeting_pattern`, `state`, `prev_notes`, `new_notes`
+
+`term` is `full` (default), `half_any`, `first_half`, or `second_half`. Import normalizes aliases (`half`, `1st_half`, `h1`, etc.). Legacy workbooks without `term` import as `full`; MBAP `half-1`/`half-2` tags are a fallback when `term` is absent.
+
+`assigned_half` is optional — set to `first_half` or `second_half` when `term` is `half_any` and the half has been resolved (calendar placement or solver). Blank for other terms.
 
 `state` is `active` (default), `new`, or `archived`. `new` marks a section as newly added (scheduled like active). Archived sections are excluded from the solver and hidden on the calendar.
 

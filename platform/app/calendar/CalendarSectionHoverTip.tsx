@@ -2,9 +2,11 @@
 export function CalendarSectionHoverTip({
   title,
   instructor,
+  termLine,
 }: {
   title: string;
   instructor: string;
+  termLine?: string | null;
 }) {
   return (
     <div
@@ -15,6 +17,9 @@ export function CalendarSectionHoverTip({
       <div className="min-w-[88px] max-w-[180px] rounded-md border border-slate-200 bg-white px-2 py-1.5 text-center shadow-lg ring-1 ring-slate-200/80">
         <div className="truncate text-[9px] font-black text-slate-900">{title}</div>
         <div className="truncate text-[8px] text-slate-500">{instructor}</div>
+        {termLine ? (
+          <div className="truncate text-[8px] font-semibold text-violet-600">{termLine}</div>
+        ) : null}
       </div>
     </div>
   );

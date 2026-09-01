@@ -7,6 +7,16 @@ from openpyxl import load_workbook
 
 import datetime
 
+try:
+    from section_term import normalize_section_term, term_from_mbap_tags, normalize_assigned_half, TERM_HALF_ANY
+except ModuleNotFoundError:
+    from ..section_term import (  # type: ignore[no-redef]
+        normalize_section_term,
+        term_from_mbap_tags,
+        normalize_assigned_half,
+        TERM_HALF_ANY,
+    )
+
 DEFAULT_ALLOWED_MEETING_PATTERNS = ["MP-A-50", "MP-B-75"]
 
 try:
@@ -33,6 +43,22 @@ except ModuleNotFoundError:
         parse_list_cell,
         parse_nested_list_cell,
     )
+
+
+def _resolve_section_term(row: Dict[str, Any]) -> str:
+    explicit = row.get("term")
+    if explicit is not None and str(explicit).strip():
+        return normalize_section_term(explicit)
+    from_tags = term_from_mbap_tags(parse_list_cell(row.get("tags")))
+    if from_tags:
+        return from_tags
+    return normalize_section_term(None)
+
+
+def _resolve_assigned_half(row: Dict[str, Any], term: str) -> str | None:
+    if term != TERM_HALF_ANY:
+        return None
+    return normalize_assigned_half(row.get("assigned_half"))
 
 
 def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any]:
@@ -74,6 +100,7 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
         if section_id in seen_section_ids:
             continue
         seen_section_ids.add(section_id)
+        term = _resolve_section_term(row)
         sections.append(
             {
                 "id": section_id,
@@ -93,6 +120,8 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
                 "room_requirements": parse_list_cell(row.get("room_requirements")),
                 "crosslist_group_id": maybe_str(row.get("crosslist_group_id")),
                 "tags": parse_list_cell(row.get("tags")),
+                "term": term,
+                "assigned_half": _resolve_assigned_half(row, term),
                 "previous_meeting_pattern": maybe_str(row.get("previous_meeting_pattern")),
                 "state": normalize_section_state(row.get("state")),
             }

@@ -4,19 +4,26 @@ import clsx from "clsx";
 import { Calendar as CalendarIcon, History, MessageSquare } from "lucide-react";
 import NextLink from "next/link";
 import { usePathname } from "next/navigation";
+import { useRef } from "react";
 
 import { LiveUsersIndicator } from "@/components/LiveUsersIndicator";
 import { NavbarSettingsMenu } from "@/components/NavbarSettingsMenu";
 import { UserMenu } from "@/components/user-menu";
 import { SolverProgressIndicator, SolverProgressBadge } from "@/components/SolverProgressIndicator";
 import { isFullBleedRoute, pageHorizontalGutterClassName } from "@/lib/layout/pageGutters";
+import { useAppNavbarHeight } from "@/lib/layout/useAppNavbarHeight";
 
 export const Navbar = () => {
   const pathname = usePathname();
+  const headerRef = useRef<HTMLElement>(null);
+  useAppNavbarHeight(headerRef);
   const isFullBleed = isFullBleedRoute(pathname);
   const isEditorActive = pathname.startsWith("/editor");
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-slate-200 dark:border-default-200 bg-white/80 dark:bg-default-100/80 backdrop-blur-md relative">
+    <header
+      ref={headerRef}
+      className="sticky top-0 z-50 isolate w-full border-b border-slate-200 bg-white/95 shadow-[0_1px_0_rgba(15,23,42,0.04)] dark:border-default-200 dark:bg-default-100/95 supports-[backdrop-filter]:bg-white/80 supports-[backdrop-filter]:backdrop-blur-md dark:supports-[backdrop-filter]:bg-default-100/80 [transform:translateZ(0)]"
+    >
       <div
         className={clsx(
           isFullBleed

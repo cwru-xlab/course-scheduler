@@ -40,7 +40,8 @@ class MbapConstantsTests(unittest.TestCase):
         warnings = apply_mbap_section_metadata(section, "MBAP", "Virt Sess1")
         self.assertEqual(warnings, [])
         self.assertIn(MBAP_TAG, section["tags"])
-        self.assertIn("half-1", section["tags"])
+        self.assertEqual(section.get("term"), "first_half")
+        self.assertNotIn("half-1", section["tags"])
         self.assertEqual(section["allowed_meeting_patterns"], MBAP_ON_CAMPUS_PATTERNS)
 
 

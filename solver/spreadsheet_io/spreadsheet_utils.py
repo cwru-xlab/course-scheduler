@@ -34,6 +34,8 @@ SPREADSHEET_SPECS: List[SheetSpec] = [
             "room_requirements",
             "crosslist_group_id",
             "tags",
+            "term",
+            "assigned_half",
             "previous_meeting_pattern",
             "state",
             "prev_notes",
@@ -139,6 +141,25 @@ SHEET_NAME_TO_SPEC: Dict[str, SheetSpec] = {spec.name: spec for spec in SPREADSH
 
 # Sections schema before the `section_number` column was introduced. Still accepted
 # on import so spreadsheets exported by older versions of this app keep working.
+LEGACY_SHEET_COLUMNS_V3: Dict[str, List[str]] = {
+    "Sections": [
+        "id",
+        "course_id",
+        "department",
+        "section_code",
+        "section_number",
+        "instructor_id",
+        "expected_enrollment",
+        "enrollment_cap",
+        "allowed_meeting_patterns",
+        "room_requirements",
+        "crosslist_group_id",
+        "tags",
+        "previous_meeting_pattern",
+        "state",
+    ],
+}
+
 LEGACY_SHEET_COLUMNS_V2: Dict[str, List[str]] = {
     "Sections": [
         "id",
@@ -201,6 +222,9 @@ def normalize_sheet_headers(sheet_name: str, headers: List[str]) -> List[str]:
     expected = spec.columns
 
     candidate_schemas = [expected]
+    v3_legacy = LEGACY_SHEET_COLUMNS_V3.get(sheet_name)
+    if v3_legacy:
+        candidate_schemas.append(v3_legacy)
     v2_legacy = LEGACY_SHEET_COLUMNS_V2.get(sheet_name)
     if v2_legacy:
         candidate_schemas.append(v2_legacy)

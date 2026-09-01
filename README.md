@@ -523,7 +523,20 @@ MBAP courses use a **manual-first** workflow: exclude them from auto-solve, plac
 | `400` | On-campus | Monday room grid (6:15–7:45 PM or 8:00–9:30 PM) |
 | `800`–`899` | Online | Online band (Tuesday or Wednesday evening) |
 
-SOC import derives `section_number` from `section_code` (e.g. `400-LEC` → `400`) and tags MBAP rows with `mbap`. Half-semester sessions may also receive `half-1` / `half-2` tags (informational only).
+SOC import derives `section_number` from `section_code` (e.g. `400-LEC` → `400`) and tags MBAP rows with `mbap`. SOC `Session` maps to the section `term` field (`full`, `half_any`, `first_half`, `second_half`). Legacy `half-1` / `half-2` tags are still read on spreadsheet import when `term` is missing.
+
+#### Half-semester terms and room sharing
+
+| `term` value | Meaning | Room/instructor conflicts |
+|--------------|---------|---------------------------|
+| `full` | Full semester | Conflicts with all other terms at same time |
+| `first_half` | 1st half only | May share room/time with `second_half` only |
+| `second_half` | 2nd half only | May share room/time with `first_half` only |
+| `half_any` | Either half (solver/user picks) | Conflicts until resolved via `assigned_half` |
+
+When a `half_any` section is placed on the calendar, choose 1st or 2nd half in the placement modal. The resolved value is stored as `assigned_half` on the section row and survives reload/export.
+
+Spreadsheet `Sections` sheet columns include `term` and optional `assigned_half` (for `half_any` only). Allowed values match the table above; import normalizes aliases like `half`, `1st_half`, `h1`.
 
 #### Required timeslots and meeting patterns
 
@@ -548,17 +561,19 @@ Constants are defined in `platform/lib/scheduling/mbapConstants.ts` and `solver/
 6. **Hard-lock** placed MBAP sections before any subsequent solver run.
 7. **Update Backend** to persist manual placements.
 
-Instructor conflict warnings apply across both the room grid and Online band. Half-semester room sharing is not modeled — ignore room warnings when you know two sections occupy the same slot in different halves.
+Instructor conflict warnings apply across both the room grid and Online band. For half-semester sections, room warnings respect `term` and `assigned_half` — `first_half` and `second_half` may share a room at the same weekly time.
 
 #### Production database migration
 
-Before deploying code that uses `timeslot_ids`, run:
+Before deploying code that uses `timeslot_ids`, `term`, or `assigned_half`, run:
 
 ```sql
 ALTER TABLE sections ADD COLUMN IF NOT EXISTS timeslot_ids JSON NOT NULL DEFAULT '[]';
+ALTER TABLE sections ADD COLUMN IF NOT EXISTS term VARCHAR(16) NOT NULL DEFAULT 'full';
+ALTER TABLE sections ADD COLUMN IF NOT EXISTS assigned_half VARCHAR(16);
 ```
 
-See `solver/migrations/20260830_sections_timeslot_ids.sql`.
+See `solver/migrations/20260830_sections_timeslot_ids.sql` and `solver/migrations/20260830_sections_assigned_half.sql`.
 
 ---
 
@@ -601,6 +616,8 @@ Below is the meaning of fields as used by the scheduling system:
   - `room_requirements[]`: room feature names that must be present on the assigned room
   - `crosslist_group_id`: cross-list grouping id (bindings are enforced by constraints)
   - `tags[]`: used for UI coloring and may be used by solver extensions
+  - `term`: semester length (`full`, `half_any`, `first_half`, `second_half`); drives term-aware room/instructor conflict rules
+  - `assigned_half`: resolved half (`first_half` or `second_half`) for `half_any` sections after placement; persisted on the section row
 - `instructors[]`
   - `unavailable_times[]`: hard constraints against time ids
   - `preferences.preferred_days[]` / `preferences.preferred_patterns[]`: soft constraints for the objective
@@ -671,9 +688,12 @@ Contract file: `solver/spreadsheet_io/README.md`.
 The workbook must include these sheets and columns:
 
 - `Sections`
-  - `id`, `course_id`, `department`, `section_code`, `instructor_id`,
+  - `id`, `course_id`, `department`, `section_code`, `section_number`, `instructor_id`,
     `expected_enrollment`, `enrollment_cap`, `allowed_meeting_patterns`,
-    `room_requirements`, `crosslist_group_id`, `tags`, `previous_meeting_pattern`
+    `room_requirements`, `crosslist_group_id`, `tags`, `term`, `assigned_half`,
+    `previous_meeting_pattern`, `state`
+  - `term`: `full` (default), `half_any`, `first_half`, or `second_half` (aliases like `half`, `1st_half`, `h1` are normalized on import)
+  - `assigned_half`: optional; `first_half` or `second_half` when `term` is `half_any` and the half has been resolved
 - `Instructors`
   - `id`, `name`, `rank_type`, `unavailable_times`, `preferred_days`,
     `preferred_patterns`, `max_teaching_days`

@@ -9,6 +9,7 @@ export type CalendarSectionLike = {
   section_number?: string;
   instructor_id: string;
   crosslist_group_id?: string | null;
+  term?: string;
   room_id?: string | null;
   timeslot_id?: string | null;
 };

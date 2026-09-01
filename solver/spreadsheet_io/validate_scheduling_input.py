@@ -6,6 +6,11 @@ from typing import Any, Dict, List, Set
 
 from online_sections import ONLINE_ROOM_SENTINEL, is_online_section
 
+try:
+    from section_term import VALID_SECTION_TERMS, normalize_section_term
+except ModuleNotFoundError:
+    from ..section_term import VALID_SECTION_TERMS, normalize_section_term  # type: ignore[no-redef]
+
 
 def _err(
     code: str,
@@ -202,6 +207,32 @@ def validate_scheduling_input(data: dict) -> List[dict]:
                     )
                 )
 
+        term_raw = section.get("term")
+        if term_raw is not None and str(term_raw).strip():
+            term = normalize_section_term(term_raw)
+            if term not in VALID_SECTION_TERMS:
+                errors.append(
+                    _err(
+                        "invalid_term",
+                        f"Sections row '{section_id}' has invalid term '{term_raw}'.",
+                        sheet="Sections",
+                        row_id=section_id,
+                        field="term",
+                    )
+                )
+
+    section_term_by_id: Dict[str, str] = {}
+    for section in sections:
+        sid = str(section.get("id", "")).strip()
+        if sid:
+            section_term_by_id[sid] = normalize_section_term(section.get("term")                )
+
+    section_term_by_id: Dict[str, str] = {
+        str(section.get("id", "")).strip(): normalize_section_term(section.get("term"))
+        for section in sections
+        if str(section.get("id", "")).strip()
+    }
+
     for group in crosslist_groups:
         group_id = str(group.get("id", "")).strip()
         members = [
@@ -214,6 +245,17 @@ def validate_scheduling_input(data: dict) -> List[dict]:
                 _err(
                     "invalid_crosslist_group",
                     f"CrosslistGroups row '{group_id}' needs at least 2 member_section_ids (found {len(members)}).",
+                    sheet="CrosslistGroups",
+                    row_id=group_id or None,
+                    field="member_section_ids",
+                )
+            )
+        member_terms = {section_term_by_id.get(m, "full") for m in members}
+        if "first_half" in member_terms and "second_half" in member_terms:
+            errors.append(
+                _err(
+                    "crosslist_term_conflict",
+                    f"CrosslistGroups row '{group_id}' mixes 1st-half and 2nd-half sections.",
                     sheet="CrosslistGroups",
                     row_id=group_id or None,
                     field="member_section_ids",

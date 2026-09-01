@@ -19,6 +19,7 @@ function makeEvent(input: {
   instructorId: string;
   sectionNumber?: string;
   roomId?: string;
+  term?: string;
   start?: number;
   end?: number;
 }): CalendarEvent {
@@ -31,6 +32,7 @@ function makeEvent(input: {
       instructor_id: input.instructorId,
       department: "MBAP",
       room_id: input.roomId ?? "R1",
+      term: input.term,
     },
     timeslot: {
       id: "ts-existing",
@@ -173,6 +175,130 @@ describe("evaluatePlacement instructor conflicts across modalities", () => {
       instructorConflictEvents: [],
       linkedSectionIds: ["s-online"],
       instructorById: new Map([["prof-a", { id: "prof-a", name: "Prof A" }]]),
+      findBlockedPlacementMessage: () => null,
+      formatTime: (t) => t,
+    });
+    assert.equal(result.severity, "ok");
+  });
+});
+
+describe("evaluatePlacement term-aware room conflicts", () => {
+  const termData = {
+    sections: [
+      {
+        id: "s-first",
+        course_id: "MBAP474",
+        department: "MBAP",
+        instructor_id: "prof-a",
+        section_number: "400",
+        enrollment_cap: 30,
+        term: "first_half",
+      },
+      {
+        id: "s-second",
+        course_id: "MBAP475",
+        department: "MBAP",
+        instructor_id: "prof-b",
+        section_number: "400",
+        enrollment_cap: 30,
+        term: "second_half",
+      },
+      {
+        id: "s-half-any",
+        course_id: "MBAP476",
+        department: "MBAP",
+        instructor_id: "prof-c",
+        section_number: "400",
+        enrollment_cap: 30,
+        term: "half_any",
+      },
+    ],
+    rooms: [{ id: "R1", capacity: 40 }],
+  };
+
+  it("allows first_half and second_half in the same room at the same time", () => {
+    const existing = makeEvent({
+      id: "s-first",
+      instructorId: "prof-a",
+      term: "first_half",
+      roomId: "R1",
+    });
+    const result = evaluatePlacement({
+      sectionId: "s-second",
+      targetRoomId: "R1",
+      slot,
+      selectedDay: "Mon",
+      data: termData,
+      assignmentsBySection: {},
+      allDayEvents: [existing],
+      instructorConflictEvents: [existing],
+      linkedSectionIds: ["s-second"],
+      instructorById: new Map([
+        ["prof-a", { id: "prof-a", name: "Prof A" }],
+        ["prof-b", { id: "prof-b", name: "Prof B" }],
+      ]),
+      findBlockedPlacementMessage: () => null,
+      formatTime: (t) => t,
+    });
+    assert.equal(result.severity, "ok");
+  });
+
+  it("warns when half_any has no assigned_half against first_half", () => {
+    const existing = makeEvent({
+      id: "s-first",
+      instructorId: "prof-a",
+      term: "first_half",
+      roomId: "R1",
+    });
+    const result = evaluatePlacement({
+      sectionId: "s-half-any",
+      targetRoomId: "R1",
+      slot,
+      selectedDay: "Mon",
+      data: termData,
+      assignmentsBySection: {},
+      allDayEvents: [existing],
+      instructorConflictEvents: [existing],
+      linkedSectionIds: ["s-half-any"],
+      instructorById: new Map([
+        ["prof-a", { id: "prof-a", name: "Prof A" }],
+        ["prof-c", { id: "prof-c", name: "Prof C" }],
+      ]),
+      findBlockedPlacementMessage: () => null,
+      formatTime: (t) => t,
+    });
+    assert.equal(result.severity, "warn");
+    assert.equal(result.reasonCode, "room_conflict");
+  });
+
+  it("allows half_any with assigned_half first_half against second_half", () => {
+    const existing = makeEvent({
+      id: "s-second",
+      instructorId: "prof-b",
+      term: "second_half",
+      roomId: "R1",
+    });
+    const result = evaluatePlacement({
+      sectionId: "s-half-any",
+      targetRoomId: "R1",
+      slot,
+      selectedDay: "Mon",
+      data: termData,
+      assignmentsBySection: {
+        "s-half-any": {
+          timeslot_ids: [],
+          room_id: "R1",
+          meeting_pattern_id: "",
+          assigned_half: "first_half",
+        },
+      },
+      allDayEvents: [existing],
+      instructorConflictEvents: [existing],
+      linkedSectionIds: ["s-half-any"],
+      instructorById: new Map([
+        ["prof-b", { id: "prof-b", name: "Prof B" }],
+        ["prof-c", { id: "prof-c", name: "Prof C" }],
+      ]),
       findBlockedPlacementMessage: () => null,
       formatTime: (t) => t,
     });

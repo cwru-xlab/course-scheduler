@@ -2,6 +2,8 @@ export type Id = string;
 
 export type SectionState = "active" | "archived" | "new";
 
+export type SectionTerm = "full" | "half_any" | "first_half" | "second_half";
+
 export type Section = {
   id: Id;
   course_id: Id;
@@ -16,6 +18,10 @@ export type Section = {
   room_requirements: string[];
   crosslist_group_id?: Id | null;
   tags: string[];
+  /** Semester length — affects solver/calendar conflict rules */
+  term?: SectionTerm;
+  /** Resolved half for half_any sections after placement */
+  assigned_half?: SectionTerm | null;
   previous_meeting_pattern?: Id;
   /** active/new = schedule & show on calendar; archived = excluded from solver & calendar */
   state?: SectionState;
@@ -107,6 +113,8 @@ export type ScheduleAssignment = {
   meeting_pattern_id: Id;
   timeslot_ids: Id[];
   room_id: Id;
+  /** Solver-resolved half for half_any sections */
+  assigned_half?: SectionTerm | null;
 };
 
 export type PenaltyBreakdown = Record<string, number>;

@@ -9,6 +9,7 @@ import {
 import type { TimeslotDto } from "./calendarTypes";
 import { isPlaceholderInstructor } from "@/lib/scheduling/placeholderInstructor";
 import { isOnlineSection } from "@/lib/scheduling/sectionOnline";
+import { normalizeSectionTerm, termsConflict } from "@/lib/scheduling/sectionTerm";
 
 /**
  * Single source of truth for calendar placement validation.
@@ -58,6 +59,7 @@ type PlacementSectionLike = {
   course_id: string | number;
   department?: string | null;
   instructor_id: string;
+  term?: string;
   enrollment_cap?: number;
   expected_enrollment?: number;
   crosslist_group_id?: string | null;
@@ -83,6 +85,7 @@ type PlacementAssignmentEntry = {
   timeslot_ids: string[];
   room_id: string;
   meeting_pattern_id: string;
+  assigned_half?: string | null;
 };
 
 type PlacementAssignmentMap = Record<string, PlacementAssignmentEntry>;
@@ -288,6 +291,24 @@ export function evaluatePlacement(input: {
         "",
     );
 
+  const termContextForSection = (sid: string) => {
+    const sec = data.sections.find((s) => s.id === sid);
+    return {
+      term: normalizeSectionTerm(sec?.term),
+      assignedHalf: assignmentsBySection[sid]?.assigned_half,
+    };
+  };
+
+  const draggedTerm = termContextForSection(sectionId);
+
+  const termsConflictWithDragged = (otherSectionId: string) =>
+    termsConflict(
+      draggedTerm.term,
+      termContextForSection(otherSectionId).term,
+      draggedTerm.assignedHalf,
+      termContextForSection(otherSectionId).assignedHalf,
+    );
+
   const overlapsSelected = (eventItem: CalendarEvent) =>
     minutesOverlap(slot.start, slot.end, eventItem.start, eventItem.end);
 
@@ -300,7 +321,12 @@ export function evaluatePlacement(input: {
     : allDayEvents.filter((eventItem) => {
         if (!calendarEventConflictsWithSectionIds(eventItem, linkedSectionIdSet)) return false;
         if (resolveEventRoomId(eventItem) !== targetRoomId) return false;
-        return overlapsSelected(eventItem);
+        if (!overlapsSelected(eventItem)) return false;
+        const otherIds = calendarEventSectionIds(eventItem).filter(
+          (id) => !linkedSectionIdSet.has(id),
+        );
+        if (otherIds.length === 0) return false;
+        return otherIds.some((id) => termsConflictWithDragged(id));
       });
 
   // 4. Instructor double-booking (any modality) — warning, move still applied.
@@ -319,9 +345,16 @@ export function evaluatePlacement(input: {
       : instructorConflictEvents.filter((eventItem) => {
           if (!calendarEventConflictsWithSectionIds(eventItem, linkedSectionIdSet)) return false;
           if (!overlapsSelected(eventItem)) return false;
-          return calendarEventInstructorIds(eventItem).some((id) =>
-            draggedInstructorIds.has(id),
+          if (
+            !calendarEventInstructorIds(eventItem).some((id) => draggedInstructorIds.has(id))
+          ) {
+            return false;
+          }
+          const otherIds = calendarEventSectionIds(eventItem).filter(
+            (id) => !linkedSectionIdSet.has(id),
           );
+          if (otherIds.length === 0) return false;
+          return otherIds.some((id) => termsConflictWithDragged(id));
         });
 
   if (roomConflicts.length === 0 && instructorConflicts.length === 0) {

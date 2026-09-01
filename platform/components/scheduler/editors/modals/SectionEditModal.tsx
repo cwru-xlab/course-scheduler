@@ -11,6 +11,7 @@ import type { Section, SectionState } from "@/lib/scheduling/types";
 import {
   normalizeSectionState,
 } from "@/lib/scheduling/sectionState";
+import { SECTION_TERM_OPTIONS, normalizeSectionTerm } from "@/lib/scheduling/sectionTerm";
 
 const STATE_OPTIONS: { key: SectionState; label: string }[] = [
   { key: "active", label: "Active" },
@@ -78,6 +79,7 @@ export function SectionEditModal({
       instructor_id: draft.instructor_id.trim(),
       department: (draft.department ?? "").trim(),
       state: normalizeSectionState(draft.state),
+      term: normalizeSectionTerm(draft.term),
     });
     onClose();
   };
@@ -157,6 +159,22 @@ export function SectionEditModal({
             }
           >
             {STATE_OPTIONS.map((opt) => (
+              <option key={opt.key} value={opt.key}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-semibold text-slate-600">Term</span>
+          <select
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2"
+            value={normalizeSectionTerm(draft.term)}
+            onChange={(e) =>
+              setDraft((d) => ({ ...d, term: e.target.value as Section["term"] }))
+            }
+          >
+            {SECTION_TERM_OPTIONS.map((opt) => (
               <option key={opt.key} value={opt.key}>
                 {opt.label}
               </option>

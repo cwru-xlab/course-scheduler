@@ -9,6 +9,8 @@ import { setCalendarDragImage } from "./calendarDragGhost";
 import type { EditorInvalidatedPlacement, EditorInvalidationReason } from "@/lib/scheduling/mergeEditorIntoSnapshot";
 import { isSectionArchived } from "@/lib/scheduling/sectionState";
 import { isQueuedSection, primaryPatternForSection, sectionMatchesPatternFilter } from "@/lib/scheduling/sectionOnline";
+import { TermBadge } from "@/components/calendar/TermBadge";
+import { normalizeSectionTerm, SECTION_TERM_LABELS, termBadgeLabel } from "@/lib/scheduling/sectionTerm";
 
 export type QueueSectionRow = {
   id: string;
@@ -20,8 +22,9 @@ export type QueueSectionRow = {
   instructorName: string;
   allowed_meeting_patterns?: string[];
   tags?: string[];
+  term?: string;
   state?: string | null;
-  assignment?: { room_id?: string; timeslot_ids?: string[]; meeting_pattern_id?: string };
+  assignment?: { room_id?: string; timeslot_ids?: string[]; meeting_pattern_id?: string; assigned_half?: string | null };
   room_id?: string | null;
   timeslot_id?: string | null;
   previous_meeting_pattern?: string | null;
@@ -78,6 +81,7 @@ export function SectionQueueSidebar({
   const [search, setSearch] = useState("");
   const [patternFilter, setPatternFilter] = useState<string>("");
   const [tagFilter, setTagFilter] = useState<string>("");
+  const [termFilter, setTermFilter] = useState<string>("");
   const [sortBy, setSortBy] = useState<QueueSort>("course");
   const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
@@ -132,6 +136,9 @@ export function SectionQueueSidebar({
     if (tagFilter) {
       rows = rows.filter((s) => (s.tags ?? []).includes(tagFilter));
     }
+    if (termFilter) {
+      rows = rows.filter((s) => normalizeSectionTerm(s.term) === termFilter);
+    }
     if (tab === "unscheduled" && patternFilter) {
       rows = rows.filter((s) => sectionMatchesPatternFilter(s, patternFilter));
     }
@@ -161,21 +168,23 @@ export function SectionQueueSidebar({
       const lb = formatCalendarSectionHoverLines(b, b.instructorName).title;
       return la.localeCompare(lb, undefined, { sensitivity: "base" });
     });
-  }, [enriched, tab, search, patternFilter, tagFilter, sortBy, needsAttentionOnly]);
+  }, [enriched, tab, search, patternFilter, tagFilter, termFilter, sortBy, needsAttentionOnly]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (tagFilter) count += 1;
+    if (termFilter) count += 1;
     if (tab !== "unscheduled") return count;
     if (patternFilter) count += 1;
     if (sortBy !== "course") count += 1;
     if (needsAttentionOnly) count += 1;
     return count;
-  }, [tab, patternFilter, tagFilter, sortBy, needsAttentionOnly]);
+  }, [tab, patternFilter, tagFilter, termFilter, sortBy, needsAttentionOnly]);
 
   const clearFilters = () => {
     setPatternFilter("");
     setTagFilter("");
+    setTermFilter("");
     setSortBy("course");
     setNeedsAttentionOnly(false);
   };
@@ -335,6 +344,27 @@ export function SectionQueueSidebar({
                           ))}
                         </select>
                       </div>
+                      <div>
+                        <label
+                          htmlFor="queue-term-filter"
+                          className="mb-0.5 block text-[10px] font-semibold text-slate-500"
+                        >
+                          Term
+                        </label>
+                        <select
+                          id="queue-term-filter"
+                          className="min-w-0 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs"
+                          value={termFilter}
+                          onChange={(e) => setTermFilter(e.target.value)}
+                        >
+                          <option value="">All terms</option>
+                          {Object.entries(SECTION_TERM_LABELS).map(([key, label]) => (
+                            <option key={key} value={key}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                       {tab === "unscheduled" ? (
                         <>
                           <div>
@@ -413,6 +443,7 @@ export function SectionQueueSidebar({
                   const active = activeDragSectionId === row.id;
                   const invalidation = row.editorInvalidation;
                   const placeBlocked = invalidation?.reason === "pattern";
+                  const badge = termBadgeLabel(row.term, row.assignment?.assigned_half);
                   return (
                     <div
                       key={row.id}
@@ -473,7 +504,10 @@ export function SectionQueueSidebar({
                             Auto-unplaced
                           </span>
                         ) : null}
-                        <div className="truncate text-[11px] font-bold text-slate-900">{title}</div>
+                        <div className="flex min-w-0 items-center gap-1">
+                          <div className="truncate text-[11px] font-bold text-slate-900">{title}</div>
+                          {badge ? <TermBadge badge={badge} className="!size-4 text-[8px]" /> : null}
+                        </div>
                         <div className="truncate text-[10px] text-slate-500">{instructor}</div>
                         {invalidation ? (
                           <div className="mt-1 flex min-w-0 items-start gap-1 text-[9px] font-semibold text-amber-800">

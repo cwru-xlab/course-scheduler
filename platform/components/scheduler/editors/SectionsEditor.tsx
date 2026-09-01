@@ -27,7 +27,7 @@ import { CompactChipSelect } from "../CompactChipSelect";
 import { MultiSelect } from "../MultiSelect";
 import { RowNotesButton } from "../RowNotesButton";
 
-import type { Room, Section, SectionState } from "@/lib/scheduling/types";
+import type { Room, Section, SectionState, SectionTerm } from "@/lib/scheduling/types";
 import { useHideArchivedSections } from "@/lib/editor-ui-preferences";
 import { insertAtSortedIdPosition } from "@/lib/scheduling/insertAtSortedIdPosition";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
@@ -38,6 +38,7 @@ import {
   normalizeSectionState,
 } from "@/lib/scheduling/sectionState";
 import { MBAP_TAG } from "@/lib/scheduling/mbapConstants";
+import { SECTION_TERM_OPTIONS, normalizeSectionTerm } from "@/lib/scheduling/sectionTerm";
 
 const STATE_OPTIONS: { key: SectionState; label: string }[] = [
   { key: "active", label: "Active" },
@@ -76,6 +77,7 @@ const createEmptySection = (existing: Section[]): Section => ({
   room_requirements: [],
   crosslist_group_id: null,
   tags: [],
+  term: "full",
   state: "new",
 });
 
@@ -242,6 +244,13 @@ export const SectionsEditor = ({
       getValue: ({ section }) => normalizeSectionState(section.state),
     },
     {
+      columnId: "term",
+      label: "Term",
+      control: { kind: "multiSelect" },
+      options: SECTION_TERM_OPTIONS,
+      getValue: ({ section }) => normalizeSectionTerm(section.term),
+    },
+    {
       columnId: "instructor",
       label: "Instructor",
       control: { kind: "multiSelect", showSearch: true },
@@ -374,6 +383,15 @@ export const SectionsEditor = ({
             options={STATE_OPTIONS}
             onChange={(v) => updateSection(idx, "state", v as SectionState)}
             placeholder="State"
+          />
+        );
+      case "term":
+        return (
+          <EditableSelectCell
+            value={normalizeSectionTerm(section.term)}
+            options={SECTION_TERM_OPTIONS}
+            onChange={(v) => updateSection(idx, "term", v as SectionTerm)}
+            placeholder="Term"
           />
         );
       case "instructor":

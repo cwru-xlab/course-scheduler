@@ -37,6 +37,11 @@ from config import (
 )
 from mbap_constants import apply_mbap_section_metadata, merge_mbap_catalog
 
+try:
+    from section_term import session_to_term
+except ModuleNotFoundError:
+    from ..section_term import session_to_term  # type: ignore[no-redef]
+
 # ============================================================================
 # SHARED UTILITIES
 # ============================================================================
@@ -458,6 +463,7 @@ def load_sections_from_soc_editors(
             "allowed_meeting_patterns": [pattern_id] if pattern_id else [],
             "room_requirements": DEFAULT_ROOM_REQUIREMENTS.copy(),
             "tags": DEFAULT_TAGS.copy(),
+            "term": "full",
 
             # Supplemental metadata (not in core model, useful for downstream logic)
             "_meta": {
@@ -528,6 +534,8 @@ def load_sections_from_soc_editors(
     for s in sections:
         subject = str(s.get("_meta", {}).get("subject") or "")
         session = str(s.get("_meta", {}).get("session") or "")
+        meeting_dates = str(s.get("_meta", {}).get("meeting_dates") or "")
+        s["term"] = session_to_term(session, meeting_dates)
         mbap_warnings.extend(apply_mbap_section_metadata(s, subject, session))
 
     # -------------------------------------------------------------------------

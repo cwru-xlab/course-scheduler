@@ -7,6 +7,8 @@ import { Lock, LockOpen, Shuffle, Unlock, GripVertical } from "lucide-react";
 import { CalendarSectionHoverTip } from "./CalendarSectionHoverTip";
 import { setCalendarDragImage } from "./calendarDragGhost";
 import type { SectionLockState } from "@/lib/scheduling/types";
+import { TermBadge } from "@/components/calendar/TermBadge";
+import type { TermBadgeLabel } from "@/lib/scheduling/sectionTerm";
 
 type DepartmentPalette = {
   cardBg: string;
@@ -21,6 +23,10 @@ type SoloCalendarEventCardProps = {
   professor: string;
   hoverTitle: string;
   hoverInstructor: string;
+  hoverTermLine?: string | null;
+  termBadge?: TermBadgeLabel;
+  halfPairAccent?: string;
+  halfAnyUnresolved?: boolean;
   color: DepartmentPalette;
   matchesHoveredDepartment: boolean;
   hasActiveFilter?: boolean;
@@ -55,6 +61,10 @@ export function SoloCalendarEventCard({
   professor,
   hoverTitle,
   hoverInstructor,
+  hoverTermLine,
+  termBadge,
+  halfPairAccent,
+  halfAnyUnresolved = false,
   color,
   matchesHoveredDepartment,
   hasActiveFilter = false,
@@ -102,12 +112,14 @@ export function SoloCalendarEventCard({
             matchesHoveredDepartment &&
             "ring-2 ring-slate-300/80 shadow-md",
           isConflicting && "ring-2 ring-red-500 ring-offset-1 shadow-md",
+          halfAnyUnresolved && "border-dashed border-violet-400",
         )}
         style={{
           height: style.height,
           backgroundColor: color.cardBg,
           backgroundImage: color.cardPattern,
-          borderLeftColor: color.cardBorder,
+          borderLeftColor: halfPairAccent ?? color.cardBorder,
+          borderLeftWidth: halfPairAccent ? 6 : undefined,
         }}
         onContextMenu={onContextMenu}
         onPointerDown={onPointerDown}
@@ -125,6 +137,11 @@ export function SoloCalendarEventCard({
             <Shuffle className="size-3" aria-hidden />
           </span>
         )}
+        {termBadge ? (
+          <span className={clsx("absolute left-1 z-[3]", isStaggered ? "top-7" : "top-1")}>
+            <TermBadge badge={termBadge} />
+          </span>
+        ) : null}
         <div className="absolute right-1 top-1 z-[3] flex items-center gap-1">
           {queueDragSectionId ? (
             <span
@@ -197,7 +214,7 @@ export function SoloCalendarEventCard({
         <div
           className={clsx(
             "font-black text-[10px] truncate text-slate-900 pr-9",
-            isStaggered && "pl-6",
+            (isStaggered || termBadge) && "pl-6",
           )}
         >
           {faceTitle}
@@ -209,7 +226,11 @@ export function SoloCalendarEventCard({
       </div>
 
       {hovered ? (
-        <CalendarSectionHoverTip title={hoverTitle} instructor={hoverInstructor} />
+        <CalendarSectionHoverTip
+          title={hoverTitle}
+          instructor={hoverInstructor}
+          termLine={hoverTermLine}
+        />
       ) : null}
     </div>
   );

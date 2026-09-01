@@ -55,6 +55,8 @@ NARROW_COLUMNS: Set[str] = {
     "state",
     "section_code",
     "section_number",
+    "term",
+    "assigned_half",
     "day",
     "slots_required",
     "capacity",

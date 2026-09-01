@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
+try:
+    from section_term import session_to_term
+except ModuleNotFoundError:
+    from .section_term import session_to_term  # type: ignore[no-redef]
+
 MBAP_TAG = "mbap"
 MBAP_HALF_1_TAG = "half-1"
 MBAP_HALF_2_TAG = "half-2"
@@ -114,9 +119,13 @@ def apply_mbap_section_metadata(section: dict, subject: str, session: str) -> li
     tags = list(section.get("tags") or [])
     if MBAP_TAG not in tags:
         tags.append(MBAP_TAG)
-    for half_tag in session_half_tags(session):
-        if half_tag not in tags:
-            tags.append(half_tag)
+    term = session_to_term(session)
+    if term != "full":
+        section["term"] = term
+    else:
+        for half_tag in session_half_tags(session):
+            if half_tag not in tags:
+                tags.append(half_tag)
     section["tags"] = tags
 
     section_number = str(section.get("section_number") or "").strip()

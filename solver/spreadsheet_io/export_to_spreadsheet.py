@@ -188,6 +188,8 @@ def _rows_for_sheet(
                 "room_requirements": serialize_list_cell(item.get("room_requirements")),
                 "crosslist_group_id": _export_str(item.get("crosslist_group_id") or ""),
                 "tags": serialize_list_cell(item.get("tags")),
+                "term": _export_str(item.get("term") or "full"),
+                "assigned_half": _export_str(item.get("assigned_half") or ""),
                 "previous_meeting_pattern": _export_str(
                     item.get("previous_meeting_pattern") or ""
                 ),

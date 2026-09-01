@@ -6,6 +6,7 @@
 :root {
   --weatherhead-primary: #137fec;
   --weatherhead-surface: #f6f7f8;
+  --app-navbar-height: 4rem;
 }
 
 /* Always reserve space for the page scrollbar so opening popovers / modals
