@@ -564,7 +564,7 @@ export function mergeConcurrentSlotEvents(events: GridEvent[]): GridEvent[] {
   }
 
   const merged: GridEvent[] = [];
-  for (const bucket of bySlot.values()) {
+  for (const bucket of Array.from(bySlot.values())) {
     if (bucket.length === 1) {
       merged.push(bucket[0]);
       continue;
@@ -590,7 +590,7 @@ export function mergeConcurrentSlotEvents(events: GridEvent[]): GridEvent[] {
 /** Row height (points) for grid event labels at 7pt wrapped text. */
 export function estimateGridEventRowHeight(labels: Iterable<string>): number {
   let lineCount = 0;
-  for (const label of labels) {
+  for (const label of Array.from(labels)) {
     lineCount += String(label).split("\n").length;
   }
   return Math.max(56, 18 + lineCount * 11);

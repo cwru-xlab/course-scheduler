@@ -47,7 +47,9 @@ export function semesterLengthLabel(raw?: string | null): string {
   return SEMESTER_LENGTH_OPTIONS.find((opt) => opt.key === key)?.label ?? "Full";
 }
 
-export function normalizeAssignedHalf(value: unknown): SemesterLength | null {
+export function normalizeAssignedHalf(
+  value: unknown,
+): "first_half" | "second_half" | null {
   if (value == null || !String(value).trim()) return null;
   const normalized = normalizeSemesterLength(String(value));
   if (normalized === "first_half" || normalized === "second_half") return normalized;
@@ -175,7 +177,7 @@ export function resolveDisplayHalvesForRoomPlacements(
         other.endMin > placement.startMin,
     );
     const occupants = cluster.map(occupantsForDisplayResolution);
-    for (const [sectionId, half] of resolveAllHalvesInSlot(occupants)) {
+    for (const [sectionId, half] of Array.from(resolveAllHalvesInSlot(occupants))) {
       resolvedBySection.set(sectionId, half);
       visited.add(sectionId);
     }
@@ -206,11 +208,13 @@ export function occupiedHalvesInSlot(occupants: TermOccupant[]): Set<"first_half
       halves.add(group);
     }
   }
-  for (const half of resolveAllHalvesInSlot(
-    occupants.filter(
-      (occupant) => normalizeSemesterLength(String(occupant.semesterLength)) === "half_any",
-    ),
-  ).values()) {
+  for (const half of Array.from(
+    resolveAllHalvesInSlot(
+      occupants.filter(
+        (occupant) => normalizeSemesterLength(String(occupant.semesterLength)) === "half_any",
+      ),
+    ).values(),
+  )) {
     halves.add(half);
   }
   return halves;

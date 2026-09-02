@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import type { SemesterLength } from "./types";
 import {
   displayAssignedHalfForSection,
   normalizeSemesterLength,
@@ -63,13 +64,16 @@ describe("semesterLength conflict helpers", () => {
       "first_half",
     );
     assert.equal(
-      resolveHalfAnyHalf({ semesterLength: "half_any", occupiedHalves: ["first_half"] }),
+      resolveHalfAnyHalf({
+        semesterLength: "half_any",
+        occupiedHalves: ["first_half"] as SemesterLength[],
+      }),
       "second_half",
     );
     assert.equal(
       resolveHalfAnyHalf({
         semesterLength: "half_any",
-        occupiedHalves: ["first_half", "second_half"],
+        occupiedHalves: ["first_half", "second_half"] as SemesterLength[],
       }),
       null,
     );
@@ -91,7 +95,10 @@ describe("semesterLength conflict helpers", () => {
     assert.equal(termBadgeLabel("first_half"), "H1");
     assert.equal(termBadgeLabel("half_any", "second_half"), "H2");
     assert.equal(termBadgeLabel("half_any"), "H1");
-    assert.equal(termBadgeLabel("half_any", undefined, ["first_half"]), "H2");
+    assert.equal(
+      termBadgeLabel("half_any", undefined, ["first_half"] as SemesterLength[]),
+      "H2",
+    );
   });
 
   it("resolves overlapping half_any siblings to H1 and H2 for display", () => {
