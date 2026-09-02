@@ -9,6 +9,14 @@ import {
 import type { TimeslotDto } from "./calendarTypes";
 import { isPlaceholderInstructor } from "@/lib/scheduling/placeholderInstructor";
 import { isOnlineSection } from "@/lib/scheduling/sectionOnline";
+import {
+  normalizeAssignedHalf,
+  normalizeSemesterLength,
+  occupiedHalvesInSlot,
+  resolveHalfAnyHalf,
+  slotHasTermConflict,
+  type TermOccupant,
+} from "@/lib/scheduling/semesterLength";
 
 /**
  * Single source of truth for calendar placement validation.
@@ -26,6 +34,7 @@ export type PlacementReasonCode =
   | "blocked"
   | "capacity"
   | "room_conflict"
+  | "room_requirements"
   | "instructor_conflict"
   | "missing_data"
   | "online_section";
@@ -58,6 +67,7 @@ type PlacementSectionLike = {
   course_id: string | number;
   department?: string | null;
   instructor_id: string;
+  semester_length?: string | null;
   enrollment_cap?: number;
   expected_enrollment?: number;
   crosslist_group_id?: string | null;
@@ -83,6 +93,7 @@ type PlacementAssignmentEntry = {
   timeslot_ids: string[];
   room_id: string;
   meeting_pattern_id: string;
+  assigned_half?: string | null;
 };
 
 type PlacementAssignmentMap = Record<string, PlacementAssignmentEntry>;
@@ -152,7 +163,7 @@ export function validatePreservedAssignment(input: {
     return {
       valid: false,
       reason: "pattern",
-      message: "Pattern no longer allowed — fix in editor",
+      message: "Meeting patterns changed — place in a compatible timeslot",
     };
   }
 
@@ -196,6 +207,77 @@ export function requiredSeatsForSections(
   }, 0);
 }
 
+function termOccupantsForSections(
+  sectionIds: string[],
+  data: PlacementData,
+  assignmentsBySection: PlacementAssignmentMap,
+): TermOccupant[] {
+  return sectionIds.map((sectionId) => {
+    const section = data.sections.find((item) => item.id === sectionId);
+    return {
+      sectionId,
+      semesterLength: section?.semester_length,
+      assignedHalf: assignmentsBySection[sectionId]?.assigned_half,
+    };
+  });
+}
+
+/** Auto-resolve assigned_half for half_any when placing into a room/slot. */
+export function resolvePlacementAssignedHalf(input: {
+  section: PlacementSectionLike;
+  existingAssignedHalf?: string | null;
+  otherSectionIds: string[];
+  data: PlacementData;
+  assignmentsBySection: PlacementAssignmentMap;
+}): "first_half" | "second_half" | null {
+  if (normalizeSemesterLength(input.section.semester_length) !== "half_any") {
+    return normalizeAssignedHalf(input.existingAssignedHalf);
+  }
+  const otherOccupants = termOccupantsForSections(
+    input.otherSectionIds,
+    input.data,
+    input.assignmentsBySection,
+  );
+  return resolveHalfAnyHalf({
+    semesterLength: input.section.semester_length,
+    assignedHalf: input.existingAssignedHalf,
+    occupiedHalves: occupiedHalvesInSlot(otherOccupants),
+  });
+}
+
+function placementTermConflict(
+  movingSectionIds: string[],
+  otherSectionIds: string[],
+  data: PlacementData,
+  assignmentsBySection: PlacementAssignmentMap,
+): boolean {
+  const otherOccupants = termOccupantsForSections(
+    otherSectionIds,
+    data,
+    assignmentsBySection,
+  );
+  const occupied = occupiedHalvesInSlot(otherOccupants);
+  const movingOccupants: TermOccupant[] = movingSectionIds.map((sectionId) => {
+    const section = data.sections.find((item) => item.id === sectionId);
+    const normalized = normalizeSemesterLength(section?.semester_length);
+    let assignedHalf = assignmentsBySection[sectionId]?.assigned_half ?? null;
+    if (normalized === "half_any") {
+      assignedHalf =
+        resolveHalfAnyHalf({
+          semesterLength: section?.semester_length,
+          assignedHalf,
+          occupiedHalves: occupied,
+        }) ?? null;
+    }
+    return {
+      sectionId,
+      semesterLength: section?.semester_length,
+      assignedHalf,
+    };
+  });
+  return slotHasTermConflict([...otherOccupants, ...movingOccupants]);
+}
+
 /** True when [aStart, aEnd) and [bStart, bEnd) overlap. */
 export function minutesOverlap(
   aStart: number,
@@ -214,6 +296,8 @@ export function evaluatePlacement(input: {
   data: PlacementData;
   assignmentsBySection: PlacementAssignmentMap;
   allDayEvents: CalendarEvent[];
+  /** Defaults to allDayEvents; pass merged in-person + online for cross-modality instructor checks. */
+  instructorConflictEvents?: CalendarEvent[];
   linkedSectionIds: string[];
   instructorById: Map<string, InstructorLike>;
   findBlockedPlacementMessage: (
@@ -231,6 +315,7 @@ export function evaluatePlacement(input: {
     data,
     assignmentsBySection,
     allDayEvents,
+    instructorConflictEvents: instructorEventsInput,
     linkedSectionIds,
     instructorById,
     findBlockedPlacementMessage,
@@ -243,6 +328,16 @@ export function evaluatePlacement(input: {
       severity: "block",
       reasonCode: "missing_data",
       message: "Section not found.",
+      conflictSectionIds: [],
+    };
+  }
+
+  if (isOnlineSection(section) && targetRoomId.trim()) {
+    return {
+      severity: "block",
+      reasonCode: "online_section",
+      message:
+        "Online sections (800–899) use the Online band below — set section number and place there.",
       conflictSectionIds: [],
     };
   }
@@ -276,6 +371,16 @@ export function evaluatePlacement(input: {
     };
   }
 
+  const roomRequirements = section.room_requirements ?? [];
+  const roomRequirementMismatch =
+    targetRoomId.trim() !== "" &&
+    targetRoom &&
+    roomRequirements.length > 0 &&
+    !roomMeetsRequirements(targetRoom, roomRequirements);
+  const missingRoomFeatures = roomRequirementMismatch
+    ? roomRequirements.filter((req) => !(targetRoom?.features ?? []).includes(req))
+    : [];
+
   const resolveEventRoomId = (eventItem: CalendarEvent) =>
     getCalendarEventRoomId(
       eventItem,
@@ -288,14 +393,41 @@ export function evaluatePlacement(input: {
   const overlapsSelected = (eventItem: CalendarEvent) =>
     minutesOverlap(slot.start, slot.end, eventItem.start, eventItem.end);
 
-  // 3. Room overlap — warning, move still applied.
-  const roomConflicts = allDayEvents.filter((eventItem) => {
-    if (!calendarEventConflictsWithSectionIds(eventItem, linkedSectionIdSet)) return false;
-    if (resolveEventRoomId(eventItem) !== targetRoomId) return false;
-    return overlapsSelected(eventItem);
-  });
+  const instructorConflictEvents = instructorEventsInput ?? allDayEvents;
 
-  // 4. Instructor double-booking (any room) — warning, move still applied.
+  const overlappingRoomOtherIds = new Set<string>();
+  if (targetRoomId.trim() !== "") {
+    for (const eventItem of allDayEvents) {
+      if (!calendarEventConflictsWithSectionIds(eventItem, linkedSectionIdSet)) continue;
+      if (resolveEventRoomId(eventItem) !== targetRoomId) continue;
+      if (!overlapsSelected(eventItem)) continue;
+      for (const id of calendarEventSectionIds(eventItem)) {
+        if (!linkedSectionIdSet.has(id)) overlappingRoomOtherIds.add(id);
+      }
+    }
+  }
+
+  const hasRoomTermConflict =
+    overlappingRoomOtherIds.size > 0 &&
+    placementTermConflict(
+      linkedIds,
+      Array.from(overlappingRoomOtherIds),
+      data,
+      assignmentsBySection,
+    );
+
+  // 3. Room overlap — warning, move still applied (skip for online band with no room).
+  const roomConflicts =
+    targetRoomId.trim() === "" || !hasRoomTermConflict
+      ? []
+      : allDayEvents.filter((eventItem) => {
+          if (!calendarEventConflictsWithSectionIds(eventItem, linkedSectionIdSet)) return false;
+          if (resolveEventRoomId(eventItem) !== targetRoomId) return false;
+          if (!overlapsSelected(eventItem)) return false;
+          return calendarEventSectionIds(eventItem).some((id) => overlappingRoomOtherIds.has(id));
+        });
+
+  // 4. Instructor double-booking (any modality) — warning, move still applied.
   const draggedInstructorIds = new Set<string>();
   for (const linkedSectionId of linkedIds) {
     const linked = data.sections.find((s) => s.id === linkedSectionId);
@@ -305,18 +437,47 @@ export function evaluatePlacement(input: {
     if (isPlaceholderInstructor(instructorId, instructorName)) continue;
     draggedInstructorIds.add(instructorId);
   }
+
+  const overlappingInstructorOtherIds = new Set<string>();
+  if (draggedInstructorIds.size > 0) {
+    for (const eventItem of instructorConflictEvents) {
+      if (!calendarEventConflictsWithSectionIds(eventItem, linkedSectionIdSet)) continue;
+      if (!overlapsSelected(eventItem)) continue;
+      if (!calendarEventInstructorIds(eventItem).some((id) => draggedInstructorIds.has(id))) {
+        continue;
+      }
+      for (const id of calendarEventSectionIds(eventItem)) {
+        if (!linkedSectionIdSet.has(id)) overlappingInstructorOtherIds.add(id);
+      }
+    }
+  }
+
+  const hasInstructorTermConflict =
+    overlappingInstructorOtherIds.size > 0 &&
+    placementTermConflict(
+      linkedIds,
+      Array.from(overlappingInstructorOtherIds),
+      data,
+      assignmentsBySection,
+    );
+
   const instructorConflicts =
-    draggedInstructorIds.size === 0
+    draggedInstructorIds.size === 0 || !hasInstructorTermConflict
       ? []
-      : allDayEvents.filter((eventItem) => {
+      : instructorConflictEvents.filter((eventItem) => {
           if (!calendarEventConflictsWithSectionIds(eventItem, linkedSectionIdSet)) return false;
           if (!overlapsSelected(eventItem)) return false;
-          return calendarEventInstructorIds(eventItem).some((id) =>
-            draggedInstructorIds.has(id),
+          if (
+            !calendarEventInstructorIds(eventItem).some((id) => draggedInstructorIds.has(id))
+          ) {
+            return false;
+          }
+          return calendarEventSectionIds(eventItem).some((id) =>
+            overlappingInstructorOtherIds.has(id),
           );
         });
 
-  if (roomConflicts.length === 0 && instructorConflicts.length === 0) {
+  if (roomConflicts.length === 0 && instructorConflicts.length === 0 && !roomRequirementMismatch) {
     return {
       severity: "ok",
       reasonCode: null,
@@ -328,6 +489,17 @@ export function evaluatePlacement(input: {
   const flagged = new Set<string>(linkedIds);
   for (const eventItem of [...roomConflicts, ...instructorConflicts]) {
     for (const id of calendarEventSectionIds(eventItem)) flagged.add(id);
+  }
+
+  if (roomRequirementMismatch) {
+    const missingLabel =
+      missingRoomFeatures.length > 0 ? missingRoomFeatures.join(", ") : "required features";
+    return {
+      severity: "warn",
+      reasonCode: "room_requirements",
+      message: `Warning: room ${targetRoomId} is missing ${missingLabel} required by ${section.department ?? ""} ${section.course_id} at ${selectedDay} ${timeStr}.`,
+      conflictSectionIds: Array.from(flagged),
+    };
   }
 
   // Instructor conflicts take message priority so their spec'd wording is shown.

@@ -154,7 +154,7 @@ export function CrosslistCalendarEventCard({
       <div
         data-calendar-event-card="true"
         className={clsx(
-          "group relative overflow-hidden border-l-4 rounded-lg p-2.5 flex flex-col justify-between shadow-sm select-none",
+          "group relative overflow-hidden border-l-4 rounded-lg p-2 flex flex-col gap-0.5 shadow-sm select-none",
           draggable && "cursor-grab touch-none active:cursor-grabbing",
           !isDragSource && "hover:shadow-md",
           isDragSource && hasDragMoved && "opacity-[0.12] pointer-events-none",
@@ -257,17 +257,17 @@ export function CrosslistCalendarEventCard({
         </div>
         <div
           className={clsx(
-            "relative z-[1] font-black text-[10px] truncate text-slate-900 pr-9",
-            isStaggered && "pl-6",
+            "relative z-[1] min-w-0 font-black text-[10px] leading-tight text-slate-900 line-clamp-2 break-words pr-5",
+            isStaggered && "pl-5",
           )}
         >
           {crosslistGroupId}
         </div>
-        <div className="relative z-[1] text-[9px] font-bold leading-tight text-slate-700">
-          <div className="truncate text-slate-800">
+        <div className="relative z-[1] min-w-0 text-[9px] font-bold leading-tight text-slate-700">
+          <div className="line-clamp-1 break-words text-slate-800">
             {members.length} cross-listed sections
           </div>
-          <div className="text-[8px] leading-snug truncate">{timeLabel}</div>
+          <div className="text-[8px] leading-snug line-clamp-1 break-words">{timeLabel}</div>
         </div>
       </div>
 

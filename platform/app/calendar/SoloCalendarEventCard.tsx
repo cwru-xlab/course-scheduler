@@ -7,6 +7,9 @@ import { Lock, LockOpen, Shuffle, Unlock, GripVertical } from "lucide-react";
 import { CalendarSectionHoverTip } from "./CalendarSectionHoverTip";
 import { setCalendarDragImage } from "./calendarDragGhost";
 import type { SectionLockState } from "@/lib/scheduling/types";
+import { TermBadge } from "@/components/calendar/TermBadge";
+
+type TermBadgeLabel = "H1" | "H2" | null;
 
 type DepartmentPalette = {
   cardBg: string;
@@ -21,6 +24,10 @@ type SoloCalendarEventCardProps = {
   professor: string;
   hoverTitle: string;
   hoverInstructor: string;
+  hoverTermLine?: string | null;
+  termBadge?: TermBadgeLabel;
+  termStackRank?: number;
+  halfPairAccent?: string;
   color: DepartmentPalette;
   matchesHoveredDepartment: boolean;
   hasActiveFilter?: boolean;
@@ -55,6 +62,10 @@ export function SoloCalendarEventCard({
   professor,
   hoverTitle,
   hoverInstructor,
+  hoverTermLine,
+  termBadge,
+  termStackRank = 2,
+  halfPairAccent,
   color,
   matchesHoveredDepartment,
   hasActiveFilter = false,
@@ -80,12 +91,16 @@ export function SoloCalendarEventCard({
 
   return (
     <div
-      className={clsx("absolute", hovered ? "z-50" : isConflicting ? "z-20" : "z-10")}
+      className={clsx(
+        "absolute",
+        hovered ? "z-50" : isConflicting ? "z-30" : termStackRank === 0 ? "z-20" : "z-10",
+      )}
       data-calendar-hover={hovered ? "true" : undefined}
       style={{
         left: style.left,
         width: style.width,
         top: style.top,
+        minWidth: 0,
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -93,7 +108,7 @@ export function SoloCalendarEventCard({
       <div
         data-calendar-event-card="true"
         className={clsx(
-          "group relative border-l-4 rounded-lg p-2.5 flex flex-col justify-between shadow-sm select-none",
+          "group relative overflow-hidden border-l-4 rounded-lg p-2 flex flex-col gap-0.5 shadow-sm select-none",
           draggable && "cursor-grab touch-none active:cursor-grabbing",
           !isDragSource && "hover:shadow-md",
           isDragSource && hasDragMoved && "opacity-[0.12] pointer-events-none",
@@ -107,7 +122,8 @@ export function SoloCalendarEventCard({
           height: style.height,
           backgroundColor: color.cardBg,
           backgroundImage: color.cardPattern,
-          borderLeftColor: color.cardBorder,
+          borderLeftColor: halfPairAccent ?? color.cardBorder,
+          borderLeftWidth: halfPairAccent ? 6 : undefined,
         }}
         onContextMenu={onContextMenu}
         onPointerDown={onPointerDown}
@@ -116,16 +132,7 @@ export function SoloCalendarEventCard({
         onPointerCancel={onPointerCancel}
         onClick={onClick}
       >
-        {isStaggered && (
-          <span
-            className="absolute left-1 top-1 z-[3] flex size-5 items-center justify-center rounded-md border border-indigo-200 bg-indigo-50/95 text-indigo-700 shadow-sm"
-            title="Staggered: different times on different days"
-            aria-label="Staggered across days"
-          >
-            <Shuffle className="size-3" aria-hidden />
-          </span>
-        )}
-        <div className="absolute right-1 top-1 z-[3] flex items-center gap-1">
+        <div className="absolute right-0.5 top-0.5 z-[3] flex items-center gap-0.5">
           {queueDragSectionId ? (
             <span
               draggable
@@ -194,22 +201,33 @@ export function SoloCalendarEventCard({
             </button>
           )}
         </div>
-        <div
-          className={clsx(
-            "font-black text-[10px] truncate text-slate-900 pr-9",
-            isStaggered && "pl-6",
-          )}
-        >
-          {faceTitle}
+        <div className="flex min-w-0 items-start gap-1 pr-5">
+          {isStaggered ? (
+            <span
+              className="mt-px flex size-4 shrink-0 items-center justify-center rounded border border-indigo-200 bg-indigo-50/95 text-indigo-700"
+              title="Staggered: different times on different days"
+              aria-label="Staggered across days"
+            >
+              <Shuffle className="size-2.5" aria-hidden />
+            </span>
+          ) : null}
+          {termBadge ? <TermBadge badge={termBadge} className="mt-px size-4 shrink-0 text-[8px]" /> : null}
+          <div className="min-w-0 flex-1 font-black text-[10px] leading-tight text-slate-900 line-clamp-2 break-words">
+            {faceTitle}
+          </div>
         </div>
-        <div className="text-[9px] font-bold leading-tight text-slate-700">
-          <div className="truncate">{professor}</div>
-          <div className="text-[8px] leading-snug truncate">{timeLabel}</div>
+        <div className="min-w-0 text-[9px] font-bold leading-tight text-slate-700">
+          <div className="line-clamp-1 break-words">{professor}</div>
+          <div className="text-[8px] leading-snug line-clamp-1 break-words">{timeLabel}</div>
         </div>
       </div>
 
       {hovered ? (
-        <CalendarSectionHoverTip title={hoverTitle} instructor={hoverInstructor} />
+        <CalendarSectionHoverTip
+          title={hoverTitle}
+          instructor={hoverInstructor}
+          termLine={hoverTermLine}
+        />
       ) : null}
     </div>
   );

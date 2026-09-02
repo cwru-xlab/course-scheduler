@@ -27,7 +27,7 @@ import { CompactChipSelect } from "../CompactChipSelect";
 import { MultiSelect } from "../MultiSelect";
 import { RowNotesButton } from "../RowNotesButton";
 
-import type { Room, Section, SectionState } from "@/lib/scheduling/types";
+import type { Room, Section, SectionState, SemesterLength } from "@/lib/scheduling/types";
 import { useHideArchivedSections } from "@/lib/editor-ui-preferences";
 import { insertAtSortedIdPosition } from "@/lib/scheduling/insertAtSortedIdPosition";
 import { nextIntegerId } from "@/lib/scheduling/nextId";
@@ -37,6 +37,16 @@ import {
   isSectionNew,
   normalizeSectionState,
 } from "@/lib/scheduling/sectionState";
+import {
+  SEMESTER_LENGTH_OPTIONS,
+  normalizeSemesterLength,
+  semesterLengthLabel,
+} from "@/lib/scheduling/semesterLength";
+import { MBAP_TAG } from "@/lib/scheduling/mbapConstants";
+import {
+  isSectionPlacedOnCalendar,
+  tagSectionArchivedFromEditor,
+} from "@/lib/scheduling/calendarPlacementGuard";
 
 const STATE_OPTIONS: { key: SectionState; label: string }[] = [
   { key: "active", label: "Active" },
@@ -76,6 +86,7 @@ const createEmptySection = (existing: Section[]): Section => ({
   crosslist_group_id: null,
   tags: [],
   state: "new",
+  semester_length: "full",
 });
 
 export const SectionsEditor = ({
@@ -96,7 +107,7 @@ export const SectionsEditor = ({
   );
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<Section | null>(null);
-  const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
+  const { confirmRowAdded, getRowHighlightClass, showSuccess } = useEditorActions();
   const sectionsRef = useStableDataRef(sections);
 
   useLayoutEffect(() => {
@@ -138,6 +149,17 @@ export const SectionsEditor = ({
   };
 
   const deleteSection = (index: number) => {
+    const section = sectionsRef.current[index];
+    if (isSectionPlacedOnCalendar(section.id)) {
+      const newSections = [...sectionsRef.current];
+      newSections[index] = tagSectionArchivedFromEditor({
+        ...section,
+        state: "archived",
+      });
+      onUpdate(newSections);
+      showSuccess("Section archived — it remains on the calendar until you unplace it.");
+      return;
+    }
     onUpdate(sectionsRef.current.filter((_, i) => i !== index));
   };
 
@@ -174,6 +196,33 @@ export const SectionsEditor = ({
     }
     return Array.from(set).sort();
   }, [sections]);
+
+  const archiveSectionsByTag = useCallback(
+    (tag: string) => {
+      const normalized = tag.trim().toLowerCase();
+      if (!normalized) return;
+      const toArchive = sections.filter(
+        (section) =>
+          !isSectionArchived(section) &&
+          section.tags.some((t) => t.trim().toLowerCase() === normalized),
+      );
+      if (toArchive.length === 0) {
+        window.alert(`No active sections are tagged "${tag}".`);
+        return;
+      }
+      const confirmed = window.confirm(
+        `Archive ${toArchive.length} section(s) tagged "${tag}"? They will be excluded from the solver until placed from the calendar.`,
+      );
+      if (!confirmed) return;
+      const archiveIds = new Set(toArchive.map((s) => s.id));
+      onUpdate(
+        sections.map((section) =>
+          archiveIds.has(section.id) ? { ...section, state: "archived" } : section,
+        ),
+      );
+    },
+    [onUpdate, sections],
+  );
 
   const sectionFilterDefs = useMemo((): EditorColumnFilterDef<SectionRow>[] => [
     {
@@ -212,6 +261,13 @@ export const SectionsEditor = ({
       control: { kind: "multiSelect" },
       options: STATE_OPTIONS,
       getValue: ({ section }) => normalizeSectionState(section.state),
+    },
+    {
+      columnId: "semester",
+      label: "Duration",
+      control: { kind: "multiSelect" },
+      options: SEMESTER_LENGTH_OPTIONS,
+      getValue: ({ section }) => normalizeSemesterLength(section.semester_length),
     },
     {
       columnId: "instructor",
@@ -292,6 +348,7 @@ export const SectionsEditor = ({
           section.course_id,
           section.section_code,
           section.section_number ?? "",
+          semesterLengthLabel(section.semester_length),
           section.instructor_id,
           instructorLabel,
         ]
@@ -346,6 +403,15 @@ export const SectionsEditor = ({
             options={STATE_OPTIONS}
             onChange={(v) => updateSection(idx, "state", v as SectionState)}
             placeholder="State"
+          />
+        );
+      case "semester":
+        return (
+          <EditableSelectCell
+            value={normalizeSemesterLength(section.semester_length)}
+            options={SEMESTER_LENGTH_OPTIONS}
+            onChange={(v) => updateSection(idx, "semester_length", v as SemesterLength)}
+            placeholder="Duration"
           />
         );
       case "instructor":
@@ -436,7 +502,7 @@ export const SectionsEditor = ({
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
       searchPlaceholder="Search sections..."
-      searchHint="Search by ID, department, course, code, section number, or instructor."
+      searchHint="Search by ID, department, course, code, section number, duration, or instructor."
       filterBar={
         <div className="flex flex-wrap items-center gap-2">
           <EditorColumnFilters
@@ -445,15 +511,34 @@ export const SectionsEditor = ({
             filters={columnFilters}
             onChange={setColumnFilters}
             extraContent={
-              <label className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  className="size-3.5 rounded border-slate-300 text-primary accent-[#137fec]"
-                  checked={hideArchived}
-                  onChange={(e) => setHideArchived(e.target.checked)}
-                />
-                <span>Hide archived sections</span>
-              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    className="size-3.5 rounded border-slate-300 text-primary accent-[#137fec]"
+                    checked={hideArchived}
+                    onChange={(e) => setHideArchived(e.target.checked)}
+                  />
+                  <span>Hide archived sections</span>
+                </label>
+                <button
+                  type="button"
+                  className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  onClick={() => archiveSectionsByTag(MBAP_TAG)}
+                >
+                  Archive MBAP
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  onClick={() => {
+                    const tag = window.prompt("Archive all active sections with tag:");
+                    if (tag) archiveSectionsByTag(tag);
+                  }}
+                >
+                  Archive by tag…
+                </button>
+              </div>
             }
           />
           <EditorColumnPicker

@@ -6,6 +6,8 @@ import {
   buildAssignmentRows,
   collectDayEvents,
   collectOnlineGridEvents,
+  mergeConcurrentSlotEvents,
+  type GridEvent,
   type RoomAssignmentWorkbookInput,
 } from "./roomAssignmentWorkbook";
 
@@ -71,7 +73,33 @@ describe("buildAssignmentRows", () => {
 
     const rows = buildAssignmentRows(input);
     assert.equal(rows.length, 1);
-    assert.equal(rows[0][6], "Online");
+    assert.equal(rows[0][7], "Online");
+  });
+
+  it("includes resolved duration for half-semester sections", () => {
+    const input = baseInput({
+      sections: [
+        {
+          id: "sec-half",
+          course_id: "Leadership",
+          department: "MBAP",
+          section_code: "476",
+          section_number: "400",
+          instructor_id: "inst-1",
+          semester_length: "half_any",
+        },
+      ],
+      assignments: {
+        "sec-half": {
+          timeslot_ids: ["ts-mon"],
+          room_id: "room-a",
+          assigned_half: "second_half",
+        },
+      },
+    });
+
+    const rows = buildAssignmentRows(input);
+    assert.equal(rows[0][5], "2nd Half");
   });
 });
 
@@ -152,6 +180,32 @@ describe("collectOnlineGridEvents", () => {
   });
 });
 
+describe("mergeConcurrentSlotEvents", () => {
+  function gridEvent(
+    overrides: Partial<GridEvent> & Pick<GridEvent, "label" | "termStackRank">,
+  ): GridEvent {
+    return {
+      roomId: "room-a",
+      startMin: 540,
+      endMin: 615,
+      departmentKey: "MBAP",
+      groupKey: "section::x",
+      isCrosslist: false,
+      ...overrides,
+    };
+  }
+
+  it("stacks H1 above H2 when both share the same time span", () => {
+    const merged = mergeConcurrentSlotEvents([
+      gridEvent({ label: "H2\nStrategy", termStackRank: 1, groupKey: "section::h2" }),
+      gridEvent({ label: "H1\nLeadership", termStackRank: 0, groupKey: "section::h1" }),
+    ]);
+
+    assert.equal(merged.length, 1);
+    assert.equal(merged[0].label, "H1\nLeadership\n\nH2\nStrategy");
+  });
+});
+
 describe("collectDayEvents", () => {
   it("excludes online sections from room grids", () => {
     const input = baseInput({
@@ -182,5 +236,39 @@ describe("collectDayEvents", () => {
     const events = collectDayEvents("Mon", input);
     assert.equal(events.length, 1);
     assert.equal(events[0].roomId, "room-a");
+  });
+
+  it("includes H1/H2 badge in grid labels for half-semester sections", () => {
+    const input = baseInput({
+      sections: [
+        {
+          id: "sec-h1",
+          course_id: "Leadership",
+          department: "MBAP",
+          section_code: "476",
+          section_number: "400",
+          instructor_id: "inst-1",
+          semester_length: "first_half",
+        },
+        {
+          id: "sec-h2",
+          course_id: "Strategy",
+          department: "MBAP",
+          section_code: "477",
+          section_number: "401",
+          instructor_id: "inst-1",
+          semester_length: "second_half",
+        },
+      ],
+      assignments: {
+        "sec-h1": { timeslot_ids: ["ts-mon"], room_id: "room-a" },
+        "sec-h2": { timeslot_ids: ["ts-mon"], room_id: "room-a" },
+      },
+    });
+
+    const events = collectDayEvents("Mon", input);
+    assert.equal(events.length, 2);
+    assert.match(events.find((event) => event.groupKey.includes("sec-h1"))!.label, /^H1/);
+    assert.match(events.find((event) => event.groupKey.includes("sec-h2"))!.label, /^H2/);
   });
 });

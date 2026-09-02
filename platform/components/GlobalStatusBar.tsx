@@ -67,6 +67,7 @@ type IslandContextValue = {
 const IslandContext = createContext<IslandContextValue | null>(null);
 
 const ISLAND_COLLAPSED_KEY = "wsom-island-collapsed";
+const APP_CHROME_TOP_STYLE = { top: "var(--app-navbar-height, 4rem)" } as const;
 
 const DEFAULT_FLASH_MS: Record<IslandTone, number> = {
   success: 2000,
@@ -306,17 +307,11 @@ function GlobalStatusBar({
   sticky: IslandStickyInput | null;
   onDismissFlash: () => void;
 }) {
-  const [preferCollapsed, setPreferCollapsed] = useState(true);
-  const [hydrated, setHydrated] = useState(false);
+  const [preferCollapsed, setPreferCollapsed] = useState(readPreferCollapsed);
   // Sticky briefly expands when it appears, then folds if preferCollapsed.
   const [stickyPeek, setStickyPeek] = useState(false);
   const stickyPeekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevStickyIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    setPreferCollapsed(readPreferCollapsed());
-    setHydrated(true);
-  }, []);
 
   useEffect(() => {
     const stickyId = sticky?.id ?? null;
@@ -366,20 +361,19 @@ function GlobalStatusBar({
         ? sticky!.tone
         : "neutral";
 
-  if (!hydrated) {
-    return null;
-  }
-
   const showFlash = mode === "flash" && flash;
   const showSticky = mode === "sticky" && sticky;
   const showIdle = mode === "idle" && expanded;
   const flashHasAction = Boolean(showFlash && flash.action);
 
   return (
-    <div className="pointer-events-none fixed top-16 inset-x-0 z-40 flex justify-center px-4 pt-1.5 sm:px-6 lg:px-8">
+    <div
+      className="pointer-events-none fixed inset-x-0 z-40 flex justify-center px-4 pt-1.5 sm:px-6 lg:px-8"
+      style={APP_CHROME_TOP_STYLE}
+    >
       <div
         className={clsx(
-          "pointer-events-auto overflow-hidden border shadow-md backdrop-blur-md transition-[background-color,border-color,border-radius,padding,max-width] duration-200 ease-out",
+          "pointer-events-auto overflow-hidden border shadow-md bg-white/95 supports-[backdrop-filter]:bg-white/90 supports-[backdrop-filter]:backdrop-blur-md transition-[background-color,border-color,box-shadow] duration-200 ease-out [transform:translateZ(0)]",
           toneIslandClass(tone),
           expanded
             ? clsx(

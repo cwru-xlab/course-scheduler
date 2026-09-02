@@ -2,6 +2,8 @@ export type Id = string;
 
 export type SectionState = "active" | "archived" | "new";
 
+export type SemesterLength = "full" | "half_any" | "first_half" | "second_half";
+
 export type Section = {
   id: Id;
   course_id: Id;
@@ -19,6 +21,10 @@ export type Section = {
   previous_meeting_pattern?: Id;
   /** active/new = schedule & show on calendar; archived = excluded from solver & calendar */
   state?: SectionState;
+  /** Full semester vs first/second half (or either half). Defaults to full. */
+  semester_length?: SemesterLength;
+  /** Resolved half when semester_length is half_any (set by calendar or solver). */
+  assigned_half?: SemesterLength | null;
 };
 
 export type Instructor = {
@@ -107,6 +113,7 @@ export type ScheduleAssignment = {
   meeting_pattern_id: Id;
   timeslot_ids: Id[];
   room_id: Id;
+  assigned_half?: SemesterLength | null;
 };
 
 export type PenaltyBreakdown = Record<string, number>;

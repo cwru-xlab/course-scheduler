@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint --fix",
-    "test": "npx tsx --test lib/scheduling/mergeEditorIntoSnapshot.test.ts lib/scheduling/sectionOnline.test.ts lib/export/roomAssignmentWorkbook.test.ts"
+    "test": "npx tsx --test lib/scheduling/mergeEditorIntoSnapshot.test.ts lib/scheduling/sectionOnline.test.ts lib/scheduling/semesterLength.test.ts lib/scheduling/calendarPlacementGuard.test.ts lib/export/roomAssignmentWorkbook.test.ts app/calendar/placementValidation.test.ts app/calendar/sectionScheduleSummary.test.ts"
   },
   "dependencies": {
     "@heroui/accordion": "2.2.24",
@@ -70,7 +70,7 @@
     "react-simple-code-editor": "^0.14.1",
     "recharts": "^3.8.0",
     "server-only": "^0.0.1",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@next/eslint-plugin-next": "^16.1.2",
@@ -97,5 +97,12 @@
     "tailwind-variants": "3.2.2",
     "tailwindcss": "4.1.18",
     "typescript": "5.9.3"
+  },
+  "overrides": {
+    "@babel/core": "7.29.6",
+    "brace-expansion@^1.0.0": "1.1.18",
+    "brace-expansion@^2.0.0": "2.1.4",
+    "uuid": "11.1.1",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   }
 }

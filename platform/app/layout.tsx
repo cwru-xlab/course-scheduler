@@ -50,14 +50,21 @@ export default function RootLayout({
           <SchedulingDataProvider>
             <div className="relative flex flex-col min-h-screen bg-[var(--weatherhead-surface)] dark:bg-default-100">
               <Navbar />
-              <StatusBarProvider>
-                <SolverActivityBridge />
-                <UnsavedChangesGuard />
-                <RemoteChangesBanner />
-                <main className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4 pb-8 grow">
-                  {children}
-                </main>
-              </StatusBarProvider>
+              <div
+                aria-hidden
+                className="shrink-0"
+                style={{ height: "var(--app-navbar-height, 4rem)" }}
+              />
+              <div className="flex flex-col grow">
+                <StatusBarProvider>
+                  <SolverActivityBridge />
+                  <UnsavedChangesGuard />
+                  <RemoteChangesBanner />
+                  <main className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4 pb-8 grow">
+                    {children}
+                  </main>
+                </StatusBarProvider>
+              </div>
             </div>
           </SchedulingDataProvider>
         </Providers>

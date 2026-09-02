@@ -16,6 +16,7 @@ export const SECTION_COLUMN_SPECS: EditorColumnSpec[] = [
     minWidthPx: 88,
   },
   { id: "state", label: "State", defaultVisible: true, weight: 5, minWidthPx: 88 },
+  { id: "semester", label: "Duration", defaultVisible: true, weight: 7, minWidthPx: 112 },
   { id: "instructor", label: "Instructor", defaultVisible: true, weight: 14, minWidthPx: 160 },
   { id: "enroll", label: "Expected Enrollment", defaultVisible: true, weight: 6, minWidthPx: 88 },
   { id: "cap", label: "Cap", defaultVisible: true, weight: 4, minWidthPx: 56 },
@@ -31,7 +32,7 @@ export const SECTION_COLUMN_PRESETS: EditorColumnPreset[] = [
   {
     id: "essentials",
     label: "Essentials",
-    columnIds: ["id", "dept", "course", "code", "state", "instructor", "enroll", "cap"],
+    columnIds: ["id", "dept", "course", "code", "state", "semester", "instructor", "enroll", "cap"],
   },
   {
     id: "scheduling",
@@ -43,6 +44,7 @@ export const SECTION_COLUMN_PRESETS: EditorColumnPreset[] = [
       "code",
       "section_number",
       "state",
+      "semester",
       "instructor",
       "enroll",
       "cap",
