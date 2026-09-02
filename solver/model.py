@@ -414,6 +414,8 @@ class Section(db.Model):
     department = Column(String(128), nullable=False, default="")
     # active = schedule & calendar; archived = excluded from solver & calendar
     state = Column(String(16), nullable=False, default="active")
+    # full | half_any | first_half | second_half
+    semester_length = Column(String(32), nullable=False, default="full")
 
     # ========================================================================
     # RELATIONSHIPS
@@ -466,6 +468,7 @@ class Section(db.Model):
             "tags": self.tags or [],
             "department": self.department or "",
             "state": self.state or "active",
+            "semester_length": self.semester_length or "full",
         }
 
 

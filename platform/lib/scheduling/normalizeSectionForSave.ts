@@ -1,5 +1,6 @@
 import type { Section } from "./types";
 import { normalizeSectionState } from "./sectionState";
+import { normalizeSemesterLength } from "./semesterLength";
 
 /** Normalize section fields before persisting from calendar or merge paths. */
 export function normalizeSectionForSave(section: Section): Section {
@@ -12,6 +13,7 @@ export function normalizeSectionForSave(section: Section): Section {
     section_number: String(section.section_number ?? "").trim(),
     instructor_id: String(section.instructor_id ?? "").trim(),
     state: normalizeSectionState(section.state),
+    semester_length: normalizeSemesterLength(section.semester_length),
     allowed_meeting_patterns: [...(section.allowed_meeting_patterns ?? [])],
     room_requirements: [...(section.room_requirements ?? [])],
     tags: [...(section.tags ?? [])],

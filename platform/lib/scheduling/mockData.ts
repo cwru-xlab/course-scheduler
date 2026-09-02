@@ -31,6 +31,7 @@ export const mockSchedulingInput: SchedulingInput = {
       crosslist_group_id: "CLG-1",
       tags: ["upper_level_required"],
       state: "active",
+      semester_length: "full",
     },
     {
       id: "SEC-220-A",

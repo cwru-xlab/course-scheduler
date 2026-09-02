@@ -17,6 +17,7 @@ try:
         maybe_int,
         maybe_str,
         normalize_section_state,
+        normalize_semester_length,
         normalize_sheet_headers,
         parse_list_cell,
         parse_nested_list_cell,
@@ -29,6 +30,7 @@ except ModuleNotFoundError:
         maybe_int,
         maybe_str,
         normalize_section_state,
+        normalize_semester_length,
         normalize_sheet_headers,
         parse_list_cell,
         parse_nested_list_cell,
@@ -95,6 +97,9 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
                 "tags": parse_list_cell(row.get("tags")),
                 "previous_meeting_pattern": maybe_str(row.get("previous_meeting_pattern")),
                 "state": normalize_section_state(row.get("state")),
+                "semester_length": normalize_semester_length(
+                    row.get("duration") if row.get("duration") is not None else row.get("semester_length")
+                ),
             }
         )
 
