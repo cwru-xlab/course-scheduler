@@ -8,6 +8,7 @@ const baseSection = {
   id: "s1",
   course_id: "101",
   department: "BUAI",
+  section_code: "01",
   instructor_id: "inst-1",
   enrollment_cap: 20,
   expected_enrollment: 20,
@@ -21,20 +22,32 @@ const baseRoom = {
   features: ["projector"],
 };
 
-function makeEvent(overrides: Partial<CalendarEvent> & { id: string }): CalendarEvent {
+const baseTimeslot = {
+  id: "ts-1",
+  start_time: "10:00",
+  end_time: "11:15",
+  days: "Mon",
+  day: "Mon",
+};
+
+function makeEvent(
+  overrides: Partial<CalendarEvent> & { id: string },
+): CalendarEvent {
+  const { id, section: sectionOverrides, timeslot, start, end, ...rest } = overrides;
   return {
-    id: overrides.id,
+    ...rest,
     section: {
-      id: overrides.id,
       course_id: "202",
       department: "MC",
       instructor_id: "inst-2",
+      section_code: "01",
+      ...sectionOverrides,
+      id,
     },
-    start: 600,
-    end: 690,
-    roomId: "R1",
-    ...overrides,
-  } as CalendarEvent;
+    timeslot: timeslot ?? baseTimeslot,
+    start: start ?? 600,
+    end: end ?? 690,
+  };
 }
 
 describe("evaluatePlacement", () => {
@@ -123,10 +136,10 @@ describe("evaluatePlacement", () => {
             course_id: "202",
             department: "MC",
             instructor_id: "inst-1",
+            section_code: "02",
           },
           start: 600,
           end: 675,
-          roomId: "",
         }),
       ],
       linkedSectionIds: ["online-1"],
