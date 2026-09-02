@@ -1,5 +1,13 @@
 import ExcelJS from "exceljs";
 
+import {
+  displayAssignedHalfForSection,
+  resolveDisplayHalvesForRoomPlacements,
+  resolvedDurationLabel,
+  termBadgeLabel,
+  termStackRank,
+  type RoomSlotPlacement,
+} from "@/lib/scheduling/semesterLength";
 import { isOnlineSection } from "@/lib/scheduling/sectionOnline";
 import { isSectionArchived } from "@/lib/scheduling/sectionState";
 import { canonicalizeRoomNumber } from "@/lib/scheduling/roomNumber";
@@ -34,6 +42,7 @@ const ASSIGNMENT_HEADERS = [
   "Number",
   "Class Title",
   "Section",
+  "Duration",
   "Days and Times",
   "Room Number",
 ] as const;
@@ -76,6 +85,7 @@ export type RoomAssignmentSection = {
   state?: string | null;
   /** Stored section number from scheduling data (e.g. 100, 400). */
   section_number?: string | null;
+  semester_length?: string | null;
 };
 
 export type RoomAssignmentInstructor = {
@@ -101,6 +111,7 @@ export type RoomAssignmentPlacement = {
   timeslot_ids?: string[];
   room_id?: string | null;
   meeting_pattern_id?: string;
+  assigned_half?: string | null;
 };
 
 export type RoomAssignmentWorkbookInput = {
@@ -392,6 +403,7 @@ function eventCellLabel(input: {
   endTime: string;
   instructor: string;
   crosslistGroupId?: string;
+  termBadge?: string | null;
 }): string {
   const isCrosslist = (input.peers?.length ?? 0) >= 2;
   const course = courseLinesForEvent(input.section, input.peers);
@@ -402,7 +414,42 @@ function eventCellLabel(input: {
       ? `✕ Cross-list ${input.crosslistGroupId}`
       : "✕ Cross-list"
     : null;
-  return [crosslistHeader, course, timePart, instructor].filter(Boolean).join("\n");
+  return [crosslistHeader, input.termBadge, course, timePart, instructor].filter(Boolean).join("\n");
+}
+
+function resolveDisplayHalvesForDay(
+  day: RoomAssignmentDay,
+  input: RoomAssignmentWorkbookInput,
+): Map<string, "first_half" | "second_half"> {
+  const timeslotById = new Map(input.timeslots.map((timeslot) => [timeslot.id, timeslot]));
+  const placements: RoomSlotPlacement[] = [];
+
+  for (const section of input.sections) {
+    if (isSectionArchived(section) || isOnlineSection(section)) continue;
+    const placement = input.assignments[section.id];
+    const timeslotIds =
+      placement?.timeslot_ids?.length
+        ? placement.timeslot_ids
+        : section.timeslot_id
+          ? [section.timeslot_id]
+          : [];
+    const roomId = String(placement?.room_id ?? section.room_id ?? "").trim();
+    if (!roomId) continue;
+    for (const timeslotId of timeslotIds) {
+      const slot = timeslotById.get(String(timeslotId));
+      if (!slot || !timeslotMatchesDay(slot, day)) continue;
+      placements.push({
+        sectionId: section.id,
+        roomId,
+        startMin: parseMinutes(slot.start_time),
+        endMin: parseMinutes(slot.end_time),
+        semesterLength: section.semester_length,
+        assignedHalf: placement?.assigned_half,
+      });
+    }
+  }
+
+  return resolveDisplayHalvesForRoomPlacements(placements);
 }
 
 export function buildAssignmentRows(input: RoomAssignmentWorkbookInput): string[][] {
@@ -431,6 +478,7 @@ export function buildAssignmentRows(input: RoomAssignmentWorkbookInput): string[
         instructorById.get(section.instructor_id)?.name?.trim() ||
         section.instructor_id ||
         "";
+      const assignedHalf = placement?.assigned_half ?? null;
 
       return {
         instructor,
@@ -438,6 +486,7 @@ export function buildAssignmentRows(input: RoomAssignmentWorkbookInput): string[
         number: cols.number,
         classTitle: cols.classTitle,
         section: cols.section,
+        duration: resolvedDurationLabel(section.semester_length, assignedHalf),
         daysAndTimes: formatDaysAndTimes(slots),
         roomNumber: isOnlineSection(section)
           ? "Online"
@@ -457,6 +506,7 @@ export function buildAssignmentRows(input: RoomAssignmentWorkbookInput): string[
       row.number,
       row.classTitle,
       row.section,
+      row.duration,
       row.daysAndTimes,
       row.roomNumber,
     ]);
@@ -473,14 +523,19 @@ export type GridEvent = {
   groupKey: string;
   isCrosslist: boolean;
   lane?: number;
+  termStackRank?: number;
 };
 
 /** Assign non-overlapping lanes for concurrent events (mirrors calendar lane logic). */
 export function assignEventLanes<T extends { startMin: number; endMin: number }>(
   events: T[],
+  getStackRank?: (event: T) => number,
 ): (T & { lane: number })[] {
   const sorted = [...events].sort(
-    (a, b) => a.startMin - b.startMin || a.endMin - b.endMin,
+    (a, b) =>
+      a.startMin - b.startMin ||
+      a.endMin - b.endMin ||
+      (getStackRank ? getStackRank(a) - getStackRank(b) : 0),
   );
   const laneEndTimes: number[] = [];
   return sorted.map((event) => {
@@ -495,12 +550,59 @@ export function assignEventLanes<T extends { startMin: number; endMin: number }>
   });
 }
 
+/**
+ * Merge events that share the same time span into one stacked card.
+ * Half-semester pairs (H1/H2) keep calendar order: H1 on top, H2 below.
+ */
+export function mergeConcurrentSlotEvents(events: GridEvent[]): GridEvent[] {
+  const bySlot = new Map<string, GridEvent[]>();
+  for (const event of events) {
+    const key = `${event.startMin}::${event.endMin}`;
+    const bucket = bySlot.get(key) ?? [];
+    bucket.push(event);
+    bySlot.set(key, bucket);
+  }
+
+  const merged: GridEvent[] = [];
+  for (const bucket of bySlot.values()) {
+    if (bucket.length === 1) {
+      merged.push(bucket[0]);
+      continue;
+    }
+
+    const sorted = [...bucket].sort(
+      (a, b) =>
+        (a.termStackRank ?? 2) - (b.termStackRank ?? 2) ||
+        a.label.localeCompare(b.label),
+    );
+
+    merged.push({
+      ...sorted[0],
+      label: sorted.map((event) => event.label).join("\n\n"),
+      isCrosslist: sorted.some((event) => event.isCrosslist),
+      termStackRank: Math.min(...sorted.map((event) => event.termStackRank ?? 2)),
+    });
+  }
+
+  return merged.sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
+}
+
+/** Row height (points) for grid event labels at 7pt wrapped text. */
+export function estimateGridEventRowHeight(labels: Iterable<string>): number {
+  let lineCount = 0;
+  for (const label of labels) {
+    lineCount += String(label).split("\n").length;
+  }
+  return Math.max(56, 18 + lineCount * 11);
+}
+
 export function collectDayEvents(
   day: RoomAssignmentDay,
   input: RoomAssignmentWorkbookInput,
 ): GridEvent[] {
   const timeslotById = new Map(input.timeslots.map((t) => [t.id, t]));
   const instructorById = new Map(input.instructors.map((i) => [i.id, i]));
+  const displayHalves = resolveDisplayHalvesForDay(day, input);
 
   const membersByGroup = new Map<string, RoomAssignmentSection[]>();
   for (const section of input.sections) {
@@ -552,6 +654,14 @@ export function collectDayEvents(
     seenGroupKeys.add(groupKey);
 
     const isCrosslist = Boolean(peers && peers.length >= 2);
+    const assignedHalf =
+      displayAssignedHalfForSection(
+        section.id,
+        section.semester_length,
+        displayHalves,
+        input.assignments[section.id]?.assigned_half,
+      ) ?? null;
+    const badge = termBadgeLabel(section.semester_length, assignedHalf);
 
     events.push({
       roomId,
@@ -564,10 +674,12 @@ export function collectDayEvents(
         endTime: slot.end_time,
         instructor,
         crosslistGroupId: isCrosslist ? groupId : undefined,
+        termBadge: badge,
       }),
       departmentKey: departmentKey(labelSection),
       groupKey,
       isCrosslist,
+      termStackRank: termStackRank(section.semester_length, assignedHalf),
     });
   }
 
@@ -629,6 +741,8 @@ export function collectOnlineGridEvents(
     seenGroupKeys.add(groupKey);
 
     const isCrosslist = Boolean(peers && peers.length >= 2);
+    const assignedHalf = input.assignments[section.id]?.assigned_half ?? null;
+    const badge = termBadgeLabel(section.semester_length, assignedHalf);
 
     events.push({
       roomId: "",
@@ -641,10 +755,12 @@ export function collectOnlineGridEvents(
         endTime: slot.end_time,
         instructor,
         crosslistGroupId: isCrosslist ? groupId : undefined,
+        termBadge: badge,
       }),
       departmentKey: departmentKey(labelSection),
       groupKey,
       isCrosslist,
+      termStackRank: termStackRank(section.semester_length, assignedHalf),
     });
   }
 
@@ -670,8 +786,9 @@ function applyAssignmentSheet(
     { header: ASSIGNMENT_HEADERS[2], key: "number", width: 10 },
     { header: ASSIGNMENT_HEADERS[3], key: "classTitle", width: 42 },
     { header: ASSIGNMENT_HEADERS[4], key: "section", width: 10 },
-    { header: ASSIGNMENT_HEADERS[5], key: "daysAndTimes", width: 28 },
-    { header: ASSIGNMENT_HEADERS[6], key: "roomNumber", width: 22 },
+    { header: ASSIGNMENT_HEADERS[5], key: "duration", width: 12 },
+    { header: ASSIGNMENT_HEADERS[6], key: "daysAndTimes", width: 28 },
+    { header: ASSIGNMENT_HEADERS[7], key: "roomNumber", width: 22 },
   ];
 
   const headerRow = sheet.getRow(1);
@@ -746,10 +863,16 @@ function paintGridRow(
     };
   }
 
-  const sortedEvents = [...rowEvents].sort(
-    (a, b) => a.startMin - b.startMin || a.endMin - b.endMin,
+  const sortedEvents = mergeConcurrentSlotEvents(
+    [...rowEvents].sort(
+      (a, b) =>
+        a.startMin - b.startMin ||
+        a.endMin - b.endMin ||
+        (a.termStackRank ?? 2) - (b.termStackRank ?? 2),
+    ),
   );
   const occupied = new Array(colCount).fill(false);
+  const paintedLabels: string[] = [];
 
   for (const event of sortedEvents) {
     const span = quarterSpanColumns(event.startMin, event.endMin);
@@ -768,7 +891,7 @@ function paintGridRow(
         horizontal: "left",
         wrapText: true,
       };
-      row.height = Math.max(row.height ?? 56, 84);
+      paintedLabels.push(String(cell.value));
       continue;
     }
 
@@ -814,8 +937,11 @@ function paintGridRow(
       },
     };
 
-    const lineCount = String(cell.value).split("\n").length;
-    row.height = Math.max(row.height ?? 56, Math.min(140, 24 + lineCount * 11));
+    paintedLabels.push(event.label);
+  }
+
+  if (paintedLabels.length) {
+    row.height = estimateGridEventRowHeight(paintedLabels);
   }
 }
 
@@ -832,7 +958,7 @@ function applyOnlineGridSection(
     return { laneCount: 0, events: [] };
   }
 
-  const laned = assignEventLanes(onlineEvents);
+  const laned = assignEventLanes(onlineEvents, (event) => event.termStackRank ?? 2);
   const laneCount = laned.reduce((max, event) => Math.max(max, event.lane + 1), 0);
 
   const band = sheet.getRow(bandRow);
@@ -917,7 +1043,7 @@ function applyDayGridSheet(
 
   sheet.getColumn(1).width = 18;
   for (let i = 0; i < colCount; i += 1) {
-    sheet.getColumn(i + 2).width = 3.5;
+    sheet.getColumn(i + 2).width = 4.25;
   }
 
   const header = sheet.getRow(1);

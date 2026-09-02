@@ -512,6 +512,69 @@ The notes modal also supports deep links:
 
 These notes are **not persisted to the solver backend**.
 
+### 14.7 MBAP manual scheduling workflow
+
+MBAP courses use a **manual-first** workflow: exclude them from auto-solve, place them on the calendar by hand, then hard-lock before re-running the solver for other programs.
+
+#### Section numbers and modalities
+
+| `section_number` | Modality | Calendar placement |
+|------------------|----------|-------------------|
+| `400` | On-campus | Monday room grid (6:15–7:45 PM or 8:00–9:30 PM) |
+| `800`–`899` | Online | Online band (Tuesday or Wednesday evening) |
+
+SOC import derives `section_number` from `section_code` (e.g. `400-LEC` → `400`) and tags MBAP rows with `mbap`. SOC `Session` maps to `semester_length` (`full`, `half_any`, `first_half`, `second_half`). Legacy `half-1` / `half-2` tags are still read on spreadsheet import when `duration` is missing.
+
+#### Half-semester terms and room sharing
+
+| `semester_length` value | Meaning | Room/instructor conflicts |
+|-------------------------|---------|---------------------------|
+| `full` | Full semester | Conflicts with all other terms at same time |
+| `first_half` | 1st half only | May share room/time with `second_half` only |
+| `second_half` | 2nd half only | May share room/time with `first_half` only |
+| `half_any` | Either half (solver/user picks) | Conflicts until resolved via `assigned_half` |
+
+When a `half_any` section is placed on the calendar, choose 1st or 2nd half in the placement modal. The resolved value is stored as `assigned_half` on the section row and survives reload/export.
+
+Spreadsheet `Sections` sheet columns include `duration` and optional `assigned_half` (for `half_any` only). Allowed values match the table above; import normalizes aliases like `half`, `1st half`, `h1`.
+
+#### Required timeslots and meeting patterns
+
+Create these in **Editor → Timeslots** and **Editor → Meeting Patterns** (IDs must match):
+
+| ID | Day | Time | Pattern ID |
+|----|-----|------|------------|
+| `Mon_1815_1945` | Mon | 18:15–19:45 | `mbap_mon_615` |
+| `Mon_2000_2130` | Mon | 20:00–21:30 | `mbap_mon_800` |
+| `Tue_1800_2100` | Tue | 18:00–21:00 | `mbap_tue_eve` |
+| `Wed_1800_2100` | Wed | 18:00–21:00 | `mbap_wed_eve` |
+
+Constants are defined in `platform/lib/scheduling/mbapConstants.ts` and `solver/mbap_constants.py`. SOC import applies the matching `allowed_meeting_patterns` when MBAP sections are detected.
+
+#### Recommended workflow
+
+1. Import or edit data; confirm MBAP sections have `section_number` 400 or 800–899 and tag `mbap`.
+2. In **Editor → Sections**, click **Archive MBAP** (or **Archive by tag…**) to exclude MBAP from the solver.
+3. **Run Solver** for the remaining schedule.
+4. On **Calendar**, filter the queue by tag `mbap` (Archived tab).
+5. Place **400** sections on **Monday** in a room; place **800** sections in the **Online** band on Tue/Wed.
+6. **Hard-lock** placed MBAP sections before any subsequent solver run.
+7. **Update Backend** to persist manual placements.
+
+Instructor conflict warnings apply across both the room grid and Online band. For half-semester sections, room warnings respect `semester_length` and `assigned_half` — `first_half` and `second_half` may share a room at the same weekly time.
+
+#### Production database migration
+
+Before deploying code that uses `assigned_half`, run:
+
+```sql
+ALTER TABLE sections ADD COLUMN IF NOT EXISTS assigned_half VARCHAR(16);
+```
+
+(`timeslot_ids` and `semester_length` may already exist from prior migrations.)
+
+See `solver/migrations/20260830_sections_assigned_half.sql`.
+
 ---
 
 ## 15. Canonical Scheduling Input Model (Frontend + Solver)
@@ -553,6 +616,9 @@ Below is the meaning of fields as used by the scheduling system:
   - `room_requirements[]`: room feature names that must be present on the assigned room
   - `crosslist_group_id`: cross-list grouping id (bindings are enforced by constraints)
   - `tags[]`: used for UI coloring and may be used by solver extensions
+  - `semester_length`: `full`, `half_any`, `first_half`, or `second_half` (spreadsheet column `duration`)
+  - `assigned_half`: resolved half (`first_half` or `second_half`) for `half_any` sections after calendar placement or solver output
+  - `timeslot_ids[]`: all meeting timeslot IDs for a section (legacy `timeslot_id` is the first element)
 - `instructors[]`
   - `unavailable_times[]`: hard constraints against time ids
   - `preferences.preferred_days[]` / `preferences.preferred_patterns[]`: soft constraints for the objective
@@ -597,6 +663,7 @@ On success, solver returns `ScheduleSolution` with:
   - `meeting_pattern_id`
   - `timeslot_ids[]`
   - `room_id`
+  - `assigned_half`: optional; set for `half_any` sections when the solver or calendar resolves the half
 - `total_score` (objective value)
 - `penalty_breakdown` (per-category numeric totals)
 - `explanations[]` (human-readable strings)

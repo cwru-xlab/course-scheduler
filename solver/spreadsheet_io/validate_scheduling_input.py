@@ -202,6 +202,35 @@ def validate_scheduling_input(data: dict) -> List[dict]:
                     )
                 )
 
+        semester_length_raw = section.get("semester_length")
+        if semester_length_raw is not None and str(semester_length_raw).strip():
+            try:
+                from section_term import VALID_SECTION_TERMS, normalize_section_term
+            except ModuleNotFoundError:
+                from ..section_term import VALID_SECTION_TERMS, normalize_section_term  # type: ignore[no-redef]
+            semester_length = normalize_section_term(semester_length_raw)
+            if semester_length not in VALID_SECTION_TERMS:
+                errors.append(
+                    _err(
+                        "invalid_semester_length",
+                        f"Sections row '{section_id}' has invalid duration '{semester_length_raw}'.",
+                        sheet="Sections",
+                        row_id=section_id,
+                        field="duration",
+                    )
+                )
+
+    try:
+        from section_term import normalize_section_term
+    except ModuleNotFoundError:
+        from ..section_term import normalize_section_term  # type: ignore[no-redef]
+
+    section_semester_length_by_id: Dict[str, str] = {
+        str(section.get("id", "")).strip(): normalize_section_term(section.get("semester_length"))
+        for section in sections
+        if str(section.get("id", "")).strip()
+    }
+
     for group in crosslist_groups:
         group_id = str(group.get("id", "")).strip()
         members = [
@@ -214,6 +243,17 @@ def validate_scheduling_input(data: dict) -> List[dict]:
                 _err(
                     "invalid_crosslist_group",
                     f"CrosslistGroups row '{group_id}' needs at least 2 member_section_ids (found {len(members)}).",
+                    sheet="CrosslistGroups",
+                    row_id=group_id or None,
+                    field="member_section_ids",
+                )
+            )
+        member_lengths = {section_semester_length_by_id.get(m, "full") for m in members}
+        if "first_half" in member_lengths and "second_half" in member_lengths:
+            errors.append(
+                _err(
+                    "crosslist_semester_length_conflict",
+                    f"CrosslistGroups row '{group_id}' mixes 1st-half and 2nd-half sections.",
                     sheet="CrosslistGroups",
                     row_id=group_id or None,
                     field="member_section_ids",

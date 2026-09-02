@@ -16,11 +16,13 @@ This workbook format is the interchange schema for the scheduler UI's `Schedulin
 `id`, `course_id`, `department`, `section_code`, `instructor_id`,
 `expected_enrollment`, `enrollment_cap`, `allowed_meeting_patterns`,
 `room_requirements`, `crosslist_group_id`, `tags`, `previous_meeting_pattern`, `state`,
-`duration`, `prev_notes`, `new_notes`
+`duration`, `assigned_half`, `prev_notes`, `new_notes`
 
 `state` is `active` (default), `new`, or `archived`. `new` marks a section as newly added (scheduled like active). Archived sections are excluded from the solver and hidden on the calendar.
 
 `duration` is `Full` (default), `Half (any)`, `First Half`, or `Second Half`. Older workbooks without this column import as Full. Legacy workbooks that used the `semester_length` header are still accepted on import.
+
+`assigned_half` is optional; use `First Half` or `Second Half` only when `duration` is `Half (any)` and the half has been resolved on the calendar or by the solver.
 
 `prev_notes` / `new_notes` are consumed by the platform UI (not the solver). Export fills `prev_notes`; planners add text in `new_notes` for import.
 

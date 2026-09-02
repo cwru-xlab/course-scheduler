@@ -50,6 +50,69 @@ class TestUpdateSectionsTimeslotIds(unittest.TestCase):
         self.assertEqual(section["timeslot_ids"], ["ts-mon-9", "ts-wed-9"])
         self.assertEqual(section["timeslot_id"], "ts-mon-9")
 
+    def test_roundtrip_assigned_half(self) -> None:
+        payload = {
+            "sections": [
+                {
+                    "id": "sec-test-half-persist",
+                    "course_id": "COURSE-TEST-HALF",
+                    "section_code": "TESTHALF",
+                    "section_number": "400",
+                    "instructor_id": "INST-TEST-HALF",
+                    "room_id": "ROOM-TEST-HALF",
+                    "timeslot_ids": ["ts-mon-9"],
+                    "expected_enrollment": 20,
+                    "enrollment_cap": 25,
+                    "allowed_meeting_patterns": [],
+                    "room_requirements": [],
+                    "tags": ["mbap"],
+                    "semester_length": "half_any",
+                    "assigned_half": "first_half",
+                }
+            ]
+        }
+        post_res = self.client.post("/update-sections", json=payload)
+        self.assertEqual(post_res.status_code, 200)
+        self.assertEqual(post_res.get_json().get("status"), "ok")
+
+        get_res = self.client.get("/data")
+        self.assertEqual(get_res.status_code, 200)
+        body = get_res.get_json()
+        section = next(
+            s for s in body["data"]["sections"] if s["id"] == "sec-test-half-persist"
+        )
+        self.assertEqual(section["semester_length"], "half_any")
+        self.assertEqual(section["assigned_half"], "first_half")
+
+    def test_clears_assigned_half_when_semester_length_not_half_any(self) -> None:
+        payload = {
+            "sections": [
+                {
+                    "id": "sec-test-half-clear",
+                    "course_id": "COURSE-TEST-HALF2",
+                    "section_code": "TESTFULL",
+                    "section_number": "400",
+                    "instructor_id": "INST-TEST-HALF2",
+                    "expected_enrollment": 20,
+                    "enrollment_cap": 25,
+                    "allowed_meeting_patterns": [],
+                    "room_requirements": [],
+                    "tags": [],
+                    "semester_length": "full",
+                    "assigned_half": "first_half",
+                }
+            ]
+        }
+        post_res = self.client.post("/update-sections", json=payload)
+        self.assertEqual(post_res.status_code, 200)
+
+        get_res = self.client.get("/data")
+        section = next(
+            s for s in get_res.get_json()["data"]["sections"] if s["id"] == "sec-test-half-clear"
+        )
+        self.assertEqual(section["semester_length"], "full")
+        self.assertIsNone(section["assigned_half"])
+
 
 if __name__ == "__main__":
     unittest.main()

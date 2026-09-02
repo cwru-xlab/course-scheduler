@@ -416,6 +416,8 @@ class Section(db.Model):
     state = Column(String(16), nullable=False, default="active")
     # full | half_any | first_half | second_half
     semester_length = Column(String(32), nullable=False, default="full")
+    # first_half | second_half when semester_length is half_any and resolved
+    assigned_half = Column(String(16), nullable=True)
 
     # ========================================================================
     # RELATIONSHIPS
@@ -469,6 +471,7 @@ class Section(db.Model):
             "department": self.department or "",
             "state": self.state or "active",
             "semester_length": self.semester_length or "full",
+            "assigned_half": self.assigned_half,
         }
 
 

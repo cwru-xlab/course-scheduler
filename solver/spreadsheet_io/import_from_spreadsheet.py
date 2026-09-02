@@ -7,6 +7,21 @@ from openpyxl import load_workbook
 
 import datetime
 
+try:
+    from section_term import (
+        TERM_HALF_ANY,
+        normalize_assigned_half,
+        normalize_section_term,
+        term_from_mbap_tags,
+    )
+except ModuleNotFoundError:
+    from ..section_term import (  # type: ignore[no-redef]
+        TERM_HALF_ANY,
+        normalize_assigned_half,
+        normalize_section_term,
+        term_from_mbap_tags,
+    )
+
 DEFAULT_ALLOWED_MEETING_PATTERNS = ["MP-A-50", "MP-B-75"]
 
 try:
@@ -35,6 +50,25 @@ except ModuleNotFoundError:
         parse_list_cell,
         parse_nested_list_cell,
     )
+
+
+def _resolve_section_semester_length(row: Dict[str, Any]) -> str:
+    duration = row.get("duration")
+    if duration is not None and str(duration).strip():
+        return normalize_section_term(duration)
+    legacy = row.get("semester_length")
+    if legacy is not None and str(legacy).strip():
+        return normalize_section_term(legacy)
+    from_tags = term_from_mbap_tags(parse_list_cell(row.get("tags")))
+    if from_tags:
+        return from_tags
+    return normalize_section_term(None)
+
+
+def _resolve_assigned_half(row: Dict[str, Any], semester_length: str) -> str | None:
+    if semester_length != TERM_HALF_ANY:
+        return None
+    return normalize_assigned_half(row.get("assigned_half"))
 
 
 def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any]:
@@ -76,6 +110,7 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
         if section_id in seen_section_ids:
             continue
         seen_section_ids.add(section_id)
+        semester_length = _resolve_section_semester_length(row)
         sections.append(
             {
                 "id": section_id,
@@ -97,9 +132,8 @@ def parse_scheduling_input_from_excel_bytes(excel_bytes: bytes) -> Dict[str, Any
                 "tags": parse_list_cell(row.get("tags")),
                 "previous_meeting_pattern": maybe_str(row.get("previous_meeting_pattern")),
                 "state": normalize_section_state(row.get("state")),
-                "semester_length": normalize_semester_length(
-                    row.get("duration") if row.get("duration") is not None else row.get("semester_length")
-                ),
+                "semester_length": semester_length,
+                "assigned_half": _resolve_assigned_half(row, semester_length),
             }
         )
 

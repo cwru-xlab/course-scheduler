@@ -199,6 +199,11 @@ def _rows_for_sheet(
                 ),
                 "state": _export_str(item.get("state") or "active"),
                 "duration": semester_length_label(item.get("semester_length")),
+                "assigned_half": (
+                    semester_length_label(item.get("assigned_half"))
+                    if item.get("semester_length") == "half_any" and item.get("assigned_half")
+                    else ""
+                ),
                 "prev_notes": "",
                 "new_notes": "",
             }

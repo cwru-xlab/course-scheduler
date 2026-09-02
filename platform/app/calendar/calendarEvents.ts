@@ -11,6 +11,7 @@ export type CalendarSectionLike = {
   crosslist_group_id?: string | null;
   room_id?: string | null;
   timeslot_id?: string | null;
+  semester_length?: string | null;
 };
 
 /** Hover card lines: "DEPT code - Section N" + instructor. */
@@ -109,9 +110,18 @@ export function mergeCrosslistCalendarEvents(
 
 export function assignCalendarEventLanes<T extends { start: number; end: number }>(
   events: T[],
+  getStackRank?: (event: T) => number,
 ): (T & { lane: number })[] {
+  const sorted = [...events].sort((a, b) => {
+    const byStart = a.start - b.start;
+    if (byStart !== 0) return byStart;
+    const byEnd = a.end - b.end;
+    if (byEnd !== 0) return byEnd;
+    if (getStackRank) return getStackRank(a) - getStackRank(b);
+    return 0;
+  });
   const laneEndTimes: number[] = [];
-  return events.map((event) => {
+  return sorted.map((event) => {
     let lane = laneEndTimes.findIndex((laneEnd) => laneEnd <= event.start);
     if (lane === -1) {
       lane = laneEndTimes.length;
@@ -176,4 +186,12 @@ export function calendarEventDisplayLabel(event: CalendarEvent): string {
     return event.crosslistGroupId ?? "Cross-list";
   }
   return `${event.section.department ?? ""} ${event.section.course_id}`.trim();
+}
+
+/** Merge in-person grid events with online-band events for cross-modality instructor checks. */
+export function buildPlacementConflictEvents(
+  inPersonEvents: CalendarEvent[],
+  onlineEvents: CalendarEvent[],
+): CalendarEvent[] {
+  return [...inPersonEvents, ...onlineEvents];
 }

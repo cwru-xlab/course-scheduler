@@ -10,6 +10,12 @@ import type { EditorInvalidatedPlacement, EditorInvalidationReason } from "@/lib
 import { isSectionArchived } from "@/lib/scheduling/sectionState";
 import { isQueuedSection, primaryPatternForSection, sectionMatchesPatternFilter } from "@/lib/scheduling/sectionOnline";
 import { sectionArchivedFromEditor } from "@/lib/scheduling/calendarPlacementGuard";
+import { TermBadge } from "@/components/calendar/TermBadge";
+import {
+  normalizeSemesterLength,
+  SEMESTER_LENGTH_OPTIONS,
+  termBadgeLabel,
+} from "@/lib/scheduling/semesterLength";
 
 export type QueueSectionRow = {
   id: string;
@@ -21,7 +27,8 @@ export type QueueSectionRow = {
   instructorName: string;
   allowed_meeting_patterns?: string[];
   state?: string | null;
-  assignment?: { room_id?: string; timeslot_ids?: string[]; meeting_pattern_id?: string };
+  semester_length?: string | null;
+  assignment?: { room_id?: string; timeslot_ids?: string[]; meeting_pattern_id?: string; assigned_half?: string | null };
   room_id?: string | null;
   timeslot_id?: string | null;
   previous_meeting_pattern?: string | null;
@@ -78,6 +85,7 @@ export function SectionQueueSidebar({
   const [tab, setTab] = useState<QueueTab>("unscheduled");
   const [search, setSearch] = useState("");
   const [patternFilter, setPatternFilter] = useState<string>("");
+  const [semesterLengthFilter, setSemesterLengthFilter] = useState<string>("");
   const [sortBy, setSortBy] = useState<QueueSort>("course");
   const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
@@ -125,6 +133,11 @@ export function SectionQueueSidebar({
     if (tab === "unscheduled" && patternFilter) {
       rows = rows.filter((s) => sectionMatchesPatternFilter(s, patternFilter));
     }
+    if (semesterLengthFilter) {
+      rows = rows.filter(
+        (s) => normalizeSemesterLength(s.semester_length) === semesterLengthFilter,
+      );
+    }
     if (q) {
       rows = rows.filter((s) => {
         const label = formatCalendarSectionHoverLines(s, s.instructorName).title.toLowerCase();
@@ -156,20 +169,22 @@ export function SectionQueueSidebar({
       const lb = formatCalendarSectionHoverLines(b, b.instructorName).title;
       return la.localeCompare(lb, undefined, { sensitivity: "base" });
     });
-  }, [enriched, tab, search, patternFilter, sortBy, needsAttentionOnly]);
+  }, [enriched, tab, search, patternFilter, semesterLengthFilter, sortBy, needsAttentionOnly]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
+    if (semesterLengthFilter) count += 1;
     if (tab === "unscheduled") {
       if (patternFilter) count += 1;
       if (sortBy !== "course") count += 1;
     }
     if (needsAttentionOnly) count += 1;
     return count;
-  }, [tab, patternFilter, sortBy, needsAttentionOnly]);
+  }, [tab, patternFilter, semesterLengthFilter, sortBy, needsAttentionOnly]);
 
   const clearFilters = () => {
     setPatternFilter("");
+    setSemesterLengthFilter("");
     setSortBy("course");
     setNeedsAttentionOnly(false);
   };
@@ -310,6 +325,27 @@ export function SectionQueueSidebar({
                     <div className="space-y-1.5 rounded-md border border-slate-200 bg-slate-50/60 p-2">
                       <div>
                         <label
+                          htmlFor="queue-semester-length-filter"
+                          className="mb-0.5 block text-[10px] font-semibold text-slate-500"
+                        >
+                          Semester length
+                        </label>
+                        <select
+                          id="queue-semester-length-filter"
+                          className="min-w-0 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs"
+                          value={semesterLengthFilter}
+                          onChange={(e) => setSemesterLengthFilter(e.target.value)}
+                        >
+                          <option value="">All</option>
+                          {SEMESTER_LENGTH_OPTIONS.map(({ key, label }) => (
+                            <option key={key} value={key}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label
                           htmlFor="queue-pattern-filter"
                           className="mb-0.5 block text-[10px] font-semibold text-slate-500"
                         >
@@ -391,6 +427,14 @@ export function SectionQueueSidebar({
                   );
                   const active = activeDragSectionId === row.id;
                   const invalidation = row.editorInvalidation;
+                  const isHalfAny = normalizeSemesterLength(row.semester_length) === "half_any";
+                  const isPlaced = Boolean(
+                    row.assignment?.room_id && row.assignment?.timeslot_ids?.length,
+                  );
+                  const badge =
+                    !isHalfAny || isPlaced
+                      ? termBadgeLabel(row.semester_length, row.assignment?.assigned_half)
+                      : null;
                   return (
                     <div
                       key={row.id}
@@ -444,7 +488,10 @@ export function SectionQueueSidebar({
                             Auto-unplaced
                           </span>
                         ) : null}
-                        <div className="truncate text-[11px] font-bold text-slate-900">{title}</div>
+                        <div className="flex min-w-0 items-center gap-1">
+                          <div className="truncate text-[11px] font-bold text-slate-900">{title}</div>
+                          {badge ? <TermBadge badge={badge} className="!size-4 text-[8px]" /> : null}
+                        </div>
                         <div className="truncate text-[10px] text-slate-500">{instructor}</div>
                         {invalidation ? (
                           <div className="mt-1 flex min-w-0 items-start gap-1 text-[9px] font-semibold text-amber-800">

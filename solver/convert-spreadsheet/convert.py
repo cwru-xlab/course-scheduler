@@ -28,6 +28,10 @@ from collections import defaultdict
 
 import openpyxl
 
+_SOLVER_DIR = Path(__file__).resolve().parent.parent
+if str(_SOLVER_DIR) not in sys.path:
+    sys.path.insert(0, str(_SOLVER_DIR))
+
 from config import (
     INPUT_DIR,
     OUTPUT_DIR,
@@ -35,6 +39,8 @@ from config import (
     DEFAULT_ROOM_REQUIREMENTS,
     DEFAULT_TAGS,
 )
+from mbap_constants import apply_mbap_section_metadata, merge_mbap_catalog
+from section_term import session_to_term
 
 # ============================================================================
 # SHARED UTILITIES
@@ -132,6 +138,14 @@ def _extract_section_code(section_val) -> str:
         return ""
     m = re.match(r"(\d+-\w+)", str(section_val).strip())
     return m.group(1) if m else str(section_val).strip()
+
+
+def _extract_section_number(section_code: str) -> str:
+    """Extract registrar section number: '400-LEC' -> '400', '801-OL' -> '801'."""
+    if not section_code:
+        return ""
+    m = re.match(r"^(\d+)", str(section_code).strip())
+    return m.group(1) if m else ""
 
 
 def _extract_section_type(section_code: str) -> str:
@@ -354,6 +368,7 @@ def load_sections_from_soc_editors(
         # -- Section fields -------------------------------------------------
         section_raw = row.get("Section") or ""
         section_code = _extract_section_code(section_raw)
+        section_number = _extract_section_number(section_code)
         section_type = _extract_section_type(section_code)
 
         # -- Enrollment -----------------------------------------------------
@@ -431,6 +446,7 @@ def load_sections_from_soc_editors(
             "id": class_nbr,
             "course_id": course_id,
             "section_code": section_code,
+            "section_number": section_number,
             "section_type": section_type,
 
             # Instructor
@@ -523,9 +539,21 @@ def load_sections_from_soc_editors(
             s["allowed_meeting_patterns"] = all_pattern_ids
 
     # -------------------------------------------------------------------------
+    # POST-PROCESSING: MBAP catalog + section metadata
+    # -------------------------------------------------------------------------
+    merge_mbap_catalog(timeslot_id_to_timeslot, pattern_key_to_pattern)
+    mbap_warnings: list[str] = []
+    for s in sections:
+        subject = str(s.get("_meta", {}).get("subject") or "")
+        session = str(s.get("_meta", {}).get("session") or "")
+        meeting_dates = str(s.get("_meta", {}).get("meeting_dates") or "")
+        s["semester_length"] = session_to_term(session, meeting_dates)
+        mbap_warnings.extend(apply_mbap_section_metadata(s, subject, session))
+
+    # -------------------------------------------------------------------------
     # Gaps report
     # -------------------------------------------------------------------------
-    gaps_report = _build_gaps_report(sections, rows_missing_class_nbr)
+    gaps_report = _build_gaps_report(sections, rows_missing_class_nbr, mbap_warnings)
 
     timeslots = list(timeslot_id_to_timeslot.values())
     meeting_patterns = list(pattern_key_to_pattern.values())
@@ -537,7 +565,11 @@ def load_sections_from_soc_editors(
     return sections, instructors, rooms, timeslots, meeting_patterns, gaps_report
 
 
-def _build_gaps_report(sections: list[dict], rows_missing_class_nbr: int) -> dict:
+def _build_gaps_report(
+    sections: list[dict],
+    rows_missing_class_nbr: int,
+    mbap_warnings: list[str] | None = None,
+) -> dict:
     """
     Document every field that could not be populated from the source file
     and suggest remediation strategies.
@@ -554,6 +586,7 @@ def _build_gaps_report(sections: list[dict], rows_missing_class_nbr: int) -> dic
             ),
             "cross_listed_sections": crosslisted_count,
             "staff_tbd_instructors": len(staff_sections),
+            "mbap_warnings": mbap_warnings or [],
         },
         "model_fields_not_populated": {
             # ---- Section fields ----
@@ -780,6 +813,7 @@ def load_sections_from_sis(
                 catalog_nbr = first_part[-1] if first_part else ""
         course_id = _normalize_id(f"{subject}{catalog_nbr}") or section_id
         section_code = (row.get("CLASS_SECTION") or row.get("Section") or "").strip() or section_id
+        section_number = _extract_section_number(section_code)
         enrl_cap = _parse_enrollment_val(row.get("ENRL_CAP") or row.get("enrollment_cap"))
         enrl_tot = _parse_enrollment_val(row.get("ENRL_TOT") or row.get("enrollment_total"))
         instr_id = _normalize_id(instr_name) if instr_name else "unknown"
@@ -787,6 +821,7 @@ def load_sections_from_sis(
 
         sections.append({
             "id": section_id, "course_id": course_id, "section_code": section_code,
+            "section_number": section_number,
             "instructor_id": instr_id, "expected_enrollment": enrl_tot,
             "enrollment_cap": enrl_cap,
             "allowed_meeting_patterns": [pattern_id] if pattern_id is not None else [],
@@ -809,6 +844,10 @@ def load_sections_from_sis(
             ]
         else:
             s["allowed_meeting_patterns"] = all_pattern_ids
+
+    merge_mbap_catalog(timeslot_id_to_timeslot, pattern_key_to_pattern)
+    for s in sections:
+        apply_mbap_section_metadata(s, "", "")
 
     return (
         sections, list(instr_name_to_instructor.values()),

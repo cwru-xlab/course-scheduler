@@ -37,6 +37,7 @@ SPREADSHEET_SPECS: List[SheetSpec] = [
             "previous_meeting_pattern",
             "state",
             "duration",
+            "assigned_half",
             "prev_notes",
             "new_notes",
         ],

@@ -80,8 +80,15 @@ import { normalizeSectionForSave } from "@/lib/scheduling/normalizeSectionForSav
 import { isSectionArchived, normalizeSectionState } from "@/lib/scheduling/sectionState";
 import {
   SEMESTER_LENGTH_OPTIONS,
+  displayAssignedHalfForSection,
   normalizeSemesterLength,
+  resolveDisplayHalvesForRoomPlacements,
+  type RoomSlotPlacement,
+  termBadgeLabel,
+  termHoverLabel,
+  termStackRank,
 } from "@/lib/scheduling/semesterLength";
+import { computeHalfPairAccents } from "@/lib/scheduling/halfPairGroups";
 import { isPlaceholderInstructor } from "@/lib/scheduling/placeholderInstructor";
 import {
     CALENDAR_ROOM_SORT_OPTIONS,
@@ -135,6 +142,7 @@ import { SectionScheduleBanner } from "./SectionScheduleBanner";
 import { SoloCalendarEventCard } from "./SoloCalendarEventCard";
 import {
     assignCalendarEventLanes,
+    buildPlacementConflictEvents,
     calendarEventInstructorIds,
     calendarEventMatchesFilters,
     calendarEventSectionIds,
@@ -149,6 +157,7 @@ import {
 import {
     evaluatePlacement as evaluatePlacementShared,
     minutesOverlap,
+    resolvePlacementAssignedHalf,
     validatePreservedAssignment,
     type PlacementEvaluation,
     type PlacementSeverity,
@@ -200,6 +209,7 @@ type SectionDto = {
   tags?: string[];
   state?: string | null;
   semester_length?: string | null;
+  assigned_half?: string | null;
 };
 
 type RoomDto = {
@@ -241,6 +251,7 @@ const assignmentsSignature = (map: Record<string, {
   timeslot_ids?: string[];
   room_id?: string | null;
   meeting_pattern_id?: string | null;
+  assigned_half?: string | null;
 }>): string =>
   JSON.stringify(
     Object.entries(map)
@@ -249,6 +260,7 @@ const assignmentsSignature = (map: Record<string, {
         sectionId,
         v.room_id || "",
         v.meeting_pattern_id || "",
+        v.assigned_half || "",
         [...(v.timeslot_ids ?? [])].sort(),
       ]),
   );
@@ -285,7 +297,7 @@ type SaveScheduleModalState = {
 
 type CalendarAssignmentMap = Record<
   string,
-  { timeslot_ids: string[]; room_id: string; meeting_pattern_id: string }
+  { timeslot_ids: string[]; room_id: string; meeting_pattern_id: string; assigned_half?: string | null }
 >;
 
 type BlockedRuleMatch = {
@@ -361,19 +373,21 @@ function mapSolverAssignmentEntry(
     timeslot_ids: string[];
     room_id: string;
     meeting_pattern_id: string;
+    assigned_half?: string | null;
   },
 ) {
   return {
     timeslot_ids: assignment.timeslot_ids,
     room_id: normalizeAssignmentRoomId(section, assignment.room_id),
     meeting_pattern_id: assignment.meeting_pattern_id,
+    assigned_half: assignment.assigned_half ?? null,
   };
 }
 
 function normalizeAssignmentMapEntry(
   section: SectionDto,
   assignments: CalendarAssignmentMap,
-): { timeslot_ids: string[]; room_id: string; meeting_pattern_id: string } {
+): { timeslot_ids: string[]; room_id: string; meeting_pattern_id: string; assigned_half?: string | null } {
   const fromMap = assignments[section.id];
   return {
     timeslot_ids:
@@ -382,6 +396,7 @@ function normalizeAssignmentMapEntry(
         : persistedSectionTimeslotIds(section),
     room_id: (fromMap?.room_id ?? section.room_id ?? "").trim(),
     meeting_pattern_id: fromMap?.meeting_pattern_id ?? section.previous_meeting_pattern ?? "",
+    assigned_half: fromMap?.assigned_half ?? section.assigned_half ?? null,
   };
 }
 
@@ -862,7 +877,7 @@ function selectAnySlotNearMinutes(
   )[0];
 }
 
-const EVENT_HEIGHT_PX = 70;
+const EVENT_HEIGHT_PX = 78;
 const EVENT_GAP_PX = 8;
 const EVENT_TOP_PADDING_PX = 12;
 const MIN_TRACK_HEIGHT_PX = 240;
@@ -1516,6 +1531,7 @@ type PatternDayApplyRow = {
           timeslot_ids: [],
           room_id: "",
           meeting_pattern_id: "",
+          assigned_half: null,
         };
       }
     }
@@ -1559,6 +1575,7 @@ type PatternDayApplyRow = {
           sectionStatesRef.current,
         ),
         semester_length: normalizeSemesterLength(section.semester_length),
+        assigned_half: assignment?.assigned_half ?? section.assigned_half ?? null,
         room_id: normalizeAssignmentRoomId(
           section,
           assignment?.room_id ?? null,
@@ -1703,6 +1720,7 @@ type PatternDayApplyRow = {
                 timeslot_ids: persistedSectionTimeslotIds(section),
                 room_id: section.room_id ?? "",
                 meeting_pattern_id: section.previous_meeting_pattern ?? "",
+                assigned_half: section.assigned_half ?? null,
               },
             ]),
           );
@@ -2306,6 +2324,7 @@ type PatternDayApplyRow = {
             room_id: null,
             timeslot_id: null,
             timeslot_ids: [],
+            assigned_half: null,
             previous_meeting_pattern: preservedPattern,
           };
         }
@@ -2322,6 +2341,7 @@ type PatternDayApplyRow = {
           room_id: normalizeAssignmentRoomId(section, assignment.room_id) || null,
           timeslot_id: assignment.timeslot_ids?.[0] ?? null,
           timeslot_ids: assignment.timeslot_ids ?? [],
+          assigned_half: assignment.assigned_half ?? null,
           previous_meeting_pattern: nextMeetingPatternId,
           allowed_meeting_patterns: nextAllowedPatterns,
         };
@@ -2428,6 +2448,7 @@ type PatternDayApplyRow = {
     }
     const sectionId = meetingPatternSelectionModal.sectionId;
     const targetRoomId = meetingPatternSelectionModal.roomId;
+    const anchorSlot = timeslotById.get(meetingPatternSelectionModal.anchorSlotId);
     const nextTimeslotIds = Array.from(new Set(selection.timeslotIds));
     const validation = resolveStaggeredPatternPlacement(
       sectionId,
@@ -2443,12 +2464,54 @@ type PatternDayApplyRow = {
     }
 
     const linkedSectionIds = data ? crosslistPeerSectionIds(sectionId, data.sections) : [sectionId];
+    const linkedIdSet = new Set(linkedSectionIds);
+    const otherSectionIds = new Set<string>();
+    if (anchorSlot && data) {
+      const anchorStart = parseMinutes(anchorSlot.start_time);
+      const anchorEnd = parseMinutes(anchorSlot.end_time);
+      for (const otherSection of data.sections) {
+        if (linkedIdSet.has(otherSection.id) || isOnlineSection(otherSection)) continue;
+        const otherAssignment = assignmentsBySection[otherSection.id];
+        const otherRoomId = otherAssignment?.room_id ?? otherSection.room_id ?? "";
+        if (otherRoomId !== targetRoomId) continue;
+        const otherTimeslotIds =
+          otherAssignment?.timeslot_ids ??
+          (otherSection.timeslot_id ? [otherSection.timeslot_id] : []);
+        const overlaps = otherTimeslotIds
+          .map((timeslotId) => timeslotById.get(timeslotId))
+          .some((timeslot) => {
+            if (!timeslot) return false;
+            const start = parseMinutes(timeslot.start_time);
+            const end = parseMinutes(timeslot.end_time);
+            return minutesOverlap(anchorStart, anchorEnd, start, end);
+          });
+        if (overlaps) otherSectionIds.add(otherSection.id);
+      }
+    }
+    const section = sectionById.get(sectionId);
+    const autoAssignedHalf =
+      section && data
+        ? resolvePlacementAssignedHalf({
+            section,
+            existingAssignedHalf: assignmentsBySection[sectionId]?.assigned_half ?? null,
+            otherSectionIds: Array.from(otherSectionIds),
+            data,
+            assignmentsBySection,
+          })
+        : null;
     const nextAssignments: AssignmentMap = { ...assignmentsBySection };
     for (const linkedSectionId of linkedSectionIds) {
+      const prior = assignmentsBySection[linkedSectionId];
+      const linkedSection = sectionById.get(linkedSectionId);
+      const isHalfAny =
+        linkedSection && normalizeSemesterLength(linkedSection.semester_length) === "half_any";
       nextAssignments[linkedSectionId] = {
         timeslot_ids: [...validation.timeslotIds],
         room_id: targetRoomId,
         meeting_pattern_id: selection.meetingPatternId,
+        assigned_half: isHalfAny
+          ? autoAssignedHalf ?? prior?.assigned_half ?? null
+          : null,
       };
     }
     // Push a single undo entry covering the whole place+choose-pattern action,
@@ -2492,8 +2555,9 @@ type PatternDayApplyRow = {
     persistCalendarAssignments,
     pushUndoSnapshot,
     resolveEditorInvalidationForSection,
-    validatePatternPlacement,
     resolveStaggeredPatternPlacement,
+    sectionById,
+    timeslotById,
   ]);
 
   // Dismissing the modal without choosing a pattern reverts the deferred (never
@@ -2620,6 +2684,56 @@ type PatternDayApplyRow = {
       .sort((a, b) => a.groupId.localeCompare(b.groupId));
   }, [data, departmentPaletteByKey]);
 
+  const buildDisplayAssignedHalfMap = useCallback(
+    (day: Day) => {
+      if (!data) return new Map<string, "first_half" | "second_half">();
+      const placements: RoomSlotPlacement[] = [];
+      for (const section of data.sections) {
+        if (isOnlineSection(section)) continue;
+        const assignment = assignmentsBySection[section.id];
+        const timeslotIds =
+          assignment?.timeslot_ids ??
+          solverTimeslotIdsBySection[section.id] ??
+          (section.timeslot_id ? [section.timeslot_id] : []);
+        const roomId = String(assignment?.room_id ?? section.room_id ?? "").trim();
+        if (!roomId) continue;
+        for (const timeslotId of timeslotIds) {
+          const ts = timeslotById.get(timeslotId);
+          if (!ts || !timeslotMatchesDay(ts, day)) continue;
+          placements.push({
+            sectionId: section.id,
+            roomId,
+            startMin: parseMinutes(ts.start_time),
+            endMin: parseMinutes(ts.end_time),
+            semesterLength: section.semester_length,
+            assignedHalf: assignment?.assigned_half,
+          });
+        }
+      }
+      return resolveDisplayHalvesForRoomPlacements(placements);
+    },
+    [assignmentsBySection, data, solverTimeslotIdsBySection, timeslotById],
+  );
+
+  const displayAssignedHalfBySection = useMemo(
+    () => buildDisplayAssignedHalfMap(selectedDay),
+    [buildDisplayAssignedHalfMap, selectedDay],
+  );
+
+  const termStackRankForSection = useCallback(
+    (sectionId: string, semesterLength?: string | null, day: Day = selectedDay) =>
+      termStackRank(
+        semesterLength,
+        displayAssignedHalfForSection(
+          sectionId,
+          semesterLength,
+          buildDisplayAssignedHalfMap(day),
+          assignmentsBySection[sectionId]?.assigned_half,
+        ),
+      ),
+    [assignmentsBySection, buildDisplayAssignedHalfMap, selectedDay],
+  );
+
   const allDayEvents = useMemo(() => {
     if (!data) return [];
     const baseEvents = data.sections
@@ -2644,8 +2758,43 @@ type PatternDayApplyRow = {
 
     return assignCalendarEventLanes(
       mergeCrosslistCalendarEvents(baseEvents as RawCalendarEvent[]),
+      (event) => termStackRankForSection(event.section.id, event.section.semester_length),
     );
-  }, [assignmentsBySection, data, selectedDay, solverTimeslotIdsBySection, timeslotById]);
+  }, [
+    assignmentsBySection,
+    data,
+    selectedDay,
+    solverTimeslotIdsBySection,
+    termStackRankForSection,
+    timeslotById,
+  ]);
+
+  const halfPairAccentsBySection = useMemo(() => {
+    if (!data) return new Map<string, string>();
+    const placed = data.sections
+      .filter((s) => !isOnlineSection(s))
+      .flatMap((section) => {
+        const assignment = assignmentsBySection[section.id];
+        const timeslotIds =
+          assignment?.timeslot_ids ??
+          solverTimeslotIdsBySection[section.id] ??
+          (section.timeslot_id ? [section.timeslot_id] : []);
+        const roomId = assignment?.room_id ?? section.room_id ?? "";
+        return timeslotIds
+          .map((timeslotId) => timeslotById.get(timeslotId))
+          .filter((ts): ts is TimeslotDto => !!ts && timeslotMatchesDay(ts, selectedDay))
+          .map((ts) => ({
+            sectionId: section.id,
+            roomId: String(roomId),
+            timeslotKey: `${ts.id}:${ts.start_time}-${ts.end_time}`,
+            startMin: parseMinutes(ts.start_time),
+            endMin: parseMinutes(ts.end_time),
+            semesterLength: section.semester_length,
+            assignedHalf: displayAssignedHalfBySection.get(section.id),
+          }));
+      });
+    return computeHalfPairAccents(placed);
+  }, [assignmentsBySection, data, displayAssignedHalfBySection, selectedDay, solverTimeslotIdsBySection, timeslotById]);
 
   const onlineDayEvents = useMemo(() => {
     if (!data) return [];
@@ -2669,6 +2818,38 @@ type PatternDayApplyRow = {
       mergeCrosslistCalendarEvents(baseEvents as RawCalendarEvent[]),
     );
   }, [assignmentsBySection, data, selectedDay, solverTimeslotIdsBySection, timeslotById]);
+
+  const showOnlineBand = useMemo(() => {
+    if (!data) return false;
+    if (onlineDayEvents.length > 0) return true;
+    if (calendarDrag?.origin === "online") return true;
+    if (
+      pendingPlacementSectionId &&
+      data.sections.some((s) => s.id === pendingPlacementSectionId && isOnlineSection(s))
+    ) {
+      return true;
+    }
+    return data.sections.some((section) => {
+      if (!isOnlineSection(section)) return false;
+      return !isSectionScheduled(
+        section,
+        assignmentsBySection[section.id],
+        solverTimeslotIdsBySection[section.id],
+      );
+    });
+  }, [
+    assignmentsBySection,
+    calendarDrag?.origin,
+    data,
+    onlineDayEvents.length,
+    pendingPlacementSectionId,
+    solverTimeslotIdsBySection,
+  ]);
+
+  const placementConflictEvents = useMemo(
+    () => buildPlacementConflictEvents(allDayEvents, onlineDayEvents),
+    [allDayEvents, onlineDayEvents],
+  );
 
   const onlineBandTrackHeight = useMemo(() => {
     const laneCount = Math.max(
@@ -2704,8 +2885,12 @@ type PatternDayApplyRow = {
         instructor_id: section.instructor_id,
         instructorName: inst?.name?.trim() || section.instructor_id || "—",
         allowed_meeting_patterns: section.allowed_meeting_patterns,
+        semester_length: section.semester_length,
         state: section.state,
-        assignment,
+        assignment: {
+          ...assignment,
+          assigned_half: assignmentsBySection[section.id]?.assigned_half ?? null,
+        },
         room_id: section.room_id,
         timeslot_id: section.timeslot_id,
         previous_meeting_pattern: section.previous_meeting_pattern,
@@ -2753,6 +2938,7 @@ type PatternDayApplyRow = {
 
     return assignCalendarEventLanes(
       mergeCrosslistCalendarEvents(baseEvents as RawCalendarEvent[]),
+      (event) => termStackRankForSection(event.section.id, event.section.semester_length, day),
     );
   };
 
@@ -2798,17 +2984,9 @@ type PatternDayApplyRow = {
       const roomEvents = [...(allEventsByRoom.get(room.id) ?? [])].sort(
         (a, b) => a.start - b.start,
       );
-      const laneEndTimes: number[] = [];
-      const eventsWithLane = roomEvents.map((event) => {
-        let lane = laneEndTimes.findIndex((laneEnd) => laneEnd <= event.start);
-        if (lane === -1) {
-          lane = laneEndTimes.length;
-          laneEndTimes.push(event.end);
-        } else {
-          laneEndTimes[lane] = event.end;
-        }
-        return { ...event, lane };
-      });
+      const eventsWithLane = assignCalendarEventLanes(roomEvents, (event) =>
+        termStackRankForSection(event.section.id, event.section.semester_length),
+      );
       const laneCount = eventsWithLane.reduce((max, event) => Math.max(max, event.lane + 1), 0);
       const needed =
         EVENT_TOP_PADDING_PX * 2 +
@@ -2822,7 +3000,7 @@ type PatternDayApplyRow = {
       );
       return { room, visibleEvents, hiddenEvents, rowHeight: Math.max(100, needed) };
     });
-  }, [allEventsByRoom, data, roomSortMode, sectionMatchesFilters]);
+  }, [allEventsByRoom, data, roomSortMode, sectionMatchesFilters, termStackRankForSection]);
 
   const linkedSectionIdsBySection = useMemo(() => {
     const map = new Map<string, string[]>();
@@ -2856,17 +3034,18 @@ type PatternDayApplyRow = {
 
     return sortRooms(data.rooms, roomSortMode).map((room) => {
       const roomEvents = [...(byRoom.get(room.id) ?? [])].sort((a, b) => a.start - b.start);
-      const laneEndTimes: number[] = [];
-      const roomEventsWithLane = roomEvents.map((event) => {
-        let lane = laneEndTimes.findIndex((laneEnd) => laneEnd <= event.start);
-        if (lane === -1) {
-          lane = laneEndTimes.length;
-          laneEndTimes.push(event.end);
-        } else {
-          laneEndTimes[lane] = event.end;
-        }
-        return { ...event, lane };
-      });
+      const displayHalves = buildDisplayAssignedHalfMap(day);
+      const roomEventsWithLane = assignCalendarEventLanes(roomEvents, (event) =>
+        termStackRank(
+          event.section.semester_length,
+          displayAssignedHalfForSection(
+            event.section.id,
+            event.section.semester_length,
+            displayHalves,
+            assignmentsBySection[event.section.id]?.assigned_half,
+          ),
+        ),
+      );
       const laneCount = roomEventsWithLane.reduce((max, event) => Math.max(max, event.lane + 1), 0);
       const needed =
         EVENT_TOP_PADDING_PX * 2 +
@@ -3310,6 +3489,7 @@ type PatternDayApplyRow = {
           timeslot_ids: [],
           room_id: "",
           meeting_pattern_id: preservedPattern,
+          assigned_half: null,
         };
         nextSolverTimeslots[id] = [];
       }
@@ -4491,6 +4671,7 @@ type PatternDayApplyRow = {
         data,
         assignmentsBySection,
         allDayEvents,
+        instructorConflictEvents: placementConflictEvents,
         linkedSectionIds,
         instructorById,
         findBlockedPlacementMessage,
@@ -4612,6 +4793,7 @@ type PatternDayApplyRow = {
     [
       assignmentsBySection,
       allDayEvents,
+      placementConflictEvents,
       backendSaveMessage,
       conflictSectionIds,
       dragFeedback,
@@ -5167,6 +5349,7 @@ type PatternDayApplyRow = {
         data,
         assignmentsBySection,
         allDayEvents,
+        instructorConflictEvents: placementConflictEvents,
         linkedSectionIds,
         instructorById,
         findBlockedPlacementMessage,
@@ -5175,6 +5358,7 @@ type PatternDayApplyRow = {
     },
     [
       allDayEvents,
+      placementConflictEvents,
       assignmentsBySection,
       data,
       findBlockedPlacementMessage,
@@ -5190,7 +5374,40 @@ type PatternDayApplyRow = {
       targetRoomId: string,
       slot: TimeslotWithMinutes,
       placementCheck: PlacementEvaluation,
+      assignedHalfOverride?: "first_half" | "second_half",
     ) => {
+      const invalidation = editorInvalidatedPlacements.get(sectionId);
+      if (invalidation?.reason === "pattern") {
+        setDragFeedback({
+          status: "invalid",
+          message: "Update allowed meeting patterns in the editor before placing.",
+        });
+        return;
+      }
+      const section = sectionById.get(sectionId);
+      const linkedSectionIds = data ? crosslistPeerSectionIds(sectionId, data.sections) : [sectionId];
+      const linkedIdSet = new Set(linkedSectionIds);
+      const otherSectionIds = new Set<string>();
+      for (const event of allDayEvents) {
+        const eventRoomId =
+          assignmentsBySection[event.section.id]?.room_id ?? event.section.room_id ?? "";
+        if (eventRoomId !== targetRoomId) continue;
+        if (!minutesOverlap(slot.start, slot.end, event.start, event.end)) continue;
+        for (const id of calendarEventSectionIds(event)) {
+          if (!linkedIdSet.has(id)) otherSectionIds.add(id);
+        }
+      }
+      const autoAssignedHalf =
+        section && data
+          ? resolvePlacementAssignedHalf({
+              section,
+              existingAssignedHalf:
+                assignedHalfOverride ?? assignmentsBySection[sectionId]?.assigned_half ?? null,
+              otherSectionIds: Array.from(otherSectionIds),
+              data,
+              assignmentsBySection,
+            })
+          : null;
       const patternOptions = buildMeetingPatternOptionsForPlacement(sectionId, slot.id);
       if (patternOptions.length === 0) {
         const message =
@@ -5199,7 +5416,6 @@ type PatternDayApplyRow = {
         setBackendSaveMessage({ type: "error", text: message });
         return;
       }
-      const section = sectionById.get(sectionId);
       const preferredPatternId = String(
         assignmentsBySection[sectionId]?.meeting_pattern_id ??
           section?.previous_meeting_pattern ??
@@ -5306,7 +5522,6 @@ type PatternDayApplyRow = {
         return;
       }
 
-      const linkedSectionIds = data ? crosslistPeerSectionIds(sectionId, data.sections) : [sectionId];
       pushUndoSnapshot({
         assignmentsBySection,
         solverTimeslotIdsBySection,
@@ -5317,10 +5532,18 @@ type PatternDayApplyRow = {
 
       const nextAssignments: AssignmentMap = { ...assignmentsBySection };
       for (const linkedSectionId of linkedSectionIds) {
+        const prior = assignmentsBySection[linkedSectionId];
+        const linkedSection = sectionById.get(linkedSectionId);
+        const isHalfAny =
+          linkedSection &&
+          normalizeSemesterLength(linkedSection.semester_length) === "half_any";
         nextAssignments[linkedSectionId] = {
           timeslot_ids: [...validation.timeslotIds],
           room_id: targetRoomId,
           meeting_pattern_id: selection.meetingPatternId,
+          assigned_half: isHalfAny
+            ? assignedHalfOverride ?? autoAssignedHalf ?? prior?.assigned_half ?? null
+            : null,
         };
       }
       setAssignmentsBySection(nextAssignments);
@@ -5365,6 +5588,7 @@ type PatternDayApplyRow = {
       });
     },
     [
+      allDayEvents,
       assignmentsBySection,
       backendSaveMessage,
       buildMeetingPatternOptionsForPlacement,
@@ -5485,6 +5709,7 @@ type PatternDayApplyRow = {
         data,
         assignmentsBySection,
         allDayEvents: [...allDayEvents, ...onlineDayEvents],
+        instructorConflictEvents: placementConflictEvents,
         linkedSectionIds,
         instructorById,
         findBlockedPlacementMessage,
@@ -5494,6 +5719,7 @@ type PatternDayApplyRow = {
     [
       allDayEvents,
       onlineDayEvents,
+      placementConflictEvents,
       assignmentsBySection,
       data,
       findBlockedPlacementMessage,
@@ -7601,6 +7827,18 @@ type PatternDayApplyRow = {
                     const isConflicting = conflictSectionIds.has(section.id);
                     const isStaggered = sectionIsStaggered(section.id);
                     const hoverLines = formatCalendarSectionHoverLines(section, professor);
+                    const assignedHalf = displayAssignedHalfForSection(
+                      section.id,
+                      section.semester_length,
+                      displayAssignedHalfBySection,
+                      assignmentsBySection[section.id]?.assigned_half,
+                    );
+                    const badge = termBadgeLabel(section.semester_length, assignedHalf);
+                    const hoverTermLine = termHoverLabel(section.semester_length, assignedHalf);
+                    const eventTermStackRank = termStackRankForSection(
+                      section.id,
+                      section.semester_length,
+                    );
 
                     return (
                       <SoloCalendarEventCard
@@ -7610,6 +7848,10 @@ type PatternDayApplyRow = {
                         professor={professor}
                         hoverTitle={hoverLines.title}
                         hoverInstructor={hoverLines.instructor}
+                        hoverTermLine={hoverTermLine}
+                        termBadge={badge}
+                        termStackRank={eventTermStackRank}
+                        halfPairAccent={halfPairAccentsBySection.get(section.id)}
                         color={color}
                         matchesHoveredDepartment={matchesAllFilters}
                         hasActiveFilter={activeLegendDepartmentKeys.size > 0 || hasSearch}
@@ -7736,11 +7978,7 @@ type PatternDayApplyRow = {
             </div>
           </div>
 
-          {onlineDayEvents.length > 0 ||
-          (pendingPlacementSectionId &&
-            data?.sections.some(
-              (s) => s.id === pendingPlacementSectionId && isOnlineSection(s),
-            )) ? (
+          {showOnlineBand ? (
             <div className="border-t border-violet-200 bg-violet-50/40">
               <div className="flex border-b border-violet-200/80 bg-violet-100/50">
                 <div className="w-40 shrink-0 border-r border-violet-200 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-violet-800">
@@ -8084,26 +8322,81 @@ type PatternDayApplyRow = {
                       departmentPaletteByKey.get(departmentColorKey(section)) ??
                       solidPaletteAt(0);
                     const dragSectionId = section.id;
-                    const isDragSource = calendarDrag?.sectionId === dragSectionId;
+                    const isDragSource =
+                      calendarDrag?.sectionId === dragSectionId ||
+                      (queueUnplaceDrag?.sectionId === dragSectionId && queueUnplaceDrag.hasMoved);
                     const lockState = getSectionLockState(section.id);
                     const isConflicting = conflictSectionIds.has(section.id);
+                    const matchesHoveredDepartment =
+                      activeLegendDepartmentKeys.size === 0 ||
+                      activeLegendDepartmentKeys.has(departmentColorKey(section));
+                    const matchesSearch =
+                      !hasSearch || (matchingSectionIds?.has(section.id) ?? true);
+                    const matchesAllFilters = matchesHoveredDepartment && matchesSearch;
+                    const assignedHalf = displayAssignedHalfForSection(
+                      section.id,
+                      section.semester_length,
+                      displayAssignedHalfBySection,
+                      assignmentsBySection[section.id]?.assigned_half,
+                    );
+                    const badge = termBadgeLabel(section.semester_length, assignedHalf);
+                    const hoverTermLine = termHoverLabel(section.semester_length, assignedHalf);
+                    const timeLabel = `${formatTimeAmPm(timeslot.start_time)} - ${formatTimeAmPm(timeslot.end_time)}`;
+                    const isPointerOverQueueSidebar = (clientX: number, clientY: number) => {
+                      const sidebarRect = queueSidebarRef.current?.getBoundingClientRect();
+                      return (
+                        !!sidebarRect &&
+                        clientX >= sidebarRect.left &&
+                        clientX <= sidebarRect.right &&
+                        clientY >= sidebarRect.top &&
+                        clientY <= sidebarRect.bottom
+                      );
+                    };
                     return (
-                      <div
+                      <SoloCalendarEventCard
                         key={`online-${section.id}`}
-                        className={clsx(
-                          "absolute z-[10] rounded-lg border-l-4 px-2 py-1 shadow-sm touch-none select-none overflow-hidden",
-                          isDragSource && calendarDrag?.hasMoved && "opacity-40",
-                          isConflicting && "ring-2 ring-red-500/70",
+                        timeLabel={timeLabel}
+                        faceTitle={hoverLines.title}
+                        professor={professor}
+                        hoverTitle={hoverLines.title}
+                        hoverInstructor={hoverLines.instructor}
+                        hoverTermLine={hoverTermLine}
+                        termBadge={badge}
+                        termStackRank={termStackRankForSection(
+                          section.id,
+                          section.semester_length,
                         )}
+                        color={color}
+                        matchesHoveredDepartment={matchesAllFilters}
+                        hasActiveFilter={activeLegendDepartmentKeys.size > 0 || hasSearch}
+                        isDragSource={isDragSource}
+                        hasDragMoved={
+                          Boolean(calendarDrag?.hasMoved) ||
+                          Boolean(
+                            queueUnplaceDrag?.sectionId === dragSectionId &&
+                              queueUnplaceDrag?.hasMoved,
+                          )
+                        }
+                        placementLocked={lockState}
+                        draggable={Boolean(solverInput)}
+                        lockable={Boolean(solverInput)}
+                        isStaggered={sectionIsStaggered(section.id)}
+                        onToggleLock={(e) => requestToggleLockFromCalendar(section.id, e?.shiftKey)}
+                        isConflicting={isConflicting}
+                        queueDragSectionId={section.id}
+                        onQueueDragBlocked={() =>
+                          setDragFeedback({
+                            status: "invalid",
+                            message:
+                              "This section is locked for the solver. Unlock it in the schedule table to move it.",
+                          })
+                        }
                         style={{
                           left: `${leftPct * 100}%`,
                           width: `${Math.max(widthPct * 100, 0.5)}%`,
                           top: topPx,
                           height: EVENT_HEIGHT_PX,
-                          backgroundColor: color.cardBg,
-                          borderLeftColor: color.cardBorder,
                         }}
-                        title={`${hoverLines.title} — ${hoverLines.instructor}`}
                         onPointerDown={(e) => {
                           if (!solverInput || e.button !== 0) return;
                           e.stopPropagation();
@@ -8127,9 +8420,30 @@ type PatternDayApplyRow = {
                             });
                             return;
                           }
+                          if (e.shiftKey) {
+                            calendarDragPointerYRef.current = e.clientY;
+                            e.currentTarget.setPointerCapture(e.pointerId);
+                            setConflictSectionIds(new Set());
+                            setBackendSaveMessage(null);
+                            queueSidebarAutoOpenedRef.current = false;
+                            sidebarUnplaceDropSucceededRef.current = false;
+                            setQueueUnplaceDrag({
+                              sectionId: dragSectionId,
+                              pointerId: e.pointerId,
+                              startX: e.clientX,
+                              startY: e.clientY,
+                              hasMoved: false,
+                              clientX: e.clientX,
+                              clientY: e.clientY,
+                              faceTitle: hoverLines.title,
+                              professor,
+                              cardBg: color.cardBg,
+                              cardBorder: color.cardBorder,
+                            });
+                            return;
+                          }
                           calendarDragPointerYRef.current = e.clientY;
-                          const targetEl = e.currentTarget;
-                          targetEl.setPointerCapture(e.pointerId);
+                          e.currentTarget.setPointerCapture(e.pointerId);
                           setConflictSectionIds(new Set());
                           setBackendSaveMessage(null);
                           setCalendarDrag({
@@ -8161,12 +8475,23 @@ type PatternDayApplyRow = {
                             }
                           };
                           if (!data) return keepHasMoved();
+                          if (isPointerOverQueueSidebar(e.clientX, e.clientY)) {
+                            keepHasMoved();
+                            if (!queueSidebarOpen) {
+                              autoOpenQueueSidebar();
+                            }
+                            setDragFeedback({
+                              status: "valid",
+                              message: "Release in the queue sidebar to unplace.",
+                            });
+                            return;
+                          }
                           if (!isPointerOverOnlineBand(e.clientX, e.clientY)) {
                             keepHasMoved();
                             setDragFeedback({
                               status: "invalid",
                               message:
-                                "Online sections stay in the Online band — drop on a highlighted slot.",
+                                "Drop on a highlighted online slot, or drag to the queue sidebar to unplace.",
                             });
                             return;
                           }
@@ -8234,6 +8559,10 @@ type PatternDayApplyRow = {
                               suppressCardClickRef.current = false;
                             } else {
                               suppressCardClickRef.current = true;
+                              if (isPointerOverQueueSidebar(e.clientX, e.clientY)) {
+                                unplaceSection(prev.sectionId);
+                                return null;
+                              }
                               const overOnlineBand = isPointerOverOnlineBand(
                                 e.clientX,
                                 e.clientY,
@@ -8242,7 +8571,7 @@ type PatternDayApplyRow = {
                                 setDragFeedback({
                                   status: "invalid",
                                   message:
-                                    "Online sections stay in the Online band — drop on a highlighted slot.",
+                                    "Drop on a highlighted online slot, or drag to the queue sidebar to unplace.",
                                 });
                                 return null;
                               }
@@ -8282,12 +8611,7 @@ type PatternDayApplyRow = {
                             draft: toSectionFormDraft(section),
                           });
                         }}
-                      >
-                        <div className="truncate text-[9px] font-black text-slate-900">
-                          {hoverLines.title}
-                        </div>
-                        <div className="truncate text-[8px] text-slate-600">{professor}</div>
-                      </div>
+                      />
                     );
                   })}
                 </div>
@@ -9436,6 +9760,7 @@ type PatternDayApplyRow = {
           const printRows = getRoomRowsForDay(day);
           const printRowsWithEvents = printRows.filter((row) => row.events.length > 0);
           const onlineEvents = getOnlineEventsForDay(day);
+          const printDisplayHalves = buildDisplayAssignedHalfMap(day);
           const hasRoomEvents = printRowsWithEvents.length > 0;
           const hasOnlineEvents = onlineEvents.length > 0;
           const hasAnyEvents = hasRoomEvents || hasOnlineEvents;
@@ -9450,6 +9775,16 @@ type PatternDayApplyRow = {
               departmentPaletteByKey.get(departmentColorKey(section)) ?? solidPaletteAt(0);
             const borderColor = options?.online ? "#7C3AED" : color.printBorder;
             const backgroundColor = options?.online ? "#F5F3FF" : color.printBg;
+            const printTermBadge = (sectionId: string, semesterLength?: string | null) =>
+              termBadgeLabel(
+                semesterLength,
+                displayAssignedHalfForSection(
+                  sectionId,
+                  semesterLength,
+                  printDisplayHalves,
+                  assignmentsBySection[sectionId]?.assigned_half,
+                ),
+              );
 
             if (isCrosslistGroupEvent(event) && event.crosslistGroupId && event.crosslistMembers) {
               return (
@@ -9482,7 +9817,9 @@ type PatternDayApplyRow = {
                         const sectionBit = member.section_code
                           ? ` · Section ${member.section_code}`
                           : "";
-                        const line = `${courseLine}${sectionBit} (${professorName})`;
+                        const termBadge = printTermBadge(member.id, member.semester_length);
+                        const termPrefix = termBadge ? `${termBadge} · ` : "";
+                        const line = `${termPrefix}${courseLine}${sectionBit} (${professorName})`;
                         return (
                           <li key={member.id} className="break-words">
                             {line}
@@ -9501,6 +9838,8 @@ type PatternDayApplyRow = {
             const dept = (section.department ?? "").toString().trim();
             const courseLine = [dept, String(section.course_id)].filter(Boolean).join(" ");
             const sectionBit = section.section_code ? ` · Section ${section.section_code}` : "";
+            const termBadge = printTermBadge(section.id, section.semester_length);
+            const termPrefix = termBadge ? `${termBadge} · ` : "";
             return (
               <div
                 key={eventKey}
@@ -9517,6 +9856,7 @@ type PatternDayApplyRow = {
                 </div>
                 <div className="min-w-0 flex-1 leading-snug">
                   <div className="font-bold text-slate-900 break-words">
+                    {termPrefix}
                     {courseLine}
                     {sectionBit}
                   </div>
