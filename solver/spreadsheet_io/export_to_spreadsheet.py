@@ -198,7 +198,7 @@ def _rows_for_sheet(
                     item.get("previous_meeting_pattern") or ""
                 ),
                 "state": _export_str(item.get("state") or "active"),
-                "semester_length": semester_length_label(item.get("semester_length")),
+                "duration": semester_length_label(item.get("semester_length")),
                 "prev_notes": "",
                 "new_notes": "",
             }

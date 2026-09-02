@@ -16,7 +16,7 @@ export const SECTION_COLUMN_SPECS: EditorColumnSpec[] = [
     minWidthPx: 88,
   },
   { id: "state", label: "State", defaultVisible: true, weight: 5, minWidthPx: 88 },
-  { id: "semester", label: "Semester", defaultVisible: true, weight: 7, minWidthPx: 112 },
+  { id: "semester", label: "Duration", defaultVisible: true, weight: 7, minWidthPx: 112 },
   { id: "instructor", label: "Instructor", defaultVisible: true, weight: 14, minWidthPx: 160 },
   { id: "enroll", label: "Expected Enrollment", defaultVisible: true, weight: 6, minWidthPx: 88 },
   { id: "cap", label: "Cap", defaultVisible: true, weight: 4, minWidthPx: 56 },

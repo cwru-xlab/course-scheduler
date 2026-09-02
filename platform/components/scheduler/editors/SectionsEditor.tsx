@@ -221,7 +221,7 @@ export const SectionsEditor = ({
     },
     {
       columnId: "semester",
-      label: "Semester",
+      label: "Duration",
       control: { kind: "multiSelect" },
       options: SEMESTER_LENGTH_OPTIONS,
       getValue: ({ section }) => normalizeSemesterLength(section.semester_length),
@@ -368,7 +368,7 @@ export const SectionsEditor = ({
             value={normalizeSemesterLength(section.semester_length)}
             options={SEMESTER_LENGTH_OPTIONS}
             onChange={(v) => updateSection(idx, "semester_length", v as SemesterLength)}
-            placeholder="Semester"
+            placeholder="Duration"
           />
         );
       case "instructor":
@@ -459,7 +459,7 @@ export const SectionsEditor = ({
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
       searchPlaceholder="Search sections..."
-      searchHint="Search by ID, department, course, code, section number, semester, or instructor."
+      searchHint="Search by ID, department, course, code, section number, duration, or instructor."
       filterBar={
         <div className="flex flex-wrap items-center gap-2">
           <EditorColumnFilters
