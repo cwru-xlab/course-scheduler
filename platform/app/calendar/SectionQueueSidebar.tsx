@@ -9,6 +9,7 @@ import { setCalendarDragImage } from "./calendarDragGhost";
 import type { EditorInvalidatedPlacement, EditorInvalidationReason } from "@/lib/scheduling/mergeEditorIntoSnapshot";
 import { isSectionArchived } from "@/lib/scheduling/sectionState";
 import { isQueuedSection, primaryPatternForSection, sectionMatchesPatternFilter } from "@/lib/scheduling/sectionOnline";
+import { sectionArchivedFromEditor } from "@/lib/scheduling/calendarPlacementGuard";
 
 export type QueueSectionRow = {
   id: string;
@@ -24,6 +25,7 @@ export type QueueSectionRow = {
   room_id?: string | null;
   timeslot_id?: string | null;
   previous_meeting_pattern?: string | null;
+  tags?: string[];
   isGhost?: boolean;
   editorInvalidation?: EditorInvalidatedPlacement | null;
 };
@@ -49,7 +51,7 @@ type QueueSort = "course" | "pattern";
 function invalidationLabel(reason: EditorInvalidationReason): string {
   switch (reason) {
     case "pattern":
-      return "Pattern no longer allowed — fix in editor";
+      return "Meeting patterns changed — place in a compatible timeslot";
     case "capacity":
       return "Enrollment exceeds room capacity";
     case "room_requirements":
@@ -116,6 +118,9 @@ export function SectionQueueSidebar({
       }
     } else if (tab === "archived") {
       rows = rows.filter((s) => isSectionArchived(s));
+      if (needsAttentionOnly) {
+        rows = rows.filter((s) => !s.queued || sectionArchivedFromEditor(s));
+      }
     }
     if (tab === "unscheduled" && patternFilter) {
       rows = rows.filter((s) => sectionMatchesPatternFilter(s, patternFilter));
@@ -134,6 +139,11 @@ export function SectionQueueSidebar({
       const aInvalid = Boolean(a.editorInvalidation);
       const bInvalid = Boolean(b.editorInvalidation);
       if (aInvalid !== bInvalid) return aInvalid ? -1 : 1;
+      if (tab === "archived") {
+        const aScheduled = !a.queued;
+        const bScheduled = !b.queued;
+        if (aScheduled !== bScheduled) return aScheduled ? -1 : 1;
+      }
       if (tab === "unscheduled" && sortBy === "pattern") {
         const patternCmp = primaryPatternForSection(a).localeCompare(
           primaryPatternForSection(b),
@@ -149,10 +159,11 @@ export function SectionQueueSidebar({
   }, [enriched, tab, search, patternFilter, sortBy, needsAttentionOnly]);
 
   const activeFilterCount = useMemo(() => {
-    if (tab !== "unscheduled") return 0;
     let count = 0;
-    if (patternFilter) count += 1;
-    if (sortBy !== "course") count += 1;
+    if (tab === "unscheduled") {
+      if (patternFilter) count += 1;
+      if (sortBy !== "course") count += 1;
+    }
     if (needsAttentionOnly) count += 1;
     return count;
   }, [tab, patternFilter, sortBy, needsAttentionOnly]);
@@ -356,7 +367,17 @@ export function SectionQueueSidebar({
                     </div>
                   ) : null}
                 </>
-              ) : null}
+              ) : (
+                <label className="flex min-w-0 cursor-pointer items-center gap-2 text-[10px] font-semibold text-slate-600">
+                  <input
+                    type="checkbox"
+                    className="size-3.5 shrink-0 rounded border-slate-300"
+                    checked={needsAttentionOnly}
+                    onChange={(e) => setNeedsAttentionOnly(e.target.checked)}
+                  />
+                  <span className="min-w-0">Needs attention only</span>
+                </label>
+              )}
             </div>
 
             <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-2 pb-3 pt-2 space-y-1.5 [scrollbar-gutter:stable]">
@@ -370,7 +391,6 @@ export function SectionQueueSidebar({
                   );
                   const active = activeDragSectionId === row.id;
                   const invalidation = row.editorInvalidation;
-                  const placeBlocked = invalidation?.reason === "pattern";
                   return (
                     <div
                       key={row.id}
@@ -386,17 +406,10 @@ export function SectionQueueSidebar({
                     >
                       <button
                         type="button"
-                        draggable={!placeBlocked}
+                        draggable
                         aria-label={`Drag ${title} to calendar`}
-                        className={clsx(
-                          "mt-0.5 shrink-0 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600",
-                          placeBlocked ? "cursor-not-allowed opacity-50" : "cursor-grab active:cursor-grabbing",
-                        )}
+                        className="mt-0.5 shrink-0 cursor-grab rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing"
                         onDragStart={(e) => {
-                          if (placeBlocked) {
-                            e.preventDefault();
-                            return;
-                          }
                           suppressRowClickRef.current = true;
                           e.dataTransfer.setData("text/section-id", row.id);
                           e.dataTransfer.effectAllowed = "move";
@@ -451,6 +464,16 @@ export function SectionQueueSidebar({
                           <div className="mt-1 flex items-center gap-1 text-[9px] text-slate-500">
                             <Archive className="size-3" />
                             Archived
+                          </div>
+                        ) : null}
+                        {isSectionArchived(row) && !row.queued ? (
+                          <div className="mt-1 inline-flex rounded bg-amber-200/80 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-amber-900">
+                            Still scheduled on calendar
+                          </div>
+                        ) : null}
+                        {sectionArchivedFromEditor(row) ? (
+                          <div className="mt-1 text-[9px] font-semibold text-violet-700">
+                            Archived from editor
                           </div>
                         ) : null}
                         {(row.allowed_meeting_patterns?.length ?? 0) > 0 ? (

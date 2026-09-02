@@ -181,7 +181,7 @@ export default function HistoryPage() {
       ) : null}
 
       <div
-        className="sticky top-[calc(4rem+1rem)] z-40 rounded-xl border border-sky-200 bg-sky-50/80 backdrop-blur-md p-4 shadow-sm ring-1 ring-sky-100"
+        className="sticky top-[calc(var(--app-navbar-height,4rem)+1rem)] z-40 rounded-xl border border-sky-200 bg-sky-50/80 backdrop-blur-md p-4 shadow-sm ring-1 ring-sky-100"
         aria-label="Active schedule"
       >
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

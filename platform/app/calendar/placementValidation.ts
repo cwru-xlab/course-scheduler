@@ -26,6 +26,7 @@ export type PlacementReasonCode =
   | "blocked"
   | "capacity"
   | "room_conflict"
+  | "room_requirements"
   | "instructor_conflict"
   | "missing_data"
   | "online_section";
@@ -152,7 +153,7 @@ export function validatePreservedAssignment(input: {
     return {
       valid: false,
       reason: "pattern",
-      message: "Pattern no longer allowed — fix in editor",
+      message: "Meeting patterns changed — place in a compatible timeslot",
     };
   }
 
@@ -247,6 +248,16 @@ export function evaluatePlacement(input: {
     };
   }
 
+  if (isOnlineSection(section) && targetRoomId.trim()) {
+    return {
+      severity: "block",
+      reasonCode: "online_section",
+      message:
+        "Online sections (800–899) use the Online band below — set section number and place there.",
+      conflictSectionIds: [],
+    };
+  }
+
   const linkedIds = linkedSectionIds.length ? linkedSectionIds : [sectionId];
   const linkedSectionIdSet = new Set(linkedIds);
   const timeStr = `${formatTime(slot.start_time)}-${formatTime(slot.end_time)}`;
@@ -276,6 +287,16 @@ export function evaluatePlacement(input: {
     };
   }
 
+  const roomRequirements = section.room_requirements ?? [];
+  const roomRequirementMismatch =
+    targetRoomId.trim() !== "" &&
+    targetRoom &&
+    roomRequirements.length > 0 &&
+    !roomMeetsRequirements(targetRoom, roomRequirements);
+  const missingRoomFeatures = roomRequirementMismatch
+    ? roomRequirements.filter((req) => !(targetRoom?.features ?? []).includes(req))
+    : [];
+
   const resolveEventRoomId = (eventItem: CalendarEvent) =>
     getCalendarEventRoomId(
       eventItem,
@@ -288,12 +309,15 @@ export function evaluatePlacement(input: {
   const overlapsSelected = (eventItem: CalendarEvent) =>
     minutesOverlap(slot.start, slot.end, eventItem.start, eventItem.end);
 
-  // 3. Room overlap — warning, move still applied.
-  const roomConflicts = allDayEvents.filter((eventItem) => {
-    if (!calendarEventConflictsWithSectionIds(eventItem, linkedSectionIdSet)) return false;
-    if (resolveEventRoomId(eventItem) !== targetRoomId) return false;
-    return overlapsSelected(eventItem);
-  });
+  // 3. Room overlap — warning, move still applied (skip for online band with no room).
+  const roomConflicts =
+    targetRoomId.trim() === ""
+      ? []
+      : allDayEvents.filter((eventItem) => {
+          if (!calendarEventConflictsWithSectionIds(eventItem, linkedSectionIdSet)) return false;
+          if (resolveEventRoomId(eventItem) !== targetRoomId) return false;
+          return overlapsSelected(eventItem);
+        });
 
   // 4. Instructor double-booking (any room) — warning, move still applied.
   const draggedInstructorIds = new Set<string>();
@@ -316,7 +340,7 @@ export function evaluatePlacement(input: {
           );
         });
 
-  if (roomConflicts.length === 0 && instructorConflicts.length === 0) {
+  if (roomConflicts.length === 0 && instructorConflicts.length === 0 && !roomRequirementMismatch) {
     return {
       severity: "ok",
       reasonCode: null,
@@ -328,6 +352,17 @@ export function evaluatePlacement(input: {
   const flagged = new Set<string>(linkedIds);
   for (const eventItem of [...roomConflicts, ...instructorConflicts]) {
     for (const id of calendarEventSectionIds(eventItem)) flagged.add(id);
+  }
+
+  if (roomRequirementMismatch) {
+    const missingLabel =
+      missingRoomFeatures.length > 0 ? missingRoomFeatures.join(", ") : "required features";
+    return {
+      severity: "warn",
+      reasonCode: "room_requirements",
+      message: `Warning: room ${targetRoomId} is missing ${missingLabel} required by ${section.department ?? ""} ${section.course_id} at ${selectedDay} ${timeStr}.`,
+      conflictSectionIds: Array.from(flagged),
+    };
   }
 
   // Instructor conflicts take message priority so their spec'd wording is shown.

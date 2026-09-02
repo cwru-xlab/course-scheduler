@@ -210,4 +210,22 @@ describe("mergeEditorIntoSnapshot", () => {
     assert.equal(result.editorInvalidatedPlacements.length, 0);
     assert.equal(result.snapshot.solution.assignments.length, 1);
   });
+
+  it("preserves online placement without room_id", () => {
+    const prevInput = baseInput([baseSection("s1", { section_number: "801" })], rooms);
+    const freshInput = baseInput([baseSection("s1", { section_number: "801", enrollment_cap: 25 })], rooms);
+    const existing = snapshotFromInput(prevInput, [
+      {
+        section_id: "s1",
+        room_id: "",
+        timeslot_ids: ["t1"],
+        meeting_pattern_id: "MWF-10",
+      },
+    ]);
+
+    const result = mergeEditorIntoSnapshot(existing, freshInput);
+    assert.equal(result.editorInvalidatedPlacements.length, 0);
+    assert.equal(result.snapshot.solution.assignments.length, 1);
+    assert.deepEqual(result.snapshot.solution.assignments[0]?.timeslot_ids, ["t1"]);
+  });
 });
