@@ -94,7 +94,6 @@ import {
 } from "@/lib/scheduling/roomNumber";
 import { sectionLocksFromInput } from "@/lib/scheduling/sectionLocks";
 import { isAssignmentEmpty, isOnlineSection, isSectionScheduled, normalizeAssignmentRoomId, persistedSectionTimeslotIds, resolveEffectiveAssignment } from "@/lib/scheduling/sectionOnline";
-import { isSectionArchived, normalizeSectionState } from "@/lib/scheduling/sectionState";
 import {
     SCHEDULING_WINDOW_END_HOUR,
     SCHEDULING_WINDOW_START_HOUR,
