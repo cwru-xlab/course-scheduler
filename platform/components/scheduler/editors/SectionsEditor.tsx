@@ -42,6 +42,10 @@ import {
   normalizeSemesterLength,
   semesterLengthLabel,
 } from "@/lib/scheduling/semesterLength";
+import {
+  isSectionPlacedOnCalendar,
+  tagSectionArchivedFromEditor,
+} from "@/lib/scheduling/calendarPlacementGuard";
 
 const STATE_OPTIONS: { key: SectionState; label: string }[] = [
   { key: "active", label: "Active" },
@@ -102,7 +106,7 @@ export const SectionsEditor = ({
   );
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addDraft, setAddDraft] = useState<Section | null>(null);
-  const { confirmRowAdded, getRowHighlightClass } = useEditorActions();
+  const { confirmRowAdded, getRowHighlightClass, showSuccess } = useEditorActions();
   const sectionsRef = useStableDataRef(sections);
 
   useLayoutEffect(() => {
@@ -144,6 +148,17 @@ export const SectionsEditor = ({
   };
 
   const deleteSection = (index: number) => {
+    const section = sectionsRef.current[index];
+    if (isSectionPlacedOnCalendar(section.id)) {
+      const newSections = [...sectionsRef.current];
+      newSections[index] = tagSectionArchivedFromEditor({
+        ...section,
+        state: "archived",
+      });
+      onUpdate(newSections);
+      showSuccess("Section archived — it remains on the calendar until you unplace it.");
+      return;
+    }
     onUpdate(sectionsRef.current.filter((_, i) => i !== index));
   };
 

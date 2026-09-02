@@ -14,6 +14,10 @@ import { persistSchedulingInput } from "./persist";
 import { mergeEditorSaveIntoCalendar } from "./mergeEditorIntoSnapshot";
 import type { SchedulingInput } from "./types";
 import { normalizeCrosslistData } from "./crosslist";
+import {
+  getCalendarPlacedSectionIds,
+  tagSectionArchivedFromEditor,
+} from "./calendarPlacementGuard";
 import { confirmLeaveIfUnsaved } from "./unsavedChanges";
 import {
   diffSchedulingRowKeys,
@@ -542,12 +546,31 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
 
     const beforeSave = normalizeCrosslistData(current);
     const baseline = savedBaselineRef.current;
+    let inputToSave = beforeSave;
+    if (baseline) {
+      const placedIds = getCalendarPlacedSectionIds();
+      const currentIds = new Set(beforeSave.sections.map((section) => section.id));
+      const removedPlaced = baseline.sections.filter(
+        (section) => !currentIds.has(section.id) && placedIds.has(section.id),
+      );
+      if (removedPlaced.length > 0) {
+        inputToSave = {
+          ...beforeSave,
+          sections: [
+            ...beforeSave.sections,
+            ...removedPlaced.map((section) =>
+              tagSectionArchivedFromEditor({ ...section, state: "archived" as const }),
+            ),
+          ],
+        };
+      }
+    }
     saveInFlightRef.current = true;
     setIsSaving(true);
     setSaveFeedback(null);
 
     try {
-      const result = await persistSchedulingInput(beforeSave, {
+      const result = await persistSchedulingInput(inputToSave, {
         manualActivity: options?.manual,
       });
       if (!result.ok) {
@@ -555,10 +578,10 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
         return false;
       }
 
-      const savedKeys = diffSchedulingRowKeys(baseline, beforeSave);
+      const savedKeys = diffSchedulingRowKeys(baseline, inputToSave);
       setHasUnsavedChanges(false);
-      savedBaselineRef.current = beforeSave;
-      serverFingerprintRef.current = fingerprintSchedulingInput(beforeSave);
+      savedBaselineRef.current = inputToSave;
+      serverFingerprintRef.current = fingerprintSchedulingInput(inputToSave);
       if (user?.networkId) {
         serverRevisionRef.current = {
           lastModifiedByNetworkId: user.networkId,
@@ -590,7 +613,7 @@ const useSchedulingDataInternal = (): UseSchedulingDataReturn => {
               lastModifiedAt: new Date().toISOString(),
             }
           : undefined;
-      void mergeEditorSaveIntoCalendar(beforeSave, dataRevision);
+      void mergeEditorSaveIntoCalendar(inputToSave, dataRevision);
 
       return true;
     } catch (err) {
