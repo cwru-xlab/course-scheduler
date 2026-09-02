@@ -9,7 +9,6 @@ import { siteConfig } from "@/config/site";
 import { fontSans } from "@/config/fonts";
 import { Navbar } from "@/components/navbar";
 import { StatusBarProvider } from "@/components/GlobalStatusBar";
-import { APP_SHELL_OFFSET_CLASS } from "@/lib/layout/useAppNavbarHeight";
 import { SolverActivityBridge } from "@/components/SolverActivityBridge";
 import { UnsavedChangesGuard } from "@/components/scheduler/UnsavedChangesGuard";
 import { RemoteChangesBanner } from "@/components/scheduler/RemoteChangesBanner";
@@ -51,7 +50,12 @@ export default function RootLayout({
           <SchedulingDataProvider>
             <div className="relative flex flex-col min-h-screen bg-[var(--weatherhead-surface)] dark:bg-default-100">
               <Navbar />
-              <div className={clsx("flex flex-col grow", APP_SHELL_OFFSET_CLASS)}>
+              <div
+                aria-hidden
+                className="shrink-0"
+                style={{ height: "var(--app-navbar-height, 4rem)" }}
+              />
+              <div className="flex flex-col grow">
                 <StatusBarProvider>
                   <SolverActivityBridge />
                   <UnsavedChangesGuard />

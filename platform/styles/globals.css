@@ -7,13 +7,7 @@
   --weatherhead-primary: #137fec;
   --weatherhead-surface: #f6f7f8;
   --app-navbar-height: 4rem;
-  /* Collapsed status island (pt-1.5 + h-7 pill) plus a little breathing room. */
   --app-status-island-clearance: 2.75rem;
-}
-
-/* Offset scrollable page content below fixed navbar + status island. */
-.app-shell-offset {
-  padding-top: calc(var(--app-navbar-height) + var(--app-status-island-clearance));
 }
 
 /* Always reserve space for the page scrollbar so opening popovers / modals

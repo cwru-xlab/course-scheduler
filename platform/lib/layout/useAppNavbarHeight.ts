@@ -2,10 +2,7 @@
 
 import { useEffect, type RefObject } from "react";
 
-export const APP_NAVBAR_HEIGHT_VAR = "--app-navbar-height";
-
-/** Offset page content below the fixed navbar and status island. */
-export const APP_SHELL_OFFSET_CLASS = "app-shell-offset";
+import { APP_NAVBAR_HEIGHT_VAR } from "./appChromeLayout";
 
 /** Keeps `--app-navbar-height` in sync with the measured fixed navbar (progress bar, badges, etc.). */
 export function useAppNavbarHeight(ref: RefObject<HTMLElement | null>) {
