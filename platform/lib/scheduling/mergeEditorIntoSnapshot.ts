@@ -2,10 +2,23 @@ import type { SchedulingInput, SectionLockState } from "./types";
 import type { LastSolverRunSnapshot } from "./history";
 import { isValidLastSolverRunSnapshot } from "./history";
 import { crosslistPeerSectionIds } from "./crosslist";
+import { isOnlineSection } from "./sectionOnline";
 import {
   validatePreservedAssignment,
   type EditorInvalidatedPlacement,
 } from "@/app/calendar/placementValidation";
+
+function isPlacedAssignment(
+  assignment: { section_id?: string; timeslot_ids?: string[]; room_id?: string },
+  sections: SchedulingInput["sections"],
+): boolean {
+  if ((assignment.timeslot_ids?.length ?? 0) === 0) return false;
+  const section = sections.find((entry) => entry.id === assignment.section_id);
+  if (section && isOnlineSection(section)) {
+    return true;
+  }
+  return String(assignment.room_id ?? "").trim().length > 0;
+}
 
 export type { EditorInvalidatedPlacement, EditorInvalidationReason } from "@/app/calendar/placementValidation";
 
@@ -290,11 +303,11 @@ export async function mergeEditorSaveIntoCalendar(
     { dataRevision },
   );
 
-  const prevPlacedCount = (existing.solution?.assignments ?? []).filter(
-    (a) => (a.timeslot_ids?.length ?? 0) > 0 && String(a.room_id ?? "").trim(),
+  const prevPlacedCount = (existing.solution?.assignments ?? []).filter((a) =>
+    isPlacedAssignment(a, existing.input.sections),
   ).length;
-  const nextPlacedCount = snapshot.solution.assignments.filter(
-    (a) => (a.timeslot_ids?.length ?? 0) > 0 && String(a.room_id ?? "").trim(),
+  const nextPlacedCount = snapshot.solution.assignments.filter((a) =>
+    isPlacedAssignment(a, snapshot.input.sections),
   ).length;
   if (prevPlacedCount > 0 && nextPlacedCount === 0) {
     console.warn(
