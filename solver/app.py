@@ -420,8 +420,34 @@ def _ensure_schema_migrations() -> None:
                     )
                 except Exception:  # pylint: disable=broad-except
                     pass
-    except Exception:  # pylint: disable=broad-except
-        pass
+    except Exception as exc:  # pylint: disable=broad-except
+        print(f"[migration] schema migration failed: {exc}", flush=True)
+
+    _ensure_term_columns()
+
+
+def _ensure_term_columns() -> None:
+    """Add semester_length / assigned_half; isolated so earlier migration failures do not block."""
+    try:
+        inspector = inspect(db.engine)
+        if "sections" not in inspector.get_table_names():
+            return
+        section_cols = {c["name"] for c in inspector.get_columns("sections")}
+        with db.engine.begin() as conn:
+            if "semester_length" not in section_cols:
+                conn.execute(
+                    text(
+                        "ALTER TABLE sections ADD COLUMN semester_length VARCHAR(32) NOT NULL DEFAULT 'full'"
+                    )
+                )
+                print("[migration] added sections.semester_length", flush=True)
+            if "assigned_half" not in section_cols:
+                conn.execute(
+                    text("ALTER TABLE sections ADD COLUMN assigned_half VARCHAR(16)")
+                )
+                print("[migration] added sections.assigned_half", flush=True)
+    except Exception as exc:  # pylint: disable=broad-except
+        print(f"[migration] term column migration failed: {exc}", flush=True)
 
 
 def _backfill_section_timeslot_ids() -> None:

@@ -565,15 +565,16 @@ Instructor conflict warnings apply across both the room grid and Online band. Fo
 
 #### Production database migration
 
-Before deploying code that uses `assigned_half`, run:
+Before deploying code that uses half-semester duration, run on the production Postgres database:
 
 ```sql
+ALTER TABLE sections ADD COLUMN IF NOT EXISTS semester_length VARCHAR(32) NOT NULL DEFAULT 'full';
 ALTER TABLE sections ADD COLUMN IF NOT EXISTS assigned_half VARCHAR(16);
 ```
 
-(`timeslot_ids` and `semester_length` may already exist from prior migrations.)
+Existing sections default to `full` with no assigned half. Then **restart/redeploy the solver** so startup migrations can verify the schema.
 
-See `solver/migrations/20260830_sections_assigned_half.sql`.
+See `solver/migrations/20260831_sections_semester_length.sql` and `solver/migrations/20260830_sections_assigned_half.sql`.
 
 ---
 
