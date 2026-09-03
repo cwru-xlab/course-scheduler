@@ -817,6 +817,7 @@ function getAllowedSlotDurationsForQueuePlacement(
   solverInput: SchedulingInput | null,
   selectedDay: Day,
   timeslotById: Map<string, TimeslotDto>,
+  assignments?: CalendarAssignmentMap,
 ): number[] {
   const section = data.sections.find((entry) => entry.id === sectionId);
   if (!section || !solverInput) return [];
@@ -830,6 +831,16 @@ function getAllowedSlotDurationsForQueuePlacement(
   for (const pattern of solverInput.meeting_patterns ?? []) {
     if (allowedPatternSet && !allowedPatternSet.has(pattern.id)) continue;
     if (!meetingPatternIncludesDay(pattern, selectedDay)) continue;
+    for (const d of meetingPatternSlotDurationsForDay(pattern, selectedDay, timeslotById)) {
+      durations.add(d);
+    }
+  }
+  if (durations.size === 0) {
+    const patternId =
+      assignments?.[sectionId]?.meeting_pattern_id?.trim() ||
+      section.previous_meeting_pattern?.trim() ||
+      "";
+    const pattern = solverInput.meeting_patterns?.find((entry) => entry.id === patternId);
     for (const d of meetingPatternSlotDurationsForDay(pattern, selectedDay, timeslotById)) {
       durations.add(d);
     }
@@ -883,6 +894,9 @@ const EVENT_TOP_PADDING_PX = 12;
 const MIN_TRACK_HEIGHT_PX = 240;
 /** Pixels of movement before drag mode (timeslot highlights) activates. */
 const CALENDAR_DRAG_MOVE_THRESHOLD_PX = 14;
+/** Narrow band at the top/bottom of the room grid scrollport for auto-scroll while dragging. */
+const CALENDAR_EDGE_SCROLL_PX = 40;
+const CALENDAR_EDGE_SCROLL_MAX_STEP = 36;
 const QUEUE_SIDEBAR_AUTO_OPEN_EDGE_PX = 120;
 const TIMESLOT_DURATION_MATCH_TOLERANCE_MIN = 5;
 type DepartmentPalette = {
@@ -1375,14 +1389,21 @@ type PatternDayApplyRow = {
   const queueSidebarAutoOpenedRef = useRef(false);
   const sidebarUnplaceDropSucceededRef = useRef(false);
   const placementCommittedRef = useRef(false);
+  const placementDropFailedRef = useRef(false);
   const onlineBandTrackRef = useRef<HTMLDivElement | null>(null);
   const [pendingPlacementSectionId, setPendingPlacementSectionId] = useState<string | null>(null);
   const [placementPreview, setPlacementPreview] = useState<PlacementPreview | null>(null);
+  /** True only while an HTML5 drag from the queue sidebar is in flight. */
+  const [queuePlacementDragActive, setQueuePlacementDragActive] = useState(false);
   const roomTrackRefs = useRef<Record<string, HTMLDivElement | null>>({});
   /** Vertical scroll container for the room grid (`overflow-y-auto`). */
   const calendarScrollContainerRef = useRef<HTMLDivElement | null>(null);
-  /** Latest pointer Y during calendar drag (document listener; works when source card is `pointer-events-none`). */
+  /** Latest pointer position during drags (document listener). */
   const calendarDragPointerYRef = useRef<number | null>(null);
+  const calendarDragPointerXRef = useRef<number | null>(null);
+  const updateQueueRoomPlacementPreviewRef = useRef<
+    ((roomId: string, clientX: number) => void) | null
+  >(null);
   const suppressCardClickRef = useRef(false);
   const setRoomTrackRef = useCallback((roomId: string, el: HTMLDivElement | null) => {
     roomTrackRefs.current[roomId] = el;
@@ -1991,20 +2012,22 @@ type PatternDayApplyRow = {
         }
 
         let roomConflict = false;
-        for (const [otherSectionId, assignment] of Object.entries(baseAssignments)) {
-          if (linkedSectionIdSet.has(otherSectionId)) continue;
-          const otherRoomId = assignment?.room_id ?? "";
-          if (otherRoomId !== targetRoomId) continue;
-          const otherSlotIds = assignment?.timeslot_ids ?? [];
-          for (const otherSlotId of otherSlotIds) {
-            const otherSlot = timeslotById.get(otherSlotId);
-            if (!otherSlot) continue;
-            if (!slotOverlaps(slot, otherSlot)) continue;
-            roomConflict = true;
-            conflictSectionIds.add(otherSectionId);
-            break;
+        if (targetRoomId.trim() !== "") {
+          for (const [otherSectionId, assignment] of Object.entries(baseAssignments)) {
+            if (linkedSectionIdSet.has(otherSectionId)) continue;
+            const otherRoomId = assignment?.room_id ?? "";
+            if (otherRoomId !== targetRoomId) continue;
+            const otherSlotIds = assignment?.timeslot_ids ?? [];
+            for (const otherSlotId of otherSlotIds) {
+              const otherSlot = timeslotById.get(otherSlotId);
+              if (!otherSlot) continue;
+              if (!slotOverlaps(slot, otherSlot)) continue;
+              roomConflict = true;
+              conflictSectionIds.add(otherSectionId);
+              break;
+            }
+            if (roomConflict) break;
           }
-          if (roomConflict) break;
         }
         if (roomConflict) {
           skippedDayLabels.push(dayLabel);
@@ -3666,8 +3689,13 @@ type PatternDayApplyRow = {
 
   useEffect(() => {
     const onDragOver = (e: DragEvent) => {
-      if (queueSidebarOpen) return;
       if (!e.dataTransfer?.types.includes("text/section-id")) return;
+      if (queuePlacementDragActive) {
+        calendarDragPointerYRef.current = e.clientY;
+        calendarDragPointerXRef.current = e.clientX;
+        e.preventDefault();
+      }
+      if (queueSidebarOpen) return;
       const sidebarRect = queueSidebarRef.current?.getBoundingClientRect();
       const nearLeftEdge = e.clientX < QUEUE_SIDEBAR_AUTO_OPEN_EDGE_PX;
       const overCollapsedSidebar =
@@ -3683,15 +3711,19 @@ type PatternDayApplyRow = {
     };
     document.addEventListener("dragover", onDragOver);
     return () => document.removeEventListener("dragover", onDragOver);
-  }, [queueSidebarOpen, autoOpenQueueSidebar]);
+  }, [queueSidebarOpen, autoOpenQueueSidebar, queuePlacementDragActive]);
 
   useEffect(() => {
     const onDragStart = (e: DragEvent) => {
       if (!e.dataTransfer?.types.includes("text/section-id")) return;
       queueSidebarAutoOpenedRef.current = false;
       sidebarUnplaceDropSucceededRef.current = false;
+      setQueuePlacementDragActive(true);
     };
     const onDragEnd = () => {
+      setQueuePlacementDragActive(false);
+      calendarDragPointerYRef.current = null;
+      calendarDragPointerXRef.current = null;
       maybeCloseAutoOpenedQueueSidebar(sidebarUnplaceDropSucceededRef.current);
     };
     document.addEventListener("dragstart", onDragStart);
@@ -4455,6 +4487,7 @@ type PatternDayApplyRow = {
       solverInput ?? null,
       selectedDay,
       timeslotById,
+      assignmentsBySection,
     );
     if (!allowedDurations.length) return [];
     return data.timeslots
@@ -4467,7 +4500,7 @@ type PatternDayApplyRow = {
       .filter((slot) =>
         slotDurationMatchesAllowedLengths(Math.max(0, slot.end - slot.start), allowedDurations),
       );
-  }, [data, pendingPlacementSectionId, selectedDay, solverInput, timeslotById]);
+  }, [assignmentsBySection, data, pendingPlacementSectionId, selectedDay, solverInput, timeslotById]);
 
   const onlineQueuePlacementPossibleTimeslots = useMemo(() => {
     if (!data || !pendingPlacementSectionId) return [];
@@ -4479,6 +4512,7 @@ type PatternDayApplyRow = {
       solverInput ?? null,
       selectedDay,
       timeslotById,
+      assignmentsBySection,
     );
     if (!allowedDurations.length) return [];
     return data.timeslots
@@ -4491,7 +4525,7 @@ type PatternDayApplyRow = {
       .filter((slot) =>
         slotDurationMatchesAllowedLengths(Math.max(0, slot.end - slot.start), allowedDurations),
       );
-  }, [data, pendingPlacementSectionId, selectedDay, solverInput, timeslotById]);
+  }, [assignmentsBySection, data, pendingPlacementSectionId, selectedDay, solverInput, timeslotById]);
 
   const onlineQueueBlockedTimeslotInfo = useMemo(() => {
     const blockedSlotIds = new Set<string>();
@@ -5249,71 +5283,80 @@ type PatternDayApplyRow = {
     );
   }, []);
 
-  const activeEdgeScrollPointerId =
+  const edgeScrollPointerId =
     calendarDrag?.pointerId ?? queueUnplaceDrag?.pointerId ?? null;
+  const isCalendarEdgeScrollActive =
+    edgeScrollPointerId != null || queuePlacementDragActive;
 
   useEffect(() => {
-    if (activeEdgeScrollPointerId == null) {
+    if (!isCalendarEdgeScrollActive) {
       calendarDragPointerYRef.current = null;
+      calendarDragPointerXRef.current = null;
       return;
     }
-    const pointerId = activeEdgeScrollPointerId;
-    const onPointerMoveDoc = (ev: PointerEvent) => {
-      if (ev.pointerId !== pointerId) return;
-      calendarDragPointerYRef.current = ev.clientY;
-    };
-    document.addEventListener("pointermove", onPointerMoveDoc, { capture: true });
+    const pointerId = edgeScrollPointerId;
+    const onPointerMoveDoc =
+      pointerId != null
+        ? (ev: PointerEvent) => {
+            if (ev.pointerId !== pointerId) return;
+            calendarDragPointerYRef.current = ev.clientY;
+            calendarDragPointerXRef.current = ev.clientX;
+          }
+        : null;
+    if (onPointerMoveDoc) {
+      document.addEventListener("pointermove", onPointerMoveDoc, { capture: true });
+    }
 
-    const edgePx = 120;
-    const maxStep = 48;
     let rafId = 0;
     let stopped = false;
 
     const tick = () => {
       if (stopped) return;
       const y = calendarDragPointerYRef.current;
+      const x = calendarDragPointerXRef.current;
       if (y != null) {
         const inner = calendarScrollContainerRef.current;
-        const headerEl = typeof document !== "undefined" ? document.querySelector("header") : null;
-        const navbarBottom = headerEl ? headerEl.getBoundingClientRect().bottom : 64;
-        const vh = typeof window !== "undefined" ? window.innerHeight : 0;
         const innerRect = inner?.getBoundingClientRect();
+        const edgePx = CALENDAR_EDGE_SCROLL_PX;
 
         let upIntensity = 0;
-        if (y < navbarBottom + edgePx) {
-          upIntensity = Math.max(upIntensity, clamp((navbarBottom + edgePx - y) / edgePx, 0, 1));
-        }
-        if (innerRect && y < innerRect.top + edgePx) {
-          upIntensity = Math.max(
-            upIntensity,
-            clamp((innerRect.top + edgePx - y) / edgePx, 0, 1),
-          );
-        }
-
         let downIntensity = 0;
-        if (y > vh - edgePx) {
-          downIntensity = Math.max(downIntensity, clamp((y - (vh - edgePx)) / edgePx, 0, 1));
-        }
-        if (innerRect && y > innerRect.bottom - edgePx) {
-          downIntensity = Math.max(
-            downIntensity,
-            clamp((y - (innerRect.bottom - edgePx)) / edgePx, 0, 1),
-          );
+        if (innerRect) {
+          if (y < innerRect.top + edgePx) {
+            upIntensity = clamp((innerRect.top + edgePx - y) / edgePx, 0, 1);
+          }
+          if (y > innerRect.bottom - edgePx) {
+            downIntensity = clamp((y - (innerRect.bottom - edgePx)) / edgePx, 0, 1);
+          }
         }
 
+        let scrolled = false;
         if (upIntensity > 0) {
-          const step = maxStep * upIntensity * upIntensity;
+          const step = CALENDAR_EDGE_SCROLL_MAX_STEP * upIntensity * upIntensity;
           if (inner && inner.scrollTop > 0) {
             inner.scrollTop = Math.max(0, inner.scrollTop - step);
+            scrolled = true;
           }
         }
 
         if (downIntensity > 0) {
-          const step = maxStep * downIntensity * downIntensity;
+          const step = CALENDAR_EDGE_SCROLL_MAX_STEP * downIntensity * downIntensity;
           if (inner) {
             const maxInner = inner.scrollHeight - inner.clientHeight;
             if (inner.scrollTop < maxInner - 0.5) {
               inner.scrollTop = Math.min(maxInner, inner.scrollTop + step);
+              scrolled = true;
+            }
+          }
+        }
+
+        if (scrolled && queuePlacementDragActive && x != null) {
+          for (const [roomId, el] of Object.entries(roomTrackRefs.current)) {
+            if (!el) continue;
+            const r = el.getBoundingClientRect();
+            if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+              updateQueueRoomPlacementPreviewRef.current?.(roomId, x);
+              break;
             }
           }
         }
@@ -5325,10 +5368,11 @@ type PatternDayApplyRow = {
     return () => {
       stopped = true;
       window.cancelAnimationFrame(rafId);
-      document.removeEventListener("pointermove", onPointerMoveDoc, { capture: true });
-      calendarDragPointerYRef.current = null;
+      if (onPointerMoveDoc) {
+        document.removeEventListener("pointermove", onPointerMoveDoc, { capture: true });
+      }
     };
-  }, [activeEdgeScrollPointerId]);
+  }, [edgeScrollPointerId, isCalendarEdgeScrollActive, queuePlacementDragActive]);
 
   const evaluatePlacement = useCallback(
     (sectionId: string, targetRoomId: string, slot: TimeslotWithMinutes): PlacementEvaluation => {
@@ -5376,14 +5420,9 @@ type PatternDayApplyRow = {
       placementCheck: PlacementEvaluation,
       assignedHalfOverride?: "first_half" | "second_half",
     ) => {
-      const invalidation = editorInvalidatedPlacements.get(sectionId);
-      if (invalidation?.reason === "pattern") {
-        setDragFeedback({
-          status: "invalid",
-          message: "Update allowed meeting patterns in the editor before placing.",
-        });
-        return;
-      }
+      // Pattern invalidation only means the *previous* placement is stale.
+      // Allow re-placing into any slot that still matches allowed meeting patterns;
+      // resolveEditorInvalidationForSection clears the flag after a successful place.
       const section = sectionById.get(sectionId);
       const linkedSectionIds = data ? crosslistPeerSectionIds(sectionId, data.sections) : [sectionId];
       const linkedIdSet = new Set(linkedSectionIds);
@@ -5412,6 +5451,7 @@ type PatternDayApplyRow = {
       if (patternOptions.length === 0) {
         const message =
           "No compatible meeting patterns include this day/time. Suggested fix: place the section in a different timeslot or update meeting pattern compatibility.";
+        placementDropFailedRef.current = true;
         setDragFeedback({ status: "invalid", message });
         setBackendSaveMessage({ type: "error", text: message });
         return;
@@ -5518,6 +5558,7 @@ type PatternDayApplyRow = {
         { anchorSlotId: slot.id },
       );
       if (!validation.ok) {
+        placementDropFailedRef.current = true;
         setDragFeedback({ status: "invalid", message: validation.message });
         return;
       }
@@ -5595,7 +5636,6 @@ type PatternDayApplyRow = {
       conflictSectionIds,
       data,
       dragFeedback,
-      editorInvalidatedPlacements,
       persistCalendarAssignments,
       pushUndoSnapshot,
       resolveEditorInvalidationForSection,
@@ -5618,6 +5658,7 @@ type PatternDayApplyRow = {
         solverInput ?? null,
         selectedDay,
         timeslotById,
+        assignmentsBySection,
       );
       const slot = selectSlotNearMinutes(
         data.timeslots,
@@ -5656,6 +5697,7 @@ type PatternDayApplyRow = {
       });
     },
     [
+      assignmentsBySection,
       calendarDrag,
       data,
       evaluatePlacement,
@@ -5667,10 +5709,15 @@ type PatternDayApplyRow = {
     ],
   );
 
+  useEffect(() => {
+    updateQueueRoomPlacementPreviewRef.current = updateQueueRoomPlacementPreview;
+  }, [updateQueueRoomPlacementPreview]);
+
   const commitPlacementByClick = useCallback(
     (sectionId: string, targetRoomId: string, slot: TimeslotWithMinutes) => {
       const check = evaluatePlacement(sectionId, targetRoomId, slot);
       if (check.severity === "block") {
+        placementDropFailedRef.current = true;
         setDragFeedback({ status: "invalid", message: check.message });
         return;
       }
@@ -5733,6 +5780,7 @@ type PatternDayApplyRow = {
     (sectionId: string, slot: TimeslotWithMinutes) => {
       const check = evaluateOnlinePlacement(sectionId, slot);
       if (check.severity === "block") {
+        placementDropFailedRef.current = true;
         setDragFeedback({ status: "invalid", message: check.message });
         return;
       }
@@ -5896,6 +5944,7 @@ type PatternDayApplyRow = {
         solverInput ?? null,
         selectedDay,
         timeslotById,
+        assignmentsBySection,
       );
       const slot = selectSlotNearMinutes(
         data.timeslots,
@@ -5934,6 +5983,7 @@ type PatternDayApplyRow = {
       });
     },
     [
+      assignmentsBySection,
       calendarDrag,
       data,
       evaluateOnlinePlacement,
@@ -7033,6 +7083,8 @@ type PatternDayApplyRow = {
           activeDragSectionId={pendingPlacementSectionId}
           onBeginPlace={(sectionId: string) => {
             placementCommittedRef.current = false;
+            placementDropFailedRef.current = false;
+            setCalendarDrag(null);
             const section = data?.sections.find((s) => s.id === sectionId);
             const online = section ? isOnlineSection(section) : false;
             const archived = section ? isSectionArchived(section) : false;
@@ -7055,7 +7107,11 @@ type PatternDayApplyRow = {
           onEditSection={openSectionEditor}
           onPlacementDragEnd={() => {
             if (!placementCommittedRef.current) {
-              cancelPlacementMode();
+              if (!placementDropFailedRef.current) {
+                cancelPlacementMode();
+              } else {
+                placementDropFailedRef.current = false;
+              }
             }
           }}
           onDropUnplace={handleQueueSidebarUnplaceDrop}
@@ -7198,13 +7254,21 @@ type PatternDayApplyRow = {
                   className="relative overflow-visible border-b border-slate-200/80 last:border-b-0 z-0 has-[[data-calendar-hover=true]]:z-30"
                   style={{ minHeight: rowHeight }}
                   onDragOver={(e) => {
-                    if (!pendingPlacementSectionId) return;
+                    if (!pendingPlacementSectionId || !data) return;
+                    const pendingSection = data.sections.find(
+                      (s) => s.id === pendingPlacementSectionId,
+                    );
+                    if (pendingSection && isOnlineSection(pendingSection)) return;
                     e.preventDefault();
                     e.dataTransfer.dropEffect = "move";
                     updateQueueRoomPlacementPreview(room.id, e.clientX);
                   }}
                   onDrop={(e) => {
                     if (!pendingPlacementSectionId || !data) return;
+                    const pendingSection = data.sections.find(
+                      (s) => s.id === pendingPlacementSectionId,
+                    );
+                    if (pendingSection && isOnlineSection(pendingSection)) return;
                     e.preventDefault();
                     const sectionId = e.dataTransfer.getData("text/section-id");
                     if (sectionId && sectionId !== pendingPlacementSectionId) return;
@@ -7216,6 +7280,7 @@ type PatternDayApplyRow = {
                       solverInput ?? null,
                       selectedDay,
                       timeslotById,
+                      assignmentsBySection,
                     );
                     const slot = selectSlotNearMinutes(
                       data.timeslots,
@@ -7258,6 +7323,7 @@ type PatternDayApplyRow = {
                       solverInput ?? null,
                       selectedDay,
                       timeslotById,
+                      assignmentsBySection,
                     );
                     const slot = selectSlotNearMinutes(
                       data.timeslots,
@@ -8043,6 +8109,7 @@ type PatternDayApplyRow = {
                       solverInput ?? null,
                       selectedDay,
                       timeslotById,
+                      assignmentsBySection,
                     );
                     const slot = selectSlotNearMinutes(
                       data.timeslots,
@@ -8050,7 +8117,15 @@ type PatternDayApplyRow = {
                       allowedDurations,
                       mins,
                     );
-                    if (!slot) return;
+                    if (!slot) {
+                      placementDropFailedRef.current = true;
+                      setDragFeedback({
+                        status: "invalid",
+                        message:
+                          "No compatible slot here for this section's allowed meeting patterns.",
+                      });
+                      return;
+                    }
                     commitOnlinePlacementByClick(pendingPlacementSectionId, slot);
                   }}
                   onPointerMove={(e) => {
@@ -8094,6 +8169,7 @@ type PatternDayApplyRow = {
                       solverInput ?? null,
                       selectedDay,
                       timeslotById,
+                      assignmentsBySection,
                     );
                     const slot = selectSlotNearMinutes(
                       data.timeslots,
