@@ -112,25 +112,49 @@ export function assignCalendarEventLanes<T extends { start: number; end: number 
   events: T[],
   getStackRank?: (event: T) => number,
 ): (T & { lane: number })[] {
-  const sorted = [...events].sort((a, b) => {
-    const byStart = a.start - b.start;
-    if (byStart !== 0) return byStart;
-    const byEnd = a.end - b.end;
-    if (byEnd !== 0) return byEnd;
-    if (getStackRank) return getStackRank(a) - getStackRank(b);
-    return 0;
-  });
-  const laneEndTimes: number[] = [];
-  return sorted.map((event) => {
-    let lane = laneEndTimes.findIndex((laneEnd) => laneEnd <= event.start);
-    if (lane === -1) {
-      lane = laneEndTimes.length;
-      laneEndTimes.push(event.end);
+  if (events.length === 0) return [];
+
+  // Build transitive overlap clusters so non-overlapping blocks can still share lanes.
+  const byStart = [...events].sort((a, b) => a.start - b.start || a.end - b.end);
+  const clusters: T[][] = [];
+  let current: T[] = [];
+  let clusterEnd = -Infinity;
+  for (const event of byStart) {
+    if (current.length === 0 || event.start < clusterEnd) {
+      current.push(event);
+      clusterEnd = Math.max(clusterEnd, event.end);
     } else {
-      laneEndTimes[lane] = event.end;
+      clusters.push(current);
+      current = [event];
+      clusterEnd = event.end;
     }
-    return { ...event, lane };
-  });
+  }
+  if (current.length) clusters.push(current);
+
+  const result: (T & { lane: number })[] = [];
+  for (const cluster of clusters) {
+    // Within an overlap group, prefer lower stack rank first so H1 sits above H2
+    // even when the H2 block starts earlier.
+    const ordered = [...cluster].sort((a, b) => {
+      if (getStackRank) {
+        const byRank = getStackRank(a) - getStackRank(b);
+        if (byRank !== 0) return byRank;
+      }
+      return a.start - b.start || a.end - b.end;
+    });
+    const laneEndTimes: number[] = [];
+    for (const event of ordered) {
+      let lane = laneEndTimes.findIndex((laneEnd) => laneEnd <= event.start);
+      if (lane === -1) {
+        lane = laneEndTimes.length;
+        laneEndTimes.push(event.end);
+      } else {
+        laneEndTimes[lane] = event.end;
+      }
+      result.push({ ...event, lane });
+    }
+  }
+  return result;
 }
 
 export function calendarEventMatchesFilters(

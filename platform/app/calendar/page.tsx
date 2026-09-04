@@ -157,6 +157,7 @@ import {
 import {
     evaluatePlacement as evaluatePlacementShared,
     minutesOverlap,
+    placementTermConflict,
     resolvePlacementAssignedHalf,
     validatePreservedAssignment,
     type PlacementEvaluation,
@@ -2013,6 +2014,7 @@ type PatternDayApplyRow = {
 
         let roomConflict = false;
         if (targetRoomId.trim() !== "") {
+          const overlappingOtherIds = new Set<string>();
           for (const [otherSectionId, assignment] of Object.entries(baseAssignments)) {
             if (linkedSectionIdSet.has(otherSectionId)) continue;
             const otherRoomId = assignment?.room_id ?? "";
@@ -2022,11 +2024,21 @@ type PatternDayApplyRow = {
               const otherSlot = timeslotById.get(otherSlotId);
               if (!otherSlot) continue;
               if (!slotOverlaps(slot, otherSlot)) continue;
-              roomConflict = true;
-              conflictSectionIds.add(otherSectionId);
+              overlappingOtherIds.add(otherSectionId);
               break;
             }
-            if (roomConflict) break;
+          }
+          if (
+            overlappingOtherIds.size > 0 &&
+            placementTermConflict(
+              linkedSectionIds,
+              Array.from(overlappingOtherIds),
+              data,
+              baseAssignments,
+            )
+          ) {
+            roomConflict = true;
+            for (const id of Array.from(overlappingOtherIds)) conflictSectionIds.add(id);
           }
         }
         if (roomConflict) {
@@ -4902,6 +4914,7 @@ type PatternDayApplyRow = {
       }
 
       const roomConflictLabels: string[] = [];
+      const overlappingRoomOtherIds: string[] = [];
       let instructorConflict: { name: string; label: string } | null = null;
       for (const [otherId, assignment] of Object.entries(baseAssignments)) {
         if (linkedSet.has(otherId)) continue;
@@ -4924,7 +4937,10 @@ type PatternDayApplyRow = {
             .join(" ")
             .trim() || otherId;
         const otherRoom = assignment?.room_id ?? otherSection?.room_id ?? "";
-        if (otherRoom === targetRoomId) roomConflictLabels.push(otherLabel);
+        if (otherRoom === targetRoomId) {
+          overlappingRoomOtherIds.push(otherId);
+          roomConflictLabels.push(otherLabel);
+        }
         const otherInstr = otherSection?.instructor_id;
         if (otherInstr && instructorIds.has(otherInstr) && !instructorConflict) {
           instructorConflict = {
@@ -4934,13 +4950,17 @@ type PatternDayApplyRow = {
         }
       }
 
+      const hasRoomTermConflict =
+        overlappingRoomOtherIds.length > 0 &&
+        placementTermConflict(linkedIds, overlappingRoomOtherIds, data, baseAssignments);
+
       if (instructorConflict) {
         return {
           severity: "warn",
           message: `${instructorConflict.name} already teaches ${instructorConflict.label} at ${day} ${timeStr}.`,
         };
       }
-      if (roomConflictLabels.length) {
+      if (hasRoomTermConflict) {
         return {
           severity: "warn",
           message: `Room ${targetRoomId} is shared with ${roomConflictLabels.slice(0, 3).join(", ")} at ${day} ${timeStr}.`,

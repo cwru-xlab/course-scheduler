@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint --fix",
-    "test": "npx tsx --test lib/scheduling/mergeEditorIntoSnapshot.test.ts lib/scheduling/sectionOnline.test.ts lib/scheduling/semesterLength.test.ts lib/scheduling/calendarPlacementGuard.test.ts lib/export/roomAssignmentWorkbook.test.ts app/calendar/placementValidation.test.ts app/calendar/sectionScheduleSummary.test.ts"
+    "test": "npx tsx --test lib/scheduling/mergeEditorIntoSnapshot.test.ts lib/scheduling/sectionOnline.test.ts lib/scheduling/semesterLength.test.ts lib/scheduling/calendarPlacementGuard.test.ts lib/export/roomAssignmentWorkbook.test.ts app/calendar/placementValidation.test.ts app/calendar/sectionScheduleSummary.test.ts app/calendar/calendarEvents.test.ts"
   },
   "dependencies": {
     "@heroui/accordion": "2.2.24",
