@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { evaluatePlacement } from "./placementValidation";
+import { evaluatePlacement, placementTermConflict } from "./placementValidation";
 import type { CalendarEvent } from "./calendarEvents";
 
 const baseSection = {
@@ -486,5 +486,64 @@ describe("evaluatePlacement semester_length-aware room conflicts", () => {
       formatTime: (t) => t,
     });
     assert.equal(result.severity, "ok");
+  });
+
+  it("placementTermConflict is false for complementary halves (sidebar path)", () => {
+    assert.equal(
+      placementTermConflict(
+        ["s-second"],
+        ["s-first"],
+        termData,
+        {
+          "s-first": {
+            timeslot_ids: ["ts-1"],
+            room_id: "R1",
+            meeting_pattern_id: "",
+          },
+        },
+      ),
+      false,
+    );
+  });
+
+  it("placementTermConflict is false for half_any against a single occupied half", () => {
+    assert.equal(
+      placementTermConflict(
+        ["s-half-any"],
+        ["s-first"],
+        termData,
+        {
+          "s-first": {
+            timeslot_ids: ["ts-1"],
+            room_id: "R1",
+            meeting_pattern_id: "",
+          },
+        },
+      ),
+      false,
+    );
+  });
+
+  it("placementTermConflict is true when half_any cannot fit both halves", () => {
+    assert.equal(
+      placementTermConflict(
+        ["s-half-any"],
+        ["s-first", "s-second"],
+        termData,
+        {
+          "s-first": {
+            timeslot_ids: ["ts-1"],
+            room_id: "R1",
+            meeting_pattern_id: "",
+          },
+          "s-second": {
+            timeslot_ids: ["ts-1"],
+            room_id: "R1",
+            meeting_pattern_id: "",
+          },
+        },
+      ),
+      true,
+    );
   });
 });

@@ -245,7 +245,8 @@ export function resolvePlacementAssignedHalf(input: {
   });
 }
 
-function placementTermConflict(
+/** True when moving sections cannot share a room/instructor slot with the others (term-aware). */
+export function placementTermConflict(
   movingSectionIds: string[],
   otherSectionIds: string[],
   data: PlacementData,
