@@ -16,7 +16,7 @@ export default function TimeslotsPage() {
       <EditorPageHeader
         current="timeslots"
         title="Timeslots"
-        subtitle="Define days and time ranges."
+        subtitle="Define a single day and time range. Combine timeslots on a meeting pattern."
         data={data}
       />
 

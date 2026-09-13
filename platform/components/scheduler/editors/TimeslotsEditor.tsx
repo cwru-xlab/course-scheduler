@@ -5,7 +5,6 @@ import { useCallback, useMemo, useState } from "react";
 import { ReadOnlyIdCell } from "./ReadOnlyIdCell";
 import { EditableCell } from "../EditableCell";
 import { EditableSelectCell } from "../EditableSelectCell";
-import { MultiSelect } from "../MultiSelect";
 import { RowNotesButton } from "../RowNotesButton";
 import { EditorColumnFilters } from "./EditorColumnFilters";
 import { EditorColumnPicker } from "./EditorColumnPicker";
@@ -30,7 +29,7 @@ import {
   TIMESLOT_TIME_OPTIONS,
   clampTimeToBounds,
   fromTimeOnly,
-  splitTimeslotDays,
+  primaryTimeslotDay,
   toTimeOnly,
 } from "./timeslotEditorConstants";
 
@@ -89,11 +88,10 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
       },
       {
         columnId: "days",
-        label: "Days",
-        control: { kind: "multiSelect" },
+        label: "Day",
+        control: { kind: "singleSelect" },
         options: TIMESLOT_DAY_OPTIONS,
-        arrayValue: true,
-        getValue: ({ slot }) => splitTimeslotDays(slot.day),
+        getValue: ({ slot }) => primaryTimeslotDay(slot.day),
       },
       {
         columnId: "start",
@@ -162,11 +160,11 @@ export const TimeslotsEditor = ({ timeslots, onUpdate }: TimeslotsEditorProps) =
         return <ReadOnlyIdCell value={slot.id} />;
       case "days":
         return (
-          <MultiSelect
-            value={splitTimeslotDays(slot.day)}
+          <EditableSelectCell
+            value={primaryTimeslotDay(slot.day)}
             options={TIMESLOT_DAY_OPTIONS}
-            onChange={(v) => updateTimeslot(idx, "day", v.join(","))}
-            placeholder="Select days"
+            onChange={(v) => updateTimeslot(idx, "day", v)}
+            placeholder="Select day"
           />
         );
       case "start":

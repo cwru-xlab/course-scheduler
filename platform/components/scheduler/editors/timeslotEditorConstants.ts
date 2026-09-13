@@ -78,3 +78,7 @@ export const splitTimeslotDays = (raw: string | string[] | undefined): string[] 
     .map((s) => s.trim())
     .filter(Boolean);
 };
+
+/** Timeslots are single-day atoms; meeting patterns combine them. */
+export const primaryTimeslotDay = (raw: string | string[] | undefined): string =>
+  splitTimeslotDays(raw)[0] ?? "";

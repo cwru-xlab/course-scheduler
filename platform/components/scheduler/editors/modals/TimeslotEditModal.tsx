@@ -4,14 +4,13 @@ import { useEffect, useState } from "react";
 import { Button } from "@heroui/button";
 
 import { EditorModalShell } from "../EditorModalShell";
-import { MultiSelect } from "../../MultiSelect";
 import {
   TIMESLOT_BLOCK_TYPE_OPTIONS,
   TIMESLOT_DAY_OPTIONS,
   TIMESLOT_TIME_OPTIONS,
   clampTimeToBounds,
   fromTimeOnly,
-  splitTimeslotDays,
+  primaryTimeslotDay,
   toTimeOnly,
 } from "../timeslotEditorConstants";
 import type { Timeslot } from "@/lib/scheduling/types";
@@ -46,10 +45,15 @@ export function TimeslotEditModal({
       setError("Timeslot ID is required.");
       return;
     }
+    const day = primaryTimeslotDay(draft.day);
+    if (!day) {
+      setError("Day is required.");
+      return;
+    }
     onSave({
       ...draft,
       id: draft.id.trim(),
-      day: splitTimeslotDays(draft.day).join(","),
+      day,
       start_time: fromTimeOnly(clampTimeToBounds(toTimeOnly(draft.start_time))),
       end_time: fromTimeOnly(clampTimeToBounds(toTimeOnly(draft.end_time))),
     });
@@ -96,13 +100,19 @@ export function TimeslotEditModal({
           </select>
         </label>
         <label className="flex flex-col gap-1 sm:col-span-2">
-          <span className="text-xs font-semibold text-slate-600">Days</span>
-          <MultiSelect
-            value={splitTimeslotDays(draft.day)}
-            options={TIMESLOT_DAY_OPTIONS}
-            onChange={(v) => setDraft((d) => ({ ...d, day: v.join(",") }))}
-            placeholder="Select days"
-          />
+          <span className="text-xs font-semibold text-slate-600">Day</span>
+          <select
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2"
+            value={primaryTimeslotDay(draft.day)}
+            onChange={(e) => setDraft((d) => ({ ...d, day: e.target.value }))}
+          >
+            <option value="">Select day</option>
+            {TIMESLOT_DAY_OPTIONS.map((opt) => (
+              <option key={opt.key} value={opt.key}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-slate-600">Start time</span>

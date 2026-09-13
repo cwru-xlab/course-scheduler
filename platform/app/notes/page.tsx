@@ -284,7 +284,7 @@ export default function NotesFeedPage() {
         return {
           title: `Timeslot ${row.id}`,
           fields: [
-            { label: "Day(s)", value: String(row.day ?? "N/A") },
+            { label: "Day", value: String(row.day ?? "N/A") },
             { label: "Start", value: String(row.start_time ?? "N/A") },
             { label: "End", value: String(row.end_time ?? "N/A") },
           ],

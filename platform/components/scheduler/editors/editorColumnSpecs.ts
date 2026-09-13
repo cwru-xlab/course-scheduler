@@ -80,7 +80,7 @@ export const ROOM_COLUMN_SPECS = allVisible([
 
 export const TIMESLOT_COLUMN_SPECS = allVisible([
   { id: "id", label: "ID", weight: 10, pinned: "left", minWidthPx: 88 },
-  { id: "days", label: "Days", weight: 22, minWidthPx: 120 },
+  { id: "days", label: "Day", weight: 22, minWidthPx: 120 },
   { id: "start", label: "Start", weight: 18, minWidthPx: 88 },
   { id: "end", label: "End", weight: 18, minWidthPx: 88 },
   { id: "block", label: "Block", weight: 14, minWidthPx: 88 },
